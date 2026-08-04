@@ -10,8 +10,33 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
-Nothing is released yet. The project is at milestone M0 — see
-[docs/07-roadmap.md](docs/07-roadmap.md).
+Nothing since the first pre-release.
+
+## [0.1.0-alpha.1]
+
+First build anyone can install. **The tunnel has never carried live traffic** —
+no subscription has yet returned a real server to point it at — so treat this as
+something to look at, not something to rely on. The APK is signed with the debug
+key and named accordingly; it installs, and it is not fit for distribution.
+
+What is actually verified: the core builds for three ABIs on a clean machine,
+the APK carries `libbox.so` inside it, 649 tests pass with a clean analysis
+across the workspace, the Dart↔Kotlin channel contract matches on both sides,
+and subscription headers from a real Remnawave panel parse exactly as specified.
+
+### Fixed
+
+- **Four settings did nothing.** The kill switch, "hide unreachable", "auto
+  connect" and the `checking` state each wrote or declared a value that no layer
+  read. The kill switch is no longer a switch at all: the guarantee belongs to
+  Android's "Always-on VPN" with "Block connections without VPN", so the row
+  names it and opens the system screen instead of implying Commy provides it.
+- **Routing rules were dropped in silence.** Every rule naming `geosite:` or a
+  `geoip:` country is removed at build time while no rule set is on disk — which
+  keeps the tunnel working, but the warnings explaining it were thrown away.
+  They now reach the log and a banner on the routing screen.
+- **The reachability probe said nothing.** Its result was stored and read by no
+  widget, so «Проверить» ran a real probe and reported nothing at all.
 
 ### Added
 
@@ -49,4 +74,5 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/commits/main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.1...main
+[0.1.0-alpha.1]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.1
