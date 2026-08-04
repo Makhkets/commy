@@ -1,0 +1,203 @@
+name: Release
+
+# Fires on a version tag. Builds the core, builds signed Android artifacts, and
+# publishes a GitHub Release with checksums.
+#
+# Signing is optional on purpose. Without the secrets the job still produces an
+# installable APK, signed with the debug key and named so that nobody mistakes it
+# for a release build. A project that cannot cut a release until someone uploads
+# a keystore is a project that does not cut releases.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build (must already exist)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: 3.44.8
+  NDK_VERSION: 28.0.13004108
+
+jobs:
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    outputs:
+      signed: ${{ steps.signing.outputs.signed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager --install "ndk;${NDK_VERSION}"
+
+      - name: Build libbox.aar
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
+        run: scripts/build_core.sh android
+
+      - name: Set up signing
+        id: signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No signing secrets configured — building an UNSIGNED release."
+            echo "Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,"
+            echo "ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD to publish a signed build."
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/commy.jks"
+          cat > apps/commy/android/key.properties <<EOF
+          storeFile=$RUNNER_TEMP/commy.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
+      - run: melos run gen --no-select
+
+      - name: Build APKs
+        working-directory: apps/commy
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build universal APK
+        working-directory: apps/commy
+        run: flutter build apk --release
+
+      - name: Build app bundle
+        working-directory: apps/commy
+        run: flutter build appbundle --release
+
+      # Gradle happily produces an APK with no native library in it. That
+      # installs, opens, and cannot connect to anything — the worst possible
+      # failure to ship, because it looks like a working release.
+      - name: Verify the artifacts carry the core
+        working-directory: apps/commy
+        run: |
+          out=build/app/outputs/flutter-apk
+          for apk in "$out"/app-*-release.apk "$out"/app-release.apk; do
+            [ -f "$apk" ] || continue
+            abi=$(basename "$apk")
+            if ! unzip -l "$apk" | grep -qE 'lib/[a-z0-9-]+/libbox\.so'; then
+              echo "::error::$abi ships without the sing-box core"
+              exit 1
+            fi
+            echo "ok: $abi $(du -h "$apk" | cut -f1)"
+          done
+
+      - name: Collect and checksum
+        run: |
+          mkdir -p dist
+          v="${GITHUB_REF_NAME#v}"
+          suffix=""
+          [ "${{ steps.signing.outputs.signed }}" = "true" ] || suffix="-UNSIGNED"
+          out=apps/commy/build/app/outputs
+          for f in "$out"/flutter-apk/app-*-release.apk; do
+            [ -f "$f" ] || continue
+            abi=$(basename "$f" | sed -E 's/app-(.*)-release\.apk/\1/')
+            cp "$f" "dist/commy-${v}-${abi}${suffix}.apk"
+          done
+          [ -f "$out/flutter-apk/app-release.apk" ] && \
+            cp "$out/flutter-apk/app-release.apk" "dist/commy-${v}-universal${suffix}.apk"
+          [ -f "$out/bundle/release/app-release.aab" ] && \
+            cp "$out/bundle/release/app-release.aab" "dist/commy-${v}${suffix}.aab"
+          cp apps/commy/android/app/libs/libbox.aar "dist/libbox-${v}.aar"
+          cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: dist
+
+      - name: Extract the notes for this version from CHANGELOG.md
+        id: notes
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          {
+            if [ -f CHANGELOG.md ] && grep -q "## \[$v\]" CHANGELOG.md; then
+              awk -v ver="## \\[$v\\]" '
+                $0 ~ ver {found=1; next}
+                found && /^## \[/ {exit}
+                found {print}
+              ' CHANGELOG.md
+            else
+              echo "See CHANGELOG.md for details."
+            fi
+            echo
+            if [ "${{ needs.android.outputs.signed }}" != "true" ]; then
+              echo "> ⚠️ **This build is unsigned.** Android will refuse to install it over a"
+              echo "> signed build, and it is not suitable for distribution. It is here so the"
+              echo "> release pipeline stays honest, not because you should use it."
+              echo
+            fi
+            echo '## Verify your download'
+            echo
+            echo '```bash'
+            echo 'sha256sum -c SHA256SUMS.txt --ignore-missing'
+            echo '```'
+            echo
+            echo 'Commy is not a VPN service: it hosts no servers and ships no configurations.'
+            echo 'You bring your own.'
+          } > release-notes.md
+          cat release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true

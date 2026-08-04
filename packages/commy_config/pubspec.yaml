@@ -1,0 +1,17 @@
+name: commy_config
+description: >-
+  Parsers for proxy links and subscriptions, plus the sing-box config builder.
+  Pure Dart, no codegen, no Flutter.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  commy_domain:
+    path: ../commy_domain
+
+dev_dependencies:
+  test: ^1.25.0
+  very_good_analysis: '>=6.0.0 <11.0.0'

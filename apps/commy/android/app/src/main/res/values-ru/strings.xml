@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_channel_tunnel">Туннель</string>
+    <string name="notification_channel_tunnel_description">Показывает состояние туннеля, пока он поднят. Если отключить, туннель не сможет работать в фоне.</string>
+    <string name="notification_channel_core">Сообщения ядра</string>
+
+    <string name="notification_idle">Отключено</string>
+    <string name="notification_starting">Подключение…</string>
+    <string name="notification_connected">Подключено</string>
+    <string name="notification_stopping">Отключение…</string>
+    <string name="notification_error">Отключено</string>
+    <string name="notification_disconnect">Отключить</string>
+
+    <string name="notification_speed">↑ %1$s/с   ↓ %2$s/с</string>
+
+    <string name="notification_open_title">Commy не подключён</string>
+    <string name="notification_open_text">Откройте приложение, чтобы поднять туннель.</string>
+</resources>

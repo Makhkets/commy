@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nothing leaves the device.
+
+     Cloud backup and device-to-device transfer are both refused wholesale.
+     The database holds server metadata and the keystore holds credentials;
+     neither belongs in someone else's backup infrastructure, and a transfer
+     that silently carried a user's servers to a new phone would be a surprise,
+     not a feature. Backup and restore is an explicit, user-driven export —
+     see docs/07-roadmap.md, feature G10. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

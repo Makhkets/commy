@@ -1,0 +1,18 @@
+# Code generation for commy_data.
+#
+# drift_dev is the only generator wired into this package, and the database is
+# the only file carrying a `part` directive: the tables live in plain Dart
+# files without part files of their own, so everything lands in
+# `lib/src/database/commy_database.g.dart`.
+#
+# Rule R9: that file is produced by `melos run gen` and is never edited by hand.
+
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # ISO-8601 text instead of unix seconds. Timezone-safe, readable in a
+          # dump, and it lets the R2 guard test (no secret ever reaches the
+          # plain database) scan raw column values as strings.
+          store_date_time_values_as_text: true

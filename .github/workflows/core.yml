@@ -1,0 +1,132 @@
+name: Core
+
+# Builds the sing-box network core. Split out from the main CI because it is by
+# far the slowest job and only needs to run when the core or its build script
+# actually changes — gomobile recompiles the entire core once per ABI.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'scripts/build_core.*'
+      - '.github/workflows/core.yml'
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'scripts/build_core.*'
+      - '.github/workflows/core.yml'
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      artifact:
+        description: Name of the uploaded AAR artifact
+        value: libbox-aar
+
+permissions:
+  contents: read
+
+env:
+  # Keep in step with core/go.mod, scripts/build_core.sh and
+  # docs/13-libbox-reference.md. A test asserts they agree.
+  SINGBOX_VERSION: v1.13.16
+  NDK_VERSION: 28.0.13004108
+
+jobs:
+  vet:
+    name: go vet + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      # go mod tidy does NOT accept -tags and only records go.sum entries for the
+      # default build configuration. with_clash_api and with_quic pull in modules
+      # that are not in it, so a plain `go build` dies at COMPILE time with
+      # "missing go.sum entry for ... github.com/go-chi/render", which reads like
+      # a broken sing-box version. Passing the tags via GOFLAGS is the fix.
+      - name: Verify go.sum covers the tagged build
+        working-directory: core
+        run: |
+          TAGS=$(grep -oP '(?<=^readonly TAGS=")[^"]+' ../scripts/build_core.sh)
+          echo "tags: $TAGS"
+          GOFLAGS="-tags=$TAGS" go mod tidy
+          git diff --exit-code go.mod go.sum || {
+            echo "::error::go.mod/go.sum are out of date."
+            echo "Run: GOFLAGS=\"-tags=$TAGS\" go mod tidy"
+            exit 1
+          }
+
+      - name: go vet
+        working-directory: core
+        run: |
+          TAGS=$(grep -oP '(?<=^readonly TAGS=")[^"]+' ../scripts/build_core.sh)
+          go vet -tags "$TAGS" ./...
+
+      - name: go test
+        working-directory: core
+        run: go test ./internal/...
+
+      - name: Typecheck for android/arm64
+        working-directory: core
+        run: |
+          TAGS=$(grep -oP '(?<=^readonly TAGS=")[^"]+' ../scripts/build_core.sh)
+          GOOS=android GOARCH=arm64 CGO_ENABLED=0 \
+            go build -tags "$TAGS" -ldflags "-checklinkname=0" ./...
+
+  aar:
+    name: libbox.aar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install NDK ${{ env.NDK_VERSION }}
+        run: sdkmanager --install "ndk;${NDK_VERSION}"
+
+      # Upstream golang.org/x/mobile does not understand -libname and answers it
+      # by printing usage and exiting 0 — a "successful" build that produces no
+      # file. sing-box pins SagerNet's fork; so do we.
+      - name: Cache gomobile
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: gomobile-v0.1.12-${{ runner.os }}
+
+      - name: Build the AAR
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
+        run: scripts/build_core.sh android
+
+      - name: Verify the artefact is real
+        run: |
+          aar=apps/commy/android/app/libs/libbox.aar
+          test -f "$aar" || { echo "::error::no AAR produced"; exit 1; }
+          echo "size: $(du -h "$aar" | cut -f1)"
+          # An AAR without a .so is an empty shell that links and then does nothing.
+          unzip -l "$aar" | grep -q 'jni/arm64-v8a/libbox.so' \
+            || { echo "::error::AAR contains no arm64 library"; exit 1; }
+          unzip -l "$aar" | grep -E 'jni/.*\.so|classes\.jar'
+          sha256sum "$aar"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libbox-aar
+          path: apps/commy/android/app/libs/libbox.aar
+          retention-days: 14
+          if-no-files-found: error

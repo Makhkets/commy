@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- The tunnel runs in a foreground service for as long as it is up.
+         systemExempted is what a VpnService uses: verified against the official
+         sing-box Android client, which is the reference implementation for this
+         core. specialUse would need a Play-review justification we do not need. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+
+    <!-- Android 13+. Without it the tunnel still runs, but silently: the
+         persistent notification is the only place the user sees state when the
+         app is closed, so we ask, and we accept a refusal. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Only used when the user turns on "connect at boot". -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- QR import. Requested at the moment the scanner opens, never before. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <!--
+      Deliberately NOT requested, though the reference client asks for them:
+
+      QUERY_ALL_PACKAGES — the <queries> block below gives us every launcher-
+        visible app, which is exactly what a per-app tunnelling picker needs.
+        The broad permission would additionally expose apps the user cannot see
+        in their launcher, and Play requires a justification for it. Reading the
+        full package list of a privacy tool's user is not something we want the
+        ability to do.
+
+      ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION — on Android these are what
+        gate the Wi-Fi SSID, which libbox asks for through readWIFIState(). We
+        return null instead. Connecting automatically on a named network is not
+        worth asking a privacy-conscious user for their location.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:name="${applicationName}"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Commy"
+        android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Protocol links. Tapping one anywhere on the device opens the
+                 import sheet with it already filled in. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vless" />
+                <data android:scheme="vmess" />
+                <data android:scheme="trojan" />
+                <data android:scheme="ss" />
+                <data android:scheme="hysteria2" />
+                <data android:scheme="hy2" />
+                <data android:scheme="tuic" />
+                <data android:scheme="wireguard" />
+                <data android:scheme="wg" />
+                <data android:scheme="socks" />
+                <data android:scheme="socks5" />
+                <data android:scheme="shadowtls" />
+                <data android:scheme="commy" />
+                <data android:scheme="sn" />
+
+                <!-- Migration from other clients, per docs/06-data-model.md.
+                     Someone already using Happ or NekoBox should not have to
+                     retype anything to try this one. -->
+                <data android:scheme="happ" />
+                <data android:scheme="sing-box" />
+                <data android:scheme="clash" />
+            </intent-filter>
+
+            <!-- Config files opened from a file manager or a chat app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/yaml" />
+                <data android:mimeType="application/x-yaml" />
+            </intent-filter>
+
+            <!--
+              Config and subscription files served over http(s).
+
+              Scoped to file extensions, and that is the whole design decision.
+              A subscription URL usually looks like
+              https://panel.example.com/sub/<token> with nothing to match on, so
+              covering those would mean claiming host="*" path=".*" — which
+              registers Commy as a handler for every link on the web and puts it
+              in the "Open with" chooser for all of them. For a tool whose pitch
+              is that it stays out of the way, that is not a trade worth making.
+              Bare subscription URLs come in through ACTION_SEND below (share the
+              link from a browser), by paste, or by QR.
+
+              pathSuffix is exact but only exists from API 31. pathPattern works
+              on every level we support and is the one that actually fires on
+              older phones, at the cost of Android's non-backtracking matcher
+              missing paths with an extra dot in them. Both are listed so each
+              covers the other's gap.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.json" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.yaml" />
+                <data android:pathPattern=".*\\.yml" />
+                <data android:pathSuffix=".json" tools:targetApi="31" />
+                <data android:pathSuffix=".txt" tools:targetApi="31" />
+                <data android:pathSuffix=".yaml" tools:targetApi="31" />
+                <data android:pathSuffix=".yml" tools:targetApi="31" />
+            </intent-filter>
+
+            <!-- Shared text: "share" a link from a browser or messenger. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <!-- The tunnel. exported=false plus BIND_VPN_SERVICE: only the system
+             may bind it. The ForegroundServicePermission lint fires because it
+             cannot see that a VpnService is exempt; the reference client
+             suppresses it the same way. -->
+        <service
+            android:name=".tunnel.CommyVpnService"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            tools:ignore="ForegroundServicePermission">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <!-- Quick Settings tile: connect and disconnect without opening the app. -->
+        <service
+            android:name=".tunnel.CommyTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="Commy"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            tools:targetApi="n">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <receiver
+            android:name=".tunnel.BootReceiver"
+            android:enabled="false"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+</manifest>

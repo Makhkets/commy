@@ -1,0 +1,86 @@
+name: Labels
+
+# Two halves of the same idea, which is that labels should come from files in
+# the repository rather than from whoever happened to be doing triage.
+#
+#   scope  a pull request gets its scope labels from the paths it touches,
+#          using .github/labeler.yml
+#   sync   .github/labels.yml becomes the repository's actual label set
+#
+# Without this file both of those configs are inert, which is a worse failure
+# than not having them: they look maintained and do nothing.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+    paths:
+      - '.github/labels.yml'
+      - '.github/workflows/labels.yml'
+      - 'scripts/sync_labels.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: labels-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: scope labels
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # pull_request_target, and therefore a write token, so that pull requests
+      # from forks get labelled too — under plain `pull_request` a fork's token
+      # is read-only and the step fails on every external contribution.
+      #
+      # The usual danger of pull_request_target is checking out the pull
+      # request's code and running it with that token. This job has no checkout
+      # step at all: labeler reads the changed-file list over the API and the
+      # config from the base branch. Keep it that way. If this job ever needs
+      # to run something from the pull request, it needs to be a different
+      # workflow on a different trigger.
+      - uses: actions/labeler@v5
+        with:
+          # Not the default. Drops a label again when a pull request stops
+          # touching that area, so the labels describe the current diff rather
+          # than its history.
+          sync-labels: true
+          # Already the default in v5, stated anyway: the `ci` label depends on
+          # `.github/**` matching dot-prefixed paths, and that is too quiet a
+          # thing to break if a future major flips the default back.
+          dot: true
+
+  sync:
+    name: sync label set
+    if: github.event_name != 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # PyYAML happens to be present on the hosted image today. Depending on
+      # that is how a workflow breaks during an image rollout for no reason
+      # anyone can reconstruct.
+      - run: pip install --disable-pip-version-check --quiet pyyaml
+
+      # Creates and updates only. Anything on the repository that is not in
+      # labels.yml is reported and left alone, because deleting a label also
+      # removes it from every issue that carried it.
+      - name: Apply .github/labels.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python scripts/sync_labels.py

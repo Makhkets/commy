@@ -1,0 +1,49 @@
+name: commy_ui
+description: >-
+  Design system of Commy: tokens, themes, atomic widgets and adaptive shells.
+version: 0.1.0
+publish_to: none
+
+environment:
+  flutter: '>=3.22.0'
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  commy_domain:
+    path: ../commy_domain
+  flutter:
+    sdk: flutter
+  # `lucide_icons_flutter` is the maintained, actively published port named in
+  # docs/01-stack.md. The similarly named `lucide_icons` also exists on pub.dev
+  # but tracks a much older upstream and is not the one we picked.
+  lucide_icons_flutter: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: '>=6.0.0 <11.0.0'
+
+# Both typefaces are vendored rather than taken from the system: identical
+# rendering on five platforms is worth a couple of megabytes, and a golden test
+# against a system font proves nothing. Licences (SIL OFL 1.1) sit next to the
+# files and are shown on the About screen.
+#
+# The family names here must stay exactly `CommyFonts.ui` and `CommyFonts.mono`
+# — the type scale asks for them by name, qualified with this package.
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: fonts/Inter-SemiBold.ttf
+          weight: 600
+    - family: JetBrainsMono
+      fonts:
+        - asset: fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: fonts/JetBrainsMono-Medium.ttf
+          weight: 500

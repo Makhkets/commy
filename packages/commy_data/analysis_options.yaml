@@ -1,0 +1,8 @@
+include: ../../analysis_options.yaml
+
+analyzer:
+  exclude:
+    # Drift output. Rule R9: generated files are never edited by hand, and they
+    # are not held to the hand-written lint bar either.
+    - 'lib/**/*.g.dart'
+    - 'lib/**/*.drift.dart'

@@ -1,0 +1,8 @@
+# Declared so that `flutter test --tags golden` — which is what
+# `melos run test:golden` runs — does not warn about an unknown tag, and so
+# that the tag has one written meaning.
+tags:
+  golden:
+    description: >-
+      Photographs a component in both themes with the vendored fonts loaded.
+      Regenerate with `flutter test --update-goldens`.

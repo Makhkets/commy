@@ -1,0 +1,18 @@
+include: ../../analysis_options.yaml
+
+# Rule R5 does not apply here directly, but the package still depends on
+# nothing but `commy_domain`: no Flutter, no codegen, no YAML library. See
+# `ClashYamlReader` for why the last one is written by hand.
+
+linter:
+  rules:
+    # `avoid_equals_and_hash_code_on_mutable_classes` keys off the @immutable
+    # annotation from `package:meta`, and this package has no dependency on it
+    # for the same reason `commy_domain` has none. Every value type here has
+    # only final fields and no method that mutates state.
+    avoid_equals_and_hash_code_on_mutable_classes: false
+
+    # `ConfigGenerator` and `LinkParser` are single- or few-method ports
+    # declared in the domain; the adapters here implement them as classes so
+    # they can carry the platform and the rule set directory.
+    one_member_abstracts: false

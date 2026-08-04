@@ -1,0 +1,17 @@
+# Shared analysis options for the whole monorepo.
+#
+# Every package includes this file with `include: ../../analysis_options.yaml`
+# and may only *narrow* the rules, never widen them silently: any relaxation
+# has to carry a comment explaining why.
+#
+# `very_good_analysis` treats warnings as errors — that is the point.
+
+include: package:very_good_analysis/analysis_options.yaml
+
+analyzer:
+  exclude:
+    - '**/build/**'
+    - '**/.dart_tool/**'
+    - '**/generated/**'
+  errors:
+    todo: ignore

@@ -1,0 +1,79 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+max_line_length = 100
+
+[*.dart]
+indent_size = 2
+max_line_length = 80
+
+[*.go]
+indent_style = tab
+indent_size = 4
+max_line_length = 120
+
+[*.{kt,kts}]
+indent_size = 4
+max_line_length = 120
+
+[*.swift]
+indent_size = 4
+max_line_length = 120
+
+[*.{c,h,cc,cpp,hpp}]
+indent_size = 2
+max_line_length = 100
+
+# Gradle. The Kotlin DSL files this repo uses are covered by the [*.{kt,kts}]
+# rule above; this is here for the Groovy build files that Flutter plugins
+# still ship, which follow the Java convention rather than the Kotlin one.
+[*.gradle]
+indent_size = 4
+max_line_length = 120
+
+# Android resources and manifests are 4-space, which is what the Flutter
+# template emits and what every file under android/app/src/main/res already
+# uses. Without this rule the global 2-space default silently disagrees with
+# the entire directory.
+[*.xml]
+indent_size = 4
+max_line_length = 120
+
+# A property is a single key=value line and cannot be wrapped, so a column
+# limit here only produces warnings nobody can act on. gradle.properties
+# already carries a 109-character jvmargs line.
+[*.properties]
+max_line_length = off
+
+# Gradle's own wrapper: gradlew must stay LF or it fails on Linux and macOS
+# with "bad interpreter", and gradlew.bat must stay CRLF (handled by the
+# [*.{bat,cmd,ps1}] rule below). Getting this backwards breaks the build on a
+# machine that is not the one where it was committed.
+[{gradlew,*.sh}]
+end_of_line = lf
+
+[*.{yml,yaml,json,jsonc}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = 88
+
+[Makefile]
+indent_style = tab
+
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+# Verbatim legal text. An editor that reflows, re-indents or strips whitespace
+# from the GPL is editing a licence, so nothing here applies to it.
+[LICENSE]
+trim_trailing_whitespace = false
+insert_final_newline = false
+max_line_length = off

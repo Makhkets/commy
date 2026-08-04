@@ -1,0 +1,21 @@
+name: commy_core
+description: >-
+  The single door to the sing-box core: CoreClient implementations, platform
+  channels, FFI and the Clash API transport, plus AppLogger.
+version: 0.1.0
+publish_to: none
+
+environment:
+  flutter: '>=3.22.0'
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  commy_domain:
+    path: ../commy_domain
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: '>=6.0.0 <11.0.0'

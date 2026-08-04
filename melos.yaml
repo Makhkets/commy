@@ -1,0 +1,94 @@
+# Melos workspace for the Commy monorepo.
+#
+# `melos bootstrap` is a built-in command, not a script — that is why it is not
+# listed under `scripts`. Everything else in CLAUDE.md section 4 is a script and
+# is invoked as `melos run <name>`.
+#
+# Pinned to melos 6.x on purpose: melos 7 dropped melos.yaml in favour of a
+# `melos:` block inside the root pubspec.yaml and requires Dart pub workspaces.
+# See docs/adr/0006-codegen-and-native-layout.md.
+#
+# First run in a fresh clone:
+#   dart pub get                        (in the repo root)
+#   dart pub global activate melos 6.3.3
+#   melos bootstrap
+#
+# `melos` has to be on PATH, not only a dev_dependency: the scripts below invoke
+# `melos exec`, so `dart run melos run <script>` fails from inside itself with
+# "melos is not recognised". Activate the SAME version that pubspec.yaml pins —
+# a global melos that drifts from the pinned one is worse than no melos.
+#
+# Windows note: run melos from PowerShell or cmd, not Git Bash. Under Git Bash
+# it dies with `FormatException: Unexpected extension byte` while decoding a
+# child process's output on a non-UTF-8 system locale.
+#
+# Non-interactive shells: add --no-select to any `melos run` whose script has
+# packageFilters, or it will try to prompt and crash on the missing terminal.
+
+name: commy
+
+repository: https://github.com/Makhkets/commy
+
+packages:
+  - packages/*
+  - apps/*
+
+ignore:
+  - '**/build/**'
+  - '**/.dart_tool/**'
+
+command:
+  bootstrap:
+    runPubGetInParallel: true
+
+scripts:
+  gen:
+    description: >-
+      Run code generation. Only drift_dev and slang_build_runner are wired in;
+      freezed, json_serializable and riverpod_generator are deliberately absent.
+      Pass --no-select in CI and any other non-interactive shell: melos prompts
+      for a package whenever a script carries packageFilters, and that prompt
+      dies with "Error getting terminal echo mode" when there is no terminal.
+    run: >-
+      melos exec -c 1 --fail-fast --
+      "dart run build_runner build"
+    packageFilters:
+      dependsOn:
+        - build_runner
+
+  analyze:
+    description: Static analysis of every package. Warnings are errors.
+    run: melos exec -c 1 --fail-fast -- "dart analyze --fatal-infos ."
+
+  test:
+    description: Unit and widget tests across the whole monorepo.
+    run: melos run test:dart --no-select && melos run test:flutter --no-select
+
+  test:dart:
+    description: Tests of the pure Dart packages.
+    run: melos exec -c 1 --fail-fast -- "dart test"
+    packageFilters:
+      dirExists:
+        - test
+      flutter: false
+
+  test:flutter:
+    description: Tests of the Flutter packages and the app.
+    run: melos exec -c 1 --fail-fast -- "flutter test"
+    packageFilters:
+      dirExists:
+        - test
+      flutter: true
+
+  test:golden:
+    description: Golden tests of the design system, both themes.
+    run: melos exec -c 1 --fail-fast -- "flutter test --tags golden"
+    packageFilters:
+      scope:
+        - commy_ui
+      dirExists:
+        - test
+
+  fix:
+    description: Apply automatic fixes and format every package.
+    run: melos exec -c 1 -- "dart fix --apply . && dart format ."

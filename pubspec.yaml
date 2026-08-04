@@ -1,0 +1,13 @@
+name: commy_workspace
+description: >-
+  Root of the Commy monorepo. Holds nothing but the melos workspace
+  configuration and the shared analysis options. Never published.
+version: 0.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dev_dependencies:
+  melos: ^6.3.2
+  very_good_analysis: '>=6.0.0 <11.0.0'

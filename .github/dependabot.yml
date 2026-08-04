@@ -1,0 +1,57 @@
+version: 2
+
+# Grouped aggressively on purpose. Ungrouped, this repo has four ecosystems and
+# would open a dozen PRs a week, which is how a maintainer learns to ignore
+# Dependabot entirely — and then misses the one update that mattered.
+updates:
+  - package-ecosystem: pub
+    directories:
+      - /
+      - /apps/commy
+      - /packages/commy_config
+      - /packages/commy_core
+      - /packages/commy_data
+      - /packages/commy_domain
+      - /packages/commy_ui
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      dart-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: gomod
+    directory: /core
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
+    # Rule R8: the network core is never bumped in passing. A sing-box update is
+    # its own pull request with its own matrix run and its own reading of the
+    # changelog, because it changes what happens to every user's traffic.
+    ignore:
+      - dependency-name: github.com/sagernet/sing-box
+
+  - package-ecosystem: gradle
+    directory: /apps/commy/android
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: 'chore(ci)'

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- bg/canvas from docs/04-design-system.md. The launch window uses the
+         app's own background so the hand-off into Flutter is invisible; a white
+         flash before a dark UI is the cheapest way to look unfinished. -->
+    <color name="commy_canvas">#0A0B0D</color>
+    <color name="commy_canvas_light">#F6F7F9</color>
+    <color name="ic_launcher_background">#0A0B0D</color>
+
+    <!-- status/connected from docs/04-design-system.md. The one place a colour
+         is allowed outside the Flutter token set: Notification.color is read by
+         the system before our UI exists, so it cannot come from commy_ui. -->
+    <color name="commy_connected">#2FD98A</color>
+</resources>

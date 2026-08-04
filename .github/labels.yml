@@ -1,0 +1,143 @@
+# The label set, in version control so that adding one is a reviewable change
+# rather than a click somebody makes at midnight and nobody else ever sees.
+#
+# Applied by .github/workflows/labels.yml. That workflow creates and updates
+# labels but never deletes them: removing a label strips it from every issue
+# that carried it, and GitHub does not give that back.
+#
+# Two families, and the colour tells you which one you are looking at:
+#
+#   graphite  WHERE the change is. These are exactly the Conventional Commit
+#             scopes from CLAUDE.md section 5, so a label and a commit message
+#             can never disagree. Attached automatically by .github/labeler.yml
+#             from the paths a pull request touches — do not apply them by hand.
+#
+#   signal    HOW MUCH YOU SHOULD CARE, and what the issue is waiting on.
+#             Applied by the issue forms or by a maintainer.
+#
+# Colours are the design tokens from docs/04-design-system.md, not decoration:
+# 6C7178 graphite, F76C6C error, F0A93B connecting, 2FD98A connected,
+# 63A8FF info, 8D9299 idle. Descriptions are capped at 100 characters by
+# GitHub; scripts/sync_labels.py refuses to push a longer one.
+
+labels:
+  # ── scope ──────────────────────────────────────────────────────────────────
+  - name: core
+    color: 6C7178
+    description: The Go sing-box wrapper and its build script
+
+  - name: android
+    color: 6C7178
+    description: The Android side of the app and the VpnService tunnel
+
+  - name: apple
+    color: 6C7178
+    description: iOS and macOS, including the NEPacketTunnelProvider extension
+
+  - name: windows
+    color: 6C7178
+    description: The Windows client and its elevated helper service
+
+  - name: linux
+    color: 6C7178
+    description: The Linux client and its polkit helper
+
+  - name: ui
+    color: 6C7178
+    description: 'commy_ui: design tokens, theme, widgets, golden tests'
+
+  - name: domain
+    color: 6C7178
+    description: 'commy_domain: entities and use cases. Imports no Flutter'
+
+  - name: data
+    color: 6C7178
+    description: 'commy_data: Drift, secure storage, repositories'
+
+  - name: config
+    color: 6C7178
+    description: 'commy_config: link and subscription parsers, sing-box JSON'
+
+  - name: protocol
+    color: 6C7178
+    description: A proxy protocol — support for a new one, or a fix in one we speak
+
+  - name: ci
+    color: 6C7178
+    description: Workflows, actions and repository automation
+
+  - name: docs
+    color: 6C7178
+    description: Specification, ADRs, README and everything else in prose
+
+  # ── kind ───────────────────────────────────────────────────────────────────
+  - name: bug
+    color: F76C6C
+    description: Something does not work the way it should
+
+  - name: enhancement
+    color: 63A8FF
+    description: A new capability, or an existing one made better
+
+  # Loud on purpose. This project carries all of a user's traffic, so these two
+  # outrank whatever else is in the queue.
+  - name: security
+    color: B02A2A
+    description: Handle first. Report privately by advisory, never in a public issue
+
+  - name: traffic-leak
+    color: B02A2A
+    description: 'Traffic escaping the tunnel: DNS, IPv6, a network change, a crash'
+
+  # ── waiting on ─────────────────────────────────────────────────────────────
+  - name: triage
+    color: F0A93B
+    description: Not yet read by a maintainer
+
+  - name: needs-info
+    color: F0A93B
+    description: Waiting on the reporter. Closed after a while if nothing arrives
+
+  - name: blocked
+    color: F0A93B
+    description: Waiting on something outside this repository
+
+  - name: upstream
+    color: 8D9299
+    description: Belongs in sing-box or another dependency. We track it, we cannot fix it
+
+  # ── invitations ────────────────────────────────────────────────────────────
+  - name: good first issue
+    color: 2FD98A
+    description: Small, self-contained, and someone will help you through it
+
+  - name: help wanted
+    color: 2FD98A
+    description: The maintainers would like a hand with this one
+
+  # ── closing reasons ────────────────────────────────────────────────────────
+  # "Commy does not host servers, does not phone home, and has no accounts" is
+  # a decision, not a backlog item. Saying so with a label is kinder than
+  # writing the same paragraph out for the twentieth time.
+  - name: out-of-scope
+    color: 8D9299
+    description: Refused by design, not for lack of time. See docs/00-vision.md
+
+  - name: duplicate
+    color: 8D9299
+    description: Already tracked somewhere else
+
+  - name: wontfix
+    color: 8D9299
+    description: A real issue that will not be worked on
+
+  - name: invalid
+    color: 8D9299
+    description: Not reproducible, or not a problem with Commy
+
+  # ── housekeeping ───────────────────────────────────────────────────────────
+  # Declared so Dependabot's pull requests arrive in the repository's own
+  # colours instead of the default it would otherwise invent.
+  - name: dependencies
+    color: 24272C
+    description: Dependency updates. Mostly opened by Dependabot

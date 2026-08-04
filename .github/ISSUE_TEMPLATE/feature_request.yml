@@ -1,0 +1,71 @@
+name: Feature request
+description: Suggest something Commy should do
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read [docs/00-vision.md](../../docs/00-vision.md) first, and in
+        particular what the project deliberately does **not** do.
+
+        Three kinds of request are refused by design, not by workload:
+
+        - **anything that ships servers or configurations.** Commy connects to
+          servers you already have. It hosts none, sells none and bundles none.
+        - **anything that talks to a host the user did not enter.** No analytics,
+          no crash reporting, no update check. There are exactly three
+          exceptions, all user-triggered, all listed in
+          [docs/09-security-privacy.md](../../docs/09-security-privacy.md).
+        - **accounts, subscriptions-to-us, ads, or a paid tier.**
+
+        Everything else is fair game.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What you were trying to do, and what got in the way. Describe the
+        situation rather than the feature — a good problem statement often has a
+        cheaper solution than the one you had in mind.
+      placeholder: |
+        My provider rotates servers weekly and I have to re-import by hand,
+        because…
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms this matters on
+      multiple: true
+      options: [Android, iOS, Windows, macOS, Linux, All]
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >-
+        Including other clients. "Client X does this and it works well" is a
+        strong argument and a useful reference.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: This does not require Commy to host, bundle or sell anything
+          required: true
+        - label: This does not require an outbound request the user did not ask for
+          required: true
+        - label: I searched existing issues and discussions
+          required: true

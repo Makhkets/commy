@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Native strings only.
+
+  Everything the Flutter UI shows goes through slang. What lives here is the
+  handful of strings the Android system renders on its own — the notification
+  the foreground service is required to have, the Quick Settings tile label —
+  which Flutter is not running for, and in some cases not even started.
+-->
+<resources>
+    <string name="app_name" translatable="false">Commy</string>
+
+    <string name="notification_channel_tunnel">Tunnel</string>
+    <string name="notification_channel_tunnel_description">Shows the tunnel state while it is running. Turning this off stops the tunnel from staying up in the background.</string>
+    <string name="notification_channel_core">Core messages</string>
+
+    <string name="notification_idle">Disconnected</string>
+    <string name="notification_starting">Connecting…</string>
+    <string name="notification_connected">Connected</string>
+    <string name="notification_stopping">Disconnecting…</string>
+    <string name="notification_error">Disconnected</string>
+    <string name="notification_disconnect">Disconnect</string>
+
+    <!-- Upload and download speed. %1$s and %2$s are already formatted sizes. -->
+    <string name="notification_speed">↑ %1$s/s   ↓ %2$s/s</string>
+
+    <string name="notification_open_title">Commy is not connected</string>
+    <string name="notification_open_text">Open the app to bring the tunnel up.</string>
+</resources>

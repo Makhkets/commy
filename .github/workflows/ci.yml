@@ -1,0 +1,184 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned rather than "stable": a Flutter bump changes the Dart version and the
+  # lint set underneath us, and that should be a deliberate PR, not a Tuesday.
+  FLUTTER_VERSION: 3.44.8
+
+jobs:
+  analyze:
+    name: analyze + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # melos has to be on PATH, not merely a dev_dependency: its own scripts
+      # shell out to `melos exec`, which is not resolvable from inside
+      # `dart run melos`. Activate the exact version pubspec.yaml pins so the
+      # global tool and the pinned one cannot drift apart.
+      - name: Install melos
+        run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Code generation
+        run: melos run gen --no-select
+
+      # Generated sources are not committed (rule R9 says they come from codegen).
+      # If codegen produced something different from what the author had, the diff
+      # shows up here rather than as a mystery failure later.
+      - name: Analyze
+        run: melos run analyze --no-select
+
+      - name: Test
+        run: melos run test --no-select
+
+      # Dart and Kotlin each hold half of the platform-channel contract and
+      # neither compiler can see the other. A renamed channel or a dropped
+      # method surfaces as a button that quietly stops working on a device.
+      - name: Platform channel contract
+        run: python scripts/check_wire_contract.py
+
+  goldens:
+    name: golden tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Install melos
+        run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
+      - run: melos run gen --no-select
+
+      # Goldens are rendered by Skia and differ between platforms; they are
+      # generated on Linux and only compared on Linux. A failure here means the
+      # UI changed — regenerate with `flutter test --update-goldens` and review
+      # the image diff, do not just accept it.
+      - name: Golden tests
+        run: melos run test:golden --no-select
+
+      - name: Upload failed golden diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: '**/test/**/failures/**'
+          retention-days: 7
+          if-no-files-found: ignore
+
+  android:
+    name: debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: sdkmanager --install "ndk;28.0.13004108"
+
+      # The APK cannot link without it, so build it here rather than pulling a
+      # possibly-stale artifact from another workflow.
+      - name: Build libbox.aar
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/28.0.13004108
+        run: scripts/build_core.sh android
+
+      # libbox's PlatformInterface is a Go interface exported through gomobile.
+      # Kotlin compiles perfectly well against a stale idea of it — the failure
+      # arrives later, at JNI link time, on a user's device, with no usable
+      # stack. So compare what the AAR actually declares against what we
+      # implement, and fail here instead.
+      - name: PlatformInterface matches the AAR
+        run: |
+          cd "$RUNNER_TEMP"
+          unzip -o -q "$GITHUB_WORKSPACE/apps/commy/android/app/libs/libbox.aar" classes.jar
+          javap -cp classes.jar io.nekohasekai.libbox.PlatformInterface \
+            | grep -oE '[a-zA-Z]+\(' | tr -d '(' | sort > required.txt
+          grep -oE 'override fun [a-zA-Z]+' \
+            "$GITHUB_WORKSPACE/apps/commy/android/app/src/main/kotlin/dev/commy/app/tunnel/CommyPlatformInterface.kt" \
+            | sed 's/override fun //' | sort > implemented.txt
+          if ! diff -u required.txt implemented.txt; then
+            echo "::error::CommyPlatformInterface does not match libbox's PlatformInterface."
+            echo "Left = what the AAR declares, right = what we implement."
+            echo "See docs/13-libbox-reference.md."
+            exit 1
+          fi
+          echo "ok: all $(wc -l < required.txt) methods match"
+
+      - name: Install melos
+        run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
+      - run: melos run gen --no-select
+
+      - name: Build debug APK
+        working-directory: apps/commy
+        run: flutter build apk --debug
+
+      - name: Check the APK is real
+        working-directory: apps/commy
+        run: |
+          apk=build/app/outputs/flutter-apk/app-debug.apk
+          test -f "$apk" || { echo "::error::no APK produced"; exit 1; }
+          echo "size: $(du -h "$apk" | cut -f1)"
+          # An APK that links but ships no native core is useless at runtime and
+          # looks perfectly fine to Gradle.
+          unzip -l "$apk" | grep -q 'lib/arm64-v8a/libbox.so' \
+            || { echo "::error::APK contains no sing-box core"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: commy-debug-apk
+          path: apps/commy/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error

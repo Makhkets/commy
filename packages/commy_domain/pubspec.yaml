@@ -1,0 +1,17 @@
+name: commy_domain
+description: >-
+  Pure Dart heart of Commy: entities, ports and use cases. Depends on nothing
+  at all, Flutter least of all (rule R5).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+# There is no `dependencies:` block on purpose. This package has zero runtime
+# dependencies — not even `meta`. Adding one is an architectural decision, not
+# a convenience. See docs/adr/0006-codegen-and-native-layout.md.
+
+dev_dependencies:
+  test: ^1.25.0
+  very_good_analysis: '>=6.0.0 <11.0.0'

@@ -1,0 +1,125 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### ⚠️ Before you paste anything
+
+        **Never post a subscription URL, a UUID, a password or a private key.**
+        A subscription link is a credential: anyone who has it can use your
+        servers and see how much traffic you have left.
+
+        Commy redacts these from its own logs automatically, but it cannot
+        redact what you type into this box. If you are unsure whether something
+        is sensitive, replace it with `…`.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+      placeholder: |
+        I imported a subscription with 40 nodes and only 12 appeared.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Commy version
+      description: Settings → About. Include the build number if you have it.
+      placeholder: 0.1.0 (42)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android
+        - iOS
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version and device
+      placeholder: Android 14, Pixel 7
+    validations:
+      required: true
+
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: Protocol involved
+      description: Leave blank if the problem is not about a connection.
+      options:
+        - Not applicable
+        - VLESS / Reality
+        - VLESS (other)
+        - VMess
+        - Trojan
+        - Shadowsocks
+        - Hysteria2
+        - TUIC
+        - WireGuard
+        - ShadowTLS
+        - Several / not sure
+
+  - type: dropdown
+    id: install-source
+    attributes:
+      label: Where you got the build
+      options:
+        - GitHub Releases
+        - Built from source
+        - F-Droid
+        - Google Play
+        - App Store
+        - Other
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >-
+        Diagnostics → Logs → Export. Export runs the redaction pass, so
+        credentials are already stripped — but read them once before pasting.
+      render: text
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Generated config
+      description: >-
+        Optional. Diagnostics → Config. **Remove the `uuid`, `password`,
+        `private_key` and `secret` fields before pasting.**
+      render: json
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I checked that no subscription URL, UUID, password or key is in this report
+          required: true
+        - label: I searched existing issues for the same problem
+          required: true

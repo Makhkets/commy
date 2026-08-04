@@ -1,0 +1,35 @@
+# Scopes match the Conventional Commit scopes in CLAUDE.md section 5, so a label
+# and a commit message never disagree about which part of the repo changed.
+core:
+  - changed-files:
+      - any-glob-to-any-file: ['core/**', 'scripts/build_core.*']
+android:
+  - changed-files:
+      - any-glob-to-any-file: ['apps/commy/android/**']
+apple:
+  - changed-files:
+      - any-glob-to-any-file: ['apps/commy/ios/**', 'apps/commy/macos/**', 'native/apple/**']
+windows:
+  - changed-files:
+      - any-glob-to-any-file: ['apps/commy/windows/**', 'native/windows/**']
+linux:
+  - changed-files:
+      - any-glob-to-any-file: ['apps/commy/linux/**', 'native/linux/**']
+ui:
+  - changed-files:
+      - any-glob-to-any-file: ['packages/commy_ui/**']
+domain:
+  - changed-files:
+      - any-glob-to-any-file: ['packages/commy_domain/**']
+data:
+  - changed-files:
+      - any-glob-to-any-file: ['packages/commy_data/**']
+config:
+  - changed-files:
+      - any-glob-to-any-file: ['packages/commy_config/**']
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ['.github/**']
+docs:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '*.md']

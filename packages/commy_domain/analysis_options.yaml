@@ -1,0 +1,20 @@
+include: ../../analysis_options.yaml
+
+# Rule R5 is enforced structurally, not by a lint: this package declares no
+# dependencies at all, so `import 'package:flutter/...'` fails to resolve and
+# `depend_on_referenced_packages` fires on top of that.
+
+linter:
+  rules:
+    # `avoid_equals_and_hash_code_on_mutable_classes` keys off the @immutable
+    # annotation, which lives in `package:meta`. commy_domain has zero
+    # dependencies by design, so the annotation is unavailable. Every entity
+    # here is immutable by construction: all fields are final, all constructors
+    # are const where possible, and no method mutates state.
+    avoid_equals_and_hash_code_on_mutable_classes: false
+
+    # Several ports are deliberately single-method boundaries
+    # (SubscriptionFetcher, ConfigGenerator, IdGenerator). They must stay
+    # interfaces rather than function typedefs: implementations carry state and
+    # have to be replaceable in tests.
+    one_member_abstracts: false

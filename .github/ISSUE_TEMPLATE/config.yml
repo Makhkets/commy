@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/Makhkets/commy/security/advisories/new
+    about: >-
+      Report privately. Do not open a public issue for anything that could expose
+      a user's traffic, credentials or identity — see SECURITY.md.
+
+  - name: 💬 Question or help with your own server
+    url: https://github.com/Makhkets/commy/discussions
+    about: >-
+      Commy is a client, not a hosting service. We cannot help you buy, rent or
+      configure a server, and we do not distribute configurations.
+
+  - name: 📖 Documentation
+    url: https://github.com/Makhkets/commy/tree/main/docs
+    about: Architecture, threat model, roadmap and the decisions behind them.

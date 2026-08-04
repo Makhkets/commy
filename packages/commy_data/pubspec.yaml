@@ -1,0 +1,33 @@
+name: commy_data
+description: >-
+  Storage and I/O: encrypted Drift database, secure storage, HTTP client and
+  the repository implementations of the domain ports.
+version: 0.1.0
+publish_to: none
+
+environment:
+  flutter: '>=3.22.0'
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  commy_domain:
+    path: ../commy_domain
+  dio: ^5.4.0
+  drift: '>=2.20.0 <3.0.0'
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: '>=9.0.0 <11.0.0'
+  path: ^1.9.0
+  path_provider: ^2.1.0
+  # `sqlite3_flutter_libs` and `sqlcipher_flutter_libs` are both EOL: since
+  # `package:sqlite3` 3.x the native library is produced by build hooks inside
+  # that package. Secrets live in flutter_secure_storage, not in an encrypted
+  # database — see docs/adr/0007-database-encryption.md.
+  sqlite3: ^3.4.0
+
+dev_dependencies:
+  build_runner: ^2.4.0
+  drift_dev: '>=2.20.0 <3.0.0'
+  flutter_test:
+    sdk: flutter
+  very_good_analysis: '>=6.0.0 <11.0.0'

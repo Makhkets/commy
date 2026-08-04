@@ -1,0 +1,139 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# Nothing here should ever be committed. If you are adding an exception, stop.
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+*.pfx
+key.properties
+**/android/key.properties
+.env
+.env.*
+secrets/
+fastlane/report.xml
+fastlane/Preview.html
+
+# Real subscriptions and configs used while testing.
+# Test fixtures must be anonymised and live under test/fixtures/.
+*.private.json
+*.private.yaml
+local_config*.json
+
+# ── Dart / Flutter ────────────────────────────────────────────────────────────
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.fvm/versions
+pubspec_overrides.yaml
+doc/api/
+coverage/
+*.g.dart.bak
+
+# Golden test failures — the diffs, not the goldens themselves.
+**/failures/
+
+# ── Go ────────────────────────────────────────────────────────────────────────
+core/build/
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.aar
+*.xcframework/
+vendor/
+*.test
+*.out
+
+# ── Android ───────────────────────────────────────────────────────────────────
+**/android/**/gradle-wrapper.jar
+**/android/.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/app/release/
+**/android/app/debug/
+**/android/app/profile/
+*.apk
+*.aab
+
+# ── Apple ─────────────────────────────────────────────────────────────────────
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/app.flx
+**/ios/Flutter/App.framework
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Flutter/ephemeral/
+**/Pods/
+**/*.xcworkspace/xcuserdata/
+**/xcuserdata/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+**/windows/flutter/generated_plugin_registrant.*
+**/windows/flutter/generated_plugins.cmake
+**/windows/flutter/ephemeral/
+*.msix
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
+**/linux/flutter/generated_plugin_registrant.*
+**/linux/flutter/generated_plugins.cmake
+**/linux/flutter/ephemeral/
+*.AppImage
+*.deb
+*.rpm
+
+# ── Editors ───────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.iws
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Monorepo tooling ──────────────────────────────────────────────────────────
+.melos_tool/
+melos_*.iml
+.fvm/flutter_sdk
+.fvm/fvm_config.json
+
+# Lockfiles: apps pin theirs, libraries do not.
+packages/*/pubspec.lock
+
+# ── Extra build output ────────────────────────────────────────────────────────
+**/android/**/.cxx/
+**/android/app/src/main/jniLibs/
+**/android/app/src/main/assets/flutter_assets/
+core/bin/
+core/dist/
+*.framework.dSYM
+
+# Generated sources. Rule R9: these come from codegen and are never hand-edited,
+# so committing them only produces diffs nobody reads and merge conflicts nobody
+# can resolve. CI runs `melos run gen` before analyze and test, and so must a
+# fresh clone — the build instructions in README.md say so.
+*.g.dart
+*.freezed.dart
+*.drift.dart
+*.ffi.dart
+lib/i18n/strings*.g.dart

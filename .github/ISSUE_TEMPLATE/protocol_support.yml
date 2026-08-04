@@ -1,0 +1,89 @@
+name: Protocol support
+description: Ask for a proxy protocol Commy does not speak yet
+labels: [enhancement, protocol, config]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Before you fill this in
+
+        **Do not paste a working link.** A share link contains a UUID or a
+        password and identifies a real server. Replace every credential with
+        `…` — the *shape* of the link is what matters here, not its contents.
+
+        Commy speaks whatever [sing-box](https://github.com/SagerNet/sing-box)
+        speaks: VLESS with Reality, VMess, Trojan, Shadowsocks, ShadowTLS,
+        AnyTLS, Hysteria2, TUIC and WireGuard. If sing-box does not support a
+        protocol, we cannot add it by ourselves — the request belongs upstream,
+        and this issue is then about *linking to* that work.
+
+  - type: input
+    id: protocol
+    attributes:
+      label: Protocol
+      placeholder: e.g. Juicity, NaiveProxy, Snell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: singbox
+    attributes:
+      label: Does sing-box support it?
+      description: >-
+        Check the sing-box documentation. This decides whether the work is a
+        parser and a config section on our side, or a feature request upstream.
+      options:
+        - 'Yes — it is in sing-box'
+        - 'Yes, but only behind a build tag'
+        - 'No'
+        - 'I do not know'
+    validations:
+      required: true
+
+  - type: input
+    id: build-tag
+    attributes:
+      label: Build tag
+      description: >-
+        If it needs one. Our tag set is deliberately short — see
+        docs/13-libbox-reference.md — and every added tag grows the binary,
+        which matters for the 50 MiB iOS extension limit.
+      placeholder: with_something
+
+  - type: input
+    id: spec
+    attributes:
+      label: Specification or reference implementation
+      description: A link to the protocol definition or its canonical client.
+    validations:
+      required: true
+
+  - type: textarea
+    id: link-shape
+    attributes:
+      label: What a share link looks like
+      description: >-
+        With every credential removed. This is what the parser has to accept.
+      render: text
+      placeholder: |
+        proto://…@example.net:443?sni=…&fp=chrome#Name
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Where you actually need it
+      description: >-
+        Which panel or provider hands these out. "It would be nice" is a weaker
+        case than "my provider migrated and I cannot connect any more".
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: The link above contains no UUID, password or key
+          required: true
+        - label: I searched existing issues for this protocol
+          required: true
