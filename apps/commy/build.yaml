@@ -1,0 +1,19 @@
+# slang has two entry points and they do NOT share a config file.
+#
+# `dart run slang` reads slang.yaml. `dart run build_runner build` reads this
+# file and ignores slang.yaml entirely — a difference that silently produced a
+# generated bundle with `baseLocale: AppLocale.en` while slang.yaml said `ru`.
+# The options below are a copy of slang.yaml so that both commands emit the
+# same code. Change one, change the other.
+targets:
+  $default:
+    builders:
+      slang_build_runner:
+        options:
+          base_locale: ru
+          fallback_strategy: base_locale
+          input_directory: assets/i18n
+          input_file_pattern: .i18n.json
+          output_file_name: strings.g.dart
+          translate_var: t
+          enum_name: AppLocale

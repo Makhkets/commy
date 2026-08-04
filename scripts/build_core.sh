@@ -103,21 +103,20 @@ ensure_gomobile() {
   gobin="$(go env GOPATH)/bin"
   export PATH="${gobin}:${PATH}"
 
-  # `command -v` is not enough: a previously installed upstream gomobile sits at
-  # the same path under the same name. Ask the binary whether it knows the flag
-  # we depend on, and reinstall when it does not.
-  if ! command -v gomobile >/dev/null 2>&1 ||
-     ! gomobile bind -h 2>&1 | grep -q -- '-libname'; then
-    say "installing ${GOMOBILE_PKG}@${GOMOBILE_VERSION}"
-    go install "${GOMOBILE_PKG}/cmd/gomobile@${GOMOBILE_VERSION}"
-    go install "${GOMOBILE_PKG}/cmd/gobind@${GOMOBILE_VERSION}"
-  fi
-
-  if ! gomobile bind -h 2>&1 | grep -q -- '-libname'; then
-    die "the gomobile on PATH does not support -libname.
-   That is upstream golang.org/x/mobile, which cannot build libbox.
-   Remove it from \$(go env GOPATH)/bin and re-run."
-  fi
+  # Installed unconditionally, on purpose.
+  #
+  # Detecting which gomobile is already there is harder than it looks and got
+  # this wrong twice. `command -v gomobile` cannot tell the two apart — upstream
+  # and the fork live at the same path under the same name — and the fork does
+  # NOT list -libname in `bind -h`, so probing the help text rejects the correct
+  # tool. `go version -m` reads the module path, but needs a binary path the
+  # host OS understands, which differs between Git Bash and a Linux runner.
+  #
+  # `go install` is idempotent and cheap once the module is in the cache, so the
+  # reliable move is to stop guessing and just pin it every time.
+  say "installing ${GOMOBILE_PKG}@${GOMOBILE_VERSION}"
+  go install "${GOMOBILE_PKG}/cmd/gomobile@${GOMOBILE_VERSION}"
+  go install "${GOMOBILE_PKG}/cmd/gobind@${GOMOBILE_VERSION}"
 
   gomobile init
 }
