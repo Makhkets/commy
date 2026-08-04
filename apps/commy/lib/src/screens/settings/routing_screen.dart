@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -57,9 +58,12 @@ class _Body extends ConsumerWidget {
     final dns = ref.watch(dnsSettingsProvider).value ?? DnsSettings.defaults;
     final rules = policy.rules;
 
+    final warnings = ref.watch(configWarningsProvider);
+
     return ListView(
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
+        if (warnings.isNotEmpty) _DroppedRules(warnings: warnings),
         Padding(
           padding: EdgeInsets.all(spacing.s4),
           child: SegmentedControl<RoutingMode>(
@@ -196,6 +200,77 @@ class _Body extends ConsumerWidget {
       return;
     }
     await controller.addRule(matcher: draft.matcher, action: draft.action);
+  }
+}
+
+/// What the last configuration build threw away, and why.
+///
+/// Every rule naming `geosite:` or a `geoip:` country needs a rule set on
+/// disk. Until one is downloaded the builder drops those rules so the tunnel
+/// still comes up — correct, but invisible: the rule stays on this screen,
+/// looking applied, and does nothing. This is where that stops being silent.
+class _DroppedRules extends StatelessWidget {
+  const _DroppedRules({required this.warnings});
+
+  final List<String> warnings;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final colors = context.colors;
+    final spacing = context.spacing;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(spacing.s4, spacing.s4, spacing.s4, 0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.statusErrorWash,
+          borderRadius: context.radii.lgAll,
+        ),
+        padding: EdgeInsets.all(spacing.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  CommyIcons.warning,
+                  size: CommySizes.iconControl,
+                  color: colors.statusError,
+                ),
+                SizedBox(width: spacing.s2),
+                Expanded(
+                  child: Text(
+                    t.routing.dropped.title,
+                    style: context.typography.title3.copyWith(
+                      color: colors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: spacing.s2),
+            Text(
+              t.routing.dropped.body,
+              style: context.typography.caption.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
+            SizedBox(height: spacing.s2),
+            for (final warning in warnings) ...<Widget>[
+              Text(
+                warning,
+                style: context.typography.monoSmall.copyWith(
+                  color: colors.textTertiary,
+                ),
+              ),
+              SizedBox(height: spacing.s1),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

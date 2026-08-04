@@ -95,7 +95,80 @@ final tunnelStatusProvider = Provider<TunnelStatus>((ref) {
   if (action.isBusy && reported is TunnelIdle) {
     return const TunnelStatus.starting();
   }
+  // `checking` is the one state the core never reports. It is derived here,
+  // which is exactly the asymmetry scripts/check_wire_contract.py records when
+  // it lists `checking` under DART_ONLY_STATES.
+  if (action.isChecking && reported is TunnelConnected) {
+    return TunnelStatus.checking(
+      since: reported.since,
+      nodeId: reported.nodeId,
+    );
+  }
   return reported;
+});
+
+/// Probes reachability once each time the tunnel comes up.
+///
+/// docs/05-ux-flows.md puts `checking` between `connected` and "готово", and
+/// says why: a raised tunnel is not working internet — the server may be dead,
+/// the quota spent, the provider filtering. Without this the state exists in
+/// the domain, in the codec and in the button, and never once happens on a
+/// device.
+///
+/// Watched from the root, like the log pump: the probe belongs to the
+/// connection, not to whichever screen is on top when it comes up.
+final autoCheckProvider = Provider<void>((ref) {
+  // Keyed on `since` rather than a bool: reconnecting produces a new timestamp,
+  // so each connection is probed exactly once and a rebuild probes none.
+  DateTime? probed;
+  ref.listen<AsyncValue<TunnelStatus>>(coreStatusProvider, (previous, next) {
+    final status = next.value;
+    if (status is! TunnelConnected) {
+      probed = null;
+      return;
+    }
+    if (probed == status.since) {
+      return;
+    }
+    probed = status.since;
+    unawaited(ref.read(tunnelControllerProvider.notifier).check());
+  });
+});
+
+/// Connects on launch when the user asked for it.
+///
+/// Deliberately decided **once**, off the first settled read of both settings
+/// and the stored selection. Reacting to every later change would turn the
+/// switch into "connect the moment this is enabled", which is not what
+/// "автоподключение при запуске" says on the settings screen.
+final autoConnectProvider = Provider<void>((ref) {
+  var decided = false;
+  void consider() {
+    if (decided) {
+      return;
+    }
+    final settings = ref.read(settingsProvider).value;
+    final selected = ref.read(selectedNodeIdProvider);
+    if (settings == null || selected.isLoading) {
+      return;
+    }
+    decided = true;
+    final nodeId = selected.value;
+    if (!settings.autoConnect || nodeId == null) {
+      return;
+    }
+    unawaited(
+      ref.read(tunnelControllerProvider.notifier).connect(nodeId: nodeId),
+    );
+  }
+
+  ref
+    ..listen<AsyncValue<AppSettings>>(settingsProvider, (_, __) => consider())
+    ..listen<AsyncValue<String?>>(
+      selectedNodeIdProvider,
+      (_, __) => consider(),
+    );
+  consider();
 });
 
 /// Actions on the tunnel, plus whatever the last one produced.
@@ -110,6 +183,7 @@ class TunnelActionState {
   /// Creates the state.
   const TunnelActionState({
     this.isBusy = false,
+    this.isChecking = false,
     this.failure,
     this.notice,
     this.lastConfig,
@@ -120,6 +194,12 @@ class TunnelActionState {
 
   /// A start or stop call is in flight.
   final bool isBusy;
+
+  /// A reachability probe is in flight.
+  ///
+  /// Kept apart from [isBusy]: the tunnel is up and usable while this is set,
+  /// so the button must stay a "disconnect", not become a spinner.
+  final bool isChecking;
 
   /// The failure the last action produced, if it produced one.
   final CommyFailure? failure;
@@ -137,6 +217,7 @@ class TunnelActionState {
   /// A copy with the given fields replaced.
   TunnelActionState copyWith({
     bool? isBusy,
+    bool? isChecking,
     CommyFailure? failure,
     TunnelNotice? notice,
     CoreConfig? lastConfig,
@@ -145,6 +226,7 @@ class TunnelActionState {
   }) {
     return TunnelActionState(
       isBusy: isBusy ?? this.isBusy,
+      isChecking: isChecking ?? this.isChecking,
       failure: clearFailure ? null : failure ?? this.failure,
       notice: clearNotice ? null : notice ?? this.notice,
       lastConfig: lastConfig ?? this.lastConfig,
@@ -156,12 +238,14 @@ class TunnelActionState {
       identical(this, other) ||
       other is TunnelActionState &&
           other.isBusy == isBusy &&
+          other.isChecking == isChecking &&
           other.failure == failure &&
           other.notice == notice &&
           other.lastConfig == lastConfig;
 
   @override
-  int get hashCode => Object.hash(isBusy, failure, notice, lastConfig);
+  int get hashCode =>
+      Object.hash(isBusy, isChecking, failure, notice, lastConfig);
 
   @override
   String toString() => 'TunnelActionState(busy: $isBusy, $failure)';
@@ -331,17 +415,22 @@ class TunnelController extends Notifier<TunnelActionState> {
     if (node == null) {
       return;
     }
-    state = state.copyWith(clearNotice: true, clearFailure: true);
+    state = state.copyWith(
+      isChecking: true,
+      clearNotice: true,
+      clearFailure: true,
+    );
     final result = await ref.read(checkReachabilityUseCaseProvider)(
       outboundTag: SingBoxTags.forNode(node),
     );
     final failure = result.failureOrNull;
     if (failure != null) {
-      state = state.copyWith(failure: failure);
+      state = state.copyWith(isChecking: false, failure: failure);
       return;
     }
     final latency = result.valueOrNull;
     state = state.copyWith(
+      isChecking: false,
       notice: latency == null
           ? const TunnelNotice(TunnelNoticeKind.checkFailed)
           : TunnelNotice(

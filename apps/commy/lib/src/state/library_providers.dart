@@ -6,6 +6,7 @@ library;
 
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy_domain/commy_domain.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Every stored server, in display order.
@@ -37,6 +38,56 @@ final routingPolicyProvider = StreamProvider<RoutingPolicy>((ref) {
 final dnsSettingsProvider = StreamProvider<DnsSettings>((ref) {
   return ref.watch(routingRepositoryProvider).watchDns();
 });
+
+/// Whether unreachable servers are currently kept out of the lists.
+///
+/// docs/05-ux-flows.md is precise about this: "**timeout** не прячет узел:
+/// сервер мог быть временно недоступен. Скрытие нерабочих — отдельный
+/// переключатель." So a server that failed a probe stays visible until the
+/// user asks otherwise, and the filter lives behind `AppSettings`.
+final nodeFilterProvider = Provider<NodeFilter>((ref) {
+  final settings = ref.watch(settingsProvider).value;
+  return NodeFilter(
+    hideUnavailable: settings?.hideUnavailable ?? false,
+  );
+});
+
+/// Applies the "hide unavailable" setting to a list of servers.
+@immutable
+class NodeFilter {
+  /// Creates the filter.
+  const NodeFilter({required this.hideUnavailable});
+
+  /// Whether servers that failed their last probe are dropped.
+  final bool hideUnavailable;
+
+  /// Whether [node] is shown.
+  ///
+  /// A node nobody has measured yet counts as reachable: it has not failed,
+  /// it simply has not been asked. Hiding it would make a fresh import look
+  /// like a broken one.
+  bool isVisible(ProxyNode node) =>
+      !hideUnavailable || node.latency != null || node.lastCheckedAt == null;
+
+  /// [nodes] with the hidden ones removed.
+  List<ProxyNode> apply(List<ProxyNode> nodes) {
+    if (!hideUnavailable) {
+      return nodes;
+    }
+    return <ProxyNode>[
+      for (final node in nodes)
+        if (isVisible(node)) node,
+    ];
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NodeFilter && other.hideUnavailable == hideUnavailable;
+
+  @override
+  int get hashCode => hideUnavailable.hashCode;
+}
 
 /// Nodes that came from a paste, a QR code or a file rather than a panel.
 ///

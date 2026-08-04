@@ -37,7 +37,6 @@ class AppSettings {
   const AppSettings({
     this.themeMode = AppThemeMode.system,
     this.locale,
-    this.killSwitch = false,
     this.autoConnect = false,
     this.startOnBoot = false,
     this.hideUnavailable = false,
@@ -55,7 +54,6 @@ class AppSettings {
           JsonRead.stringOr(json, 'themeMode', orElse: 'system'),
         ),
         locale: JsonRead.stringOrNull(json, 'locale'),
-        killSwitch: JsonRead.boolean(json, 'killSwitch', orElse: false),
         autoConnect: JsonRead.boolean(json, 'autoConnect', orElse: false),
         startOnBoot: JsonRead.boolean(json, 'startOnBoot', orElse: false),
         hideUnavailable: JsonRead.boolean(
@@ -99,8 +97,20 @@ class AppSettings {
   /// BCP-47 language tag, or `null` to follow the system.
   final String? locale;
 
-  /// Whether traffic is blocked while the tunnel is down.
-  final bool killSwitch;
+  // There is deliberately no `killSwitch` here.
+  //
+  // It used to exist, was written by a switch on the settings screen, and was
+  // read by nothing: no builder put it in the configuration and no Kotlin
+  // consulted it. That made it worse than a missing feature — it was a claim
+  // about traffic being blocked, in the one part of the app whose job is to
+  // be exact about what happens to traffic (docs/09-security-privacy.md).
+  //
+  // The guarantee itself belongs to the operating system. Android enforces
+  // "Always-on VPN" + "Block connections without VPN" in the framework, so it
+  // survives the app being killed, which is precisely the case an in-process
+  // kill switch cannot cover. The settings screen now names that and offers to
+  // open it. Old stored settings may still carry the key; `fromJson` ignores
+  // what it does not read.
 
   /// Whether the app connects to the last used node on launch.
   final bool autoConnect;
@@ -151,7 +161,6 @@ class AppSettings {
   AppSettings copyWith({
     AppThemeMode? themeMode,
     String? locale,
-    bool? killSwitch,
     bool? autoConnect,
     bool? startOnBoot,
     bool? hideUnavailable,
@@ -166,7 +175,6 @@ class AppSettings {
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
       locale: nextLocale != null && nextLocale.isEmpty ? null : nextLocale,
-      killSwitch: killSwitch ?? this.killSwitch,
       autoConnect: autoConnect ?? this.autoConnect,
       startOnBoot: startOnBoot ?? this.startOnBoot,
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
@@ -183,7 +191,6 @@ class AppSettings {
   JsonMap toJson() => <String, Object?>{
         'themeMode': themeMode.name,
         'locale': locale,
-        'killSwitch': killSwitch,
         'autoConnect': autoConnect,
         'startOnBoot': startOnBoot,
         'hideUnavailable': hideUnavailable,
@@ -201,7 +208,6 @@ class AppSettings {
       other is AppSettings &&
           other.themeMode == themeMode &&
           other.locale == locale &&
-          other.killSwitch == killSwitch &&
           other.autoConnect == autoConnect &&
           other.startOnBoot == startOnBoot &&
           other.hideUnavailable == hideUnavailable &&
@@ -216,7 +222,6 @@ class AppSettings {
   int get hashCode => Object.hash(
         themeMode,
         locale,
-        killSwitch,
         autoConnect,
         startOnBoot,
         hideUnavailable,
@@ -231,5 +236,5 @@ class AppSettings {
   @override
   String toString() =>
       'AppSettings(${themeMode.name}, ${locale ?? 'system'}, '
-      'killSwitch: $killSwitch, tun: ${tunStack.name})';
+      'tun: ${tunStack.name})';
 }

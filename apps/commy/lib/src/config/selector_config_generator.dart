@@ -20,6 +20,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
     required this.platform,
     required this.knownNodes,
     this.builder = const SingBoxConfigBuilder(),
+    this.onWarnings,
   });
 
   /// Which sing-box feature set is allowed on this platform.
@@ -30,6 +31,15 @@ class SelectorConfigGenerator implements ConfigGenerator {
 
   /// The underlying builder, pinned to sing-box v1.13.16.
   final SingBoxConfigBuilder builder;
+
+  /// Receives everything the builder had to drop to produce a valid document.
+  ///
+  /// The domain port returns a bare `CoreConfig`, so without this the notes
+  /// die here — and they are the only place the user is ever told that the
+  /// `geosite:` rule they typed was silently removed because no rule set is on
+  /// disk. Reported on every build, including one that dropped nothing, so a
+  /// listener can clear a stale warning instead of showing it forever.
+  final void Function(List<String> warnings)? onWarnings;
 
   @override
   Result<CoreConfig, CommyFailure> build({
@@ -50,7 +60,10 @@ class SelectorConfigGenerator implements ConfigGenerator {
         includeClashApi: includeClashApi,
       ),
     );
-    return result.map((built) => built.config);
+    return result.map((built) {
+      onWarnings?.call(built.warnings);
+      return built.config;
+    });
   }
 
   /// The selected node first, then everything else, with no duplicates.

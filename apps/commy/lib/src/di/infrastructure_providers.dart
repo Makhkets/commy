@@ -57,6 +57,14 @@ final coreClientProvider = Provider<CoreClient>((ref) {
 /// Application and core version strings, read once at startup.
 final appInfoProvider = Provider<AppInfo>((ref) => AppInfo.unknown);
 
+/// System screens Commy can point at but not replace.
+///
+/// Only the VPN settings so far, and only because the kill-switch guarantee
+/// belongs to Android rather than to us.
+final systemSettingsProvider = Provider<SystemSettings>(
+  (ref) => const SystemSettings(),
+);
+
 /// The single logger. Every `print` in this app would be a lint error; this is
 /// the replacement (docs/09-security-privacy.md, rule R3).
 ///

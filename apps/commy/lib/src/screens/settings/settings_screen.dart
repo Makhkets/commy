@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -118,17 +119,15 @@ class _Body extends ConsumerWidget {
                 ),
               ),
             ),
+            // Not a switch. Blocking traffic when the tunnel dies is a promise
+            // this process cannot keep — a killed process blocks nothing — so
+            // the row names the mechanism that can keep it, says it belongs to
+            // the system, and opens it.
             SettingsTile(
               icon: CommyIcons.block,
               title: t.settings.connection.killSwitch,
               subtitle: t.settings.connection.killSwitchHint,
-              trailing: CommySwitch(
-                value: settings.killSwitch,
-                semanticLabel: t.settings.connection.killSwitch,
-                onChanged: (value) => unawaited(
-                  controller.save(settings.copyWith(killSwitch: value)),
-                ),
-              ),
+              onTap: () => unawaited(_openVpnSettings(context, ref)),
             ),
             SettingsTile(
               icon: CommyIcons.offline,
@@ -159,6 +158,33 @@ class _Body extends ConsumerWidget {
         SizedBox(height: spacing.s6),
       ],
     );
+  }
+
+  /// Opens the system VPN settings, or explains that this build has none.
+  ///
+  /// Desktop and the occasional Android image have no such screen. Saying so
+  /// is better than a row that swallows the tap.
+  Future<void> _openVpnSettings(BuildContext context, WidgetRef ref) async {
+    final t = Translations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final opened = await ref.read(systemSettingsProvider).openVpnSettings();
+    if (opened || messenger == null) {
+      return;
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          behavior: SnackBarBehavior.floating,
+          content: Toast(
+            message: t.settings.connection.killSwitchUnavailable,
+            tone: CommyTone.info,
+            icon: CommyIcons.info,
+          ),
+        ),
+      );
   }
 
   String _routingSubtitle(Translations t) {

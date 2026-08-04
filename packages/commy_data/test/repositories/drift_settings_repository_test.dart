@@ -27,8 +27,8 @@ void main() {
       const settings = AppSettings(
         themeMode: AppThemeMode.dark,
         locale: 'ru',
-        killSwitch: true,
         autoConnect: true,
+        hideUnavailable: true,
         logLevel: LogLevel.debug,
         mixedPort: 7890,
         tunStack: TunStack.mixed,

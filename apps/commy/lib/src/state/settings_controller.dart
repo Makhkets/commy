@@ -40,6 +40,11 @@ class SettingsController extends Notifier<CommyFailure?> {
     );
   }
 
+  /// Hides or shows servers that failed their last probe.
+  Future<void> setHideUnavailable({required bool enabled}) async {
+    await save((await _settings()).copyWith(hideUnavailable: enabled));
+  }
+
   /// Switches the theme.
   Future<void> setThemeMode(AppThemeMode mode) async {
     await save((await _settings()).copyWith(themeMode: mode));

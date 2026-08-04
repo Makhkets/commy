@@ -22,8 +22,40 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
   return SelectorConfigGenerator(
     platform: ref.watch(configPlatformProvider),
     knownNodes: () => ref.read(nodesProvider).value ?? const <ProxyNode>[],
+    onWarnings: (warnings) {
+      ref.read(configWarningsProvider.notifier).report(warnings);
+      final logger = ref.read(appLoggerProvider);
+      for (final warning in warnings) {
+        logger.warn(warning, tag: 'config');
+      }
+    },
   );
 });
+
+/// What the last configuration build had to leave out.
+///
+/// Empty on a clean build. A rule naming a rule set that is not on disk is
+/// dropped so the tunnel still comes up — which is the right call, and a
+/// silent one until somebody shows this list.
+final configWarningsProvider =
+    NotifierProvider<ConfigWarnings, List<String>>(ConfigWarnings.new);
+
+/// Holds the notes from the most recent build.
+class ConfigWarnings extends Notifier<List<String>> {
+  @override
+  List<String> build() => const <String>[];
+
+  /// Replaces the list with what the latest build produced.
+  ///
+  /// Compared before assigning: a build happens on every connect, and handing
+  /// Riverpod a new-but-equal list would rebuild the routing screen each time.
+  void report(List<String> warnings) {
+    if (Structural.listEquals(state, warnings)) {
+      return;
+    }
+    state = List<String>.unmodifiable(warnings);
+  }
+}
 
 /// Turns pasted text into stored nodes.
 final importLinksUseCaseProvider = Provider<ImportLinksUseCase>((ref) {

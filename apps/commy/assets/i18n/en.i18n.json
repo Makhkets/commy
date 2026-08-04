@@ -46,6 +46,8 @@
     "noNodeSelected": "No server selected",
     "manualGroup": "Your servers",
     "manualGroupSubtitle": "Added by hand",
+    "hiddenCount": "Hidden: $count unavailable",
+    "showHidden": "Show",
     "checkOk": "Access confirmed: $ms ms",
     "checkFailed": "The check did not pass",
     "switched": "Switched to $name"
@@ -171,7 +173,8 @@
       "startOnBoot": "Start on boot",
       "startOnBootHint": "Needs a system permission",
       "killSwitch": "Kill switch",
-      "killSwitchHint": "Block traffic if the tunnel drops",
+      "killSwitchHint": "Provided by Android: Always-on VPN with \"Block connections without VPN\". Tap to open it.",
+      "killSwitchUnavailable": "This system has no VPN settings screen",
       "hideUnavailable": "Hide unreachable",
       "hideUnavailableHint": "Servers that did not answer a probe",
       "allowLan": "Allow LAN access",
@@ -191,6 +194,10 @@
     "addRule": "Add",
     "finalRule": "Everything else",
     "finalRuleHint": "The last rule is always there and cannot be removed: routing must have a final outcome.",
+    "dropped": {
+      "title": "Some rules are not being applied",
+      "body": "They name a rule set that is not on disk. The tunnel still comes up, but these rules do nothing until the sets are downloaded."
+    },
     "action": {
       "proxy": "Proxy",
       "direct": "Direct",

@@ -5,6 +5,7 @@ import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/traffic_history.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/notice_host.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -38,10 +39,15 @@ class _CommyAppState extends ConsumerState<CommyApp> {
   @override
   Widget build(BuildContext context) {
     ref
-      // Two long-lived subscriptions, watched from the root so they outlive
-      // every screen.
+      // Long-lived subscriptions, watched from the root so they outlive every
+      // screen.
       ..watch(logPumpProvider)
       ..watch(trafficHistoryProvider)
+      // The `checking` step. It belongs to the connection, not to whichever
+      // screen happens to be on top when the tunnel comes up.
+      ..watch(autoCheckProvider)
+      // "Connect on launch", decided once off the first settled read.
+      ..watch(autoConnectProvider)
       // Loading a locale is asynchronous — slang defers every non-base
       // bundle — so it happens in a listener rather than during build.
       ..listen<AsyncValue<AppSettings>>(settingsProvider, (previous, next) {
@@ -68,6 +74,8 @@ class _CommyAppState extends ConsumerState<CommyApp> {
           locale: TranslationProvider.of(context).flutterLocale,
           supportedLocales: AppLocaleUtils.supportedLocales,
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          builder: (context, child) =>
+              NoticeHost(child: child ?? const SizedBox.shrink()),
         ),
       ),
     );

@@ -9,6 +9,7 @@ import 'package:commy/src/screens/home/widgets/subscription_section.dart';
 import 'package:commy/src/screens/import/import_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/failure_view.dart';
@@ -93,8 +94,12 @@ class _HomeContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final spacing = context.spacing;
-    final manual = ref.watch(manualNodesProvider);
+    final filter = ref.watch(nodeFilterProvider);
+    final manual = filter.apply(ref.watch(manualNodesProvider));
     final selectedId = ref.watch(selectedNodeIdProvider).value;
+    // Counted across every list at once so the footer states one number the
+    // user can check against, rather than one per card.
+    final hidden = nodes.length - filter.apply(nodes).length;
     // The banner reads the *folded* status, not just this app's last action:
     // a core that died on its own has to explain itself too, and that arrives
     // as a `TunnelError` on the status stream with nothing local behind it.
@@ -126,10 +131,10 @@ class _HomeContent extends ConsumerWidget {
         for (final subscription in subscriptions) ...<Widget>[
           SubscriptionSection(
             subscription: subscription,
-            nodes: <ProxyNode>[
+            nodes: filter.apply(<ProxyNode>[
               for (final node in nodes)
                 if (node.subscriptionId == subscription.id) node,
-            ],
+            ]),
           ),
           SizedBox(height: spacing.s4),
         ],
@@ -141,6 +146,7 @@ class _HomeContent extends ConsumerWidget {
           for (final node in manual)
             NodeRow(node: node, isActive: node.id == selectedId),
         ],
+        if (hidden > 0) _HiddenFooter(count: hidden),
       ],
     );
   }
@@ -165,6 +171,49 @@ class _HomeContent extends ConsumerWidget {
   /// Roughly the height of the hero area: enough to put the first card under
   /// the app bar without hunting for a render box.
   static const double _listOffset = 360;
+}
+
+/// Says how many servers the "hide unavailable" setting took out of the list.
+///
+/// A filter that silently shrinks the list is how a user concludes their
+/// import lost half the servers. The count is shown with the way to undo it,
+/// on the screen where the absence is noticed rather than in settings.
+class _HiddenFooter extends ConsumerWidget {
+  const _HiddenFooter({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = Translations.of(context);
+    final spacing = context.spacing;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(spacing.s4, spacing.s4, spacing.s4, 0),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              t.home.hiddenCount(count: count),
+              style: context.typography.caption.copyWith(
+                color: context.colors.textTertiary,
+              ),
+            ),
+          ),
+          CommyButton(
+            label: t.home.showHidden,
+            variant: CommyButtonVariant.ghost,
+            isCompact: true,
+            onPressed: () => unawaited(
+              ref
+                  .read(settingsControllerProvider.notifier)
+                  .setHideUnavailable(enabled: false),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _HomeSkeleton extends StatelessWidget {
