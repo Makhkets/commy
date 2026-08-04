@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
@@ -178,16 +179,4 @@ class SubscriptionSection extends ConsumerWidget {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
-
-  static String _ago(Duration value) {
-    if (value.inHours >= 1) {
-      return '${value.inHours} h';
-    }
-    if (value.inMinutes >= 1) {
-      return '${value.inMinutes} min';
-    }
-    return '${value.inSeconds} s';
-  }
-
-  static String _hours(Duration value) => '${value.inHours} h';
 }
