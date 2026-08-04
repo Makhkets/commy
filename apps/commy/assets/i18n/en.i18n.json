@@ -13,7 +13,8 @@
     "error": "Error",
     "check": "Check",
     "cancel": "Cancel",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "noNode": "Choose a server first"
   },
 
   "metrics": {
@@ -25,15 +26,22 @@
 
   "home": {
     "empty": {
-      "title": "Add your server",
-      "body": "Commy offers no ready-made servers and runs none of its own. That is a product decision, not a gap.",
+      "title": "No servers yet",
+      "body": "Commy stays empty until you import something. We run no servers of our own and sell none.",
       "paste": "Paste a link",
-      "subscription": "Subscription URL",
-      "scan": "Scan a QR code",
-      "file": "Open a config file"
+      "pasteAndConnect": "Paste and connect",
+      "clipboardFound": "A link was found in the clipboard",
+      "subscription": "Subscription",
+      "scan": "QR code",
+      "file": "File"
     },
     "selectNode": "Choose a server",
-    "noNodeSelected": "No server selected"
+    "noNodeSelected": "No server selected",
+    "manualGroup": "Your servers",
+    "manualGroupSubtitle": "Added by hand",
+    "checkOk": "Access confirmed: $ms ms",
+    "checkFailed": "The check did not pass",
+    "switched": "Switched to $name"
   },
 
   "import": {
@@ -44,42 +52,63 @@
       "many": "$count links",
       "paste": "Paste"
     },
+    "paste": {
+      "title": "Paste a link",
+      "label": "One link or several lines",
+      "hint": "vless://…, vmess://…, ss://…",
+      "action": "Import"
+    },
     "subscription": {
       "title": "Subscription URL",
       "subtitle": "Server list, quota and expiry from your panel",
       "url": "Subscription link",
+      "urlHint": "https://panel.example.net/sub/…",
       "name": "Name (optional)",
       "interval": "Refresh every",
-      "add": "Add"
+      "intervalHours": "$count h",
+      "autoUpdate": "Auto refresh",
+      "add": "Add",
+      "invalidUrl": "That does not look like an http or https link"
     },
     "qr": {
       "title": "Scan a QR code",
       "permission": "Camera access needed",
-      "permissionBody": "Asked for here only, and only while the scanner is open."
+      "permissionBody": "Asked for here only, and only while the scanner is open.",
+      "unavailable": "No camera on this device"
     },
     "file": {
       "title": "Open a config file",
-      "subtitle": "sing-box JSON, Clash YAML, base64"
+      "subtitle": "sing-box JSON, Clash YAML, base64",
+      "cancelled": "No file chosen",
+      "unreadable": "The file could not be read"
     },
     "result": {
       "imported": "Imported $count servers",
       "skipped": "$count skipped",
       "showSkipped": "Show reasons",
-      "nothing": "No servers found"
+      "skippedTitle": "Skipped lines",
+      "nothing": "No servers found",
+      "nothingBody": "Check that the text holds a vless:// style link or a base64 subscription."
     }
   },
 
   "subscription": {
+    "title": "Subscription",
     "updatedAgo": "$time ago",
     "autoEvery": "auto $interval",
     "never": "never refreshed",
     "quota": "$used of $total",
     "unlimited": "unlimited",
     "daysLeft": "$count left",
+    "days": "$count d",
     "expired": "expired",
+    "nodes": "$count servers",
     "refresh": "Refresh",
     "pingAll": "Measure all",
     "more": "More",
+    "support": "Support",
+    "website": "Website",
+    "refreshed": "Refreshed: $count servers",
     "menu": {
       "collapse": "Collapse",
       "expand": "Expand",
@@ -93,22 +122,54 @@
       "body": "Its servers and their credentials go with it. The link itself can be added again.",
       "confirm": "Delete",
       "cancel": "Cancel"
-    }
+    },
+    "linkCopied": "Link copied"
   },
 
   "node": {
     "latency": "$ms ms",
     "notMeasured": "—",
     "unreachable": "Unreachable",
-    "auto": "Auto"
+    "auto": "Auto",
+    "delete": "Delete server",
+    "copyLink": "Copy link"
   },
 
   "settings": {
     "title": "Settings",
+    "sections": "Sections",
     "routing": "Routing",
+    "routingSubtitle": "Mode, rules, apps, DNS",
     "diagnostics": "Diagnostics",
+    "diagnosticsSubtitle": "Logs, connections, config, statistics",
     "appearance": "Appearance",
-    "about": "About"
+    "appearanceSubtitle": "Theme, language, text size",
+    "about": "About",
+    "aboutSubtitle": "Version, core, licences",
+    "silence": {
+      "title": "Silence on the wire",
+      "body": "Not one outgoing request you did not ask for. Below is the complete list of exceptions, and it is closed.",
+      "ipCheck": "Check my IP",
+      "ipCheckHint": "only when you tap",
+      "ruleSets": "geoip and geosite rule sets",
+      "ruleSetsHint": "when you tap Refresh",
+      "blockLists": "Ad block lists",
+      "blockListsHint": "source is configurable",
+      "footer": "A fourth exception cannot appear without changing this screen."
+    },
+    "connection": {
+      "title": "Connection",
+      "autoConnect": "Auto connect",
+      "autoConnectHint": "When the app starts",
+      "startOnBoot": "Start on boot",
+      "startOnBootHint": "Needs a system permission",
+      "killSwitch": "Kill switch",
+      "killSwitchHint": "Block traffic if the tunnel drops",
+      "hideUnavailable": "Hide unreachable",
+      "hideUnavailableHint": "Servers that did not answer a probe",
+      "allowLan": "Allow LAN access",
+      "allowLanHint": "The proxy listens beyond localhost"
+    }
   },
 
   "routing": {
@@ -119,17 +180,35 @@
       "direct": "Direct"
     },
     "rules": "Rules",
-    "addRule": "Add a rule",
+    "rulesHint": "Rules · order = priority",
+    "addRule": "Add",
     "finalRule": "Everything else",
+    "finalRuleHint": "The last rule is always there and cannot be removed: routing must have a final outcome.",
     "action": {
       "proxy": "Proxy",
       "direct": "Direct",
       "block": "Block"
     },
+    "extra": "More",
     "apps": "Apps",
+    "appsValue": "$count chosen",
+    "appsOff": "All",
     "ruleSets": "Rule sets",
     "ruleSetsHint": "Downloaded only when you tap",
-    "dns": "DNS"
+    "dns": "DNS",
+    "dnsValue": "$remote · $strategy",
+    "bypassLan": "LAN bypasses the proxy",
+    "blockAds": "Block ads",
+    "newRule": {
+      "title": "New rule",
+      "matcher": "Match",
+      "matcherHint": "geosite:ru, domain:example.com, geoip:private",
+      "action": "Action",
+      "save": "Save",
+      "empty": "A match cannot be empty"
+    },
+    "emptyRules": "No rules of your own yet",
+    "emptyRulesBody": "With no rules everything follows the final outcome. Add the first one to split the traffic."
   },
 
   "diagnostics": {
@@ -139,8 +218,25 @@
     "config": "Config",
     "stats": "Statistics",
     "copy": "Copy",
-    "export": "Export",
+    "copied": "Copied",
+    "export": "Export to a file",
     "clear": "Clear",
+    "redactionNotice": "UUIDs, passwords and subscription links are stripped automatically when copying and exporting.",
+    "levelAll": "ALL",
+    "logsEmpty": "No logs yet",
+    "logsEmptyBody": "The core writes here while the tunnel runs. Connect and the lines will appear.",
+    "connectionsEmpty": "No connections",
+    "connectionsEmptyBody": "This shows which rule matched each host. The list fills up while traffic flows.",
+    "configEmpty": "No config built yet",
+    "configEmptyBody": "The configuration appears the moment you connect: it is assembled from the chosen server, the rules and DNS.",
+    "configTitle": "Core configuration",
+    "configRedacted": "Secrets are stripped. This is what goes to the core, minus the credentials.",
+    "statsEmpty": "No statistics yet",
+    "statsEmptyBody": "The chart covers the last 60 seconds and the rows below cover the session.",
+    "statsWindow": "Last 60 seconds",
+    "statsUp": "Uploaded",
+    "statsDown": "Downloaded",
+    "statsTotal": "Session total",
     "exportWarning": {
       "title": "Export the logs?",
       "body": "Credentials, subscription links and full addresses are stripped before saving. Read the file before sending it anywhere.",
@@ -155,19 +251,27 @@
     "themeSystem": "Match system",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "language": "Language"
+    "language": "Language",
+    "languageSystem": "Match system",
+    "languageRu": "Русский",
+    "languageEn": "English"
   },
 
   "about": {
     "title": "About",
     "version": "Version",
     "core": "Core",
+    "coreValue": "sing-box $version",
     "sources": "Source code",
     "licences": "Licences",
-    "notAService": "Commy is not a VPN service. No servers of ours, no bundled configs, no accounts and no backend."
+    "licence": "GPL-3.0-or-later",
+    "notAService": "Commy is not a VPN service. No servers of ours, no bundled configs, no accounts and no backend.",
+    "storageDegraded": "The database is not encrypted in this build. Secrets still live in the system keystore."
   },
 
   "error": {
+    "title": "Something went wrong",
+    "openLogs": "Open the logs",
     "subscriptionUnreachable": {
       "message": "The subscription server is not answering",
       "action": "Retry"
@@ -178,7 +282,7 @@
     },
     "unsupportedProtocol": {
       "message": "$scheme is not supported yet",
-      "action": "Report it"
+      "action": "Open the logs"
     },
     "configInvalid": {
       "message": "The configuration is not valid",
@@ -213,6 +317,28 @@
     "delete": "Delete",
     "close": "Close",
     "search": "Search",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "add": "Add",
+    "done": "Done",
+    "back": "Back",
+    "openLogs": "Open the logs",
+    "clear": "Clear"
+  },
+
+  "a11y": {
+    "settings": "Settings",
+    "addServer": "Add a server",
+    "back": "Back",
+    "connect": "Connect button",
+    "closeSheet": "Close",
+    "clearField": "Clear the field",
+    "dragRule": "Reorder rule",
+    "offline": "This server is not answering",
+    "flag": "Flag: $country",
+    "quota": "$used of $total used",
+    "search": "Search the logs",
+    "copyLogs": "Copy the logs",
+    "subscriptionHealth": "Subscription health",
+    "dismiss": "Dismiss"
   }
 }

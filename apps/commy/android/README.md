@@ -122,6 +122,24 @@ ABI splits включены: `arm64-v8a`, `armeabi-v7a`, `x86_64` плюс unive
 32-битный ARM оставлен намеренно — в регионах, ради которых это приложение
 существует, полно дешёвых телефонов, никогда не видевших arm64-сборки.
 
+> ⚠️ **Сейчас `libbox.aar` собран только под `arm64-v8a`.** Gradle всё равно
+> честно соберёт четыре APK, и это ловушка: `app-armeabi-v7a-debug.apk` и
+> `app-x86_64-debug.apk` **не содержат `libbox.so`**. Они ставятся, запускаются,
+> показывают весь UI — и падают с `UnsatisfiedLinkError` в тот момент, когда
+> пользователь жмёт «Подключиться». Проверено на собранном APK.
+>
+> Перед релизом ядро надо пересобрать под все ABI:
+>
+> ```bash
+> COMMY_ANDROID_ABIS=android/arm64,android/arm,android/amd64 scripts/build_core.sh android
+> ```
+>
+> Проверка одной командой — в APK обязан быть `libbox.so`:
+>
+> ```bash
+> unzip -l build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk | grep libbox.so
+> ```
+
 ### Подпись
 
 Релизная подпись **необязательна**. Без ключа сборка всё равно даёт
@@ -250,6 +268,23 @@ keyPassword=…
 - [ ] **раздельное туннелирование**: приложение из списка исключений ходит мимо.
 
 ---
+
+## Что уже проверено сборкой, а что нет
+
+Проверено на этой машине (Flutter 3.44.8, AGP 9.0.1, Gradle 9.1, JDK 17):
+
+- [x] `:app:compileDebugKotlin` — чисто, без единого warning'а в нашем коде;
+      весь Kotlin линкуется с настоящим `libbox.aar`;
+- [x] `:app:assembleDebug` — четыре APK собираются;
+- [x] в `app-arm64-v8a-debug.apk` лежит `libbox.so` (40 МБ);
+- [x] в слитом манифесте есть `CommyVpnService`, `CommyTileService`,
+      `BootReceiver`, все разрешения, `foregroundServiceType=systemExempted`
+      (`0x400`), все 19 схем deep links, и **нет** `QUERY_ALL_PACKAGES`;
+- [x] `BootReceiver` в APK действительно `enabled=false`.
+
+**Не проверено — нужен реальный телефон:** всё поведение. Компилируемость
+`PlatformInterface` не означает, что туннель поднимается; ручной чек-лист ниже
+для того и написан. Ни один из четырёх критериев M1 автоматически не закрыт.
 
 ## Известные ограничения
 

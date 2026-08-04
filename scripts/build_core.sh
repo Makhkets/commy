@@ -88,15 +88,37 @@ sync_modules() {
   ( cd "${CORE_DIR}" && GOFLAGS="-tags=${TAGS}" go mod tidy )
 }
 
+# SagerNet's fork, pinned to the version sing-box's own Makefile installs.
+#
+# NOT golang.org/x/mobile. Upstream gomobile does not understand -libname, and
+# its response to the flag is to print its usage text and exit 0 — a build that
+# reports success and produces no file. Installing the wrong one is the single
+# most expensive mistake available here, because nothing about the output says
+# "wrong tool".
+readonly GOMOBILE_PKG="github.com/sagernet/gomobile"
+readonly GOMOBILE_VERSION="v0.1.12"
+
 ensure_gomobile() {
   local gobin
   gobin="$(go env GOPATH)/bin"
   export PATH="${gobin}:${PATH}"
-  if ! command -v gomobile >/dev/null 2>&1; then
-    say "installing gomobile"
-    go install golang.org/x/mobile/cmd/gomobile@latest
-    go install golang.org/x/mobile/cmd/gobind@latest
+
+  # `command -v` is not enough: a previously installed upstream gomobile sits at
+  # the same path under the same name. Ask the binary whether it knows the flag
+  # we depend on, and reinstall when it does not.
+  if ! command -v gomobile >/dev/null 2>&1 ||
+     ! gomobile bind -h 2>&1 | grep -q -- '-libname'; then
+    say "installing ${GOMOBILE_PKG}@${GOMOBILE_VERSION}"
+    go install "${GOMOBILE_PKG}/cmd/gomobile@${GOMOBILE_VERSION}"
+    go install "${GOMOBILE_PKG}/cmd/gobind@${GOMOBILE_VERSION}"
   fi
+
+  if ! gomobile bind -h 2>&1 | grep -q -- '-libname'; then
+    die "the gomobile on PATH does not support -libname.
+   That is upstream golang.org/x/mobile, which cannot build libbox.
+   Remove it from \$(go env GOPATH)/bin and re-run."
+  fi
+
   gomobile init
 }
 

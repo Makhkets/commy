@@ -12,7 +12,14 @@ import 'package:flutter_test/flutter_test.dart';
 /// It also refuses to pass on an empty directory, so that a run which quietly
 /// wrote no goldens at all cannot look like a green one.
 void main() {
-  test('every golden differs between the two themes', tags: 'golden', () {
+  test(
+    'every golden differs between the two themes',
+    tags: 'golden',
+    // Reads the golden PNGs off disk, so it can only run where they exist —
+    // and they exist only on Linux, which owns them because CI runs there.
+    // See the note on `goldenTest` in test/support/commy_test_host.dart.
+    skip: !Platform.isLinux,
+    () {
     final directory = Directory('test/golden/goldens');
     expect(
       directory.existsSync(),
@@ -53,7 +60,8 @@ void main() {
       reason: 'These render the same in both themes, so the theme never '
           'applied and the golden proves nothing.',
     );
-  });
+    },
+  );
 }
 
 bool _sameBytes(List<int> a, List<int> b) {

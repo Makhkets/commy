@@ -181,6 +181,20 @@ void goldenTest(
         );
       },
       tags: 'golden',
+      // Golden images are Skia output, and Skia rasterises text differently on
+      // every platform: the same widget renders with a 0.9-4.3 % pixel diff
+      // between Windows and Linux, which is enough to fail every comparison.
+      //
+      // So one platform owns them, and it is Linux, because that is where CI
+      // runs and CI is the authority. On anything else the comparison is
+      // skipped rather than made lenient — a tolerance wide enough to absorb a
+      // font-rendering difference is also wide enough to hide the layout
+      // regression these tests exist to catch.
+      //
+      // To refresh them:  see .github/workflows/goldens.yml, or run
+      //   flutter test --update-goldens --tags golden
+      // on Linux and commit the result.
+      skip: !Platform.isLinux,
     );
   }
 }

@@ -1,0 +1,64 @@
+name: Regenerate goldens
+
+# Golden images belong to one platform. Skia rasterises text differently on
+# every OS, so a set generated on Windows fails on Linux by 1-4 % of pixels —
+# enough to fail, not enough to be a real change. Linux owns them because CI
+# runs there, and this workflow is how they get refreshed.
+#
+# Run it from the Actions tab after a deliberate UI change, download the
+# artifact, and commit the PNGs. It does not push on its own: a golden update
+# is a claim that the UI was *meant* to change, and that claim needs a human
+# looking at the diff.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: What changed in the UI
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: 3.44.8
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install melos
+        run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - run: melos bootstrap
+      - run: melos run gen --no-select
+
+      - name: Regenerate
+        working-directory: packages/commy_ui
+        run: flutter test --update-goldens --tags golden
+
+      - name: Show what moved
+        working-directory: packages/commy_ui
+        run: |
+          echo "### Goldens changed" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          git status --porcelain test/golden/goldens >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "Reason given: ${{ github.event.inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: goldens
+          path: packages/commy_ui/test/golden/goldens/
+          if-no-files-found: error
