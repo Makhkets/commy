@@ -10,7 +10,27 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
-Nothing since the first pre-release.
+Nothing since the last pre-release.
+
+## [0.1.0-alpha.2]
+
+`v0.1.0-alpha.1` never produced a downloadable file: every APK built and then
+`bundleRelease` failed, because ABI splits and an app bundle cannot both be on
+while resource shrinking is. Fixed, and the bundle now builds first so the two
+cannot interact at all.
+
+### Added
+
+- **Deep links work.** The manifest has always registered Commy as a handler
+  for `vless://`, `vmess://`, `trojan://`, `ss://`, `hysteria2://`, `tuic://`,
+  for JSON and YAML config files and for shared text — and nothing on the Dart
+  side listened, so tapping such a link opened the app to no effect. A link now
+  opens the import sheet with the text already in it, and a Quick Settings tap
+  connects. The contract checker no longer excuses that channel.
+
+### Fixed
+
+- **Release artifacts.** See above.
 
 ## [0.1.0-alpha.1]
 
@@ -74,5 +94,6 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.1...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.2...main
+[0.1.0-alpha.2]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.1
