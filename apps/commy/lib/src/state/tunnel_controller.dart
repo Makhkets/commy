@@ -1,14 +1,3 @@
-import 'dart:async';
-
-import 'package:commy/src/di/infrastructure_providers.dart';
-import 'package:commy/src/di/repository_providers.dart';
-import 'package:commy/src/di/use_case_providers.dart';
-import 'package:commy/src/state/library_providers.dart';
-import 'package:commy_config/commy_config.dart';
-import 'package:commy_domain/commy_domain.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 /// The connect flow: status in, actions out.
 ///
 /// The status the button draws is **not** simply the core's status. Two things
@@ -22,6 +11,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// Everything else is the core's word and is passed through untouched.
 library;
+
+import 'dart:async';
+
+import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/library_providers.dart';
+import 'package:commy_config/commy_config.dart';
+import 'package:commy_domain/commy_domain.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The tag the log lines from this file carry.
 const String _tag = 'tunnel';
@@ -232,8 +232,8 @@ class TunnelController extends Notifier<TunnelActionState> {
       clearFailure: true,
       clearNotice: true,
     );
-    final logger = ref.read(appLoggerProvider);
-    logger.info('connect requested', tag: _tag);
+    final logger = ref.read(appLoggerProvider)
+      ..info('connect requested', tag: _tag);
 
     final result = await ref.read(connectUseCaseProvider)(nodeId: target);
     final failure = result.failureOrNull;
@@ -266,8 +266,14 @@ class TunnelController extends Notifier<TunnelActionState> {
   ///
   /// `starting` counts as up: the tap on a spinning button is a cancel, which
   /// is what docs/05-ux-flows.md promises for that state.
+  ///
+  /// It reads `coreStatusProvider`, not `tunnelStatusProvider`. The latter
+  /// folds this notifier's own state back in, so reading it from here is a
+  /// cycle — and Riverpod says so at runtime rather than at compile time,
+  /// which is exactly the kind of bug that only shows up under a user's
+  /// finger.
   Future<bool> toggle() async {
-    final shouldStop = switch (ref.read(tunnelStatusProvider)) {
+    final shouldStop = switch (_reportedStatus) {
       TunnelConnected() || TunnelChecking() || TunnelStarting() => true,
       TunnelIdle() || TunnelStopping() || TunnelError() => false,
     };
@@ -278,12 +284,16 @@ class TunnelController extends Notifier<TunnelActionState> {
     return connect();
   }
 
+  /// What the core last said, with no local state folded in.
+  TunnelStatus get _reportedStatus =>
+      ref.read(coreStatusProvider).value ?? const TunnelStatus.idle();
+
   /// Picks [node]. Switches the outbound in place when the tunnel is up.
   ///
   /// A restart would drop every open connection, which is exactly what
   /// docs/05-ux-flows.md forbids: "не отключаемся и не подключаемся заново".
   Future<void> selectNode(ProxyNode node) async {
-    final isUp = switch (ref.read(tunnelStatusProvider)) {
+    final isUp = switch (_reportedStatus) {
       TunnelConnected() || TunnelChecking() => true,
       TunnelIdle() ||
       TunnelStarting() ||

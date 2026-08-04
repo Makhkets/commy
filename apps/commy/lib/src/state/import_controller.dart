@@ -207,7 +207,7 @@ class ImportController extends Notifier<ImportState> {
   Future<String?> importFile() async {
     state = const ImportState(isBusy: true);
     try {
-      final picked = await FilePicker.platform.pickFiles(
+      final picked = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: configExtensions,
       );

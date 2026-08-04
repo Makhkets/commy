@@ -1,12 +1,3 @@
-import 'package:commy/src/platform/flutter_clipboard.dart';
-import 'package:commy_config/commy_config.dart'
-    show CommyLinkParser, ConfigPlatform;
-import 'package:commy_core/commy_core.dart';
-import 'package:commy_data/commy_data.dart';
-import 'package:commy_domain/commy_domain.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 /// The bottom layer of the composition root: everything the app needs that is
 /// not a repository, a use case or a screen.
 ///
@@ -19,6 +10,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Everything else has a working default so that a widget test only overrides
 /// what it actually cares about.
 library;
+
+import 'package:commy/src/platform/flutter_clipboard.dart';
+import 'package:commy_config/commy_config.dart'
+    show CommyLinkParser, ConfigPlatform;
+import 'package:commy_core/commy_core.dart';
+import 'package:commy_data/commy_data.dart';
+import 'package:commy_domain/commy_domain.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Thrown by the providers `main()` is required to override.
 const String _mustOverride =

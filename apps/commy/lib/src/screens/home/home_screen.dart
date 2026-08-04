@@ -69,7 +69,7 @@ class HomeScreen extends ConsumerWidget {
           if (all.isEmpty && subs.isEmpty) {
             return FirstRunView(onImport: () => _openImport(context, ref));
           }
-          return _HomeContent(subscriptions: subs);
+          return _HomeContent(subscriptions: subs, nodes: all);
         },
       ),
     );
@@ -84,18 +84,29 @@ class HomeScreen extends ConsumerWidget {
 
 /// The connected-state body: hero area, an error if there is one, the list.
 class _HomeContent extends ConsumerWidget {
-  const _HomeContent({required this.subscriptions});
+  const _HomeContent({required this.subscriptions, required this.nodes});
 
   final List<Subscription> subscriptions;
+  final List<ProxyNode> nodes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final spacing = context.spacing;
-    final action = ref.watch(tunnelControllerProvider);
     final manual = ref.watch(manualNodesProvider);
     final selectedId = ref.watch(selectedNodeIdProvider).value;
-    final failure = action.failure;
+    // The banner reads the *folded* status, not just this app's last action:
+    // a core that died on its own has to explain itself too, and that arrives
+    // as a `TunnelError` on the status stream with nothing local behind it.
+    final failure = switch (ref.watch(tunnelStatusProvider)) {
+      TunnelError(:final failure) => failure,
+      TunnelIdle() ||
+      TunnelStarting() ||
+      TunnelConnected() ||
+      TunnelChecking() ||
+      TunnelStopping() =>
+        null,
+    };
 
     return ListView(
       padding: EdgeInsets.only(bottom: spacing.s10),
@@ -113,7 +124,13 @@ class _HomeContent extends ConsumerWidget {
           SizedBox(height: spacing.s4),
         ],
         for (final subscription in subscriptions) ...<Widget>[
-          SubscriptionSection(subscription: subscription),
+          SubscriptionSection(
+            subscription: subscription,
+            nodes: <ProxyNode>[
+              for (final node in nodes)
+                if (node.subscriptionId == subscription.id) node,
+            ],
+          ),
           SizedBox(height: spacing.s4),
         ],
         if (manual.isNotEmpty) ...<Widget>[

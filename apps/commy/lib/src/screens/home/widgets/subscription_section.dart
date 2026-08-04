@@ -22,15 +22,21 @@ import 'package:url_launcher/url_launcher.dart';
 /// which panel.
 class SubscriptionSection extends ConsumerWidget {
   /// Creates the card.
-  const SubscriptionSection({required this.subscription, super.key});
+  const SubscriptionSection({
+    required this.subscription,
+    required this.nodes,
+    super.key,
+  });
 
   /// The subscription to draw.
   final Subscription subscription;
 
+  /// Its servers, already filtered by the caller.
+  final List<ProxyNode> nodes;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
-    final nodes = ref.watch(nodesOfSubscriptionProvider(subscription.id));
     final selectedId = ref.watch(selectedNodeIdProvider).value;
     final busy = ref.watch(subscriptionControllerProvider);
     final info = subscription.userInfo;
@@ -61,7 +67,10 @@ class SubscriptionSection extends ConsumerWidget {
         ref.read(tunnelControllerProvider.notifier).measureAll(nodes),
       ),
       onMore: () => unawaited(
-        SubscriptionMenuSheet.show(context: context, subscription: subscription),
+        SubscriptionMenuSheet.show(
+          context: context,
+          subscription: subscription,
+        ),
       ),
       nodes: <Widget>[
         for (final node in nodes)

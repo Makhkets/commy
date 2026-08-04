@@ -1,12 +1,12 @@
-import 'package:commy/src/di/repository_providers.dart';
-import 'package:commy_domain/commy_domain.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 /// What the user owns: servers, subscriptions, settings and routing.
 ///
 /// Every one of these is a live stream out of the repository, so a write in
 /// one screen shows up in another without anybody wiring a refresh.
 library;
+
+import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy_domain/commy_domain.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Every stored server, in display order.
 final nodesProvider = StreamProvider<List<ProxyNode>>((ref) {
@@ -38,17 +38,11 @@ final dnsSettingsProvider = StreamProvider<DnsSettings>((ref) {
   return ref.watch(routingRepositoryProvider).watchDns();
 });
 
-/// Nodes that belong to [subscriptionId], in panel order.
-final nodesOfSubscriptionProvider =
-    Provider.family<List<ProxyNode>, String>((ref, subscriptionId) {
-  final all = ref.watch(nodesProvider).value ?? const <ProxyNode>[];
-  return <ProxyNode>[
-    for (final node in all)
-      if (node.subscriptionId == subscriptionId) node,
-  ];
-});
-
 /// Nodes that came from a paste, a QR code or a file rather than a panel.
+///
+/// The per-subscription split is deliberately **not** a provider family. The
+/// home screen already holds the whole list, and a family would recompute and
+/// re-notify one card per stored subscription on every latency write.
 final manualNodesProvider = Provider<List<ProxyNode>>((ref) {
   final all = ref.watch(nodesProvider).value ?? const <ProxyNode>[];
   return <ProxyNode>[

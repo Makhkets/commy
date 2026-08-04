@@ -165,7 +165,9 @@ class SettingsTile extends StatelessWidget {
                     SizedBox(height: spacing.s1),
                     Text(
                       subtitleText,
-                      style: (isMonospaceSubtitle ? type.monoSmall : type.caption)
+                      style: (isMonospaceSubtitle
+                              ? type.monoSmall
+                              : type.caption)
                           .copyWith(color: colors.textTertiary),
                     ),
                   ],

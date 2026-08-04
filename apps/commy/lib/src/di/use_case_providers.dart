@@ -1,3 +1,10 @@
+/// The use-case layer of the composition root.
+///
+/// Nothing here holds state; every provider is a pure assembly of ports. A
+/// screen watches a use case, calls it, and gets a `Result` back — the
+/// `try/catch` boundary is already inside `commy_domain`.
+library;
+
 import 'package:commy/src/config/selector_config_generator.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
@@ -5,13 +12,6 @@ import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-/// The use-case layer of the composition root.
-///
-/// Nothing here holds state; every provider is a pure assembly of ports. A
-/// screen watches a use case, calls it, and gets a `Result` back — the
-/// `try/catch` boundary is already inside `commy_domain`.
-library;
 
 /// Turns app state into a complete sing-box configuration (step 5 of
 /// docs/02-architecture.md).

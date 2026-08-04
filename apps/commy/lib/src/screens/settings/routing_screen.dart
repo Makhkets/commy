@@ -215,9 +215,10 @@ class _RuleList extends ConsumerWidget {
       buildDefaultDragHandles: false,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: rules.length,
-      onReorder: (oldIndex, newIndex) => unawaited(
-        controller.reorderRules(oldIndex, newIndex),
-      ),
+      // `onReorderItem`, not `onReorder`: the newer callback hands over an
+      // index that already accounts for the removed row, so the controller
+      // does not have to guess which convention it is being given.
+      onReorderItem: (from, to) => unawaited(controller.moveRule(from, to)),
       itemBuilder: (context, index) {
         final rule = rules[index];
         return Dismissible(

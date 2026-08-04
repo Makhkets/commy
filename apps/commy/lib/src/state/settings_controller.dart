@@ -33,7 +33,7 @@ class SettingsController extends Notifier<CommyFailure?> {
   }
 
   /// Turns exception E-1, the on-demand IP check, on or off.
-  Future<void> setIpCheck(bool enabled) async {
+  Future<void> setIpCheck({required bool enabled}) async {
     final current = await _settings();
     await save(
       current.copyWith(ipCheckUrl: enabled ? defaultIpCheckUrl : ''),
@@ -119,17 +119,19 @@ class SettingsController extends Notifier<CommyFailure?> {
     );
   }
 
-  /// Moves a rule. Order is priority, so this is a semantic change, not a
-  /// cosmetic one.
-  Future<void> reorderRules(int oldIndex, int newIndex) async {
+  /// Moves the rule at [from] to [to]. Order is priority, so this is a
+  /// semantic change, not a cosmetic one.
+  ///
+  /// [to] is the destination index **after** the rule has been lifted out,
+  /// which is what `ReorderableListView.onReorderItem` hands over.
+  Future<void> moveRule(int from, int to) async {
     final policy = await _routing();
     final rules = List<RoutingRule>.of(policy.rules);
-    if (oldIndex < 0 || oldIndex >= rules.length) {
+    if (from < 0 || from >= rules.length) {
       return;
     }
-    final target = newIndex > oldIndex ? newIndex - 1 : newIndex;
-    final moved = rules.removeAt(oldIndex);
-    rules.insert(target.clamp(0, rules.length), moved);
+    final moved = rules.removeAt(from);
+    rules.insert(to.clamp(0, rules.length), moved);
     await saveRouting(
       policy.copyWith(
         rules: <RoutingRule>[

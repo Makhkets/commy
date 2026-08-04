@@ -45,3 +45,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # The translation sources. They are bundled rather than read from disk at
+  # build time only because slang's runtime `overrides` feature and the
+  # analyzer both expect the directory to exist; the generated Dart in
+  # lib/gen is what actually ships the strings.
+  assets:
+    - assets/i18n/

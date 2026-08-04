@@ -243,7 +243,9 @@ class _SilencePanel extends ConsumerWidget {
               trailing: CommySwitch(
                 value: settings.isIpCheckEnabled,
                 semanticLabel: t.settings.silence.ipCheck,
-                onChanged: (value) => unawaited(controller.setIpCheck(value)),
+                onChanged: (value) => unawaited(
+                  controller.setIpCheck(enabled: value),
+                ),
               ),
             ),
             SettingsTile(

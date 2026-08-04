@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/state/import_controller.dart';

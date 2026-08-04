@@ -1,9 +1,3 @@
-import 'package:commy/src/di/infrastructure_providers.dart';
-import 'package:commy_config/commy_config.dart';
-import 'package:commy_data/commy_data.dart';
-import 'package:commy_domain/commy_domain.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 /// The repository layer of the composition root.
 ///
 /// Everything here is typed as a **domain port**, never as its Drift or HTTP
@@ -11,6 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// swaps `nodeRepositoryProvider` for an in-memory list and never opens
 /// SQLite.
 library;
+
+import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy_config/commy_config.dart';
+import 'package:commy_data/commy_data.dart';
+import 'package:commy_domain/commy_domain.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Servers and their groups.
 final nodeRepositoryProvider = Provider<NodeRepository>((ref) {
