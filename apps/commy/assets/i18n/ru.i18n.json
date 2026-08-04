@@ -1,0 +1,218 @@
+{
+  "app": {
+    "name": "Commy",
+    "wordmark": "COMMY"
+  },
+
+  "connect": {
+    "idle": "Подключить",
+    "starting": "Подключение…",
+    "connected": "Подключено",
+    "checking": "Проверка доступа…",
+    "stopping": "Отключение…",
+    "error": "Ошибка",
+    "check": "Проверить",
+    "cancel": "Отмена",
+    "disconnect": "Отключить"
+  },
+
+  "metrics": {
+    "up": "Отдача",
+    "down": "Загрузка",
+    "session": "Длительность сессии",
+    "perSecond": "$value/с"
+  },
+
+  "home": {
+    "empty": {
+      "title": "Добавьте свой сервер",
+      "body": "Commy не предлагает готовых серверов и не держит своих. Это решение продукта, а не пробел.",
+      "paste": "Вставить ссылку",
+      "subscription": "Подписка по URL",
+      "scan": "Сканировать QR-код",
+      "file": "Открыть файл конфига"
+    },
+    "selectNode": "Выбрать сервер",
+    "noNodeSelected": "Сервер не выбран"
+  },
+
+  "import": {
+    "title": "Добавить сервер",
+    "clipboard": {
+      "found": "В буфере: $count",
+      "one": "1 ссылка $protocol",
+      "many": "$count ссылок",
+      "paste": "Вставить"
+    },
+    "subscription": {
+      "title": "Подписка по URL",
+      "subtitle": "Список узлов, квота и срок из панели",
+      "url": "Ссылка на подписку",
+      "name": "Имя (необязательно)",
+      "interval": "Обновлять каждые",
+      "add": "Добавить"
+    },
+    "qr": {
+      "title": "Сканировать QR-код",
+      "permission": "Нужен доступ к камере",
+      "permissionBody": "Разрешение запрашивается только здесь и только на время сканирования."
+    },
+    "file": {
+      "title": "Открыть файл конфига",
+      "subtitle": "sing-box JSON, Clash YAML, base64"
+    },
+    "result": {
+      "imported": "Импортировано узлов: $count",
+      "skipped": "Пропущено: $count",
+      "showSkipped": "Показать причины",
+      "nothing": "Не нашлось ни одного узла"
+    }
+  },
+
+  "subscription": {
+    "updatedAgo": "$time назад",
+    "autoEvery": "авто $interval",
+    "never": "ещё не обновлялась",
+    "quota": "$used из $total",
+    "unlimited": "без лимита",
+    "daysLeft": "осталось $count",
+    "expired": "срок истёк",
+    "refresh": "Обновить",
+    "pingAll": "Замерить все",
+    "more": "Ещё",
+    "menu": {
+      "collapse": "Свернуть",
+      "expand": "Развернуть",
+      "edit": "Изменить",
+      "copyLink": "Скопировать ссылку",
+      "autoUpdate": "Автообновление",
+      "delete": "Удалить"
+    },
+    "deleteConfirm": {
+      "title": "Удалить подписку?",
+      "body": "Вместе с ней исчезнут её узлы и их учётные данные. Саму ссылку можно будет добавить заново.",
+      "confirm": "Удалить",
+      "cancel": "Отмена"
+    }
+  },
+
+  "node": {
+    "latency": "$ms мс",
+    "notMeasured": "—",
+    "unreachable": "Недоступен",
+    "auto": "Авто-Выбор"
+  },
+
+  "settings": {
+    "title": "Настройки",
+    "routing": "Маршрутизация",
+    "diagnostics": "Диагностика",
+    "appearance": "Внешний вид",
+    "about": "О программе"
+  },
+
+  "routing": {
+    "title": "Маршрутизация",
+    "mode": {
+      "global": "Глобально",
+      "rules": "Правила",
+      "direct": "Прямо"
+    },
+    "rules": "Правила",
+    "addRule": "Добавить правило",
+    "finalRule": "Остальное",
+    "action": {
+      "proxy": "Прокси",
+      "direct": "Прямо",
+      "block": "Блок"
+    },
+    "apps": "Приложения",
+    "ruleSets": "Наборы правил",
+    "ruleSetsHint": "Скачиваются только по нажатию",
+    "dns": "DNS"
+  },
+
+  "diagnostics": {
+    "title": "Диагностика",
+    "logs": "Логи",
+    "connections": "Соединения",
+    "config": "Конфиг",
+    "stats": "Статистика",
+    "copy": "Копировать",
+    "export": "Экспорт",
+    "clear": "Очистить",
+    "exportWarning": {
+      "title": "Экспортировать логи?",
+      "body": "Учётные данные, ссылки подписок и полные адреса вырезаются перед сохранением. Проверьте файл, прежде чем куда-то его отправлять.",
+      "confirm": "Экспортировать",
+      "cancel": "Отмена"
+    }
+  },
+
+  "appearance": {
+    "title": "Внешний вид",
+    "theme": "Тема",
+    "themeSystem": "Как в системе",
+    "themeLight": "Светлая",
+    "themeDark": "Тёмная",
+    "language": "Язык"
+  },
+
+  "about": {
+    "title": "О программе",
+    "version": "Версия",
+    "core": "Ядро",
+    "sources": "Исходный код",
+    "licences": "Лицензии",
+    "notAService": "Commy — не VPN-сервис. Своих серверов нет, встроенных конфигов нет, аккаунтов и бэкенда нет."
+  },
+
+  "error": {
+    "subscriptionUnreachable": {
+      "message": "Сервер подписки не отвечает",
+      "action": "Повторить"
+    },
+    "subscriptionMalformed": {
+      "message": "Ответ подписки не удалось разобрать",
+      "action": "Открыть логи"
+    },
+    "unsupportedProtocol": {
+      "message": "Протокол $scheme пока не поддерживается",
+      "action": "Сообщить"
+    },
+    "configInvalid": {
+      "message": "Конфигурация неверна",
+      "action": "Показать конфиг"
+    },
+    "permissionDenied": {
+      "message": "Без разрешения на VPN туннель не поднять",
+      "action": "Разрешить"
+    },
+    "helperUnavailable": {
+      "message": "Служба туннеля не запущена",
+      "action": "Повторить"
+    },
+    "coreCrashed": {
+      "message": "Ядро аварийно завершилось",
+      "action": "Открыть логи"
+    },
+    "storage": {
+      "message": "Не удалось сохранить данные",
+      "action": "Повторить"
+    },
+    "unknown": {
+      "message": "Что-то пошло не так",
+      "action": "Открыть логи"
+    }
+  },
+
+  "common": {
+    "retry": "Повторить",
+    "cancel": "Отмена",
+    "save": "Сохранить",
+    "delete": "Удалить",
+    "close": "Закрыть",
+    "search": "Поиск",
+    "loading": "Загрузка…"
+  }
+}

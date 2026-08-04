@@ -1,0 +1,218 @@
+{
+  "app": {
+    "name": "Commy",
+    "wordmark": "COMMY"
+  },
+
+  "connect": {
+    "idle": "Connect",
+    "starting": "Connecting…",
+    "connected": "Connected",
+    "checking": "Checking access…",
+    "stopping": "Disconnecting…",
+    "error": "Error",
+    "check": "Check",
+    "cancel": "Cancel",
+    "disconnect": "Disconnect"
+  },
+
+  "metrics": {
+    "up": "Upload",
+    "down": "Download",
+    "session": "Session length",
+    "perSecond": "$value/s"
+  },
+
+  "home": {
+    "empty": {
+      "title": "Add your server",
+      "body": "Commy offers no ready-made servers and runs none of its own. That is a product decision, not a gap.",
+      "paste": "Paste a link",
+      "subscription": "Subscription URL",
+      "scan": "Scan a QR code",
+      "file": "Open a config file"
+    },
+    "selectNode": "Choose a server",
+    "noNodeSelected": "No server selected"
+  },
+
+  "import": {
+    "title": "Add a server",
+    "clipboard": {
+      "found": "In the clipboard: $count",
+      "one": "1 $protocol link",
+      "many": "$count links",
+      "paste": "Paste"
+    },
+    "subscription": {
+      "title": "Subscription URL",
+      "subtitle": "Server list, quota and expiry from your panel",
+      "url": "Subscription link",
+      "name": "Name (optional)",
+      "interval": "Refresh every",
+      "add": "Add"
+    },
+    "qr": {
+      "title": "Scan a QR code",
+      "permission": "Camera access needed",
+      "permissionBody": "Asked for here only, and only while the scanner is open."
+    },
+    "file": {
+      "title": "Open a config file",
+      "subtitle": "sing-box JSON, Clash YAML, base64"
+    },
+    "result": {
+      "imported": "Imported $count servers",
+      "skipped": "$count skipped",
+      "showSkipped": "Show reasons",
+      "nothing": "No servers found"
+    }
+  },
+
+  "subscription": {
+    "updatedAgo": "$time ago",
+    "autoEvery": "auto $interval",
+    "never": "never refreshed",
+    "quota": "$used of $total",
+    "unlimited": "unlimited",
+    "daysLeft": "$count left",
+    "expired": "expired",
+    "refresh": "Refresh",
+    "pingAll": "Measure all",
+    "more": "More",
+    "menu": {
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "edit": "Edit",
+      "copyLink": "Copy link",
+      "autoUpdate": "Auto refresh",
+      "delete": "Delete"
+    },
+    "deleteConfirm": {
+      "title": "Delete this subscription?",
+      "body": "Its servers and their credentials go with it. The link itself can be added again.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    }
+  },
+
+  "node": {
+    "latency": "$ms ms",
+    "notMeasured": "—",
+    "unreachable": "Unreachable",
+    "auto": "Auto"
+  },
+
+  "settings": {
+    "title": "Settings",
+    "routing": "Routing",
+    "diagnostics": "Diagnostics",
+    "appearance": "Appearance",
+    "about": "About"
+  },
+
+  "routing": {
+    "title": "Routing",
+    "mode": {
+      "global": "Global",
+      "rules": "Rules",
+      "direct": "Direct"
+    },
+    "rules": "Rules",
+    "addRule": "Add a rule",
+    "finalRule": "Everything else",
+    "action": {
+      "proxy": "Proxy",
+      "direct": "Direct",
+      "block": "Block"
+    },
+    "apps": "Apps",
+    "ruleSets": "Rule sets",
+    "ruleSetsHint": "Downloaded only when you tap",
+    "dns": "DNS"
+  },
+
+  "diagnostics": {
+    "title": "Diagnostics",
+    "logs": "Logs",
+    "connections": "Connections",
+    "config": "Config",
+    "stats": "Statistics",
+    "copy": "Copy",
+    "export": "Export",
+    "clear": "Clear",
+    "exportWarning": {
+      "title": "Export the logs?",
+      "body": "Credentials, subscription links and full addresses are stripped before saving. Read the file before sending it anywhere.",
+      "confirm": "Export",
+      "cancel": "Cancel"
+    }
+  },
+
+  "appearance": {
+    "title": "Appearance",
+    "theme": "Theme",
+    "themeSystem": "Match system",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "language": "Language"
+  },
+
+  "about": {
+    "title": "About",
+    "version": "Version",
+    "core": "Core",
+    "sources": "Source code",
+    "licences": "Licences",
+    "notAService": "Commy is not a VPN service. No servers of ours, no bundled configs, no accounts and no backend."
+  },
+
+  "error": {
+    "subscriptionUnreachable": {
+      "message": "The subscription server is not answering",
+      "action": "Retry"
+    },
+    "subscriptionMalformed": {
+      "message": "The subscription response could not be read",
+      "action": "Open the logs"
+    },
+    "unsupportedProtocol": {
+      "message": "$scheme is not supported yet",
+      "action": "Report it"
+    },
+    "configInvalid": {
+      "message": "The configuration is not valid",
+      "action": "Show the config"
+    },
+    "permissionDenied": {
+      "message": "The tunnel cannot come up without VPN permission",
+      "action": "Allow"
+    },
+    "helperUnavailable": {
+      "message": "The tunnel service is not running",
+      "action": "Retry"
+    },
+    "coreCrashed": {
+      "message": "The core stopped unexpectedly",
+      "action": "Open the logs"
+    },
+    "storage": {
+      "message": "Could not save",
+      "action": "Retry"
+    },
+    "unknown": {
+      "message": "Something went wrong",
+      "action": "Open the logs"
+    }
+  },
+
+  "common": {
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "close": "Close",
+    "search": "Search",
+    "loading": "Loading…"
+  }
+}

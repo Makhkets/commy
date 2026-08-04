@@ -29,6 +29,30 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 
+    // Give the classic Kotlin plugin to Flutter plugins that decided they did
+    // not need one.
+    //
+    // The pub dependency set straddles the AGP 9 migration (see the long note
+    // in gradle.properties). We are on the classic plugin, so plugins that
+    // still apply it themselves are fine — but file_picker 11 and friends do
+    //
+    //     if (agpMajor < 9) { apply plugin: 'org.jetbrains.kotlin.android' }
+    //
+    // and on AGP 9 apply nothing, expecting built-in Kotlin to pick their
+    // sources up. With built-in Kotlin off that leaves their src/main/kotlin
+    // uncompiled and the library silently empty. Applying it for them restores
+    // the source set.
+    //
+    // Registered against com.android.library so it lands immediately after the
+    // Android plugin and before the subproject's own `android { }` block — the
+    // window the Kotlin plugin has to be in. Applying it to a Java-only plugin
+    // is harmless: compileDebugKotlin is simply NO-SOURCE.
+    project.plugins.withId("com.android.library") {
+        if (!project.plugins.hasPlugin("org.jetbrains.kotlin.android")) {
+            project.plugins.apply("org.jetbrains.kotlin.android")
+        }
+    }
+
     // afterEvaluate, and that is the whole trick. A `plugins.withId` callback
     // fires the moment the Android plugin is applied, which is *before* the
     // subproject's own `android { ndkVersion flutter.ndkVersion }` line runs —

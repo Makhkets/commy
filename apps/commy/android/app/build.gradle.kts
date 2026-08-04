@@ -108,6 +108,15 @@ android {
         }
     }
 
+    buildFeatures {
+        // Off by default since AGP 8, and CoreSetup reads BuildConfig.DEBUG to
+        // decide whether to hand libbox a debug log level and redirect the Go
+        // stderr crash dump to a file. Without this the module does not compile
+        // at all, with three "Unresolved reference 'BuildConfig'" that say
+        // nothing about a Gradle default having changed.
+        buildConfig = true
+    }
+
     lint {
         checkReleaseBuilds = false
     }

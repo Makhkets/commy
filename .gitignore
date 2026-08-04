@@ -137,3 +137,7 @@ core/dist/
 *.drift.dart
 *.ffi.dart
 lib/i18n/strings*.g.dart
+
+# Python bytecode from the helper scripts in scripts/.
+__pycache__/
+*.pyc

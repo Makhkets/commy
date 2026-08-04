@@ -1,0 +1,16 @@
+# slang reads this instead of a `slang:` block in pubspec.yaml.
+#
+# Russian is the base locale, not English: the product is written for Russian
+# speakers first and the source strings are authored in Russian. Marking en as
+# the base would mean every Russian string arrives as a translation of a
+# translation.
+base_locale: ru
+fallback_strategy: base_locale
+input_directory: assets/i18n
+input_file_pattern: .i18n.json
+# The build_runner variant of slang ignores output_directory and always writes
+# next to lib/, into lib/gen/. Recorded here as fact rather than intent so the
+# next person does not spend time wondering why lib/i18n stays empty.
+output_file_name: strings.g.dart
+translate_var: t
+enum_name: AppLocale
