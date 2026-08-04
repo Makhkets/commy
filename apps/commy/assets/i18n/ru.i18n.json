@@ -17,6 +17,13 @@
     "noNode": "Сначала выберите сервер"
   },
 
+  "time": {
+    "hours": "$count ч",
+    "minutes": "$count мин",
+    "seconds": "$count с",
+    "days": "$count дн."
+  },
+
   "metrics": {
     "up": "Отдача",
     "down": "Загрузка",

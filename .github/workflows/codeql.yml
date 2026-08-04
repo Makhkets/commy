@@ -22,15 +22,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Dart is not a CodeQL language; commy_* is covered by the analyzer and
-        # the test suite instead. Go carries the network core and Kotlin holds
-        # the tunnel, which is exactly where a memory- or concurrency-shaped bug
-        # would hurt most.
+        # Go only.
+        #
+        # Dart is not a CodeQL language — commy_* is covered by the analyzer,
+        # 724 tests and the two contract checks in ci.yml instead.
+        #
+        # Kotlin is deliberately absent. CodeQL cannot extract it in `none`
+        # mode here ("detected code written in Java/Kotlin but could not
+        # process any of it"), and the alternative is a manual build mode that
+        # compiles the whole Android app inside the CodeQL harness: libbox.aar,
+        # Flutter, Gradle, the lot. That doubles the slowest job in CI to scan
+        # ~22 files of platform glue that hold no protocol logic by design
+        # (docs/02-architecture.md). A permanently red check is worse than an
+        # absent one, because people stop reading the red.
+        #
+        # What does cover that surface: review, `scripts/check_wire_contract.py`
+        # and the PlatformInterface diff, both of which run on every push.
         include:
           - language: go
             build-mode: autobuild
-          - language: java-kotlin
-            build-mode: none
     steps:
       - uses: actions/checkout@v4
 

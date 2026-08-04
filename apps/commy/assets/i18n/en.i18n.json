@@ -17,6 +17,13 @@
     "noNode": "Choose a server first"
   },
 
+  "time": {
+    "hours": "$count h",
+    "minutes": "$count min",
+    "seconds": "$count s",
+    "days": "$count d"
+  },
+
   "metrics": {
     "up": "Upload",
     "down": "Download",
