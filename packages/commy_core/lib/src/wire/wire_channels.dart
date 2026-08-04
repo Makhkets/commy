@@ -23,4 +23,12 @@ abstract final class WireChannels {
 
   /// Snapshots of the open connections.
   static const String connections = '$namespace/connections';
+
+  /// Things the Android system handed the app: deep links, opened files,
+  /// shared text, a Quick Settings tap.
+  ///
+  /// Not part of the tunnel protocol — nothing here is tunnel state, and the
+  /// other four platforms never emit on it. It is listed with the rest because
+  /// a channel name that lives in two places is a channel name that drifts.
+  static const String intents = '$namespace/intents';
 }

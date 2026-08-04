@@ -7,9 +7,11 @@ import 'package:commy/src/screens/home/widgets/hero_area.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_section.dart';
 import 'package:commy/src/screens/import/import_sheet.dart';
+import 'package:commy/src/screens/import/paste_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
+import 'package:commy/src/state/system_intent_listener.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/failure_view.dart';
@@ -40,6 +42,18 @@ class HomeScreen extends ConsumerWidget {
     final t = Translations.of(context);
     final nodes = ref.watch(nodesProvider);
     final subscriptions = ref.watch(subscriptionsProvider);
+
+    // A link tapped in another app lands here. It opens the sheet pre-filled
+    // rather than importing on its own: the user has to see what arrived
+    // before it becomes a stored server.
+    ref.listen<String?>(pendingImportProvider, (previous, next) {
+      if (next == null || next.isEmpty) {
+        return;
+      }
+      ref.read(pendingImportProvider.notifier).take();
+      ref.read(importControllerProvider.notifier).reset();
+      unawaited(PasteSheet.show(context, initialText: next));
+    });
 
     return AdaptiveScaffold(
       appBar: CommyAppBar(

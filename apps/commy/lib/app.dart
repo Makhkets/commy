@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/system_intent_listener.dart';
 import 'package:commy/src/state/traffic_history.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/notice_host.dart';
@@ -48,6 +49,8 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       ..watch(autoCheckProvider)
       // "Connect on launch", decided once off the first settled read.
       ..watch(autoConnectProvider)
+      // Deep links, opened files, shared text and the Quick Settings tile.
+      ..watch(systemIntentProvider)
       // Loading a locale is asynchronous — slang defers every non-base
       // bundle — so it happens in a listener rather than during build.
       ..listen<AsyncValue<AppSettings>>(settingsProvider, (previous, next) {

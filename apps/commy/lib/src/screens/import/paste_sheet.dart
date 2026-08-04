@@ -14,15 +14,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// calls out: "Экран не закрывается, введённое не теряется".
 class PasteSheet extends ConsumerStatefulWidget {
   /// Creates the sheet body.
-  const PasteSheet({super.key});
+  const PasteSheet({this.initialText, super.key});
 
-  /// Opens the sheet.
-  static Future<void> show(BuildContext context) {
+  /// Text the field starts with.
+  ///
+  /// Filled in when the sheet was opened by a link tapped somewhere else on
+  /// the device: the user still sees what is about to be imported and still
+  /// presses the button, which is the same contract the clipboard preview has.
+  final String? initialText;
+
+  /// Opens the sheet, optionally pre-filled with [initialText].
+  static Future<void> show(BuildContext context, {String? initialText}) {
     final title = Translations.of(context).import.paste.title;
     return CommySheet.show<void>(
       context: context,
       title: title,
-      builder: (context) => const PasteSheet(),
+      builder: (context) => PasteSheet(initialText: initialText),
     );
   }
 
@@ -31,7 +38,8 @@ class PasteSheet extends ConsumerStatefulWidget {
 }
 
 class _PasteSheetState extends ConsumerState<PasteSheet> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialText ?? '');
 
   @override
   void dispose() {

@@ -27,10 +27,15 @@ KOTLIN = ROOT / (
     "apps/commy/android/app/src/main/kotlin/dev/commy/app/wire/Wire.kt"
 )
 
-# Channels the native side may add for its own purposes. /intents carries
-# deep links and Quick Settings taps — inputs from the Android system that have
-# no counterpart in the tunnel protocol, so Dart is free to ignore it.
-KOTLIN_ONLY_CHANNELS = {"intents"}
+# Channels the native side may add for its own purposes.
+#
+# Empty, and worth keeping empty. /intents used to be listed here on the
+# grounds that Dart was "free to ignore it" — and Dart did ignore it, for long
+# enough that every deep link the manifest advertises opened the app and did
+# nothing. An allowlist entry here silences the one check that would have
+# caught that, so a channel belongs on this list only while nothing on the
+# other side is meant to consume it.
+KOTLIN_ONLY_CHANNELS: set[str] = set()
 
 # `checking` is derived on the Dart side from the first url test after a
 # connection comes up. The native side never sends it and has no constant for
@@ -40,11 +45,6 @@ DART_ONLY_STATES = {"checking"}
 # Keys the native side owns alone. Each one is deliberate; anything not on this
 # list that appears on only one side is a real disagreement.
 KOTLIN_ONLY_KEYS = {
-    # /intents payloads. Dart reads that channel with its own decoder because
-    # the events are Android-shaped, not tunnel-shaped.
-    "kind",
-    "uri",
-    "text",
     # proxies(): informational. Dart works out whether a group is switchable
     # from its `type`, so it never reads this field — but Kotlin sends it,
     # because it is free there and a future bulk latency test will want it.

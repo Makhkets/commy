@@ -13,6 +13,7 @@
 library;
 
 export 'src/android/android_core_client.dart';
+export 'src/android/system_intents.dart';
 export 'src/android/system_settings.dart';
 export 'src/clash/clash_api_client.dart';
 export 'src/clash/clash_codec.dart';
@@ -27,6 +28,7 @@ export 'src/wire/connection_info_codec.dart';
 export 'src/wire/log_line_codec.dart';
 export 'src/wire/proxy_group_codec.dart';
 export 'src/wire/select_codec.dart';
+export 'src/wire/system_intent.dart';
 export 'src/wire/traffic_sample_codec.dart';
 export 'src/wire/tunnel_status_codec.dart';
 export 'src/wire/url_test_codec.dart';

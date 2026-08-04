@@ -96,4 +96,18 @@ abstract final class WireKeys {
 
   /// Transport: `tcp` or `udp`.
   static const String network = 'network';
+
+  // ── /intents ──────────────────────────────────────────────────────────
+  //
+  // Not tunnel state. These name what the Android system handed the app: a
+  // tapped link, a shared file, a Quick Settings tap.
+
+  /// Which kind of system input arrived.
+  static const String kind = 'kind';
+
+  /// The link or the file location.
+  static const String uri = 'uri';
+
+  /// Shared plain text.
+  static const String text = 'text';
 }
