@@ -94,6 +94,17 @@ jobs:
       - run: melos bootstrap
       - run: melos run gen --no-select
 
+      # The bundle goes first, and the order is load-bearing. ABI splits and app
+      # bundles cannot both be on: with resource shrinking enabled R8 writes one
+      # shrunk-resources file per split, and `bundleRelease` then finds four
+      # where it expects one (https://issuetracker.google.com/402800800). The
+      # split is switched off for bundle tasks in app/build.gradle.kts, but
+      # building the bundle first also keeps the APK steps from leaving those
+      # four files behind for it to trip over.
+      - name: Build app bundle
+        working-directory: apps/commy
+        run: flutter build appbundle --release
+
       - name: Build APKs
         working-directory: apps/commy
         run: flutter build apk --release --split-per-abi
@@ -101,10 +112,6 @@ jobs:
       - name: Build universal APK
         working-directory: apps/commy
         run: flutter build apk --release
-
-      - name: Build app bundle
-        working-directory: apps/commy
-        run: flutter build appbundle --release
 
       # Gradle happily produces an APK with no native library in it. That
       # installs, opens, and cannot connect to anything — the worst possible

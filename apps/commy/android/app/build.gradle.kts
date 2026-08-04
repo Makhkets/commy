@@ -23,6 +23,17 @@ fun signingValue(key: String, env: String): String? =
 val storeFilePath = signingValue("storeFile", "ANDROID_KEYSTORE_PATH")
 val hasReleaseSigning = storeFilePath != null && file(storeFilePath).exists()
 
+// Whether this invocation is building an app bundle rather than APKs.
+//
+// Read from the requested task names because there is no other signal: the
+// Android extension is configured once, before any task runs, and the ABI split
+// setting it needs differs between `assemble*` and `bundle*`. Flutter invokes
+// `bundleRelease` for `flutter build appbundle`, so matching "Bundle" catches
+// it without matching `assembleRelease`.
+val isBundleTask = gradle.startParameter.taskNames.any {
+    it.contains("bundle", ignoreCase = true)
+}
+
 android {
     namespace = "dev.commy.app"
     compileSdk = 36
@@ -90,7 +101,19 @@ android {
 
     splits {
         abi {
-            isEnable = true
+            // Off for a bundle, on for APKs. An app bundle already carries every
+            // ABI and lets Play split them, so the two mechanisms overlap — and
+            // with resource shrinking on they do not merely overlap, they fail:
+            // R8 writes one shrunk-resources file per split and `bundleRelease`
+            // finds four where it expects one.
+            //
+            //   Multiple shrunk-resources files found in directory
+            //   '…/shrunk_resources_proto_format/release/minifyReleaseWithR8'
+            //
+            // https://issuetracker.google.com/402800800. The release workflow
+            // builds split APKs, a universal APK and an AAB in one job, so this
+            // has to be decided per invocation rather than once.
+            isEnable = !isBundleTask
             reset()
             // 32-bit ARM is still worth carrying: plenty of cheap phones in the
             // regions this app exists for have never seen an arm64 build.
