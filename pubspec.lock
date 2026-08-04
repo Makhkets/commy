@@ -53,10 +53,10 @@ packages:
     dependency: transitive
     description:
       name: cli_util
-      sha256: ff6785f7e9e3c38ac98b2fb035701789de90154024a75b6cb926445e83197d1c
+      sha256: "71e43f1976c3eae2d9468a5b4d6600bf8cae61508b87f27fa1799228935d48ab"
       url: "https://pub.dev"
     source: hosted
-    version: "0.4.2"
+    version: "0.5.2"
   collection:
     dependency: transitive
     description:
@@ -73,6 +73,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.1+1"
+  ffi:
+    dependency: transitive
+    description:
+      name: ffi
+      sha256: "6d7fd89431262d8f3125e81b50d3847a091d846eafcd4fdb88dd06f36d705a45"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   file:
     dependency: transitive
     description:
@@ -133,10 +141,10 @@ packages:
     dependency: "direct dev"
     description:
       name: melos
-      sha256: "4280dc46bd5b741887cce1e67e5c1a6aaf3c22310035cf5bd33dceeeda62ed22"
+      sha256: "2d588cd21b34ea4cadf5a20542bcd5042a60833aa3eae09ecdc319291cd06f69"
       url: "https://pub.dev"
     source: hosted
-    version: "6.3.3"
+    version: "8.2.2"
   meta:
     dependency: transitive
     description:
@@ -161,6 +169,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
+  petitparser:
+    dependency: transitive
+    description:
+      name: petitparser
+      sha256: "91bd59303e9f769f108f8df05e371341b15d59e995e6806aefab827b58336675"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.2"
   platform:
     dependency: transitive
     description:
@@ -273,6 +289,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  xml:
+    dependency: transitive
+    description:
+      name: xml
+      sha256: "67f0aff7be013d107995e9b75bf4e7f2c3ef2dfdb2c8e68024bba0a7fd5756a4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.1"
   yaml:
     dependency: transitive
     description:
