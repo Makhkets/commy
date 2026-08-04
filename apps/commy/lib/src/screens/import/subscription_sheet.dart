@@ -144,6 +144,7 @@ class _SubscriptionSheetState extends ConsumerState<SubscriptionSheet> {
             url: url,
             name: _name.text,
             autoUpdate: _autoUpdate,
+            intervalHours: _intervalHours,
           ),
     );
   }

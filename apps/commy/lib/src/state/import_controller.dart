@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:file_picker/file_picker.dart';
@@ -158,10 +159,16 @@ class ImportController extends Notifier<ImportState> {
   }
 
   /// Downloads [url] and stores it as a subscription.
+  ///
+  /// [intervalHours] is applied **after** the use case has stored the
+  /// subscription, on purpose: the panel's own `profile-update-interval`
+  /// header wins when it sends one, and the user's choice only fills the gap
+  /// when it does not (docs/05-ux-flows.md, scenario 3).
   Future<String?> addSubscription({
     required Uri url,
     String? name,
     bool autoUpdate = true,
+    int? intervalHours,
   }) async {
     state = const ImportState(isBusy: true);
     final result = await ref.read(addSubscriptionUseCaseProvider)(
@@ -178,7 +185,16 @@ class ImportController extends Notifier<ImportState> {
       state = ImportState(failure: failure);
       return null;
     }
-    final outcome = result.valueOrNull?.outcome ?? ParseOutcome.empty;
+    final synced = result.valueOrNull;
+    final subscription = synced?.subscription;
+    if (subscription != null &&
+        intervalHours != null &&
+        subscription.updateIntervalHours == null) {
+      await ref.read(subscriptionRepositoryProvider).upsert(
+            subscription.copyWith(updateIntervalHours: intervalHours),
+          );
+    }
+    final outcome = synced?.outcome ?? ParseOutcome.empty;
     state = ImportState(outcome: outcome);
     return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;
   }
