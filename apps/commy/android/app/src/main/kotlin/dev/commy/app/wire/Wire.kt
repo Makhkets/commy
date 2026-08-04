@@ -42,7 +42,16 @@ internal object Wire {
         const val INTENTS = "$NAMESPACE/intents"
     }
 
-    /** Method names on [Channels.METHOD]. Seven, and no more. */
+    /**
+     * Method names on [Channels.METHOD]. Seven for the tunnel, plus one.
+     *
+     * [OPEN_VPN_SETTINGS] is not a tunnel command and does not belong to the
+     * seven. It is here because the only honest kill switch on Android is the
+     * system one — "Always-on VPN" with "Block connections without VPN" — and
+     * a settings row that names that screen ought to be able to open it.
+     * Commy cannot implement the guarantee itself: a process that has been
+     * killed blocks nothing.
+     */
     object Methods {
         const val START = "start"
         const val STOP = "stop"
@@ -51,6 +60,7 @@ internal object Wire {
         const val URL_TEST = "urlTest"
         const val PROXIES = "proxies"
         const val VERSION = "version"
+        const val OPEN_VPN_SETTINGS = "openVpnSettings"
     }
 
     /** JSON field names. Matches `WireKeys`. */

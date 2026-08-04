@@ -1,7 +1,11 @@
 /// Method names accepted on the `WireChannels.method` channel.
 ///
-/// Seven, and no more. Adding one means editing the Kotlin side, this list and
-/// `docs/wire-protocol.md` in the same pull request.
+/// Seven for the tunnel, and no more: the tunnel protocol is closed. Adding
+/// one means editing the Kotlin side, this list and `docs/wire-protocol.md` in
+/// the same pull request.
+///
+/// [openVpnSettings] is the one method that is not a tunnel command, and it is
+/// counted separately for that reason — see its own note below.
 abstract final class WireMethods {
   /// Brings the tunnel up. Argument: the configuration JSON, as a string.
   static const String start = 'start';
@@ -23,4 +27,13 @@ abstract final class WireMethods {
 
   /// Reports the sing-box version string. Not part of the domain port.
   static const String version = 'version';
+
+  /// Opens the system VPN settings screen. No argument, no result.
+  ///
+  /// Not a tunnel command. It exists because the only kill switch on Android
+  /// that actually holds is the system one — "Always-on VPN" together with
+  /// "Block connections without VPN" — and an app cannot promise that itself:
+  /// once the process is killed there is nothing left to block with. So the
+  /// app names the guarantee, says who provides it, and offers to open it.
+  static const String openVpnSettings = 'openVpnSettings';
 }

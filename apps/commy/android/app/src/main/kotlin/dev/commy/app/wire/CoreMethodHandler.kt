@@ -1,6 +1,8 @@
 package dev.commy.app.wire
 
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import dev.commy.app.tunnel.TunnelController
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -101,6 +103,25 @@ internal class CoreMethodHandler(
 
         Wire.Methods.VERSION -> Libbox.version()
 
+        Wire.Methods.OPEN_VPN_SETTINGS -> {
+            // NEW_TASK because the call arrives on the application context:
+            // the handler is built with `context.applicationContext` so it
+            // outlives any one activity.
+            val intent = Intent(Settings.ACTION_VPN_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Not every build ships the VPN settings activity — some
+            // manufacturer images bury it, and Android TV has none at all.
+            // Falling back to the general settings screen is better than an
+            // ActivityNotFoundException on a row the user just tapped.
+            runCatching { context.startActivity(intent) }.getOrElse {
+                context.startActivity(
+                    Intent(Settings.ACTION_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            null
+        }
+
         else -> null
     }
 
@@ -134,6 +155,7 @@ internal class CoreMethodHandler(
             Wire.Methods.URL_TEST,
             Wire.Methods.PROXIES,
             Wire.Methods.VERSION,
+            Wire.Methods.OPEN_VPN_SETTINGS,
         )
     }
 }
