@@ -123,7 +123,11 @@ jobs:
           for apk in "$out"/app-*-release.apk "$out"/app-release.apk; do
             [ -f "$apk" ] || continue
             abi=$(basename "$apk")
-            if ! unzip -l "$apk" | grep -qE 'lib/[a-z0-9-]+/libbox\.so'; then
+            # The underscore matters: the ABI directory is `x86_64`, and a
+            # character class without `_` can never match it. The first run
+            # that got this far reported "app-x86_64-release.apk ships without
+            # the sing-box core" for an APK that carried it perfectly well.
+            if ! unzip -l "$apk" | grep -qE 'lib/[a-z0-9_-]+/libbox\.so'; then
               echo "::error::$abi ships without the sing-box core"
               exit 1
             fi
