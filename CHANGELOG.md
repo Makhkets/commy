@@ -12,6 +12,17 @@ matching the tag out of this file and uses it as the release notes.
 
 Nothing since the last pre-release.
 
+## [0.1.0-alpha.3]
+
+`alpha.2` built every artifact and then failed its own verification step: the
+pattern that checks each APK carries `libbox.so` used a character class with no
+underscore, so `lib/x86_64/libbox.so` could never match. The two ABIs that
+passed are the two whose directory names contain no underscore. Fixed.
+
+### Fixed
+
+- **Release verification.** See above. The APKs were always fine.
+
 ## [0.1.0-alpha.2]
 
 `v0.1.0-alpha.1` never produced a downloadable file: every APK built and then
@@ -94,6 +105,7 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.2...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.3...main
+[0.1.0-alpha.3]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.1
