@@ -27,7 +27,7 @@ jobs:
   regenerate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -57,7 +57,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "Reason given: ${{ github.event.inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: goldens
           path: packages/commy_ui/test/golden/goldens/
