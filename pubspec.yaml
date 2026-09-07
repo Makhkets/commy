@@ -9,5 +9,5 @@ environment:
   sdk: '>=3.5.0 <4.0.0'
 
 dev_dependencies:
-  melos: ^6.3.2
+  melos: ^8.6.0
   very_good_analysis: '>=6.0.0 <11.0.0'
