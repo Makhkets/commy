@@ -186,6 +186,7 @@ const Duration _reloadSettle = Duration(milliseconds: 400);
 /// business and must never restart the core.
 typedef _CoreInputs = ({
   bool allowLan,
+  String ipCheckUrl,
   String latencyProbeUrl,
   LogLevel logLevel,
   int mixedPort,
@@ -194,6 +195,8 @@ typedef _CoreInputs = ({
 
 _CoreInputs _coreInputsOf(AppSettings settings) => (
       allowLan: settings.allowLan,
+      // The builder opens the loopback inbound off this one (E-1).
+      ipCheckUrl: settings.ipCheckUrl,
       latencyProbeUrl: settings.latencyProbeUrl,
       logLevel: settings.logLevel,
       mixedPort: settings.mixedPort,
@@ -370,6 +373,9 @@ enum TunnelNoticeKind {
 
   /// The running core took a changed configuration.
   reloaded,
+
+  /// The reachability probe passed, but the IP check (E-1) did not answer.
+  ipCheckFailed,
 }
 
 /// A transient message and the one number or name it carries.
@@ -384,7 +390,8 @@ class TunnelNotice {
   /// Round trip of the probe, when the notice is a check result.
   final int? milliseconds;
 
-  /// Node name, when the notice is a switch.
+  /// Node name when the notice is a switch; the exit address when it is a
+  /// passed check with the IP check on.
   final String? name;
 
   @override
@@ -556,7 +563,13 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// A live tunnel is not working internet: the server may have died, the
   /// quota may be spent, the provider may be filtering. Showing "connected"
   /// and staying silent is how the app gets blamed for the server.
-  Future<void> check() async {
+  ///
+  /// [includeIp] adds the external IP check — exception E-1 of
+  /// docs/09-security-privacy.md, allowed **by button press only**. The
+  /// automatic probe after a connect leaves it `false`, and nothing else may
+  /// pass `true`. With the feature off the flag changes nothing: the use
+  /// case reads the setting and answers nothing.
+  Future<void> check({bool includeIp = false}) async {
     final node = ref.read(selectedNodeProvider);
     if (node == null) {
       return;
@@ -575,14 +588,48 @@ class TunnelController extends Notifier<TunnelActionState> {
       return;
     }
     final latency = result.valueOrNull;
+    if (latency == null) {
+      state = state.copyWith(
+        isChecking: false,
+        notice: const TunnelNotice(TunnelNoticeKind.checkFailed),
+      );
+      return;
+    }
+    final milliseconds = latency.inMilliseconds;
+    if (!includeIp) {
+      state = state.copyWith(
+        isChecking: false,
+        notice: TunnelNotice(
+          TunnelNoticeKind.checkPassed,
+          milliseconds: milliseconds,
+        ),
+      );
+      return;
+    }
+    // Still `isChecking`: the spinner covers both steps, and the address
+    // is the second one.
+    final ipResult = await ref.read(checkIpUseCaseProvider)();
+    final ipFailure = ipResult.failureOrNull;
+    if (ipFailure != null) {
+      ref
+          .read(appLoggerProvider)
+          .warn('ip check failed: ${ipFailure.code}', tag: _tag);
+      state = state.copyWith(
+        isChecking: false,
+        notice: TunnelNotice(
+          TunnelNoticeKind.ipCheckFailed,
+          milliseconds: milliseconds,
+        ),
+      );
+      return;
+    }
     state = state.copyWith(
       isChecking: false,
-      notice: latency == null
-          ? const TunnelNotice(TunnelNoticeKind.checkFailed)
-          : TunnelNotice(
-              TunnelNoticeKind.checkPassed,
-              milliseconds: latency.inMilliseconds,
-            ),
+      notice: TunnelNotice(
+        TunnelNoticeKind.checkPassed,
+        milliseconds: milliseconds,
+        name: ipResult.valueOrNull?.label,
+      ),
     );
   }
 

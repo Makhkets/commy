@@ -50,6 +50,8 @@
     "showHidden": "Показать",
     "checkOk": "Доступ есть: $ms мс",
     "checkFailed": "Проверка не прошла",
+    "checkOkWithIp": "Доступ есть: $ms мс · $ip",
+    "ipCheckFailed": "Доступ есть: $ms мс · IP не определился",
     "switched": "Переключено на $name",
     "settingsApplied": "Настройки применены к туннелю"
   },

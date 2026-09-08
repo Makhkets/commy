@@ -12,6 +12,7 @@ import 'dart:async';
 import 'package:commy/src/config/selector_config_generator.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
@@ -350,6 +351,95 @@ void main() {
     });
   });
 
+  group('the IP check, exception E-1', () {
+    const answer = IpCheckResult(ip: '203.0.113.7', country: 'NL');
+    final endpoint = Uri.parse('https://ip.example/json');
+    late CommyTestHarness harness;
+    late ProviderContainer container;
+    late _RecordingProbe probe;
+
+    Future<void> connectWith(AppSettings settings) async {
+      harness = CommyTestHarness(
+        nodes: <ProxyNode>[testNode()],
+        settings: settings,
+      );
+      addTearDown(harness.dispose);
+      await harness.settingsRepository.writeSelectedNodeId('node-1');
+      probe = _RecordingProbe(answer);
+      container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[ipCheckProbeProvider.overrideWithValue(probe)],
+        ),
+      );
+      addTearDown(container.dispose);
+      await container.read(selectedNodeIdProvider.future);
+      // `check()` resolves the selection against the stored list, and the
+      // list only loads while somebody is listening.
+      container.listen(nodesProvider, (_, __) {});
+      await pumpEventQueue();
+      await container.read(tunnelControllerProvider.notifier).connect();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pumpEventQueue();
+      expect(harness.core.isRunning, isTrue);
+    }
+
+    TunnelNotice? notice() => container.read(tunnelControllerProvider).notice;
+
+    test('the button asks the configured endpoint and shows the answer',
+        () async {
+      await connectWith(AppSettings(ipCheckUrl: endpoint.toString()));
+
+      await container
+          .read(tunnelControllerProvider.notifier)
+          .check(includeIp: true);
+      await pumpEventQueue();
+
+      expect(probe.endpoints, <Uri>[endpoint]);
+      expect(notice()?.kind, TunnelNoticeKind.checkPassed);
+      expect(notice()?.name, answer.label);
+    });
+
+    test('the automatic probe after a connect never asks', () async {
+      // docs/09: E-1 fires by button press only. `autoCheckProvider` calls
+      // `check()` without the flag, and this pins that the flag is what
+      // decides.
+      await connectWith(AppSettings(ipCheckUrl: endpoint.toString()));
+
+      await container.read(tunnelControllerProvider.notifier).check();
+      await pumpEventQueue();
+
+      expect(probe.endpoints, isEmpty);
+      expect(notice()?.kind, TunnelNoticeKind.checkPassed);
+      expect(notice()?.name, isNull);
+    });
+
+    test('off, the button asks nobody', () async {
+      await connectWith(AppSettings.defaults);
+
+      await container
+          .read(tunnelControllerProvider.notifier)
+          .check(includeIp: true);
+      await pumpEventQueue();
+
+      expect(probe.endpoints, isEmpty);
+      expect(notice()?.kind, TunnelNoticeKind.checkPassed);
+      expect(notice()?.name, isNull);
+    });
+
+    test('an endpoint that does not answer is said out loud', () async {
+      await connectWith(AppSettings(ipCheckUrl: endpoint.toString()));
+      probe.answers = false;
+
+      await container
+          .read(tunnelControllerProvider.notifier)
+          .check(includeIp: true);
+      await pumpEventQueue();
+
+      expect(notice()?.kind, TunnelNoticeKind.ipCheckFailed);
+      expect(notice()?.milliseconds, isNotNull);
+    });
+  });
+
   group('startOnBoot', () {
     test('on, the setting is written and the boot receiver hears about it',
         () async {
@@ -396,6 +486,31 @@ void main() {
       expect(system.startOnBoot, <bool>[true]);
     });
   });
+}
+
+/// An `IpCheckProbe` that remembers every endpoint it was pointed at.
+class _RecordingProbe implements IpCheckProbe {
+  _RecordingProbe(this.answer);
+
+  /// What a successful probe reports.
+  final IpCheckResult answer;
+
+  /// Whether the endpoint answers at all.
+  bool answers = true;
+
+  /// Every endpoint asked, in order.
+  final List<Uri> endpoints = <Uri>[];
+
+  @override
+  Future<Result<IpCheckResult, CommyFailure>> probe(Uri endpoint) async {
+    endpoints.add(endpoint);
+    if (!answers) {
+      return const Err<IpCheckResult, CommyFailure>(
+        ConfigInvalidFailure('no answer'),
+      );
+    }
+    return Ok<IpCheckResult, CommyFailure>(answer);
+  }
 }
 
 /// A `SystemSettings` that remembers what it was asked instead of calling

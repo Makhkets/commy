@@ -96,7 +96,12 @@ class HeroArea extends ConsumerWidget {
   }
 
   void _check(WidgetRef ref) {
-    unawaited(ref.read(tunnelControllerProvider.notifier).check());
+    // The button is the one place exception E-1 may fire from
+    // (docs/09-security-privacy.md); the automatic probe after a connect
+    // calls `check()` without the flag.
+    unawaited(
+      ref.read(tunnelControllerProvider.notifier).check(includeIp: true),
+    );
   }
 
   /// How long the tunnel has been up, or zero when it is not.

@@ -6,8 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Shows the one-line results the tunnel produces, wherever the user is.
 ///
-/// `TunnelController` stores four of them — the reachability probe passed,
-/// the probe failed, the outbound was switched, a changed configuration was
+/// `TunnelController` stores a handful of them — the reachability probe
+/// passed, with or without the exit address; the probe failed; the IP check
+/// did not answer; the outbound was switched; a changed configuration was
 /// applied — and before this existed each one was written to state and read
 /// by nobody: pressing «Проверить» ran a real probe through the core and then
 /// said nothing at all.
@@ -45,10 +46,14 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
       return;
     }
     final t = Translations.of(context);
+    final ms = notice.milliseconds ?? 0;
+    final ip = notice.name;
     final (String message, CommyTone tone, IconData icon) =
         switch (notice.kind) {
       TunnelNoticeKind.checkPassed => (
-          t.home.checkOk(ms: notice.milliseconds ?? 0),
+          ip == null
+              ? t.home.checkOk(ms: ms)
+              : t.home.checkOkWithIp(ms: ms, ip: ip),
           CommyTone.connected,
           CommyIcons.success,
         ),
@@ -66,6 +71,11 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
           t.home.settingsApplied,
           CommyTone.info,
           CommyIcons.refresh,
+        ),
+      TunnelNoticeKind.ipCheckFailed => (
+          t.home.ipCheckFailed(ms: ms),
+          CommyTone.error,
+          CommyIcons.warning,
         ),
     };
 

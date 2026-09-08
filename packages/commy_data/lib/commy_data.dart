@@ -29,6 +29,7 @@ export 'src/database/tables/setting_rows.dart';
 export 'src/database/tables/subscription_rows.dart';
 export 'src/database/tables/traffic_daily_rows.dart';
 export 'src/http/commy_http_client.dart';
+export 'src/http/http_ip_check_probe.dart';
 export 'src/http/http_text_response.dart';
 export 'src/http/http_transport_error.dart';
 export 'src/http/network_failure_mapper.dart';

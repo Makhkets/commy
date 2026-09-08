@@ -50,6 +50,8 @@
     "showHidden": "Show",
     "checkOk": "Access confirmed: $ms ms",
     "checkFailed": "The check did not pass",
+    "checkOkWithIp": "Access confirmed: $ms ms · $ip",
+    "ipCheckFailed": "Access confirmed: $ms ms · the IP check did not answer",
     "switched": "Switched to $name",
     "settingsApplied": "Settings applied to the tunnel"
   },

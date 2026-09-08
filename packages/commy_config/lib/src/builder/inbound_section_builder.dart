@@ -6,8 +6,9 @@ import 'package:commy_domain/commy_domain.dart';
 /// Builds the `inbounds` array.
 ///
 /// One TUN inbound, always, plus a local mixed inbound when the user asked to
-/// share the tunnel with the LAN. There is deliberately no local inbound
-/// otherwise: a listening socket nobody asked for is a surface, not a feature.
+/// share the tunnel with the LAN or turned the IP check on. There is
+/// deliberately no local inbound otherwise: a listening socket nobody asked
+/// for is a surface, not a feature.
 ///
 /// The field names are the post-1.12 ones. `inet4_address`, `inet6_address`,
 /// `inet4_route_address` and their siblings were merged into
@@ -34,6 +35,9 @@ abstract final class InboundSectionBuilder {
   /// Listen address of the local inbound when LAN access is on.
   static const String lanListenAddress = '0.0.0.0';
 
+  /// Listen address of the local inbound when only the app itself needs it.
+  static const String loopbackListenAddress = '127.0.0.1';
+
   /// Builds the array.
   static List<Map<String, Object?>> build({
     required AppSettings settings,
@@ -42,7 +46,8 @@ abstract final class InboundSectionBuilder {
   }) {
     return <Map<String, Object?>>[
       tun(settings: settings, routing: routing, platform: platform),
-      if (settings.allowLan) mixed(settings: settings),
+      if (settings.allowLan || settings.isIpCheckEnabled)
+        mixed(settings: settings),
     ];
   }
 
@@ -90,11 +95,17 @@ abstract final class InboundSectionBuilder {
   }
 
   /// Builds the local SOCKS + HTTP inbound.
+  ///
+  /// On every interface when the user shares the tunnel with the LAN; on
+  /// loopback only when it exists for the IP check (exception E-1). The
+  /// app's own package is excluded from the TUN on Android, so the one way
+  /// its request can go *through* the tunnel is to aim it at this port.
   static Map<String, Object?> mixed({required AppSettings settings}) =>
       <String, Object?>{
         SingBoxKeys.type: SingBoxKeys.typeMixed,
         SingBoxKeys.tag: SingBoxTags.mixedInbound,
-        SingBoxKeys.listen: lanListenAddress,
+        SingBoxKeys.listen:
+            settings.allowLan ? lanListenAddress : loopbackListenAddress,
         SingBoxKeys.listenPort: settings.mixedPort,
       };
 

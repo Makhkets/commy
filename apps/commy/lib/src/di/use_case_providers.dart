@@ -10,6 +10,7 @@ import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_config/commy_config.dart';
+import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -152,6 +153,37 @@ final checkReachabilityUseCaseProvider =
     Provider<CheckReachabilityUseCase>((ref) {
   return CheckReachabilityUseCase(
     core: ref.watch(coreClientProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+  );
+});
+
+/// Exception E-1, the external IP check — the data half.
+///
+/// Its own `CommyHttpClient`, aimed at the loopback inbound the config
+/// builder opens for exactly this purpose: on Android the app's own package
+/// is excluded from the TUN, and a plain socket would report the user's real
+/// address with a straight face. The port follows the setting, so the client
+/// is rebuilt when that changes; cheaper than a check that quietly reports
+/// the wrong side of the tunnel.
+final ipCheckProbeProvider = Provider<IpCheckProbe>((ref) {
+  final port = ref.watch(
+    settingsProvider.select(
+      (settings) => settings.value?.mixedPort ?? AppSettings.defaultMixedPort,
+    ),
+  );
+  final info = ref.watch(appInfoProvider);
+  final client = CommyHttpClient(
+    userAgent: CommyUserAgent.honest(info.version),
+    tunnelProxy: ProxyEndpoint.loopback(port),
+  );
+  ref.onDispose(client.close);
+  return HttpIpCheckProbe(client: client);
+});
+
+/// Asks the configured E-1 endpoint, or answers nothing when there is none.
+final checkIpUseCaseProvider = Provider<CheckIpUseCase>((ref) {
+  return CheckIpUseCase(
+    probe: ref.watch(ipCheckProbeProvider),
     settings: ref.watch(settingsRepositoryProvider),
   );
 });
