@@ -50,7 +50,8 @@
     "showHidden": "Показать",
     "checkOk": "Доступ есть: $ms мс",
     "checkFailed": "Проверка не прошла",
-    "switched": "Переключено на $name"
+    "switched": "Переключено на $name",
+    "settingsApplied": "Настройки применены к туннелю"
   },
 
   "import": {

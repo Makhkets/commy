@@ -171,6 +171,112 @@ final autoConnectProvider = Provider<void>((ref) {
   consider();
 });
 
+/// How long a burst of edits is allowed to settle before one reload.
+///
+/// Three switches flipped in a row should cost the core one restart, not
+/// three. Long enough to cover a hand moving between rows, short enough that
+/// the change still feels immediate.
+const Duration _reloadSettle = Duration(milliseconds: 400);
+
+/// The settings the configuration builder actually reads, and nothing else.
+///
+/// A record, so equality is structural and a field the builder starts reading
+/// has exactly one place to be added. Everything not listed — theme, language,
+/// the hide-unavailable filter, the launch and boot switches — is the app's
+/// business and must never restart the core.
+typedef _CoreInputs = ({
+  bool allowLan,
+  String latencyProbeUrl,
+  LogLevel logLevel,
+  int mixedPort,
+  TunStack tunStack,
+});
+
+_CoreInputs _coreInputsOf(AppSettings settings) => (
+      allowLan: settings.allowLan,
+      latencyProbeUrl: settings.latencyProbeUrl,
+      logLevel: settings.logLevel,
+      mixedPort: settings.mixedPort,
+      tunStack: settings.tunStack,
+    );
+
+/// Applies routing, DNS and settings changes to a running tunnel.
+///
+/// Before this, an edit on the routing screen was visible only after the next
+/// reconnect, and nothing said so. Now the change is rebuilt into a whole
+/// configuration and handed to the running core through `reload`, which
+/// keeps the TUN device (rule R6: a pause, not a window).
+///
+/// Three things keep it from firing when it should not:
+///
+/// * only the settings the builder reads are compared ([_CoreInputs]) — a
+///   theme or language change must not restart the core;
+/// * the tunnel has to be up. Down, the next connect reads the same stores.
+///   Starting, the change is remembered and applied once the core reports
+///   `connected`, because the start in flight was built from the old values;
+/// * edits are coalesced over [_reloadSettle].
+///
+/// Watched from the root, like the log pump: a routing edit is made on one
+/// screen and has to land whichever screen is on top when the timer fires.
+final liveReloadProvider = Provider<void>((ref) {
+  Timer? settle;
+  var pending = false;
+
+  void schedule() {
+    pending = false;
+    settle?.cancel();
+    settle = Timer(_reloadSettle, () {
+      unawaited(ref.read(tunnelControllerProvider.notifier).reload());
+    });
+  }
+
+  void onChange() {
+    switch (ref.read(coreStatusProvider).value) {
+      case TunnelConnected() || TunnelChecking():
+        schedule();
+      case TunnelStarting():
+        pending = true;
+      case TunnelIdle() || TunnelStopping() || TunnelError() || null:
+        pending = false;
+    }
+  }
+
+  ref
+    ..onDispose(() => settle?.cancel())
+    ..listen<AsyncValue<RoutingPolicy>>(routingPolicyProvider,
+        (previous, next) {
+      final before = previous?.value;
+      final after = next.value;
+      // The first value is a load, not a change.
+      if (before != null && after != null && before != after) {
+        onChange();
+      }
+    })
+    ..listen<AsyncValue<DnsSettings>>(dnsSettingsProvider, (previous, next) {
+      final before = previous?.value;
+      final after = next.value;
+      if (before != null && after != null && before != after) {
+        onChange();
+      }
+    })
+    ..listen<AsyncValue<AppSettings>>(settingsProvider, (previous, next) {
+      final before = previous?.value;
+      final after = next.value;
+      if (before != null &&
+          after != null &&
+          _coreInputsOf(before) != _coreInputsOf(after)) {
+        onChange();
+      }
+    })
+    ..listen<AsyncValue<TunnelStatus>>(coreStatusProvider, (previous, next) {
+      if (pending &&
+          next.value is TunnelConnected &&
+          previous?.value is TunnelStarting) {
+        schedule();
+      }
+    });
+});
+
 /// Actions on the tunnel, plus whatever the last one produced.
 final tunnelControllerProvider =
     NotifierProvider<TunnelController, TunnelActionState>(
@@ -261,6 +367,9 @@ enum TunnelNoticeKind {
 
   /// The outbound was switched inside a running core.
   switched,
+
+  /// The running core took a changed configuration.
+  reloaded,
 }
 
 /// A transient message and the one number or name it carries.
@@ -372,20 +481,23 @@ class TunnelController extends Notifier<TunnelActionState> {
   TunnelStatus get _reportedStatus =>
       ref.read(coreStatusProvider).value ?? const TunnelStatus.idle();
 
+  /// Whether the core is running and usable. `starting` is not: nothing can
+  /// be switched or reloaded inside a core that has not come up yet.
+  bool get _isUp => switch (_reportedStatus) {
+        TunnelConnected() || TunnelChecking() => true,
+        TunnelIdle() ||
+        TunnelStarting() ||
+        TunnelStopping() ||
+        TunnelError() =>
+          false,
+      };
+
   /// Picks [node]. Switches the outbound in place when the tunnel is up.
   ///
   /// A restart would drop every open connection, which is exactly what
   /// docs/05-ux-flows.md forbids: "не отключаемся и не подключаемся заново".
   Future<void> selectNode(ProxyNode node) async {
-    final isUp = switch (_reportedStatus) {
-      TunnelConnected() || TunnelChecking() => true,
-      TunnelIdle() ||
-      TunnelStarting() ||
-      TunnelStopping() ||
-      TunnelError() =>
-        false,
-    };
-    if (!isUp) {
+    if (!_isUp) {
       await ref.read(selectedNodeIdProvider.notifier).select(node.id);
       return;
     }
@@ -402,6 +514,40 @@ class TunnelController extends Notifier<TunnelActionState> {
     state = state.copyWith(
       clearFailure: true,
       notice: TunnelNotice(TunnelNoticeKind.switched, name: node.name),
+    );
+  }
+
+  /// Applies the current routing, DNS and settings to the running core.
+  ///
+  /// Whole, not patched: the same document a connect would send, handed to
+  /// `CoreClient.reload`, which keeps the TUN device. Nothing happens unless
+  /// the tunnel is up — down, the next connect builds from the same stores.
+  /// The core reports `starting` and then `connected` again, so the
+  /// reachability probe runs once more against the new configuration.
+  Future<void> reload() async {
+    final nodeId = ref.read(selectedNodeIdProvider).value;
+    if (nodeId == null || state.isBusy || !_isUp) {
+      return;
+    }
+    state = state.copyWith(
+      isBusy: true,
+      clearFailure: true,
+      clearNotice: true,
+    );
+    final logger = ref.read(appLoggerProvider)
+      ..info('reload requested', tag: _tag);
+
+    final result = await ref.read(reloadUseCaseProvider)(nodeId: nodeId);
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      logger.error('reload failed: ${failure.code}', tag: _tag);
+      state = state.copyWith(isBusy: false, failure: failure);
+      return;
+    }
+    state = state.copyWith(
+      isBusy: false,
+      lastConfig: _buildPreview(nodeId),
+      notice: const TunnelNotice(TunnelNoticeKind.reloaded),
     );
   }
 

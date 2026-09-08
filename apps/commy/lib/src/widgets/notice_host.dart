@@ -6,10 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Shows the one-line results the tunnel produces, wherever the user is.
 ///
-/// `TunnelController` stores three of them — the reachability probe passed,
-/// the probe failed, the outbound was switched — and before this existed each
-/// one was written to state and read by nobody: pressing «Проверить» ran a
-/// real probe through the core and then said nothing at all.
+/// `TunnelController` stores four of them — the reachability probe passed,
+/// the probe failed, the outbound was switched, a changed configuration was
+/// applied — and before this existed each one was written to state and read
+/// by nobody: pressing «Проверить» ran a real probe through the core and then
+/// said nothing at all.
 ///
 /// It sits in `MaterialApp.builder` rather than on the home screen because a
 /// node switch can be triggered from anywhere the list is shown, and a result
@@ -60,6 +61,11 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
           t.home.switched(name: notice.name ?? ''),
           CommyTone.info,
           CommyIcons.proxy,
+        ),
+      TunnelNoticeKind.reloaded => (
+          t.home.settingsApplied,
+          CommyTone.info,
+          CommyIcons.refresh,
         ),
     };
 

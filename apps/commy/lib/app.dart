@@ -50,6 +50,9 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       ..watch(autoCheckProvider)
       // "Connect on launch", decided once off the first settled read.
       ..watch(autoConnectProvider)
+      // Routing, DNS and settings edits reach a running core without a
+      // reconnect. Made on one screen, applied whichever is on top.
+      ..watch(liveReloadProvider)
       // "Connect on boot": the receiver in the manifest is made to agree
       // with the stored switch, once, the same way.
       ..watch(startOnBootSyncProvider)

@@ -103,6 +103,25 @@ final connectUseCaseProvider = Provider<ConnectUseCase>((ref) {
   );
 });
 
+/// Applies a changed routing policy, DNS or settings to a running core.
+///
+/// Through `CoreClient.reload`, which keeps the TUN device. The alternative,
+/// stop-then-start, is a disconnect the user did not ask for, and a window
+/// with no tunnel at all (rule R6).
+final reloadUseCaseProvider = Provider<ReloadUseCase>((ref) {
+  final platform = ref.watch(configPlatformProvider);
+  return ReloadUseCase(
+    core: ref.watch(coreClientProvider),
+    builder: BuildConfigUseCase(
+      nodes: ref.watch(nodeRepositoryProvider),
+      settings: ref.watch(settingsRepositoryProvider),
+      routing: ref.watch(routingRepositoryProvider),
+      generator: ref.watch(configGeneratorProvider),
+      includeClashApi: platform.allowsClashApi,
+    ),
+  );
+});
+
 /// Stops the tunnel.
 final disconnectUseCaseProvider = Provider<DisconnectUseCase>((ref) {
   return DisconnectUseCase(core: ref.watch(coreClientProvider));

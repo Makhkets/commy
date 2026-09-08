@@ -236,6 +236,120 @@ void main() {
     });
   });
 
+  group('live reload', () {
+    late CommyTestHarness harness;
+    late ProviderContainer container;
+
+    /// Past the settle window, with room for the fake core to restart.
+    const settled = Duration(milliseconds: 600);
+
+    setUp(() async {
+      harness = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
+      await harness.settingsRepository.writeSelectedNodeId('node-1');
+      container = ProviderContainer(overrides: harness.overrides())
+        ..listen(liveReloadProvider, (_, __) {});
+      await container.read(selectedNodeIdProvider.future);
+      await container.read(routingPolicyProvider.future);
+      await container.read(settingsProvider.future);
+      await pumpEventQueue();
+    });
+
+    tearDown(() async {
+      container.dispose();
+      await harness.dispose();
+    });
+
+    Future<void> connectAndSettle() async {
+      await container.read(tunnelControllerProvider.notifier).connect();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await pumpEventQueue();
+      expect(harness.core.isRunning, isTrue);
+    }
+
+    test('a routing edit reaches the running core without a reconnect',
+        () async {
+      await connectAndSettle();
+      final before = harness.core.lastConfig;
+
+      await harness.routingRepository.write(
+        RoutingPolicy.defaults.copyWith(blockAds: true),
+      );
+      await Future<void>.delayed(settled);
+      await pumpEventQueue();
+
+      expect(harness.core.lastConfig, isNot(same(before)));
+      expect(harness.core.startCalls, 1, reason: 'reload, not restart');
+      expect(harness.core.stopCalls, 0);
+      expect(harness.core.isRunning, isTrue);
+      expect(
+        container.read(tunnelControllerProvider).notice,
+        const TunnelNotice(TunnelNoticeKind.reloaded),
+      );
+    });
+
+    test('a theme change is not a reason to restart the core', () async {
+      await connectAndSettle();
+      final before = harness.core.lastConfig;
+
+      await harness.settingsRepository.write(
+        AppSettings.defaults.copyWith(themeMode: AppThemeMode.dark),
+      );
+      await Future<void>.delayed(settled);
+      await pumpEventQueue();
+
+      expect(harness.core.lastConfig, same(before));
+    });
+
+    test('a setting the builder reads restarts the core', () async {
+      await connectAndSettle();
+      final before = harness.core.lastConfig;
+
+      await harness.settingsRepository.write(
+        AppSettings.defaults.copyWith(allowLan: true),
+      );
+      await Future<void>.delayed(settled);
+      await pumpEventQueue();
+
+      expect(harness.core.lastConfig, isNot(same(before)));
+    });
+
+    test('with the tunnel down, nothing is sent anywhere', () async {
+      await harness.routingRepository.write(
+        RoutingPolicy.defaults.copyWith(blockAds: true),
+      );
+      await Future<void>.delayed(settled);
+      await pumpEventQueue();
+
+      expect(harness.core.lastConfig, isNull);
+      expect(harness.core.isRunning, isFalse);
+    });
+
+    test('a burst of edits costs one reload', () async {
+      await connectAndSettle();
+      final restarts = <TunnelStatus>[];
+      final watching = harness.core.status.listen((status) {
+        if (status is TunnelStarting) {
+          restarts.add(status);
+        }
+      });
+      addTearDown(watching.cancel);
+
+      await harness.routingRepository.write(
+        RoutingPolicy.defaults.copyWith(blockAds: true),
+      );
+      await harness.routingRepository.write(
+        RoutingPolicy.defaults.copyWith(blockAds: true, bypassLan: false),
+      );
+      await harness.settingsRepository.write(
+        AppSettings.defaults.copyWith(allowLan: true),
+      );
+      await Future<void>.delayed(settled);
+      await pumpEventQueue();
+
+      expect(restarts, hasLength(1));
+    });
+  });
+
   group('startOnBoot', () {
     test('on, the setting is written and the boot receiver hears about it',
         () async {

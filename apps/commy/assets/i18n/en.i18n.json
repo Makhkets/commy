@@ -50,7 +50,8 @@
     "showHidden": "Show",
     "checkOk": "Access confirmed: $ms ms",
     "checkFailed": "The check did not pass",
-    "switched": "Switched to $name"
+    "switched": "Switched to $name",
+    "settingsApplied": "Settings applied to the tunnel"
   },
 
   "import": {
