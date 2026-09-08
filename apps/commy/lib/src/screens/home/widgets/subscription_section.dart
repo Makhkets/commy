@@ -40,7 +40,7 @@ class SubscriptionSection extends ConsumerWidget {
     final selectedId = ref.watch(selectedNodeIdProvider).value;
     final busy = ref.watch(subscriptionControllerProvider);
     final info = subscription.userInfo;
-    final now = DateTime.now();
+    final now = ref.watch(clockProvider).value ?? DateTime.now();
 
     return SubscriptionCard(
       name: subscription.name,
