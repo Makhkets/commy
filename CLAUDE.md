@@ -213,6 +213,11 @@ python scripts/panel_test_setup.py --setup
 ```
 Подробнее: [docs/16-local-testing.md](docs/16-local-testing.md).
 
+**Последний прогресс:** 2026-09-09 — закрыты задачи #1–5 очереди (E-1,
+live reload, `startOnBoot`, пустые состояния диагностики, `clockProvider`),
+починен CI на `main`, приняты 6 из 7 PR dependabot. Следующему: начинать с
+**#6**, детали и что не проверено — в docs/17-agent-handoff.md, «Сессия 2».
+
 **Для следующей сессии — прочитай в этом порядке:**
 1. **[docs/17-agent-handoff.md](docs/17-agent-handoff.md)** ← начни отсюда (план работ и инструкции для агента)
 2. **[docs/15-handoff.md](docs/15-handoff.md#очередь-работ-по-убыванию-пользы)** — очередь работ, приоритеты, грабли
