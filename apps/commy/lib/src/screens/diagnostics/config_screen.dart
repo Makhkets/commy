@@ -9,6 +9,7 @@ import 'package:commy_config/commy_config.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 /// The generated sing-box configuration, read only.
 ///
@@ -34,6 +35,8 @@ class ConfigScreen extends ConsumerWidget {
           icon: CommyIcons.document,
           title: t.diagnostics.configEmpty,
           message: t.diagnostics.configEmptyBody,
+          actionLabel: t.diagnostics.goConnect,
+          onAction: () => context.go(AppRoutes.home),
         ),
       );
     }

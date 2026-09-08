@@ -92,8 +92,12 @@ class CommyTestHarness {
   ///
   /// [status] pins what the core reports, for the six-state screen tests.
   /// Leaving it out lets the fake core drive the status itself, which is what
-  /// the end-to-end flow test wants.
-  List<Override> overrides({TunnelStatus? status}) {
+  /// the end-to-end flow test wants. [extra] is for the odd provider one test
+  /// needs pinned; it comes last so it can shadow nothing above it.
+  List<Override> overrides({
+    TunnelStatus? status,
+    List<Override> extra = const <Override>[],
+  }) {
     return <Override>[
       coreClientProvider.overrideWithValue(core),
       clipboardProvider.overrideWithValue(clipboard),
@@ -107,6 +111,7 @@ class CommyTestHarness {
         coreStatusProvider.overrideWith(
           (ref) => Stream<TunnelStatus>.value(status),
         ),
+      ...extra,
     ];
   }
 
@@ -115,9 +120,13 @@ class CommyTestHarness {
   /// Not `MaterialApp.router`: a screen test that also stood the router up
   /// would be testing go_router, and a failure in either would look like a
   /// failure in both.
-  Widget wrap(Widget child, {TunnelStatus? status}) {
+  Widget wrap(
+    Widget child, {
+    TunnelStatus? status,
+    List<Override> extra = const <Override>[],
+  }) {
     return ProviderScope(
-      overrides: overrides(status: status),
+      overrides: overrides(status: status, extra: extra),
       child: TranslationProvider(
         child: Builder(
           builder: (context) => MaterialApp(

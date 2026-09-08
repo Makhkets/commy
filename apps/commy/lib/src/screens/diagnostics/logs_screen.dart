@@ -11,6 +11,7 @@ import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// The core log: monospace, coloured by level, filtered and searchable.
@@ -89,7 +90,12 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
             child: AsyncSection<List<LogLine>>(
               value: lines,
               skeleton: const ListSkeleton(rows: 8),
-              builder: (context, all) => _LogBody(lines: _filter(all)),
+              builder: (context, all) => _LogBody(
+                lines: _filter(all),
+                isFiltered: _isFiltered,
+                onResetFilters: _resetFilters,
+                onConnect: () => context.go(AppRoutes.home),
+              ),
             ),
           ),
           _RedactionNotice(onExport: () => unawaited(_export(context))),
@@ -97,6 +103,14 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
       ),
     );
   }
+
+  bool get _isFiltered => _minimum != null || _query.isNotEmpty;
+
+  void _resetFilters() => setState(() {
+        _search.clear();
+        _query = '';
+        _minimum = null;
+      });
 
   List<LogLine> _filter(List<LogLine> all) {
     final minimum = _minimum;
@@ -151,18 +165,47 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
 }
 
 class _LogBody extends StatelessWidget {
-  const _LogBody({required this.lines});
+  const _LogBody({
+    required this.lines,
+    required this.isFiltered,
+    required this.onResetFilters,
+    required this.onConnect,
+  });
 
   final List<LogLine> lines;
+
+  /// Whether a level or a search term is narrowing [lines].
+  final bool isFiltered;
+
+  /// Drops the level and the search term.
+  final VoidCallback onResetFilters;
+
+  /// Leads to the connect button.
+  final VoidCallback onConnect;
 
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
     if (lines.isEmpty) {
+      // Two different "nothing here", with two different ways out. A filter
+      // that matched nothing is undone on this screen; a log that was never
+      // written starts on the home screen, where the connect button is.
+      // docs/05-ux-flows.md: an empty state without an action is not one.
+      if (isFiltered) {
+        return EmptyState(
+          icon: CommyIcons.search,
+          title: t.diagnostics.logsFiltered,
+          message: t.diagnostics.logsFilteredBody,
+          actionLabel: t.diagnostics.resetFilters,
+          onAction: onResetFilters,
+        );
+      }
       return EmptyState(
         icon: CommyIcons.document,
         title: t.diagnostics.logsEmpty,
         message: t.diagnostics.logsEmptyBody,
+        actionLabel: t.diagnostics.goConnect,
+        onAction: onConnect,
       );
     }
     return Container(

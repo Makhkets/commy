@@ -6,6 +6,7 @@ import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 /// Throughput over the last minute, plus the totals for this session.
 ///
@@ -29,6 +30,8 @@ class StatsScreen extends ConsumerWidget {
           icon: CommyIcons.diagnostics,
           title: t.diagnostics.statsEmpty,
           message: t.diagnostics.statsEmptyBody,
+          actionLabel: t.diagnostics.goConnect,
+          onAction: () => context.go(AppRoutes.home),
         ),
       );
     }

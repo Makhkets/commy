@@ -51,6 +51,10 @@ class AsyncSection<T> extends StatelessWidget {
 }
 
 /// A stack of grey bars standing in for a list that has not arrived.
+///
+/// Clips rather than overflows. It is a placeholder, so the amount of it that
+/// fits is exactly the amount worth drawing — and a placeholder that throws a
+/// layout error on a short screen is worse than the blank it stands in for.
 class ListSkeleton extends StatelessWidget {
   /// Creates the placeholder.
   const ListSkeleton({this.rows = 4, this.hasHeader = false, super.key});
@@ -64,21 +68,27 @@ class ListSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    return Padding(
-      padding: EdgeInsets.all(spacing.s4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (hasHeader) ...<Widget>[
-            const CommySkeleton(width: _headerWidth),
-            SizedBox(height: spacing.s4),
+    // A scroll view that cannot scroll: it lays the rows out at their natural
+    // height, clips whatever does not fit, and sizes to its content where the
+    // parent gives no bound.
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: EdgeInsets.all(spacing.s4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (hasHeader) ...<Widget>[
+              const CommySkeleton(width: _headerWidth),
+              SizedBox(height: spacing.s4),
+            ],
+            for (var index = 0; index < rows; index++) ...<Widget>[
+              const _SkeletonRow(),
+              SizedBox(height: spacing.s3),
+            ],
           ],
-          for (var index = 0; index < rows; index++) ...<Widget>[
-            const _SkeletonRow(),
-            SizedBox(height: spacing.s3),
-          ],
-        ],
+        ),
       ),
     );
   }
