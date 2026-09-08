@@ -22,6 +22,13 @@ updates:
         update-types: [minor, patch]
     commit-message:
       prefix: 'chore(deps)'
+    # build_runner >= 2.15.2 needs analyzer >= 13.3.0 needs meta ^1.18.3, and
+    # Flutter 3.44.8 pins meta 1.18.0. Until FLUTTER_VERSION in the workflows
+    # moves, every such bump makes the workspace unresolvable (it did once:
+    # PR #9 turned CI red for two days). Drop this entry with the Flutter bump.
+    ignore:
+      - dependency-name: build_runner
+        versions: ['>=2.15.2']
 
   - package-ecosystem: gomod
     directory: /core

@@ -37,6 +37,10 @@ dependencies:
   url_launcher: ^6.3.0
 
 dev_dependencies:
+  # Pinned below 2.15.2 on purpose: from there build_runner needs analyzer
+  # >= 13.3.0, which needs meta ^1.18.3, and Flutter 3.44.8 (.fvmrc, CI)
+  # pins meta 1.18.0. Raising this without raising Flutter makes the whole
+  # workspace unresolvable. Dependabot is told the same in .github/dependabot.yml.
   build_runner: ^2.15.1
   flutter_test:
     sdk: flutter
