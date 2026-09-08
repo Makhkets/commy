@@ -115,7 +115,7 @@ class _Body extends ConsumerWidget {
                 value: settings.startOnBoot,
                 semanticLabel: t.settings.connection.startOnBoot,
                 onChanged: (value) => unawaited(
-                  controller.save(settings.copyWith(startOnBoot: value)),
+                  controller.setStartOnBoot(enabled: value),
                 ),
               ),
             ),

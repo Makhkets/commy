@@ -4,8 +4,8 @@
 /// one means editing the Kotlin side, this list and `docs/wire-protocol.md` in
 /// the same pull request.
 ///
-/// [openVpnSettings] is the one method that is not a tunnel command, and it is
-/// counted separately for that reason — see its own note below.
+/// [openVpnSettings] and [setStartOnBoot] are not tunnel commands, and they
+/// are counted separately for that reason — see their own notes below.
 abstract final class WireMethods {
   /// Brings the tunnel up. Argument: the configuration JSON, as a string.
   static const String start = 'start';
@@ -36,4 +36,13 @@ abstract final class WireMethods {
   /// once the process is killed there is nothing left to block with. So the
   /// app names the guarantee, says who provides it, and offers to open it.
   static const String openVpnSettings = 'openVpnSettings';
+
+  /// Turns the boot receiver on or off. Argument: a bare `bool`. No result.
+  ///
+  /// Not a tunnel command either. "Connect on boot" is a stored setting on
+  /// the Dart side and a manifest component on the Kotlin side, and the two
+  /// have to agree: a receiver enabled while the switch is off runs at every
+  /// boot for nothing, and one disabled while the switch is on is a promise
+  /// the settings screen makes and nobody keeps.
+  static const String setStartOnBoot = 'setStartOnBoot';
 }

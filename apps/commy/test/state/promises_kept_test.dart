@@ -13,6 +13,7 @@ import 'package:commy/src/config/selector_config_generator.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_core/commy_core.dart';
@@ -234,6 +235,68 @@ void main() {
       expect(harness.core.isRunning, isFalse);
     });
   });
+
+  group('startOnBoot', () {
+    test('on, the setting is written and the boot receiver hears about it',
+        () async {
+      final harness = CommyTestHarness();
+      addTearDown(harness.dispose);
+      final system = _RecordingSystemSettings();
+
+      final container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[systemSettingsProvider.overrideWithValue(system)],
+        ),
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(settingsControllerProvider.notifier)
+          .setStartOnBoot(enabled: true);
+
+      final stored = await harness.settingsRepository.read();
+      expect(stored.valueOrNull?.startOnBoot, isTrue);
+      expect(system.startOnBoot, <bool>[true]);
+    });
+
+    test('at launch, the receiver is brought in line with the stored setting',
+        () async {
+      // A reinstall or a restored backup can leave the two apart. The switch
+      // is the truth; the receiver follows it.
+      final harness = CommyTestHarness(
+        settings: const AppSettings(startOnBoot: true),
+      );
+      addTearDown(harness.dispose);
+      final system = _RecordingSystemSettings();
+
+      final container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[systemSettingsProvider.overrideWithValue(system)],
+        ),
+      );
+      addTearDown(container.dispose);
+
+      container.listen(startOnBootSyncProvider, (_, __) {});
+      await pumpEventQueue();
+
+      expect(system.startOnBoot, <bool>[true]);
+    });
+  });
+}
+
+/// A `SystemSettings` that remembers what it was asked instead of calling
+/// into a platform that is not there.
+class _RecordingSystemSettings extends SystemSettings {
+  _RecordingSystemSettings();
+
+  /// Every value handed to [setStartOnBoot], in order.
+  final List<bool> startOnBoot = <bool>[];
+
+  @override
+  Future<bool> setStartOnBoot({required bool enabled}) async {
+    startOnBoot.add(enabled);
+    return true;
+  }
 }
 
 /// A core whose reachability probe answers only when the test says so.

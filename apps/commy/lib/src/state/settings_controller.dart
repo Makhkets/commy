@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +15,36 @@ final settingsControllerProvider =
     NotifierProvider<SettingsController, CommyFailure?>(
   SettingsController.new,
 );
+
+/// Brings the boot receiver in line with the stored setting, once per launch.
+///
+/// The receiver's enabled flag belongs to the package manager and the setting
+/// to us, and nothing else keeps the two together across a reinstall or a
+/// restored backup. Watched from the root like `autoConnectProvider`, and
+/// decided off the first settled read for the same reason: a later write
+/// goes through [SettingsController.setStartOnBoot], which does its own
+/// platform call.
+final startOnBootSyncProvider = Provider<void>((ref) {
+  var applied = false;
+  void consider() {
+    if (applied) {
+      return;
+    }
+    final settings = ref.read(settingsProvider).value;
+    if (settings == null) {
+      return;
+    }
+    applied = true;
+    unawaited(
+      ref
+          .read(systemSettingsProvider)
+          .setStartOnBoot(enabled: settings.startOnBoot),
+    );
+  }
+
+  ref.listen<AsyncValue<AppSettings>>(settingsProvider, (_, __) => consider());
+  consider();
+});
 
 /// The write side of the settings screens.
 class SettingsController extends Notifier<CommyFailure?> {
@@ -38,6 +71,20 @@ class SettingsController extends Notifier<CommyFailure?> {
     await save(
       current.copyWith(ipCheckUrl: enabled ? defaultIpCheckUrl : ''),
     );
+  }
+
+  /// Turns "connect on boot" on or off.
+  ///
+  /// Two writes, and the order matters: the setting first, the platform
+  /// second, and the second only if the first went through. A boot receiver
+  /// enabled for a setting that failed to save would be the very defect this
+  /// method exists to close — a switch and a mechanism that disagree.
+  Future<void> setStartOnBoot({required bool enabled}) async {
+    await save((await _settings()).copyWith(startOnBoot: enabled));
+    if (state != null) {
+      return;
+    }
+    await ref.read(systemSettingsProvider).setStartOnBoot(enabled: enabled);
   }
 
   /// Hides or shows servers that failed their last probe.

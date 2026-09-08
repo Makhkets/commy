@@ -3,6 +3,7 @@ package dev.commy.app.wire
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import dev.commy.app.tunnel.BootReceiver
 import dev.commy.app.tunnel.TunnelController
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -13,7 +14,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /**
- * The seven methods of `dev.commy.app/core`.
+ * The methods of `dev.commy.app/core`: seven for the tunnel, two for the system.
  *
  * Every branch answers exactly once, with `success` or with `error`. A silent
  * path here is a button that does nothing and a future waiting forever, which
@@ -122,6 +123,11 @@ internal class CoreMethodHandler(
             null
         }
 
+        Wire.Methods.SET_START_ON_BOOT -> {
+            BootReceiver.setEnabled(context, boolArgument(call))
+            null
+        }
+
         else -> null
     }
 
@@ -129,6 +135,12 @@ internal class CoreMethodHandler(
         ?: throw WireException(
             Wire.Errors.CONFIG_INVALID,
             "${call.method} expects the configuration JSON as a string",
+        )
+
+    private fun boolArgument(call: MethodCall): Boolean = call.arguments as? Boolean
+        ?: throw WireException(
+            Wire.Errors.UNKNOWN,
+            "${call.method} expects a boolean argument",
         )
 
     private fun jsonArgument(call: MethodCall): JSONObject {
@@ -156,6 +168,7 @@ internal class CoreMethodHandler(
             Wire.Methods.PROXIES,
             Wire.Methods.VERSION,
             Wire.Methods.OPEN_VPN_SETTINGS,
+            Wire.Methods.SET_START_ON_BOOT,
         )
     }
 }

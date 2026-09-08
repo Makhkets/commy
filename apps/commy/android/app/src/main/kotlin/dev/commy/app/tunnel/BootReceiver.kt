@@ -36,11 +36,12 @@ import android.content.pm.PackageManager
  *
  * The manifest ships this with `android:enabled="false"`, so an install that
  * never turns the feature on has no boot-time cost at all and never asks the
- * user why a proxy client wants to run at startup. [setEnabled] is the switch,
- * and nothing calls it yet: auto-start is M3 in docs/07-roadmap.md and there is
- * no settings screen for it. The component has to exist regardless — the
- * manifest names it, and a missing class there is a build failure, not a
- * runtime one.
+ * user why a proxy client wants to run at startup. [setEnabled] is the switch.
+ * The settings screen flips it through the `setStartOnBoot` method of the wire
+ * protocol — after every write of the setting, and once at launch — so the
+ * stored switch and this component cannot disagree. The component has to
+ * exist regardless: the manifest names it, and a missing class there is a
+ * build failure, not a runtime one.
  */
 class BootReceiver : BroadcastReceiver() {
 
