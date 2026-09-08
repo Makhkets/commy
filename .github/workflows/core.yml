@@ -37,9 +37,9 @@ jobs:
     name: go vet + test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
@@ -82,19 +82,19 @@ jobs:
     name: libbox.aar
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
 
       - name: Install NDK ${{ env.NDK_VERSION }}
         run: sdkmanager --install "ndk;${NDK_VERSION}"
@@ -103,7 +103,7 @@ jobs:
       # by printing usage and exiting 0 — a "successful" build that produces no
       # file. sing-box pins SagerNet's fork; so do we.
       - name: Cache gomobile
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/go/bin
           key: gomobile-v0.1.12-${{ runner.os }}
@@ -124,7 +124,7 @@ jobs:
           unzip -l "$aar" | grep -E 'jni/.*\.so|classes\.jar'
           sha256sum "$aar"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: libbox-aar
           path: apps/commy/android/app/libs/libbox.aar

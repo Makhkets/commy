@@ -47,7 +47,7 @@ jobs:
       # config from the base branch. Keep it that way. If this job ever needs
       # to run something from the pull request, it needs to be a different
       # workflow on a different trigger.
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v7
         with:
           # Not the default. Drops a label again when a pull request stops
           # touching that area, so the labels describe the current diff rather
@@ -65,9 +65,9 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
