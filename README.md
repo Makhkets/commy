@@ -8,15 +8,32 @@ Android · iOS · Windows · macOS · Linux
 [![CI](https://github.com/Makhkets/commy/actions/workflows/ci.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/ci.yml)
 [![Core](https://github.com/Makhkets/commy/actions/workflows/core.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/core.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-in%20development-orange.svg)](docs/07-roadmap.md)
+[![Status](https://img.shields.io/badge/status-alpha-orange.svg)](docs/07-roadmap.md)
 [![sing-box](https://img.shields.io/badge/sing--box-v1.13.16-2FD98A.svg)](https://github.com/SagerNet/sing-box)
+[![Flutter](https://img.shields.io/badge/Flutter-3.44.8-0468D7.svg)](https://flutter.dev)
+
+</div>
+
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/02-home-connected.png" width="280" alt="Commy connected: live throughput, the chosen server and the subscription card">
+<br><sub><b>Connected.</b> Live throughput, session time, the chosen server, and the subscription's quota and expiry.</sub>
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/01-first-run.png" width="280" alt="Commy first run: an empty library with four ways to import a server">
+<br><sub><b>First run.</b> Empty until you import something — there is nothing bundled to connect to.</sub>
+</td>
+</tr>
+</table>
+
+<sub>Rendered from the shipping widgets. The interface is localized; Russian is shown, English is included.</sub>
 
 </div>
 
 ---
-
-> **🚧 Early development.** There is no release yet. The project is at milestone M0 —
-> specification and scaffolding. Follow [the roadmap](docs/07-roadmap.md) for progress.
 
 ## What Commy is
 
@@ -36,6 +53,28 @@ behaves the same way.
 - there are no built-in free configs and no catalogue of public servers — the app is
   empty until you import something;
 - there are no accounts, no backend, no telemetry.
+
+## Status
+
+**Alpha.** Pre-release APKs are cut from tags and published on
+[Releases](https://github.com/Makhkets/commy/releases); there is no store listing yet.
+
+| Platform | State |
+|---|---|
+| **Android** | App and tunnel written, APK builds with the core inside. Not yet verified against a live server |
+| **iOS** | Not started — [milestone M4](docs/07-roadmap.md), the project's main risk |
+| **Windows** | Not started — planned for 1.1 |
+| **macOS**, **Linux** | Not started — planned for 1.2 |
+
+What exists today: six Dart packages behind 699 tests, the sing-box core built for
+three Android ABIs, the Android tunnel (`VpnService`, all 15 `PlatformInterface`
+methods, boot receiver, quick-settings tile, Doze handling), every application
+screen, deep links for six URL schemes, and Russian/English localization.
+
+What is honestly missing: the tunnel has never carried traffic from a real server,
+so none of milestone M1's four acceptance criteria can be ticked yet. Routing
+sub-screens (DNS, per-app, rule sets) are modelled and generated but have no UI.
+Progress is tracked in [the roadmap](docs/07-roadmap.md).
 
 ## Why another client
 
@@ -58,6 +97,16 @@ that carries all of your traffic, being auditable is not a nice-to-have.
 4. **Same behaviour everywhere.** A routing rule written on your phone works
    identically on your laptop.
 5. **No ads, no paid tiers, no accounts.**
+
+## Protocols
+
+VLESS (including Reality) · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC ·
+WireGuard · ShadowTLS · SOCKS · HTTP
+
+Imported from a share link, a subscription URL, a QR code, a file, a deep link or the
+clipboard. Subscription responses are read as a plain list, base64, Clash YAML or
+sing-box JSON, and `subscription-userinfo` headers become the quota and expiry shown
+on the card.
 
 ## Planned features
 
@@ -129,6 +178,14 @@ first. It documents the four traps that account for nearly every failure here �
 among them that upstream `golang.org/x/mobile` is the *wrong* gomobile (sing-box
 needs SagerNet's fork), and that `go mod tidy` silently ignores `-tags`, which
 produces a `go.sum` that only breaks later, at compile time.
+
+**Checks**
+
+```bash
+melos run analyze --no-select          # static analysis; warnings are errors
+melos run test --no-select             # unit and widget tests
+python scripts/check_wire_contract.py  # Dart <-> Kotlin channel contract
+```
 
 ## Contributing
 
