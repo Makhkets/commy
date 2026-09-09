@@ -207,12 +207,13 @@ class ImportController extends Notifier<ImportState> {
   Future<String?> importFile() async {
     state = const ImportState(isBusy: true);
     try {
-      final picked = await FilePicker.pickFiles(
+      // One file: `pickFile`, not `pickFiles` — since file_picker 12 the
+      // latter selects several by default and returns a list.
+      final picked = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: configExtensions,
       );
-      final files = picked?.files ?? const <PlatformFile>[];
-      final path = files.isEmpty ? null : files.first.path;
+      final path = picked?.path;
       if (path == null) {
         state = ImportState.idle;
         return null;
