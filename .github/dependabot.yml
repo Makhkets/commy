@@ -29,6 +29,11 @@ updates:
     ignore:
       - dependency-name: build_runner
         versions: ['>=2.15.2']
+      # Same story: very_good_analysis 11 declares `sdk: ^3.13.0`, and Flutter
+      # 3.44.8 ships Dart 3.12.2. Seven identical pull requests (#16-#22) were
+      # unresolvable for that reason alone. Drop this entry with the Flutter bump.
+      - dependency-name: very_good_analysis
+        versions: ['>=11.0.0']
 
   - package-ecosystem: gomod
     directory: /core
