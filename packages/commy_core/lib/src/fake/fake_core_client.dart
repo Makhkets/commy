@@ -350,12 +350,17 @@ class FakeCoreClient implements CoreClient {
     ];
   }
 
+  /// Writes a synthetic *core* line to [logs] — and only there.
+  ///
+  /// The injected logger is for the client's own diagnostics, the same split
+  /// `CoreClientFactory.create` promises and `AndroidCoreClient` keeps: the
+  /// real core's log arrives through `logs` alone. Feeding both would make
+  /// the app's log pump, which follows both, record every fake line twice.
   void _note(LogLevel level, String message) {
-    final line = LogLine(level: level, message: message, at: _clock());
-    _logger?.add(line);
-    if (!_logsController.isClosed) {
-      _logsController.add(line);
+    if (_logsController.isClosed) {
+      return;
     }
+    _logsController.add(LogLine(level: level, message: message, at: _clock()));
   }
 
   void _emit(TunnelStatus status) {

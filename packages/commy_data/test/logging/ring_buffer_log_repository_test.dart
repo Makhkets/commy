@@ -79,6 +79,41 @@ void main() {
       await repository.dispose();
     });
 
+    test('appendAll keeps the order and notifies listeners once', () async {
+      final repository = RingBufferLogRepository();
+      final seen = <int>[];
+      final subscription =
+          repository.watch().listen((lines) => seen.add(lines.length));
+      await Future<void>.delayed(Duration.zero);
+
+      await repository.appendAll(
+        <LogLine>[line('a'), line('b', second: 1), line('c', second: 2)],
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      // One snapshot for the burst, not one per line: a replayed backlog of
+      // a few hundred lines must not cost the log view a few hundred repaints.
+      expect(seen, equals(<int>[0, 3]));
+      final messages =
+          (await repository.read()).valueOrNull!.map((entry) => entry.message);
+      expect(messages, equals(<String>['a', 'b', 'c']));
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
+    test('appendAll trims to the capacity, keeping the newest', () async {
+      final repository = RingBufferLogRepository(capacity: 2);
+      await repository.appendAll(
+        <LogLine>[for (var i = 0; i < 5; i++) line('line $i', second: i)],
+      );
+
+      final lines = (await repository.read()).valueOrNull!;
+      final messages = lines.map((entry) => entry.message).toList();
+
+      expect(messages, equals(<String>['line 3', 'line 4']));
+      await repository.dispose();
+    });
+
     test('clear empties the buffer', () async {
       final repository = RingBufferLogRepository();
       await repository.append(line('a'));

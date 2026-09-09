@@ -176,6 +176,25 @@ void main() {
 
       expect(logger.buffer, hasLength(1));
     });
+
+    test(
+        'a snapshot taken before subscribing and the stream after it are '
+        'disjoint', () async {
+      // The contract the app's log pump rests on when it replays the ring
+      // without deduplicating: read `buffer`, then listen, in one synchronous
+      // block, and no line can land on both sides.
+      final logger = build()..info('before');
+      final seen = <LogLine>[];
+
+      final backlog = logger.buffer;
+      final subscription = logger.lines.listen(seen.add);
+      addTearDown(subscription.cancel);
+      logger.info('after');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(backlog.map((line) => line.message), <String>['before']);
+      expect(seen.map((line) => line.message), <String>['after']);
+    });
   });
 
   group('AppLogger lifecycle', () {

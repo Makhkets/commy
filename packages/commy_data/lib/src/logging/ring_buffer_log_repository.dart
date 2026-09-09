@@ -89,6 +89,7 @@ class RingBufferLogRepository implements LogRepository {
   /// The core delivers logs in bursts; one notification per burst instead of
   /// one per line is the difference between a scrolling list and a stuttering
   /// one.
+  @override
   Future<Result<void, CommyFailure>> appendAll(Iterable<LogLine> lines) async {
     return StorageGuard.runVoidSync(() {
       _buffer.addAll(lines);

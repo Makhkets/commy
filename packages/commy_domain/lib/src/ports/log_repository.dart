@@ -17,6 +17,13 @@ abstract interface class LogRepository {
   /// Appends one line.
   Future<Result<void, CommyFailure>> append(LogLine line);
 
+  /// Appends several lines, in order, and notifies listeners once.
+  ///
+  /// For bursts and backlogs. One notification for the whole batch instead of
+  /// one per line is the difference between a log view that scrolls and one
+  /// that repaints once for every line of a startup.
+  Future<Result<void, CommyFailure>> appendAll(Iterable<LogLine> lines);
+
   /// Empties the buffer.
   Future<Result<void, CommyFailure>> clear();
 

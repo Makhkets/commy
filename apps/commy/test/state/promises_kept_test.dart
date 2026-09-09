@@ -18,6 +18,7 @@ import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_core/commy_core.dart';
+import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // `Override` lives in misc.dart, not in the default export set.
@@ -484,6 +485,121 @@ void main() {
       await pumpEventQueue();
 
       expect(system.startOnBoot, <bool>[true]);
+    });
+  });
+
+  group('the log pump', () {
+    /// Silent: the default sink writes to the platform log viewer, which in a
+    /// test run is just noise.
+    AppLogger silentLogger() => AppLogger(
+          sink: (_) {},
+          clock: () => CommyTestHarness.now,
+        );
+
+    Future<List<String>> messages(LogRepository repository) async {
+      final lines = (await repository.read()).valueOrNull!;
+      return lines.map((line) => line.message).toList();
+    }
+
+    test(
+        'lines written before the pump attaches reach the repository, once, '
+        'in order', () async {
+      final logger = silentLogger();
+      addTearDown(logger.dispose);
+      // What `main()` and `CoreClientFactory` write: before any provider
+      // exists, and before anything could be listening.
+      logger
+        ..warn('database file is not encrypted', tag: 'boot')
+        ..info('running on the fake core', tag: FakeCoreClient.logTag);
+      final harness = CommyTestHarness();
+      addTearDown(harness.dispose);
+
+      final container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[appLoggerProvider.overrideWithValue(logger)],
+        ),
+      );
+      addTearDown(container.dispose);
+      container.listen(logPumpProvider, (_, __) {});
+      await pumpEventQueue();
+      logger.info('after attach');
+      await pumpEventQueue();
+
+      expect(await messages(harness.logRepository), <String>[
+        'database file is not encrypted',
+        'running on the fake core',
+        'after attach',
+      ]);
+    });
+
+    test('an empty ring appends nothing', () async {
+      final logger = silentLogger();
+      addTearDown(logger.dispose);
+      final harness = CommyTestHarness();
+      addTearDown(harness.dispose);
+
+      final container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[appLoggerProvider.overrideWithValue(logger)],
+        ),
+      );
+      addTearDown(container.dispose);
+      container.listen(logPumpProvider, (_, __) {});
+      await pumpEventQueue();
+
+      expect(harness.logRepository.length, 0);
+    });
+
+    test('a fake core line is recorded once, not once per feed', () async {
+      // On desktop the factory hands the fake the app's logger. The pump
+      // follows both the logger and the core's log stream, so a fake that
+      // wrote its synthetic core lines to both would show every one twice.
+      final logger = silentLogger();
+      addTearDown(logger.dispose);
+      final core = FakeCoreClient(
+        logger: logger,
+        startDelay: const Duration(milliseconds: 10),
+        checkDelay: const Duration(milliseconds: 10),
+        tick: const Duration(milliseconds: 50),
+      );
+      addTearDown(core.dispose);
+      final repository = RingBufferLogRepository();
+      addTearDown(repository.dispose);
+      // Built by hand: `harness.overrides()` already pins the core, and
+      // Riverpod refuses the same provider twice.
+      final container = ProviderContainer(
+        overrides: <Override>[
+          coreClientProvider.overrideWithValue(core),
+          appLoggerProvider.overrideWithValue(logger),
+          logRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.listen(logPumpProvider, (_, __) {});
+      await pumpEventQueue();
+
+      // Waited for on the core's own stream rather than on the clock: the two
+      // start lines come out of chained timers, and a fixed sleep long enough
+      // on this machine is a flake on a loaded runner. `logs` is broadcast, so
+      // this second subscription costs the pump nothing, and the repository
+      // has already recorded both lines by the time it completes — `append`
+      // mutates the buffer before its first await.
+      final firstTwo = core.logs.take(2).toList().timeout(
+            const Duration(seconds: 2),
+          );
+
+      await core.start(const CoreConfig(<String, Object?>{}));
+      await firstTwo;
+      await pumpEventQueue();
+
+      final seen = await messages(repository);
+      expect(seen.take(2), <String>[
+        'inbound/tun: started at 172.19.0.1/30',
+        'reachability confirmed',
+      ]);
+      for (var index = 1; index < seen.length; index++) {
+        expect(seen[index], isNot(seen[index - 1]));
+      }
     });
   });
 }

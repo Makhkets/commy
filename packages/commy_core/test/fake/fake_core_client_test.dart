@@ -318,6 +318,34 @@ void main() {
       expect(await lines, hasLength(2));
     });
 
+    test('synthetic core lines go to `logs`, not to the injected logger',
+        () async {
+      // The split the factory promises: the logger gets the client's own
+      // diagnostics, the core log comes through `logs` alone. The app's log
+      // pump follows both, so a line on both would reach the screen twice.
+      final logger = AppLogger(sink: (_) {});
+      addTearDown(logger.dispose);
+      final client = FakeCoreClient(
+        logger: logger,
+        startDelay: const Duration(milliseconds: 5),
+        checkDelay: const Duration(milliseconds: 5),
+        tick: const Duration(milliseconds: 5),
+      );
+      addTearDown(client.dispose);
+      final lines = client.logs.take(2).toList().timeout(
+            const Duration(seconds: 2),
+          );
+
+      await client.start(config);
+      final fromCore = (await lines).map((line) => line.message).toSet();
+
+      expect(fromCore, hasLength(2));
+      expect(
+        logger.buffer.where((line) => fromCore.contains(line.message)),
+        isEmpty,
+      );
+    });
+
     test('emits connection snapshots that always carry a rule', () async {
       final client = build();
       addTearDown(client.dispose);

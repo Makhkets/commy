@@ -62,10 +62,31 @@ final clockProvider = StreamProvider<DateTime>((ref) {
 /// Watched once, from the root widget, so the buffer keeps filling while the
 /// user is on any screen — a log that only records while the log screen is
 /// open answers no question anybody has.
+///
+/// The logger's ring buffer is replayed before the stream is followed.
+/// `AppLogger.lines` is broadcast, so a late subscriber sees nothing written
+/// before it — and the lines written before this provider builds are exactly
+/// the ones a bug report opens with: the boot warning from `main()`, and the
+/// factory's "running on the fake core" note, which is written *inside* the
+/// `coreClientProvider` watch below. `AppLogger` prescribes the order used
+/// here: read `buffer` once on attach, then follow `lines`.
 final logPumpProvider = Provider<void>((ref) {
   final core = ref.watch(coreClientProvider);
   final logger = ref.watch(appLoggerProvider);
   final repository = ref.watch(logRepositoryProvider);
+
+  // No deduplication, on purpose. `AppLogger.add` is synchronous and there is
+  // no await between this snapshot and the subscription below, so a line is
+  // either in the backlog or on the stream, never both. A check by `LogLine`
+  // equality would only ever drop a line the app genuinely wrote twice.
+  //
+  // The drain runs once because the three providers above never rebuild. If
+  // one of them ever does (task #17 moves their lifecycle), the backlog would
+  // be replayed again — the guard belongs with that change, not here.
+  final backlog = logger.buffer;
+  if (backlog.isNotEmpty) {
+    unawaited(repository.appendAll(backlog));
+  }
 
   final fromCore = core.logs.listen(
     (line) => unawaited(repository.append(line)),
