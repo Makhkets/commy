@@ -9,6 +9,7 @@ import 'package:commy/src/screens/settings/appearance_screen.dart';
 import 'package:commy/src/screens/settings/apps_screen.dart';
 import 'package:commy/src/screens/settings/dns_screen.dart';
 import 'package:commy/src/screens/settings/routing_screen.dart';
+import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.apps,
         builder: (context, state) => const AppsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.ruleSets,
+        builder: (context, state) => const RuleSetsScreen(),
       ),
       GoRoute(
         path: AppRoutes.dns,

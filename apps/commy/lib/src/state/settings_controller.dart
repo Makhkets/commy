@@ -127,6 +127,16 @@ class SettingsController extends Notifier<CommyFailure?> {
     await setRoutingMode(enabled ? RoutingMode.rules : RoutingMode.global);
   }
 
+  /// Sets where exception E-2 fetches its rule sets from.
+  ///
+  /// An empty template is a valid answer and switches the exception off: a
+  /// user who wants the request to be impossible rather than merely unused
+  /// clears the field, and the buttons that would make it go away.
+  Future<void> setRuleSetSource(String template) async {
+    final settings = await _settings();
+    await save(settings.copyWith(ruleSetSource: template.trim()));
+  }
+
   /// Turns exception E-3, the advertising block lists, on or off.
   Future<void> setBlockAds({required bool enabled}) async {
     await saveRouting((await _routing()).copyWith(blockAds: enabled));

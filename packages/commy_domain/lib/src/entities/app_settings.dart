@@ -42,6 +42,7 @@ class AppSettings {
     this.hideUnavailable = false,
     this.latencyProbeUrl = defaultLatencyProbeUrl,
     this.ipCheckUrl = '',
+    this.ruleSetSource = defaultRuleSetSource,
     this.logLevel = LogLevel.info,
     this.allowLan = false,
     this.mixedPort = defaultMixedPort,
@@ -67,6 +68,11 @@ class AppSettings {
           orElse: defaultLatencyProbeUrl,
         ),
         ipCheckUrl: JsonRead.stringOr(json, 'ipCheckUrl', orElse: ''),
+        ruleSetSource: JsonRead.stringOr(
+          json,
+          'ruleSetSource',
+          orElse: defaultRuleSetSource,
+        ),
         logLevel: LogLevel.values.byName(
           JsonRead.stringOr(json, 'logLevel', orElse: 'info'),
         ),
@@ -84,6 +90,19 @@ class AppSettings {
   /// Probe used by the latency test. Always goes *through* the proxy.
   static const String defaultLatencyProbeUrl =
       'http://cp.cloudflare.com/generate_204';
+
+  /// Where the geoip and geosite rule sets are downloaded from.
+  ///
+  /// A template, not a URL: [ruleSetTagToken] is replaced with the tag being
+  /// fetched. Exception E-2 requires the source to be the user's to change,
+  /// their own mirror included, so this is a default rather than a constant —
+  /// and nothing is ever fetched from it except on an explicit button press.
+  static const String defaultRuleSetSource =
+      'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/'
+      '{tag}.srs';
+
+  /// The placeholder [ruleSetSource] substitutes the rule set tag into.
+  static const String ruleSetTagToken = '{tag}';
 
   /// Local mixed (SOCKS + HTTP) inbound port.
   static const int defaultMixedPort = 2080;
@@ -137,6 +156,13 @@ class AppSettings {
   /// press, it goes through the tunnel, and its answer is not stored.
   final String ipCheckUrl;
 
+  /// Template the geoip and geosite sets are downloaded from.
+  ///
+  /// This is exception E-2: it fires only on an explicit button press, the
+  /// source is the user's to change, and the answer is cached on disk so
+  /// nothing has a reason to fetch it again. See [defaultRuleSetSource].
+  final String ruleSetSource;
+
   /// Minimum severity kept in the log.
   final LogLevel logLevel;
 
@@ -155,6 +181,22 @@ class AppSettings {
   /// Whether the external IP check is configured.
   bool get isIpCheckEnabled => ipCheckUrl.isNotEmpty;
 
+  /// Whether rule sets can be downloaded at all.
+  ///
+  /// An empty source is a deliberate setting, not a broken one: a user who
+  /// wants no such request available clears the field, and the button that
+  /// would make it goes away with it.
+  bool get isRuleSetSourceEnabled => ruleSetSource.trim().isNotEmpty;
+
+  /// The URL [tag] is fetched from, or `null` when no source is configured.
+  Uri? ruleSetUrl(String tag) {
+    final template = ruleSetSource.trim();
+    if (template.isEmpty) {
+      return null;
+    }
+    return Uri.tryParse(template.replaceAll(ruleSetTagToken, tag));
+  }
+
   /// Returns a copy with the given fields replaced.
   ///
   /// [locale] is the one nullable field; pass an empty string to clear it.
@@ -166,6 +208,7 @@ class AppSettings {
     bool? hideUnavailable,
     String? latencyProbeUrl,
     String? ipCheckUrl,
+    String? ruleSetSource,
     LogLevel? logLevel,
     bool? allowLan,
     int? mixedPort,
@@ -180,6 +223,7 @@ class AppSettings {
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
       latencyProbeUrl: latencyProbeUrl ?? this.latencyProbeUrl,
       ipCheckUrl: ipCheckUrl ?? this.ipCheckUrl,
+      ruleSetSource: ruleSetSource ?? this.ruleSetSource,
       logLevel: logLevel ?? this.logLevel,
       allowLan: allowLan ?? this.allowLan,
       mixedPort: mixedPort ?? this.mixedPort,
@@ -196,6 +240,7 @@ class AppSettings {
         'hideUnavailable': hideUnavailable,
         'latencyProbeUrl': latencyProbeUrl,
         'ipCheckUrl': ipCheckUrl,
+        'ruleSetSource': ruleSetSource,
         'logLevel': logLevel.name,
         'allowLan': allowLan,
         'mixedPort': mixedPort,
@@ -213,6 +258,7 @@ class AppSettings {
           other.hideUnavailable == hideUnavailable &&
           other.latencyProbeUrl == latencyProbeUrl &&
           other.ipCheckUrl == ipCheckUrl &&
+          other.ruleSetSource == ruleSetSource &&
           other.logLevel == logLevel &&
           other.allowLan == allowLan &&
           other.mixedPort == mixedPort &&
@@ -227,6 +273,7 @@ class AppSettings {
         hideUnavailable,
         latencyProbeUrl,
         ipCheckUrl,
+        ruleSetSource,
         logLevel,
         allowLan,
         mixedPort,

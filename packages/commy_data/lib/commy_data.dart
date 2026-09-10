@@ -49,6 +49,7 @@ export 'src/repositories/drift_routing_repository.dart';
 export 'src/repositories/drift_settings_repository.dart';
 export 'src/repositories/drift_subscription_repository.dart';
 export 'src/repositories/drift_traffic_history_store.dart';
+export 'src/repositories/file_rule_set_repository.dart';
 export 'src/repositories/http_subscription_fetcher.dart';
 export 'src/secure/flutter_secure_store.dart';
 export 'src/secure/in_memory_secure_store.dart';

@@ -19,6 +19,8 @@ class SelectorConfigGenerator implements ConfigGenerator {
   const SelectorConfigGenerator({
     required this.platform,
     required this.knownNodes,
+    this.ruleSetDirectory,
+    this.availableRuleSets = _noRuleSets,
     this.builder = const SingBoxConfigBuilder(),
     this.onWarnings,
   });
@@ -28,6 +30,23 @@ class SelectorConfigGenerator implements ConfigGenerator {
 
   /// The newest snapshot of every stored node.
   final List<ProxyNode> Function() knownNodes;
+
+  /// Where the downloaded `.srs` files live, or `null` when none are.
+  ///
+  /// Supplied rather than discovered, because the builder writes this path
+  /// into the document and the core reads it out of process: a guess here is
+  /// a configuration that fails to load on somebody else's device.
+  final String? Function()? ruleSetDirectory;
+
+  /// The rule set tags that are actually on disk right now.
+  ///
+  /// Everything the builder is asked for and cannot find is dropped with a
+  /// warning rather than failing the build, which is why this is a snapshot
+  /// and not a promise: a set deleted between two builds simply stops
+  /// applying, and the banner on the routing screen says so.
+  final Set<String> Function() availableRuleSets;
+
+  static Set<String> _noRuleSets() => const <String>{};
 
   /// The underlying builder, pinned to sing-box v1.13.16.
   final SingBoxConfigBuilder builder;
@@ -58,6 +77,8 @@ class SelectorConfigGenerator implements ConfigGenerator {
         settings: settings,
         platform: platform,
         includeClashApi: includeClashApi,
+        ruleSetDirectory: ruleSetDirectory?.call(),
+        availableRuleSets: availableRuleSets(),
       ),
     );
     return result.map((built) {

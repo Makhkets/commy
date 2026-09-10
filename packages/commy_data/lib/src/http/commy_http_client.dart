@@ -170,6 +170,67 @@ class CommyHttpClient {
     }
   }
 
+  /// Fetches [url] as bytes.
+  ///
+  /// The binary sibling of [fetchText], and it exists for exactly one caller:
+  /// a `.srs` rule set is a compiled binary, and reading one as a string
+  /// mangles it. Same cap, same schemes, same deadlines — a body over
+  /// [maxBodyBytes] is refused rather than held.
+  Future<Result<List<int>, CommyFailure>> fetchBytes(
+    Uri url, {
+    required bool throughTunnel,
+    CancelToken? cancelToken,
+  }) async {
+    if (!allowedSchemes.contains(url.scheme.toLowerCase())) {
+      return Err<List<int>, CommyFailure>(
+        CommyFailure.subscriptionMalformed(
+          'unsupported URL scheme: ${url.scheme}',
+        ),
+      );
+    }
+
+    final client = throughTunnel ? _proxiedDio() : _directDio();
+    try {
+      final response = await client.getUri<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          followRedirects: true,
+          maxRedirects: maxRedirects,
+          sendTimeout: sendTimeout,
+          receiveTimeout: receiveTimeout,
+          headers: <String, String>{
+            HttpHeaders.userAgentHeader: userAgent,
+            HttpHeaders.acceptHeader: '*/*',
+          },
+          validateStatus: (status) => status != null && status < 400,
+        ),
+        cancelToken: cancelToken,
+      );
+
+      final body = response.data ?? const <int>[];
+      if (body.length > maxBodyBytes) {
+        return Err<List<int>, CommyFailure>(
+          NetworkFailureMapper.tooLarge(url, maxBodyBytes),
+        );
+      }
+      if (body.isEmpty) {
+        return Err<List<int>, CommyFailure>(
+          CommyFailure.subscriptionMalformed('$url answered with no body'),
+        );
+      }
+      return Ok<List<int>, CommyFailure>(body);
+    } on DioException catch (error) {
+      return Err<List<int>, CommyFailure>(
+        NetworkFailureMapper.fromDio(error, url),
+      );
+    } on Object catch (error) {
+      return Err<List<int>, CommyFailure>(
+        NetworkFailureMapper.fromError(error, url),
+      );
+    }
+  }
+
   /// Closes both underlying clients.
   void close({bool force = false}) {
     _direct?.close(force: force);

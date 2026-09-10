@@ -34,6 +34,20 @@ final routingPolicyProvider = StreamProvider<RoutingPolicy>((ref) {
   return ref.watch(routingRepositoryProvider).watch();
 });
 
+/// The rule sets currently on disk.
+final ruleSetsProvider = StreamProvider<List<RuleSet>>((ref) {
+  return ref.watch(ruleSetRepositoryProvider).watch();
+});
+
+/// Where those files live, once the platform has said.
+///
+/// Read by the configuration generator, which writes the path into the
+/// document the core loads out of process.
+final ruleSetDirectoryProvider = FutureProvider<String?>((ref) async {
+  final result = await ref.watch(ruleSetRepositoryProvider).directory();
+  return result.valueOrNull;
+});
+
 /// DNS settings.
 final dnsSettingsProvider = StreamProvider<DnsSettings>((ref) {
   return ref.watch(routingRepositoryProvider).watchDns();

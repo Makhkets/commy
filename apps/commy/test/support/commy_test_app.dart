@@ -64,6 +64,9 @@ class CommyTestHarness {
   final FakeSubscriptionFetcher subscriptionFetcher =
       FakeSubscriptionFetcher();
 
+  /// The geoip and geosite files. Exception E-2, without a socket.
+  final FakeRuleSetRepository ruleSetRepository = FakeRuleSetRepository();
+
   final List<ProxyGroup>? _coreGroups;
 
   /// The tunnel. Deterministic, seeded, and never touches a device.
@@ -90,6 +93,7 @@ class CommyTestHarness {
     await subscriptionRepository.dispose();
     await settingsRepository.dispose();
     await routingRepository.dispose();
+    await ruleSetRepository.dispose();
   }
 
   /// The overrides a test scope needs.
@@ -111,6 +115,7 @@ class CommyTestHarness {
       routingRepositoryProvider.overrideWithValue(routingRepository),
       logRepositoryProvider.overrideWithValue(logRepository),
       subscriptionFetcherProvider.overrideWithValue(subscriptionFetcher),
+      ruleSetRepositoryProvider.overrideWithValue(ruleSetRepository),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
       if (status != null)
         coreStatusProvider.overrideWith(

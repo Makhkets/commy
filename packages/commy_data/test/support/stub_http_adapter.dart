@@ -22,6 +22,13 @@ class StubHttpAdapter implements HttpClientAdapter {
     });
   }
 
+  /// Answers every request with [bytes], for the binary fetches.
+  factory StubHttpAdapter.bytes(List<int> bytes, {int statusCode = 200}) {
+    return StubHttpAdapter((_) async {
+      return ResponseBody.fromBytes(bytes, statusCode);
+    });
+  }
+
   /// Fails every request the way a dead host does.
   factory StubHttpAdapter.failing(DioExceptionType type) {
     return StubHttpAdapter((options) async {

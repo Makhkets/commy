@@ -168,6 +168,32 @@
     }
   },
 
+  "ruleSets": {
+    "title": "Rule sets",
+    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask, and the address below is the one that will be asked.",
+    "source": "Source",
+    "sourceLabel": "Address template",
+    "sourceHelp": "$token is replaced with the tag being fetched. Clear the field to make downloading unavailable.",
+    "sourceOff": "No source — downloading is off",
+    "sourceInvalid": "That does not look like an http or https address",
+    "needed": "Needed by your rules",
+    "onDisk": "On disk",
+    "download": "Download",
+    "update": "Update",
+    "size": "$size · $age old",
+    "missing": "Not downloaded",
+    "unused": "No rule needs it",
+    "noneNeeded": "Your rules need no lists",
+    "noneNeededBody": "Rules naming geosite: or geoip: are the ones that do. Plain domains and addresses work without anything downloaded.",
+    "downloaded": "$tag downloaded",
+    "deleteConfirm": {
+      "title": "Delete this list?",
+      "body": "The rules that name it stay where they are and stop applying until it is downloaded again.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    }
+  },
+
   "apps": {
     "title": "Apps",
     "mode": "Which apps use the tunnel",
@@ -283,6 +309,7 @@
     "appsOff": "All",
     "ruleSets": "Rule sets",
     "ruleSetsHint": "Downloaded only when you tap",
+    "ruleSetsValue": "$have of $need",
     "dns": "DNS",
     "dnsValue": "$remote · $strategy",
     "bypassLan": "LAN bypasses the proxy",

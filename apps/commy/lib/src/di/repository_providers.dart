@@ -38,6 +38,15 @@ final routingRepositoryProvider = Provider<RoutingRepository>((ref) {
   return DriftRoutingRepository(database: ref.watch(databaseProvider));
 });
 
+/// The geoip and geosite files on disk. Exception E-2.
+final ruleSetRepositoryProvider = Provider<RuleSetRepository>((ref) {
+  final repository = FileRuleSetRepository(
+    client: ref.watch(httpClientProvider),
+  );
+  ref.onDispose(repository.dispose);
+  return repository;
+});
+
 /// The in-memory log ring the diagnostics screen reads.
 ///
 /// It is deliberately not persisted: a log that survives a reinstall is a log

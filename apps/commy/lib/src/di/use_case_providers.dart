@@ -23,6 +23,13 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
   return SelectorConfigGenerator(
     platform: ref.watch(configPlatformProvider),
     knownNodes: () => ref.read(nodesProvider).value ?? const <ProxyNode>[],
+    // Both read, not watched: the generator is asked for a document at the
+    // moment a tunnel starts or reloads, and it wants what is true then.
+    ruleSetDirectory: () => ref.read(ruleSetDirectoryProvider).value,
+    availableRuleSets: () => <String>{
+      for (final set in ref.read(ruleSetsProvider).value ?? const <RuleSet>[])
+        set.tag,
+    },
     onWarnings: (warnings) {
       ref.read(configWarningsProvider.notifier).report(warnings);
       final logger = ref.read(appLoggerProvider);

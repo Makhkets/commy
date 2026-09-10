@@ -370,6 +370,77 @@ class FakeClipboard implements ClipboardPort {
   }
 }
 
+/// Rule set files kept in a map instead of on disk.
+///
+/// Records every download so a test can assert the thing exception E-2 is
+/// really about: that a request happened when the user pressed the button,
+/// and at no other time.
+class FakeRuleSetRepository implements RuleSetRepository {
+  /// Creates the store, optionally pre-filled.
+  FakeRuleSetRepository([List<RuleSet> initial = const <RuleSet>[]]) {
+    for (final set in initial) {
+      _sets[set.tag] = set;
+    }
+  }
+
+  /// Where a real one would put the files.
+  static const String path = '/tmp/commy/rule-sets';
+
+  final Map<String, RuleSet> _sets = <String, RuleSet>{};
+  final StreamController<List<RuleSet>> _changes =
+      StreamController<List<RuleSet>>.broadcast();
+
+  /// Every URL a download was asked for, in order.
+  final List<Uri> requests = <Uri>[];
+
+  /// Set to make every download fail.
+  CommyFailure? failure;
+
+  /// Everything currently stored.
+  List<RuleSet> get sets => List<RuleSet>.unmodifiable(_sets.values);
+
+  /// Releases the broadcast controller.
+  Future<void> dispose() => _changes.close();
+
+  @override
+  Stream<List<RuleSet>> watch() => _replay(_changes, () => sets);
+
+  @override
+  Future<Result<List<RuleSet>, CommyFailure>> list() async =>
+      Ok<List<RuleSet>, CommyFailure>(sets);
+
+  @override
+  Future<Result<String, CommyFailure>> directory() async =>
+      const Ok<String, CommyFailure>(path);
+
+  @override
+  Future<Result<RuleSet, CommyFailure>> download({
+    required String tag,
+    required Uri from,
+  }) async {
+    requests.add(from);
+    final refused = failure;
+    if (refused != null) {
+      return Err<RuleSet, CommyFailure>(refused);
+    }
+    final set = RuleSet(
+      tag: tag,
+      sizeBytes: 1024,
+      updatedAt: DateTime.utc(2026, 8, 4, 12),
+    );
+    _sets[tag] = set;
+    _changes.add(sets);
+    return Ok<RuleSet, CommyFailure>(set);
+  }
+
+  @override
+  Future<Result<void, CommyFailure>> delete(String tag) async {
+    _sets.remove(tag);
+    _changes.add(sets);
+    return const Ok<void, CommyFailure>(null);
+  }
+}
+
 /// A subscription server that answers from a field.
 ///
 /// Records every request so a test can assert that the scheduler asked once,

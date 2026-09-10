@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +59,14 @@ class _Body extends ConsumerWidget {
     final controller = ref.read(settingsControllerProvider.notifier);
     final dns = ref.watch(dnsSettingsProvider).value ?? DnsSettings.defaults;
     final rules = policy.rules;
+    final needed = RouteSectionBuilder.requiredRuleSets(
+      routing: policy,
+      platform: ref.watch(configPlatformProvider),
+    ).toSet();
+    final ruleSets = <String>{
+      for (final set in ref.watch(ruleSetsProvider).value ?? const <RuleSet>[])
+        set.tag,
+    };
 
     final warnings = ref.watch(configWarningsProvider);
 
@@ -157,9 +167,14 @@ class _Body extends ConsumerWidget {
               icon: CommyIcons.globe,
               title: t.routing.ruleSets,
               subtitle: t.routing.ruleSetsHint,
-              value: policy.mode == RoutingMode.rules
-                  ? t.routing.mode.rules
-                  : t.routing.mode.global,
+              // How many of the sets the rules ask for are actually here.
+              // The old value showed the routing mode, which this row has
+              // nothing to do with.
+              value: t.routing.ruleSetsValue(
+                have: ruleSets.where(needed.contains).length,
+                need: needed.length,
+              ),
+              onTap: () => context.go(AppRoutes.ruleSets),
             ),
             SettingsTile(
               icon: CommyIcons.routing,

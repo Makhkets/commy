@@ -27,6 +27,32 @@ abstract final class RouteSectionBuilder {
   /// Rule set tag the ad blocking feature looks for.
   static const String adsRuleSetName = 'ads';
 
+  /// Every rule set tag [routing] would need to apply in full.
+  ///
+  /// The answer to "what should the rule sets screen offer to download": the
+  /// tags the user's own rules name, not a catalogue of everything that
+  /// exists. Sorted, so the screen renders in a stable order.
+  ///
+  /// Reads the same [RouteMatcher] the build does, so a rule that the builder
+  /// would drop for want of a file is exactly a tag this returns.
+  static List<String> requiredRuleSets({
+    required RoutingPolicy routing,
+    required ConfigPlatform platform,
+  }) {
+    final tags = <String>{
+      if (routing.blockAds) SingBoxTags.geosite(adsRuleSetName),
+    };
+    if (routing.mode == RoutingMode.rules) {
+      for (final rule in routing.activeRules) {
+        final matcher = RouteMatcher.tryParse(rule.matcher, platform: platform);
+        if (matcher != null && !matcher.isEmpty) {
+          tags.addAll(matcher.ruleSets);
+        }
+      }
+    }
+    return tags.toList()..sort();
+  }
+
   /// Builds the section, appending anything it had to drop to [warnings].
   static Map<String, Object?> build({
     required RoutingPolicy routing,

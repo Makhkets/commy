@@ -17,6 +17,9 @@ abstract final class AppRoutes {
   /// Which apps the tunnel carries. Behind the routing screen.
   static const String apps = '/settings/routing/apps';
 
+  /// The geoip and geosite files. Exception E-2, behind the routing screen.
+  static const String ruleSets = '/settings/routing/rule-sets';
+
   /// Two resolvers, address preference, FakeIP. Behind the routing screen.
   static const String dns = '/settings/routing/dns';
 
