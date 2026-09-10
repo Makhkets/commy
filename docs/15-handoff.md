@@ -70,10 +70,10 @@
 | 3 | **`startOnBoot` → `BootReceiver.setEnabled`.** Пишется и никуда не доходит. Нужен ещё один метод канала | средне | `BootReceiver.kt`, `CoreMethodHandler.kt`, `wire_methods.dart` |
 | 4 | **Пустые состояния диагностики без действия** — нарушение Definition of Done, четыре экрана | мелко | `screens/diagnostics/*.dart` |
 | 5 | **`SubscriptionSection` берёт `DateTime.now()` напрямую**, а не из `clockProvider`. Одна строка, разблокирует тесты и golden карточки | мелко | `subscription_section.dart` |
-| 6 | **Меню подписки**: переименование и интервал обновления | мелко | `subscription_menu_sheet.dart` |
-| 7 | **«Замерить все»**: прогресс, отмена, пачками. Сейчас последовательно и без отмены | средне | `tunnel_controller.dart`, `subscription_card.dart` |
-| 8 | **Автообновление подписок не запускается.** Карточка пишет «авто 1 ч», планировщика нет | средне | `subscription_controller.dart`, `app.dart` |
-| 9 | **Меню узла**: скопировать ссылку, QR, удалить | мелко | `node_row.dart`, `node_link_exporter.dart` |
+| 6 | ✅ **Меню подписки**: переименование и интервал обновления. Лист следует за строкой в БД, а не за копией, с которой открылся; интервал берёт те же четыре значения, что и лист импорта | мелко | `subscription_menu_sheet.dart` |
+| 7 | ✅ **«Замерить все»**: пачками по 4, со счётчиком и отменой. `MeasurementController` забрал прогон у `TunnelController`, у которого остался одиночный замер | средне | `measurement_controller.dart`, `measure_progress_row.dart` |
+| 8 | ✅ **Автообновление подписок запускается.** `SubscriptionScheduler` — раз в минуту и на каждое изменение списка; панель, которая отказала, не дёргается 15 минут | средне | `subscription_scheduler.dart`, `app.dart` |
+| 9 | ⚠️ **Меню узла** по долгому нажатию: замерить, скопировать ссылку, удалить. **QR отложен** — рендер требует новой зависимости, решение владельца (§7 контракта); `QrPayload` в `commy_config` уже строит нужную строку | мелко | `node_menu_sheet.dart`, `node_controller.dart` |
 | 10 | ✅ **`AppLogger.buffer` сливается в репозиторий** при подключении: `logPumpProvider` сначала переливает кольцо логгера через `LogRepository.appendAll`, потом следует за потоком; строки `boot` и `core.fake` времени старта больше не теряются. Заодно `FakeCoreClient` перестал писать синтетические строки ядра ещё и в логгер — на десктопе они показывались дважды | мелко | `tunnel_controller.dart`, `log_repository.dart`, `fake_core_client.dart` |
 | 11 | **Экран DNS.** `DnsSettings` смоделирован и генерируется целиком, UI нет | средне | `routing_screen.dart`, `app_router.dart` |
 | 12 | **Выбор приложений (per-app).** Данные и конфиг готовы сквозь весь стек; нужен UI и метод канала «список пакетов» | крупно | `routing_screen.dart`, `CoreMethodHandler.kt` |
