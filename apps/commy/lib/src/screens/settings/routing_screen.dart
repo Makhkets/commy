@@ -167,6 +167,7 @@ class _Body extends ConsumerWidget {
                 remote: dns.remote,
                 strategy: dns.strategy.wireName,
               ),
+              onTap: () => context.go(AppRoutes.dns),
             ),
             SettingsTile(
               icon: CommyIcons.direct,

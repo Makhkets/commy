@@ -168,6 +168,35 @@
     }
   },
 
+  "dns": {
+    "title": "DNS",
+    "resolvers": "Resolvers",
+    "remote": "Through the tunnel",
+    "remoteHint": "Answers for names that go through the proxy, and is asked through it",
+    "direct": "Directly",
+    "directHint": "Answers for names that bypass the proxy",
+    "footer": "Two resolvers, always. One asked through the tunnel and one asked outside it is the whole reason a DNS query cannot say where you are; a single resolver for both is the classic leak.",
+    "strategy": "Addresses",
+    "strategyPreferIpv4": "Both, prefer IPv4",
+    "strategyPreferIpv6": "Both, prefer IPv6",
+    "strategyIpv4Only": "IPv4 only",
+    "strategyIpv6Only": "IPv6 only",
+    "extra": "More",
+    "fakeIp": "FakeIP",
+    "fakeIpHint": "Answers from a private pool instead of resolving. Faster, and no real address reaches the system cache.",
+    "independentCache": "Separate caches",
+    "independentCacheHint": "One cache per resolver. Shared, two answers to the same name overwrite each other.",
+    "independentCacheForced": "Required by FakeIP",
+    "edit": {
+      "label": "Resolver",
+      "hint": "tls://1.1.1.1",
+      "help": "Schemes: $schemes. A bare address means plain UDP. \"local\" hands the query to the system.",
+      "reset": "Use the default",
+      "unsupportedScheme": "The core has no transport for that scheme",
+      "missingAddress": "There is no address after the scheme"
+    }
+  },
+
   "settings": {
     "title": "Settings",
     "sections": "Sections",

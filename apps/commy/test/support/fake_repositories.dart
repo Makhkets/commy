@@ -310,6 +310,12 @@ class FakeRoutingRepository implements RoutingRepository {
   final StreamController<DnsSettings> _dnsChanges =
       StreamController<DnsSettings>.broadcast();
 
+  /// The policy currently stored.
+  RoutingPolicy get policy => _policy;
+
+  /// The DNS settings currently stored.
+  DnsSettings get dns => _dns;
+
   /// Releases the broadcast controllers.
   Future<void> dispose() async {
     await _policyChanges.close();

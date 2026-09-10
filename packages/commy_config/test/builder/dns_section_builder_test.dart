@@ -98,6 +98,70 @@ void main() {
     });
   });
 
+  group('DnsSectionBuilder.checkResolver', () {
+    test('accepts everything the builder accepts', () {
+      for (final resolver in <String>[
+        'tls://1.1.1.1',
+        'tls://1.1.1.1:8853',
+        'https://dns.google/dns-query',
+        '8.8.8.8',
+        'udp://8.8.8.8:53',
+        '[2606:4700:4700::1111]:53',
+        'local',
+        '',
+        '  tls://1.1.1.1  ',
+      ]) {
+        expect(
+          DnsSectionBuilder.checkResolver(resolver),
+          isNull,
+          reason: resolver,
+        );
+      }
+    });
+
+    test('names the scheme the core has no transport for', () {
+      expect(
+        DnsSectionBuilder.checkResolver('dhcp://auto'),
+        ResolverProblem.unsupportedScheme,
+      );
+      expect(
+        DnsSectionBuilder.checkResolver('tailscale://whatever'),
+        ResolverProblem.unsupportedScheme,
+      );
+    });
+
+    test('names a scheme with nothing behind it', () {
+      expect(
+        DnsSectionBuilder.checkResolver('tls://'),
+        ResolverProblem.missingAddress,
+      );
+      expect(
+        DnsSectionBuilder.checkResolver('https:///dns-query'),
+        ResolverProblem.missingAddress,
+      );
+    });
+
+    test('agrees with the builder on every case, by construction', () {
+      // The point of the method: a screen that validates one way and a core
+      // that builds another is exactly the bug this replaces.
+      for (final resolver in <String>[
+        'tls://1.1.1.1',
+        'dhcp://auto',
+        'tls://',
+        'local',
+      ]) {
+        final rejected = DnsSectionBuilder.checkResolver(resolver) != null;
+        var threw = false;
+        try {
+          DnsSectionBuilder.parseResolver(resolver, tag: 'r');
+        } on ConfigBuildException {
+          threw = true;
+        }
+        expect(threw, rejected, reason: resolver);
+      }
+    });
+  });
+
   group('DnsSectionBuilder.build', () {
     test('always defines a remote and a direct resolver', () {
       final section = _build(DnsSettings.defaults);

@@ -14,6 +14,9 @@ abstract final class AppRoutes {
   /// Mode, rules, apps, DNS.
   static const String routing = '/settings/routing';
 
+  /// Two resolvers, address preference, FakeIP. Behind the routing screen.
+  static const String dns = '/settings/routing/dns';
+
   /// The diagnostics hub. Redirects to the log tab.
   static const String diagnostics = '/settings/diagnostics';
 

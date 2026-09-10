@@ -6,6 +6,7 @@ import 'package:commy/src/screens/diagnostics/stats_screen.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy/src/screens/settings/about_screen.dart';
 import 'package:commy/src/screens/settings/appearance_screen.dart';
+import 'package:commy/src/screens/settings/dns_screen.dart';
 import 'package:commy/src/screens/settings/routing_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,6 +38,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.routing,
         builder: (context, state) => const RoutingScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.dns,
+        builder: (context, state) => const DnsScreen(),
       ),
       GoRoute(
         path: AppRoutes.appearance,

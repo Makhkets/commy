@@ -5,6 +5,19 @@ import 'package:commy_config/src/builder/sing_box_tags.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_domain/commy_domain.dart';
 
+/// Why a resolver string cannot be turned into a server object.
+///
+/// A reason rather than a sentence: the message the user reads belongs to the
+/// app's translations, and a builder that made up English would be a string
+/// nobody could translate (CLAUDE.md §5).
+enum ResolverProblem {
+  /// The `scheme://` prefix names a transport the core has no support for.
+  unsupportedScheme,
+
+  /// Nothing is left to connect to once the scheme has been taken off.
+  missingAddress,
+}
+
 /// Builds the `dns` section.
 ///
 /// Two resolvers, always. [SingBoxTags.dnsRemote] answers for names that go
@@ -90,6 +103,17 @@ abstract final class DnsSectionBuilder {
     };
   }
 
+  /// Checks [raw] the way [parseResolver] will, without building anything.
+  ///
+  /// Exists so a screen can refuse a typo where it was made. Without it the
+  /// only thing that noticed was the next attempt to connect, which failed
+  /// somewhere else with a configuration error and left the user to work out
+  /// that a DNS field two screens back was the cause.
+  ///
+  /// Reads the same dissection [parseResolver] does, so the two cannot start
+  /// disagreeing about what a resolver is.
+  static ResolverProblem? checkResolver(String raw) => _dissect(raw).problem;
+
   /// Turns a resolver string such as `tls://1.1.1.1` into a server object.
   ///
   /// `local` means the platform resolver. A bare address means plain UDP,
@@ -99,8 +123,19 @@ abstract final class DnsSectionBuilder {
     required String tag,
     String? detour,
   }) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty || trimmed.toLowerCase() == 'local') {
+    final parsed = _dissect(raw);
+    switch (parsed.problem) {
+      case ResolverProblem.unsupportedScheme:
+        throw ConfigBuildException(
+          'Resolver "${parsed.scheme}://" is not one the core can speak',
+        );
+      case ResolverProblem.missingAddress:
+        throw ConfigBuildException('Resolver "$raw" carries no address');
+      case null:
+        break;
+    }
+
+    if (parsed.isLocal) {
       return <String, Object?>{
         SingBoxKeys.type: 'local',
         SingBoxKeys.tag: tag,
@@ -108,14 +143,37 @@ abstract final class DnsSectionBuilder {
       };
     }
 
+    final scheme = parsed.scheme;
+    return <String, Object?>{
+      SingBoxKeys.type: scheme,
+      SingBoxKeys.tag: tag,
+      SingBoxKeys.server: parsed.host,
+      if (parsed.port != null) SingBoxKeys.serverPort: parsed.port,
+      if ((scheme == 'https' || scheme == 'h3') && parsed.path.isNotEmpty)
+        SingBoxKeys.dnsPath: parsed.path,
+      if (detour != null) SingBoxKeys.detour: detour,
+    };
+  }
+
+  /// Takes a resolver string apart once, for both callers above.
+  ///
+  /// On [ResolverProblem.unsupportedScheme] the `scheme` field holds what the
+  /// user actually typed rather than a transport name, so the message can
+  /// quote it back at them.
+  static _Resolver _dissect(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty || trimmed.toLowerCase() == 'local') {
+      return const _Resolver(isLocal: true);
+    }
+
     final separator = trimmed.indexOf('://');
-    final scheme = separator <= 0
-        ? 'udp'
-        : schemes[trimmed.substring(0, separator).toLowerCase()];
+    final written =
+        separator <= 0 ? '' : trimmed.substring(0, separator).toLowerCase();
+    final scheme = separator <= 0 ? 'udp' : schemes[written];
     if (scheme == null) {
-      throw ConfigBuildException(
-        'Resolver "${trimmed.substring(0, separator)}://" is not one the core '
-        'can speak',
+      return _Resolver(
+        problem: ResolverProblem.unsupportedScheme,
+        scheme: written,
       );
     }
     final rest = separator <= 0 ? trimmed : trimmed.substring(separator + 3);
@@ -130,18 +188,14 @@ abstract final class DnsSectionBuilder {
 
     final address = _splitAuthority(authority);
     if (address.key.isEmpty) {
-      throw ConfigBuildException('Resolver "$raw" carries no address');
+      return const _Resolver(problem: ResolverProblem.missingAddress);
     }
-
-    return <String, Object?>{
-      SingBoxKeys.type: scheme,
-      SingBoxKeys.tag: tag,
-      SingBoxKeys.server: address.key,
-      if (address.value != null) SingBoxKeys.serverPort: address.value,
-      if ((scheme == 'https' || scheme == 'h3') && path.isNotEmpty)
-        SingBoxKeys.dnsPath: path,
-      if (detour != null) SingBoxKeys.detour: detour,
-    };
+    return _Resolver(
+      scheme: scheme,
+      host: address.key,
+      port: address.value,
+      path: path,
+    );
   }
 
   /// DNS rules derived from the routing policy.
@@ -204,4 +258,23 @@ abstract final class DnsSectionBuilder {
     }
     return MapEntry<String, int?>(trimmed.substring(0, colon), port);
   }
+}
+
+/// A resolver string taken apart: what it is, or why it is nothing.
+class _Resolver {
+  const _Resolver({
+    this.problem,
+    this.isLocal = false,
+    this.scheme = '',
+    this.host = '',
+    this.port,
+    this.path = '',
+  });
+
+  final ResolverProblem? problem;
+  final bool isLocal;
+  final String scheme;
+  final String host;
+  final int? port;
+  final String path;
 }
