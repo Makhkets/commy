@@ -105,6 +105,22 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     );
   }
 
+  /// Sets how often the subscription is re-downloaded, in whole hours.
+  ///
+  /// Writes the figure even while [Subscription.autoUpdate] is off, so that
+  /// turning auto refresh back on keeps the interval the user picked instead
+  /// of quietly falling back to the panel's suggestion.
+  Future<void> setUpdateIntervalHours(Subscription subscription, int hours) {
+    if (hours <= 0) {
+      return Future<void>.value();
+    }
+    return _run(
+      () => ref
+          .read(subscriptionRepositoryProvider)
+          .upsert(subscription.copyWith(updateIntervalHours: hours)),
+    );
+  }
+
   /// Renames the subscription.
   Future<void> rename(Subscription subscription, String name) {
     final trimmed = name.trim();
@@ -127,10 +143,17 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
   ///
   /// The URL carries an access token, so this is a deliberate, user-initiated
   /// move of a secret out of the keystore and nothing does it implicitly.
-  Future<void> copyLink(Subscription subscription) {
-    return _run(
-      () => ref.read(clipboardProvider).write(subscription.url.toString()),
-    );
+  ///
+  /// Returns whether it landed, so the caller can say so: a clipboard write
+  /// that failed looks exactly like one that worked until the user pastes.
+  Future<bool> copyLink(Subscription subscription) async {
+    final result =
+        await ref.read(clipboardProvider).write(subscription.url.toString());
+    final failure = result.failureOrNull;
+    state = failure == null
+        ? SubscriptionActionState.idle
+        : SubscriptionActionState(failure: failure);
+    return failure == null;
   }
 
   /// Clears the last outcome once it has been shown.

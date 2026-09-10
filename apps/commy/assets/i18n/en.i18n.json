@@ -124,10 +124,20 @@
     "menu": {
       "collapse": "Collapse",
       "expand": "Expand",
-      "edit": "Edit",
+      "rename": "Rename",
       "copyLink": "Copy link",
       "autoUpdate": "Auto refresh",
+      "interval": "Refresh interval",
       "delete": "Delete"
+    },
+    "rename": {
+      "title": "Rename subscription",
+      "label": "Name",
+      "empty": "The name cannot be empty"
+    },
+    "interval": {
+      "title": "Refresh interval",
+      "body": "How often the app re-downloads the subscription while auto refresh is on."
     },
     "deleteConfirm": {
       "title": "Delete this subscription?",

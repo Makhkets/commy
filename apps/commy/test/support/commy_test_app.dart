@@ -170,6 +170,25 @@ ProxyNode testNode({
   );
 }
 
+/// A subscription with enough filled in to render a card and its menu.
+Subscription testSubscription({
+  String id = 'sub-1',
+  String name = 'My panel',
+  bool autoUpdate = true,
+  int? updateIntervalHours = 12,
+  Duration? updatedAgo = const Duration(hours: 2),
+}) {
+  return Subscription(
+    id: id,
+    name: name,
+    url: Uri.parse('https://panel.example.net/sub/token'),
+    autoUpdate: autoUpdate,
+    updateIntervalHours: updateIntervalHours,
+    lastUpdatedAt:
+        updatedAgo == null ? null : CommyTestHarness.now.subtract(updatedAgo),
+  );
+}
+
 /// Pumps a frame and lets microtasks and the fake core's timers run.
 Future<void> settle(WidgetTester tester) async {
   await tester.pump();

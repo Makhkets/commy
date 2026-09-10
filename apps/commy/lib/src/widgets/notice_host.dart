@@ -1,5 +1,6 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,10 +42,6 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
   }
 
   void _show(TunnelNotice notice) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) {
-      return;
-    }
     final t = Translations.of(context);
     final ms = notice.milliseconds ?? 0;
     final ip = notice.name;
@@ -79,23 +76,7 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
         ),
     };
 
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          // The toast draws its own surface, border and shadow from the
-          // tokens, so the SnackBar underneath has to contribute nothing
-          // (rule R4: no colour or padding decided here).
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          behavior: SnackBarBehavior.floating,
-          duration: _duration,
-          content: Toast(message: message, tone: tone, icon: icon),
-        ),
-      );
+    ToastMessenger.show(context, message: message, tone: tone, icon: icon);
     ref.read(tunnelControllerProvider.notifier).clearNotice();
   }
-
-  /// Long enough to read a latency, short enough not to sit over the list.
-  static const Duration _duration = Duration(seconds: 3);
 }
