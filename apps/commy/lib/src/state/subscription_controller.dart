@@ -64,9 +64,13 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
   /// Goes **around** the tunnel by default: a refresh that needed the tunnel
   /// would be impossible right after a reinstall, which is when it is needed
   /// most (docs/05-ux-flows.md, scenario 3).
-  Future<void> refresh(String id) async {
+  ///
+  /// Returns whether the download ran and succeeded. A refresh declined
+  /// because another one is already in flight returns false without touching
+  /// state, so a caller cannot mistake "not now" for "done".
+  Future<bool> refresh(String id) async {
     if (state.refreshingId != null) {
-      return;
+      return false;
     }
     state = SubscriptionActionState(refreshingId: id);
     final result = await ref.read(updateSubscriptionUseCaseProvider)(
@@ -79,11 +83,12 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
             tag: logTag,
           );
       state = SubscriptionActionState(failure: failure);
-      return;
+      return false;
     }
     state = SubscriptionActionState(
       importedCount: result.valueOrNull?.importedCount ?? 0,
     );
+    return true;
   }
 
   /// Folds or unfolds the card.

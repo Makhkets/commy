@@ -4,6 +4,7 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
+import 'package:commy/src/state/subscription_scheduler.dart';
 import 'package:commy/src/state/system_intent_listener.dart';
 import 'package:commy/src/state/traffic_history.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
@@ -56,6 +57,10 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // "Connect on boot": the receiver in the manifest is made to agree
       // with the stored switch, once, the same way.
       ..watch(startOnBootSyncProvider)
+      // The timer behind «авто 1 ч» on the subscription card. Rooted here
+      // because a refresh falling due must not depend on the home screen
+      // being the one on top.
+      ..watch(subscriptionRefreshProvider)
       // Deep links, opened files, shared text and the Quick Settings tile.
       ..watch(systemIntentProvider)
       // Loading a locale is asynchronous — slang defers every non-base

@@ -364,6 +364,43 @@ class FakeClipboard implements ClipboardPort {
   }
 }
 
+/// A subscription server that answers from a field.
+///
+/// Records every request so a test can assert that the scheduler asked once,
+/// or not at all, without waiting on a real socket.
+class FakeSubscriptionFetcher implements SubscriptionFetcher {
+  /// Creates the fetcher.
+  FakeSubscriptionFetcher({this.body = '', this.failure});
+
+  /// What the next fetch returns as the document.
+  String body;
+
+  /// Set to make every fetch fail.
+  CommyFailure? failure;
+
+  /// The URLs asked for, in order.
+  final List<Uri> requests = <Uri>[];
+
+  /// How many times a document was asked for.
+  int get callCount => requests.length;
+
+  @override
+  Future<Result<SubscriptionPayload, CommyFailure>> fetch(
+    Uri url, {
+    required bool throughTunnel,
+    String? userAgent,
+  }) async {
+    requests.add(url);
+    final refused = failure;
+    if (refused != null) {
+      return Err<SubscriptionPayload, CommyFailure>(refused);
+    }
+    return Ok<SubscriptionPayload, CommyFailure>(
+      SubscriptionPayload(body: body),
+    );
+  }
+}
+
 /// A stream that replays the current value to every new listener.
 ///
 /// The real Drift streams do this, and a screen that only ever sees the

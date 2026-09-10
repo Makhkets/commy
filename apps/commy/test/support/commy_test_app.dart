@@ -60,6 +60,10 @@ class CommyTestHarness {
   /// The system clipboard.
   final FakeClipboard clipboard;
 
+  /// The subscription server. Answers from a field, never opens a socket.
+  final FakeSubscriptionFetcher subscriptionFetcher =
+      FakeSubscriptionFetcher();
+
   final List<ProxyGroup>? _coreGroups;
 
   /// The tunnel. Deterministic, seeded, and never touches a device.
@@ -106,6 +110,7 @@ class CommyTestHarness {
       settingsRepositoryProvider.overrideWithValue(settingsRepository),
       routingRepositoryProvider.overrideWithValue(routingRepository),
       logRepositoryProvider.overrideWithValue(logRepository),
+      subscriptionFetcherProvider.overrideWithValue(subscriptionFetcher),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
       if (status != null)
         coreStatusProvider.overrideWith(
