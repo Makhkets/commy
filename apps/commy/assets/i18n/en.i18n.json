@@ -154,7 +154,17 @@
     "unreachable": "Unreachable",
     "auto": "Auto",
     "delete": "Delete server",
-    "copyLink": "Copy link"
+    "copyLink": "Copy link",
+    "measure": "Measure latency",
+    "linkCopied": "Link copied",
+    "noLink": "This protocol has no share link format",
+    "deleteConfirm": {
+      "title": "Delete this server?",
+      "body": "Its credentials go with it. A server that came from a subscription comes back on the next refresh.",
+      "inUse": "The tunnel is running through this server and will be disconnected.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    }
   },
 
   "settings": {
