@@ -2,6 +2,9 @@ package dev.commy.app.wire
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import dev.commy.app.tunnel.BootReceiver
 import dev.commy.app.tunnel.TunnelController
@@ -11,10 +14,11 @@ import io.nekohasekai.libbox.Libbox
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The methods of `dev.commy.app/core`: seven for the tunnel, two for the system.
+ * The methods of `dev.commy.app/core`: seven for the tunnel, three for the system.
  *
  * Every branch answers exactly once, with `success` or with `error`. A silent
  * path here is a button that does nothing and a future waiting forever, which
@@ -128,8 +132,66 @@ internal class CoreMethodHandler(
             null
         }
 
+        Wire.Methods.INSTALLED_APPS -> installedApps()
+
         else -> null
     }
+
+    /**
+     * Every app the launcher can start, as `[{package, label, isSystem}]`.
+     *
+     * Launchable apps only, and deliberately so. Listing *every* installed
+     * package on Android 11+ needs `QUERY_ALL_PACKAGES`, which Google treats
+     * as a sensitive permission and which a per-app picker does not need: the
+     * apps a person wants to route are the ones they can open. The manifest
+     * declares the matching `<queries>` block instead. The cost is real and
+     * worth naming — a background-only app the user wanted to exclude will
+     * not be in this list.
+     *
+     * Our own package is filtered out. It is always excluded from the tunnel
+     * anyway (`InboundSectionBuilder`), so offering it as a choice would be
+     * offering a choice that is not one.
+     *
+     * No icons. A few hundred bitmaps over a method channel, to draw a list
+     * that scrolls past most of them, is not a trade worth making.
+     */
+    private fun installedApps(): String {
+        val manager = context.packageManager
+        val launchable = Intent(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER)
+        val resolved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            manager.queryIntentActivities(
+                launchable,
+                PackageManager.ResolveInfoFlags.of(0L),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            manager.queryIntentActivities(launchable, 0)
+        }
+
+        val seen = HashSet<String>()
+        val apps = JSONArray()
+        for (entry in resolved) {
+            val info: ApplicationInfo = entry.activityInfo.applicationInfo
+            if (info.packageName == context.packageName) {
+                continue
+            }
+            if (!seen.add(info.packageName)) {
+                // An app with several launcher entries is still one app.
+                continue
+            }
+            apps.put(
+                JSONObject()
+                    .put(Wire.Keys.PACKAGE, info.packageName)
+                    .put(Wire.Keys.LABEL, manager.getApplicationLabel(info).toString())
+                    .put(Wire.Keys.IS_SYSTEM, info.isSystemImage()),
+            )
+        }
+        return apps.toString()
+    }
+
+    private fun ApplicationInfo.isSystemImage(): Boolean =
+        (flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
 
     private fun configArgument(call: MethodCall): String = call.arguments as? String
         ?: throw WireException(
@@ -169,6 +231,7 @@ internal class CoreMethodHandler(
             Wire.Methods.VERSION,
             Wire.Methods.OPEN_VPN_SETTINGS,
             Wire.Methods.SET_START_ON_BOOT,
+            Wire.Methods.INSTALLED_APPS,
         )
     }
 }

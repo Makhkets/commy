@@ -151,6 +151,7 @@ class _Body extends ConsumerWidget {
               value: policy.perAppMode == PerAppMode.disabled
                   ? t.routing.appsOff
                   : t.routing.appsValue(count: policy.perAppPackages.length),
+              onTap: () => context.go(AppRoutes.apps),
             ),
             SettingsTile(
               icon: CommyIcons.globe,

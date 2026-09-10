@@ -4,8 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Drives `SystemSettings` against a mocked Kotlin side.
 ///
-/// Both methods share one contract: they talk to the system, not to the
-/// tunnel, and a missing platform is an answer (`false`), never an exception.
+/// All three share one contract: they talk to the system, not to the tunnel,
+/// and a missing platform is an answer — `false`, or an empty list — never an
+/// exception.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -57,6 +58,99 @@ void main() {
       final ok = await const SystemSettings().setStartOnBoot(enabled: true);
 
       expect(ok, isFalse);
+    });
+  });
+
+  group('installedApps', () {
+    void answer(String payload) {
+      messenger.setMockMethodCallHandler(method, (call) async {
+        calls.add(call);
+        return payload;
+      });
+    }
+
+    test('reads the entries off the wire', () async {
+      answer(
+        '[{"package": "org.mozilla.firefox", "label": "Firefox", '
+        '"isSystem": false}]',
+      );
+
+      final apps = await const SystemSettings().installedApps();
+
+      expect(calls.single.method, WireMethods.installedApps);
+      expect(calls.single.arguments, isNull);
+      expect(apps.single.packageName, 'org.mozilla.firefox');
+      expect(apps.single.label, 'Firefox');
+      expect(apps.single.isSystem, isFalse);
+    });
+
+    test('sorts by label, with the system apps last', () async {
+      answer(
+        '[${<String>[
+          '{"package": "c.zebra", "label": "Zebra"}',
+          '{"package": "c.system", "label": "Aaa system", "isSystem": true}',
+          '{"package": "c.apple", "label": "apple"}',
+        ].join(',')}]',
+      );
+
+      final apps = await const SystemSettings().installedApps();
+
+      // Case-insensitive, and nobody scrolls past the system packages
+      // looking for their browser.
+      expect(
+        apps.map((app) => app.packageName),
+        <String>['c.apple', 'c.zebra', 'c.system'],
+      );
+    });
+
+    test('a package with no label is named by its package', () async {
+      answer('[{"package":"com.android.thing","label":""}]');
+
+      final apps = await const SystemSettings().installedApps();
+
+      expect(apps.single.label, 'com.android.thing');
+    });
+
+    test('an entry with no package at all is dropped', () async {
+      answer('[{"label":"Nowhere"},{"package":"a.b","label":"Real"}]');
+
+      final apps = await const SystemSettings().installedApps();
+
+      expect(apps.map((app) => app.packageName), <String>['a.b']);
+    });
+
+    test('a platform that routes no apps answers with an empty list',
+        () async {
+      messenger.setMockMethodCallHandler(method, null);
+
+      expect(await const SystemSettings().installedApps(), isEmpty);
+    });
+
+    test('a platform error is an empty list, not an exception', () async {
+      messenger.setMockMethodCallHandler(method, (call) async {
+        throw PlatformException(code: WireErrorCodes.unknown);
+      });
+
+      expect(await const SystemSettings().installedApps(), isEmpty);
+    });
+  });
+
+  group('InstalledApp.matches', () {
+    const app = InstalledApp(
+      packageName: 'org.mozilla.firefox',
+      label: 'Firefox',
+    );
+
+    test('finds by label and by package, either case', () {
+      expect(app.matches('fire'), isTrue);
+      expect(app.matches('FIRE'), isTrue);
+      expect(app.matches('mozilla'), isTrue);
+      expect(app.matches('chrome'), isFalse);
+    });
+
+    test('an empty query matches everything', () {
+      expect(app.matches(''), isTrue);
+      expect(app.matches('   '), isTrue);
     });
   });
 

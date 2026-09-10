@@ -55,6 +55,9 @@ internal object Wire {
      * [SET_START_ON_BOOT] is the other one. The "connect on boot" switch is a
      * stored setting on the Dart side and a manifest component on this side,
      * and this method is the only thing that keeps the two in agreement.
+     *
+     * [INSTALLED_APPS] is the third. Per-app routing is stored and generated
+     * entirely on the Dart side, but only this side can say which apps exist.
      */
     object Methods {
         const val START = "start"
@@ -66,6 +69,7 @@ internal object Wire {
         const val VERSION = "version"
         const val OPEN_VPN_SETTINGS = "openVpnSettings"
         const val SET_START_ON_BOOT = "setStartOnBoot"
+        const val INSTALLED_APPS = "installedApps"
     }
 
     /** JSON field names. Matches `WireKeys`. */
@@ -114,6 +118,11 @@ internal object Wire {
         const val KIND = "kind"
         const val URI = "uri"
         const val TEXT = "text"
+
+        // installedApps()
+        const val PACKAGE = "package"
+        const val LABEL = "label"
+        const val IS_SYSTEM = "isSystem"
     }
 
     /** `/status` state values. Matches `WireStates`. */

@@ -4,8 +4,9 @@
 /// one means editing the Kotlin side, this list and `docs/wire-protocol.md` in
 /// the same pull request.
 ///
-/// [openVpnSettings] and [setStartOnBoot] are not tunnel commands, and they
-/// are counted separately for that reason — see their own notes below.
+/// [openVpnSettings], [setStartOnBoot] and [installedApps] are not tunnel
+/// commands, and they are counted separately for that reason — see their own
+/// notes below.
 abstract final class WireMethods {
   /// Brings the tunnel up. Argument: the configuration JSON, as a string.
   static const String start = 'start';
@@ -36,6 +37,17 @@ abstract final class WireMethods {
   /// once the process is killed there is nothing left to block with. So the
   /// app names the guarantee, says who provides it, and offers to open it.
   static const String openVpnSettings = 'openVpnSettings';
+
+  /// Lists the apps the user can pick between for per-app routing.
+  ///
+  /// No argument. The result is a JSON array of
+  /// `{package, label, isSystem}`, as a string.
+  ///
+  /// Not a tunnel command either, and not one every platform can answer: only
+  /// Android routes by application. No icons in the payload — a few hundred
+  /// bitmaps over a method channel to draw a list that scrolls past them is
+  /// not a trade worth making.
+  static const String installedApps = 'installedApps';
 
   /// Turns the boot receiver on or off. Argument: a bare `bool`. No result.
   ///

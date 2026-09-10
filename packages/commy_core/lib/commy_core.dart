@@ -13,6 +13,7 @@
 library;
 
 export 'src/android/android_core_client.dart';
+export 'src/android/installed_app.dart';
 export 'src/android/system_intents.dart';
 export 'src/android/system_settings.dart';
 export 'src/clash/clash_api_client.dart';

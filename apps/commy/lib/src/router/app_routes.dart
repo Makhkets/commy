@@ -14,6 +14,9 @@ abstract final class AppRoutes {
   /// Mode, rules, apps, DNS.
   static const String routing = '/settings/routing';
 
+  /// Which apps the tunnel carries. Behind the routing screen.
+  static const String apps = '/settings/routing/apps';
+
   /// Two resolvers, address preference, FakeIP. Behind the routing screen.
   static const String dns = '/settings/routing/dns';
 

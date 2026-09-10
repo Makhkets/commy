@@ -168,6 +168,27 @@
     }
   },
 
+  "apps": {
+    "title": "Apps",
+    "mode": "Which apps use the tunnel",
+    "modeDisabled": "All",
+    "modeInclude": "Only chosen",
+    "modeExclude": "All but chosen",
+    "modeDisabledHint": "Every app goes through the tunnel. The list below is kept but not applied.",
+    "modeIncludeHint": "Only the apps you tick go through the tunnel. Everything else goes out directly.",
+    "modeExcludeHint": "Every app goes through the tunnel except the ones you tick.",
+    "search": "Search apps",
+    "chosen": "Chosen: $count",
+    "selectNone": "Clear",
+    "showSystem": "Show system apps",
+    "self": "Commy itself",
+    "selfHint": "Always outside the tunnel: an app that fetched its own subscription through its own tunnel could never recover from a bad one.",
+    "empty": "This platform does not route by app",
+    "emptyBody": "Per-app routing is an Android feature. On the desktops every app uses the tunnel.",
+    "nothingFound": "Nothing matches that",
+    "nothingFoundBody": "Try part of the name, or the package."
+  },
+
   "dns": {
     "title": "DNS",
     "resolvers": "Resolvers",

@@ -110,4 +110,15 @@ abstract final class WireKeys {
 
   /// Shared plain text.
   static const String text = 'text';
+
+  // installedApps()
+
+  /// Android application id, e.g. `org.mozilla.firefox`.
+  static const String package = 'package';
+
+  /// What the launcher calls it, in the device's language.
+  static const String label = 'label';
+
+  /// Whether the app shipped with the system image.
+  static const String isSystem = 'isSystem';
 }
