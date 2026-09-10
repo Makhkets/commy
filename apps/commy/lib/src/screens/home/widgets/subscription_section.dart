@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/relative_time.dart';
+import 'package:commy/src/screens/home/widgets/measure_progress_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/subscription_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -39,6 +41,8 @@ class SubscriptionSection extends ConsumerWidget {
     final t = Translations.of(context);
     final selectedId = ref.watch(selectedNodeIdProvider).value;
     final busy = ref.watch(subscriptionControllerProvider);
+    final measuring = ref.watch(measurementProvider);
+    final isMeasuringThis = measuring.scopeId == subscription.id;
     final info = subscription.userInfo;
     final now = ref.watch(clockProvider).value ?? DateTime.now();
 
@@ -64,7 +68,10 @@ class SubscriptionSection extends ConsumerWidget {
             .refresh(subscription.id),
       ),
       onPingAll: () => unawaited(
-        ref.read(tunnelControllerProvider.notifier).measureAll(nodes),
+        ref.read(measurementProvider.notifier).measureAll(
+              nodes,
+              scopeId: subscription.id,
+            ),
       ),
       onMore: () => unawaited(
         SubscriptionMenuSheet.show(
@@ -73,6 +80,7 @@ class SubscriptionSection extends ConsumerWidget {
         ),
       ),
       nodes: <Widget>[
+        if (isMeasuringThis) const MeasureProgressRow(),
         for (final node in nodes)
           NodeRow(node: node, isActive: node.id == selectedId),
       ],

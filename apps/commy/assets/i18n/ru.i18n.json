@@ -53,6 +53,7 @@
     "checkOkWithIp": "Доступ есть: $ms мс · $ip",
     "ipCheckFailed": "Доступ есть: $ms мс · IP не определился",
     "switched": "Переключено на $name",
+    "measuring": "Замерено $done из $total",
     "settingsApplied": "Настройки применены к туннелю"
   },
 

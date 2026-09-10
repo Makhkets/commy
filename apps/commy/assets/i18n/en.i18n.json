@@ -53,6 +53,7 @@
     "checkOkWithIp": "Access confirmed: $ms ms · $ip",
     "ipCheckFailed": "Access confirmed: $ms ms · the IP check did not answer",
     "switched": "Switched to $name",
+    "measuring": "Measured $done of $total",
     "settingsApplied": "Settings applied to the tunnel"
   },
 

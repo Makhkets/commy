@@ -1,6 +1,9 @@
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/i18n/failure_text.dart';
+import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
+import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,14 +34,37 @@ class NoticeHost extends ConsumerStatefulWidget {
 class _NoticeHostState extends ConsumerState<NoticeHost> {
   @override
   Widget build(BuildContext context) {
-    ref.listen<TunnelActionState>(tunnelControllerProvider, (previous, next) {
-      final notice = next.notice;
-      if (notice == null || notice == previous?.notice) {
-        return;
-      }
-      _show(notice);
-    });
+    ref
+      ..listen<TunnelActionState>(tunnelControllerProvider, (previous, next) {
+        final notice = next.notice;
+        if (notice == null || notice == previous?.notice) {
+          return;
+        }
+        _show(notice);
+      })
+      // A run of latency probes has no screen of its own to fail on: the
+      // progress row is gone by the time the last one comes back. Without
+      // this, "Latency probe URL is not configured" was written to state and
+      // read by nobody, and the run just looked like it did nothing.
+      ..listen<MeasurementState>(measurementProvider, (previous, next) {
+        final failure = next.failure;
+        if (failure == null || failure == previous?.failure) {
+          return;
+        }
+        _showFailure(failure);
+      });
     return widget.child;
+  }
+
+  void _showFailure(CommyFailure failure) {
+    final text = FailureText.of(failure, Translations.of(context));
+    ToastMessenger.show(
+      context,
+      message: text.message,
+      tone: CommyTone.error,
+      icon: CommyIcons.warning,
+    );
+    ref.read(measurementProvider.notifier).clearFailure();
   }
 
   void _show(TunnelNotice notice) {

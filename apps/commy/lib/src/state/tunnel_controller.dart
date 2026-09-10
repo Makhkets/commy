@@ -666,16 +666,6 @@ class TunnelController extends Notifier<TunnelActionState> {
     }
   }
 
-  /// Measures every node in [nodes], one after another.
-  ///
-  /// Sequential on purpose: firing thirty probes at once through one tunnel
-  /// measures the tunnel's queue, not the servers.
-  Future<void> measureAll(List<ProxyNode> nodes) async {
-    for (final node in nodes) {
-      await measure(node);
-    }
-  }
-
   /// Drops the last failure, e.g. when the user dismisses the banner.
   void clearFailure() => state = state.copyWith(clearFailure: true);
 
