@@ -78,7 +78,7 @@
 | 11 | ✅ **Экран DNS.** Два резолвера, стратегия, FakeIP, кэш. Поля проверяются тем же разбором, что делает сборщик (`DnsSectionBuilder.checkResolver`) | средне | `dns_screen.dart` |
 | 12 | ✅ **Выбор приложений (per-app).** Десятый метод канала `installedApps` через `<queries>`, без `QUERY_ALL_PACKAGES`; экран — один режим и один список | крупно | `apps_screen.dart`, `CoreMethodHandler.kt` |
 | 13 | ✅ **Наборы правил, исключение E-2.** Загрузка по кнопке **и** передача `ruleSetDirectory`/`availableRuleSets` в сборщик — работали обе половины сразу. Хранилище — директория, а не таблица | крупно | `file_rule_set_repository.dart`, `rule_sets_screen.dart` |
-| 14 | **Группа «Авто» (urltest).** Сборщик её выпускает, приложение никогда не спрашивает | средне | `selector_config_generator.dart`, `home_screen.dart` |
+| 14 | ✅ **Группа «Авто» (urltest).** `AppSettings.autoSelect` доходит до сборщика, строка «Авто» стоит над списком и показывает узел, на который группа встала. Включение на живом туннеле пересобирает документ только если группы в нём нет | средне | `auto_row.dart`, `tunnel_controller.dart` |
 | 15 | **Список узлов**: поиск, сортировка, судьба ручных групп | средне | `home_screen.dart`, `drift_node_repository.dart` |
 | 16 | **Виджет- и golden-тесты приложения.** Девять экранов из десяти не рендерятся ни одним тестом | крупно | `test/support/*`, `melos.yaml` |
 | 17 | **Ничто не закрывается**: core client, HTTP-клиент, БД и логгер создаются в `main()` мимо графа провайдеров | мелко | `main.dart`, `infrastructure_providers.dart` |
