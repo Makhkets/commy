@@ -131,6 +131,9 @@ abstract interface class CoreClient {
   Future<List<ProxyGroup>> proxies();
   Future<void>             select(String group, String tag);
   Future<Duration?>        urlTest(String tag, Uri probe);
+
+  /// Закрывает клиента. Туннель при этом НЕ останавливается.
+  Future<void>             dispose();
 }
 ```
 

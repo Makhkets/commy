@@ -81,7 +81,7 @@
 | 14 | ✅ **Группа «Авто» (urltest).** `AppSettings.autoSelect` доходит до сборщика, строка «Авто» стоит над списком и показывает узел, на который группа встала. Включение на живом туннеле пересобирает документ только если группы в нём нет | средне | `auto_row.dart`, `tunnel_controller.dart` |
 | 15 | **Список узлов**: поиск, сортировка, судьба ручных групп | средне | `home_screen.dart`, `drift_node_repository.dart` |
 | 16 | **Виджет- и golden-тесты приложения.** Девять экранов из десяти не рендерятся ни одним тестом | крупно | `test/support/*`, `melos.yaml` |
-| 17 | **Ничто не закрывается**: core client, HTTP-клиент, БД и логгер создаются в `main()` мимо графа провайдеров | мелко | `main.dart`, `infrastructure_providers.dart` |
+| 17 | ✅ **Закрытие ресурсов.** `CoreClient` получил `dispose()` в порту, core client и HTTP-клиент закрываются своим провайдером, а БД и логгер `main()` теперь **отдаёт** графу через `ownedOverride` вместо `overrideWithValue` — у последнего тело провайдера не выполняется, и регистрировать `onDispose` негде | мелко | `main.dart`, `infrastructure_providers.dart` |
 | 18 | **Статистика по дням.** `DriftTrafficHistoryStore` написан и не подключён — либо подключить, либо убрать строку из роадмапа | средне | `repository_providers.dart`, `stats_screen.dart` |
 | 19 | **Планшет** — сейчас растянутый телефон: нет rail-назначений и правой панели | средне | `app_router.dart`, `home_screen.dart` |
 
