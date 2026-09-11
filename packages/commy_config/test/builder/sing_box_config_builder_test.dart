@@ -381,6 +381,55 @@ void main() {
     });
   });
 
+  group('the Auto group', () {
+    test('a single node gets none, however loudly it is asked for', () {
+      // A urltest group of one measures a server against itself and calls the
+      // winner a choice. The app draws its own row off the same rule, so the
+      // two can never disagree about whether the group is there.
+      expect(
+        SingBoxConfigBuilder.usesAutoGroup(autoSelect: true, nodeCount: 1),
+        isFalse,
+      );
+
+      final result = const SingBoxConfigBuilder().build(
+        const SingBoxBuildRequest(
+          nodes: <ProxyNode>[_realityNode],
+          selectedNodeId: 'reality-1',
+          routing: RoutingPolicy.defaults,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          autoSelect: true,
+        ),
+      );
+      final outbounds =
+          result.valueOrNull!.config.document['outbounds']! as List<Object?>;
+      final selector = outbounds.firstWhere(
+        (item) => (item! as Map<String, Object?>)['tag'] == 'proxy',
+      )! as Map<String, Object?>;
+
+      expect(
+        <Object?>[
+          for (final item in outbounds) (item! as Map<String, Object?>)['tag'],
+        ],
+        isNot(contains('auto')),
+      );
+      expect(selector['default'], 'node-reality-1');
+    });
+
+    test('the tag of a member reads back as the node it belongs to', () {
+      // What the core answers with is a tag; what the screen shows is a
+      // server. `nodeIdOf` is the only bridge between the two.
+      expect(
+        SingBoxTags.nodeIdOf(SingBoxTags.forNode(_realityNode)),
+        'reality-1',
+      );
+      expect(SingBoxTags.nodeIdOf(SingBoxTags.autoGroup), isNull);
+      expect(SingBoxTags.nodeIdOf(SingBoxTags.proxyGroup), isNull);
+      expect(SingBoxTags.nodeIdOf('node-'), isNull);
+    });
+  });
+
   group('SingBoxConfigBuilder validation', () {
     test('refuses an empty node list', () {
       final result = const SingBoxConfigBuilder().build(

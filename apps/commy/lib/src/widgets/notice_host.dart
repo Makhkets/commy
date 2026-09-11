@@ -90,6 +90,11 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
           CommyTone.info,
           CommyIcons.proxy,
         ),
+      TunnelNoticeKind.switchedToAuto => (
+          t.home.switchedToAuto,
+          CommyTone.info,
+          CommyIcons.proxy,
+        ),
       TunnelNoticeKind.reloaded => (
           t.home.settingsApplied,
           CommyTone.info,

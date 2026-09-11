@@ -29,7 +29,13 @@ class HeroArea extends ConsumerWidget {
     final spacing = context.spacing;
     final status = ref.watch(tunnelStatusProvider);
     final connectState = ConnectState.of(status);
-    final node = ref.watch(selectedNodeProvider);
+    // On Auto the chip names the group and the server the group landed on,
+    // in that order: "Авто" alone would leave the one question this row
+    // exists to answer — through what? — unanswered for as long as the core
+    // keeps choosing.
+    final isAuto = ref.watch(autoSelectedProvider);
+    final node =
+        isAuto ? ref.watch(autoNodeProvider) : ref.watch(selectedNodeProvider);
     final traffic = ref.watch(trafficProvider).value;
     final now = ref.watch(clockProvider).value ?? DateTime.now();
 
@@ -63,7 +69,7 @@ class HeroArea extends ConsumerWidget {
         ),
         SizedBox(height: spacing.s5),
         SelectedNode(
-          name: node?.name ?? t.home.noNodeSelected,
+          name: _nodeLabel(t, isAuto: isAuto, node: node),
           semanticLabel: t.home.selectNode,
           flag: node == null
               ? null
@@ -89,6 +95,21 @@ class HeroArea extends ConsumerWidget {
         SizedBox(height: spacing.s4),
       ],
     );
+  }
+
+  /// What the chip reads: the group, the group and its pick, or the server.
+  String _nodeLabel(
+    Translations t, {
+    required bool isAuto,
+    required ProxyNode? node,
+  }) {
+    if (!isAuto) {
+      return node?.name ?? t.home.noNodeSelected;
+    }
+    if (node == null) {
+      return t.home.auto;
+    }
+    return '${t.home.auto}${NodeTile.descriptorSeparator}${node.name}';
   }
 
   void _toggle(WidgetRef ref) {

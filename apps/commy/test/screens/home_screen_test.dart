@@ -158,6 +158,76 @@ void main() {
     });
   });
 
+  group('the Auto row', () {
+    late CommyTestHarness twoServers;
+
+    setUp(() {
+      twoServers = CommyTestHarness(
+        nodes: <ProxyNode>[
+          testNode(),
+          testNode(id: 'node-2', name: 'Warsaw 01', countryCode: 'PL'),
+        ],
+      );
+    });
+
+    tearDown(() => twoServers.dispose());
+
+    Future<List<NodeTile>> pumpTwo(WidgetTester tester) async {
+      await tester.pumpWidget(
+        twoServers.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+      return tester.widgetList<NodeTile>(find.byType(NodeTile)).toList();
+    }
+
+    testWidgets('leads the list once there is something to choose between',
+        (tester) async {
+      final tiles = await pumpTwo(tester);
+      final t = Translations();
+
+      expect(tiles.first.name, t.home.auto);
+      // Nothing is running, so the row says what the group does instead of
+      // naming a server it has not picked.
+      expect(tiles.first.descriptors, <String>[t.home.autoSubtitle]);
+      expect(tiles.any((tile) => tile.name == 'Amsterdam 03'), isTrue);
+    });
+
+    testWidgets('is not offered for a single server', (tester) async {
+      await pumpHome(tester, status: const TunnelStatus.idle());
+      final t = Translations();
+
+      final tiles = tester.widgetList<NodeTile>(find.byType(NodeTile));
+      expect(tiles.length, 1);
+      expect(tiles.single.name, isNot(t.home.auto));
+    });
+
+    testWidgets('tapping it takes the active mark off the servers',
+        (tester) async {
+      final t = Translations();
+      await pumpTwo(tester);
+      // Pick a server first, so there is a mark to take away.
+      await tester.tap(find.text('Amsterdam 03'));
+      await settle(tester);
+      expect(
+        tester
+            .widgetList<NodeTile>(find.byType(NodeTile))
+            .any((tile) => tile.name == 'Amsterdam 03' && tile.isActive),
+        isTrue,
+      );
+
+      await tester.tap(find.text(t.home.auto));
+      await settle(tester);
+
+      final tiles = tester.widgetList<NodeTile>(find.byType(NodeTile)).toList();
+      expect(tiles.first.isActive, isTrue);
+      expect(tiles.skip(1).any((tile) => tile.isActive), isFalse);
+      expect(
+        (await twoServers.settingsRepository.read()).valueOrNull!.autoSelect,
+        isTrue,
+      );
+    });
+  });
+
   testWidgets('a redacted clipboard preview never shows the credential',
       (tester) async {
     const uuid = '11111111-2222-3333-4444-555555555555';

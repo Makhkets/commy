@@ -28,6 +28,7 @@ void main() {
         themeMode: AppThemeMode.dark,
         locale: 'ru',
         autoConnect: true,
+        autoSelect: true,
         hideUnavailable: true,
         logLevel: LogLevel.debug,
         mixedPort: 7890,
@@ -36,6 +37,22 @@ void main() {
       await repository.write(settings);
 
       expect((await repository.read()).valueOrNull, equals(settings));
+    });
+
+    test('settings written before Auto existed read back with it off',
+        () async {
+      // A blob from an older build has no `autoSelect` key at all. It must
+      // read as "the user did not ask for Auto", not as a crash and not as a
+      // silent yes.
+      await stack.database.customStatement(
+        'INSERT INTO settings (key, value_json) '
+        '''VALUES ('app_settings', '{"themeMode":"dark"}')''',
+      );
+
+      final settings = (await repository.read()).valueOrNull!;
+
+      expect(settings.autoSelect, isFalse);
+      expect(settings.themeMode, AppThemeMode.dark);
     });
 
     test('watch emits the current settings', () async {

@@ -50,6 +50,20 @@ abstract final class SingBoxTags {
   /// startup error in the core.
   static String forNode(ProxyNode node) => '$nodePrefix${node.id}';
 
+  /// The node identifier behind [tag], or `null` when it names something else.
+  ///
+  /// The inverse of [forNode], and it exists because the core answers in tags:
+  /// `proxies()` reports which member a group currently points at, and the
+  /// only way to turn that back into a server the user can read is this. A tag
+  /// that is not a node — `auto`, `direct`, a rule set — is not an error here,
+  /// it is simply not a node, which is what `null` says.
+  static String? nodeIdOf(String tag) {
+    if (!tag.startsWith(nodePrefix) || tag.length == nodePrefix.length) {
+      return null;
+    }
+    return tag.substring(nodePrefix.length);
+  }
+
   /// The rule set tag for `geosite:<name>`.
   static String geosite(String name) => '$geositePrefix${_slug(name)}';
 

@@ -5,6 +5,7 @@
 library;
 
 import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -150,6 +151,35 @@ class SelectedNodeIdController extends AsyncNotifier<String?> {
     }
   }
 }
+
+/// Whether the core picks the server instead of the user.
+///
+/// The same two conditions the configuration builder applies, asked of the
+/// same source: `SingBoxConfigBuilder.usesAutoGroup`. Screens must not invent
+/// their own version of this test — an app that shows Auto as the active
+/// choice while the document has no such group offers a choice the core
+/// cannot honour.
+final autoSelectedProvider = Provider<bool>((ref) {
+  final settings = ref.watch(settingsProvider).value;
+  final nodes = ref.watch(nodesProvider).value ?? const <ProxyNode>[];
+  return SingBoxConfigBuilder.usesAutoGroup(
+    autoSelect: settings?.autoSelect ?? false,
+    nodeCount: nodes.length,
+  );
+});
+
+/// The server whose row is marked as the active one, or `null` when none is.
+///
+/// Deliberately not the same question as "what is stored". On Auto the core
+/// chooses, and the stored id is only the server the list leads with — marking
+/// it would tell the user their traffic is on a server that may well not be
+/// carrying any. Every list in the app asks this, not the selection.
+final activeNodeIdProvider = Provider<String?>((ref) {
+  if (ref.watch(autoSelectedProvider)) {
+    return null;
+  }
+  return ref.watch(selectedNodeIdProvider).value;
+});
 
 /// The currently selected node, resolved against the stored list.
 final selectedNodeProvider = Provider<ProxyNode?>((ref) {

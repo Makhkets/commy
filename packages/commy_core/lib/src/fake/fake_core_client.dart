@@ -49,6 +49,7 @@ class FakeCoreClient implements CoreClient {
         _tick = tick,
         _latency = latency,
         _groups = List<ProxyGroup>.of(groups ?? defaultGroups),
+        _groupsArePinned = groups != null,
         _seed = seed,
         _random = seed,
         _clock = clock ?? DateTime.now;
@@ -59,7 +60,7 @@ class FakeCoreClient implements CoreClient {
   /// Tag the fake's own log lines carry.
   static const String logTag = 'core.fake';
 
-  /// The groups a fresh fake reports: one selector with three members.
+  /// The groups a fresh fake reports, until a document says otherwise.
   ///
   /// The tags are obviously synthetic on purpose. A fake that reports plausible
   /// real node names is a fake somebody eventually mistakes for the real thing.
@@ -79,6 +80,7 @@ class FakeCoreClient implements CoreClient {
   final Duration _tick;
   final Duration _latency;
   final List<ProxyGroup> _groups;
+  final bool _groupsArePinned;
   final int _seed;
   final DateTime Function() _clock;
 
@@ -123,6 +125,13 @@ class FakeCoreClient implements CoreClient {
 
   /// How many times [stop] has been called.
   int stopCalls = 0;
+
+  /// How many times [reload] has been called.
+  ///
+  /// Counted because a reload is not free: the core comes back up on a new
+  /// document and every open connection goes with the old one. A test that
+  /// means "this did not restart the core" has to be able to say so.
+  int reloadCalls = 0;
 
   @override
   Stream<TunnelStatus> get status => Stream<TunnelStatus>.multi(
@@ -191,6 +200,7 @@ class FakeCoreClient implements CoreClient {
     _ticks = 0;
     startCalls = 0;
     stopCalls = 0;
+    reloadCalls = 0;
     lastConfig = null;
     _emit(const TunnelStatus.idle());
   }
@@ -200,6 +210,7 @@ class FakeCoreClient implements CoreClient {
     startCalls++;
     _guard(FakeCoreStep.start, resetsState: true);
     lastConfig = config;
+    _readGroups(config);
     if (_running) {
       // Idempotent by contract: a second start does not raise a second tunnel.
       _logger?.debug('start: already running', tag: logTag);
@@ -230,9 +241,11 @@ class FakeCoreClient implements CoreClient {
 
   @override
   Future<void> reload(CoreConfig config) async {
+    reloadCalls++;
     _guard(FakeCoreStep.reload, resetsState: true);
     _requireRunning();
     lastConfig = config;
+    _readGroups(config);
     _cancelTimers();
     _emit(const TunnelStatus.starting());
     _startTimer = Timer(_startDelay, _onStarted);
@@ -277,6 +290,76 @@ class FakeCoreClient implements CoreClient {
     // A stopped core answers with an empty list, not with an error.
     return _running ? List<ProxyGroup>.unmodifiable(_groups) : const [];
   }
+
+  /// Re-reads the groups to report from the document the fake was handed.
+  ///
+  /// Without this the fake reports [defaultGroups] for its whole life, and
+  /// every `select` of a real outbound fails against a core that has only ever
+  /// heard of `node-alpha`. On desktop this class *is* the core (see the class
+  /// doc), so that is not a test detail: it is switching servers being broken
+  /// on the one platform with no other core to compare against, and the Auto
+  /// group never being reported at all.
+  ///
+  /// The keys are sing-box's own and are spelled out here rather than
+  /// imported. This class stands in for sing-box; `SingBoxKeys` lives in
+  /// `commy_config`, which sits on the far side of the app from this package
+  /// and must not become a dependency of it.
+  ///
+  /// A document that says nothing about `outbounds` leaves the reported groups
+  /// alone. That is a test fixture rather than a configuration, and a fake
+  /// that answered it with "no groups at all" would make every such test
+  /// declare outbounds it does not care about.
+  ///
+  /// Groups handed to the constructor are never overwritten: a test that
+  /// names the groups it expects is making a statement, and a document must
+  /// not quietly disagree with it.
+  void _readGroups(CoreConfig config) {
+    if (_groupsArePinned) {
+      return;
+    }
+    final outbounds = config.document['outbounds'];
+    if (outbounds is! List) {
+      return;
+    }
+    final found = <ProxyGroup>[];
+    for (final entry in outbounds) {
+      if (entry is! Map) {
+        continue;
+      }
+      final tag = entry['tag'];
+      final type = entry['type'];
+      if (tag is! String || type is! String || !_groupTypes.contains(type)) {
+        continue;
+      }
+      final members = <String>[
+        for (final member in entry['outbounds'] is List
+            ? entry['outbounds']! as List<Object?>
+            : const <Object?>[])
+          if (member is String) member,
+      ];
+      final preferred = entry['default'];
+      found.add(
+        ProxyGroup(
+          tag: tag,
+          type: type,
+          // A urltest group names no default: the real core measures and
+          // decides. The fake measures nothing, so it takes the first member —
+          // which is the selected node, because that is the order the
+          // configuration generator writes the list in.
+          now: preferred is String && members.contains(preferred)
+              ? preferred
+              : (members.isEmpty ? null : members.first),
+          all: members,
+        ),
+      );
+    }
+    _groups
+      ..clear()
+      ..addAll(found);
+  }
+
+  /// Outbound types that are groups rather than destinations.
+  static const Set<String> _groupTypes = <String>{'selector', 'urltest'};
 
   /// Closes every stream and cancels every timer.
   Future<void> dispose() async {

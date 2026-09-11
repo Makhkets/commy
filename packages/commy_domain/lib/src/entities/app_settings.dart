@@ -38,6 +38,7 @@ class AppSettings {
     this.themeMode = AppThemeMode.system,
     this.locale,
     this.autoConnect = false,
+    this.autoSelect = false,
     this.startOnBoot = false,
     this.hideUnavailable = false,
     this.latencyProbeUrl = defaultLatencyProbeUrl,
@@ -56,6 +57,7 @@ class AppSettings {
         ),
         locale: JsonRead.stringOrNull(json, 'locale'),
         autoConnect: JsonRead.boolean(json, 'autoConnect', orElse: false),
+        autoSelect: JsonRead.boolean(json, 'autoSelect', orElse: false),
         startOnBoot: JsonRead.boolean(json, 'startOnBoot', orElse: false),
         hideUnavailable: JsonRead.boolean(
           json,
@@ -134,6 +136,21 @@ class AppSettings {
   /// Whether the app connects to the last used node on launch.
   final bool autoConnect;
 
+  /// Whether the core picks the node instead of the user.
+  ///
+  /// Auto is a **group**, not a node: the core measures every member against
+  /// [latencyProbeUrl] and keeps traffic on the quickest one
+  /// (docs/05-ux-flows.md, scenario 4). It lives here rather than next to the
+  /// selected node id because the two are different answers to the same
+  /// question — the id says which server leads the list, this says whether the
+  /// core is allowed to overrule it — and because the configuration builder
+  /// reads the settings, not the selection.
+  ///
+  /// A group of one is not a choice, so the builder ignores this while there
+  /// is a single stored node. The setting survives that: import a second
+  /// server and Auto is on again, which is what the user asked for.
+  final bool autoSelect;
+
   /// Whether the app starts with the operating system. Desktop only.
   final bool startOnBoot;
 
@@ -204,6 +221,7 @@ class AppSettings {
     AppThemeMode? themeMode,
     String? locale,
     bool? autoConnect,
+    bool? autoSelect,
     bool? startOnBoot,
     bool? hideUnavailable,
     String? latencyProbeUrl,
@@ -219,6 +237,7 @@ class AppSettings {
       themeMode: themeMode ?? this.themeMode,
       locale: nextLocale != null && nextLocale.isEmpty ? null : nextLocale,
       autoConnect: autoConnect ?? this.autoConnect,
+      autoSelect: autoSelect ?? this.autoSelect,
       startOnBoot: startOnBoot ?? this.startOnBoot,
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
       latencyProbeUrl: latencyProbeUrl ?? this.latencyProbeUrl,
@@ -236,6 +255,7 @@ class AppSettings {
         'themeMode': themeMode.name,
         'locale': locale,
         'autoConnect': autoConnect,
+        'autoSelect': autoSelect,
         'startOnBoot': startOnBoot,
         'hideUnavailable': hideUnavailable,
         'latencyProbeUrl': latencyProbeUrl,
@@ -254,6 +274,7 @@ class AppSettings {
           other.themeMode == themeMode &&
           other.locale == locale &&
           other.autoConnect == autoConnect &&
+          other.autoSelect == autoSelect &&
           other.startOnBoot == startOnBoot &&
           other.hideUnavailable == hideUnavailable &&
           other.latencyProbeUrl == latencyProbeUrl &&
@@ -269,6 +290,7 @@ class AppSettings {
         themeMode,
         locale,
         autoConnect,
+        autoSelect,
         startOnBoot,
         hideUnavailable,
         latencyProbeUrl,

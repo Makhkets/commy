@@ -42,11 +42,14 @@ class NodeTile extends StatelessWidget {
   /// Display name, as the panel wrote it.
   final String name;
 
-  /// Protocol, security and transport, in that order, joined with
-  /// [descriptorSeparator].
+  /// The second line, joined with [descriptorSeparator].
   ///
-  /// These are wire names rather than words — `VLESS`, `Reality`, `TCP` — so
-  /// they are not translated and must not be.
+  /// For a server it is protocol, security and transport, in that order, and
+  /// those are wire names rather than words — `VLESS`, `Reality`, `TCP` — so
+  /// they are not translated and must not be. The Auto row uses the same line
+  /// for something else: the name of the server its group landed on, or a
+  /// sentence saying it has not landed on one yet. Either way the text arrives
+  /// finished — this widget joins and draws it, and translates nothing.
   final List<String> descriptors;
 
   /// Last measured round trip, or `null` when the node was never probed.

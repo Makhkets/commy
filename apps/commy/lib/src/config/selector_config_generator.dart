@@ -77,6 +77,12 @@ class SelectorConfigGenerator implements ConfigGenerator {
         settings: settings,
         platform: platform,
         includeClashApi: includeClashApi,
+        // Auto is the user's choice, stored with the settings, and it is read
+        // here rather than supplied like the node list because the settings
+        // are already an argument: the use case that asks for a document has
+        // just read them from storage, so this cannot disagree with what the
+        // rest of the document was built from.
+        autoSelect: settings.autoSelect,
         ruleSetDirectory: ruleSetDirectory?.call(),
         availableRuleSets: availableRuleSets(),
       ),

@@ -39,7 +39,7 @@ class SubscriptionSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
-    final selectedId = ref.watch(selectedNodeIdProvider).value;
+    final activeId = ref.watch(activeNodeIdProvider);
     final busy = ref.watch(subscriptionControllerProvider);
     final measuring = ref.watch(measurementProvider);
     final isMeasuringThis = measuring.scopeId == subscription.id;
@@ -82,7 +82,7 @@ class SubscriptionSection extends ConsumerWidget {
       nodes: <Widget>[
         if (isMeasuringThis) const MeasureProgressRow(),
         for (final node in nodes)
-          NodeRow(node: node, isActive: node.id == selectedId),
+          NodeRow(node: node, isActive: node.id == activeId),
       ],
     );
   }

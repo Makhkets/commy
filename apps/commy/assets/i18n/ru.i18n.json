@@ -44,6 +44,8 @@
     },
     "selectNode": "Выбрать сервер",
     "noNodeSelected": "Сервер не выбран",
+    "auto": "Авто",
+    "autoSubtitle": "Выбирает самый быстрый сервер",
     "manualGroup": "Свои серверы",
     "manualGroupSubtitle": "Добавлены вручную",
     "hiddenCount": "Скрыто недоступных: $count",
@@ -53,6 +55,7 @@
     "checkOkWithIp": "Доступ есть: $ms мс · $ip",
     "ipCheckFailed": "Доступ есть: $ms мс · IP не определился",
     "switched": "Переключено на $name",
+    "switchedToAuto": "Сервер теперь выбирается автоматически",
     "measuring": "Замерено $done из $total",
     "settingsApplied": "Настройки применены к туннелю"
   },

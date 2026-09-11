@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/first_run_view.dart';
 import 'package:commy/src/screens/home/widgets/hero_area.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
@@ -110,7 +111,10 @@ class _HomeContent extends ConsumerWidget {
     final spacing = context.spacing;
     final filter = ref.watch(nodeFilterProvider);
     final manual = filter.apply(ref.watch(manualNodesProvider));
-    final selectedId = ref.watch(selectedNodeIdProvider).value;
+    final activeId = ref.watch(activeNodeIdProvider);
+    // The same condition the configuration builder applies: with one server
+    // there is no group in the document, so there is nothing to offer.
+    final hasChoice = nodes.length > 1;
     // Counted across every list at once so the footer states one number the
     // user can check against, rather than one per card.
     final hidden = nodes.length - filter.apply(nodes).length;
@@ -131,6 +135,10 @@ class _HomeContent extends ConsumerWidget {
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
         HeroArea(onChooseNode: () => _scrollToList(context)),
+        if (hasChoice) ...<Widget>[
+          const AutoRow(),
+          SizedBox(height: spacing.s4),
+        ],
         if (failure != null) ...<Widget>[
           FailureBanner(
             failure: failure,
@@ -158,7 +166,7 @@ class _HomeContent extends ConsumerWidget {
             subtitle: t.home.manualGroupSubtitle,
           ),
           for (final node in manual)
-            NodeRow(node: node, isActive: node.id == selectedId),
+            NodeRow(node: node, isActive: node.id == activeId),
         ],
         if (hidden > 0) _HiddenFooter(count: hidden),
       ],

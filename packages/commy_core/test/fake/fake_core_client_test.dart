@@ -247,6 +247,112 @@ void main() {
     });
   });
 
+  group('FakeCoreClient reads its groups from the document', () {
+    /// A document shaped like the one the app actually builds.
+    const withGroups = CoreConfig(<String, Object?>{
+      'outbounds': <Object?>[
+        <String, Object?>{'type': 'vless', 'tag': 'node-1'},
+        <String, Object?>{'type': 'vless', 'tag': 'node-2'},
+        <String, Object?>{
+          'type': 'urltest',
+          'tag': 'auto',
+          'outbounds': <String>['node-1', 'node-2'],
+        },
+        <String, Object?>{
+          'type': 'selector',
+          'tag': 'proxy',
+          'outbounds': <String>['auto', 'node-1', 'node-2'],
+          'default': 'auto',
+        },
+        <String, Object?>{'type': 'direct', 'tag': 'direct'},
+      ],
+    });
+
+    test('reports the groups it was started with, and only those', () async {
+      final client = build();
+      addTearDown(client.dispose);
+      await client.start(withGroups);
+      await settled(client);
+
+      final groups = await client.proxies();
+
+      expect(groups.map((group) => group.tag), <String>['auto', 'proxy']);
+      expect(groups.last.now, 'auto');
+      expect(groups.last.all, <String>['auto', 'node-1', 'node-2']);
+      // A urltest group names no default; the fake measures nothing, so it
+      // takes the first member — which is the selected node.
+      expect(groups.first.now, 'node-1');
+    });
+
+    test('a real outbound can then be selected, which is the point', () async {
+      // Before this the fake answered with `node-alpha` for its whole life,
+      // so on desktop — where this class is the core — switching to any real
+      // server failed with "no outbound in group".
+      final client = build();
+      addTearDown(client.dispose);
+      await client.start(withGroups);
+      await settled(client);
+
+      await client.select('proxy', 'node-2');
+
+      expect((await client.proxies()).last.now, 'node-2');
+    });
+
+    test('reload moves the groups with the document', () async {
+      final client = build();
+      addTearDown(client.dispose);
+      await client.start(withGroups);
+      await settled(client);
+
+      await client.reload(
+        const CoreConfig(<String, Object?>{
+          'outbounds': <Object?>[
+            <String, Object?>{
+              'type': 'selector',
+              'tag': 'proxy',
+              'outbounds': <String>['node-1'],
+              'default': 'node-1',
+            },
+          ],
+        }),
+      );
+      await settled(client);
+
+      expect((await client.proxies()).map((group) => group.tag), <String>[
+        'proxy',
+      ]);
+      expect(client.reloadCalls, 1);
+    });
+
+    test('groups handed to the constructor are never overwritten', () async {
+      final client = FakeCoreClient(
+        startDelay: const Duration(milliseconds: 5),
+        checkDelay: const Duration(milliseconds: 5),
+        stopDelay: const Duration(milliseconds: 5),
+        tick: const Duration(milliseconds: 5),
+        groups: FakeCoreClient.defaultGroups,
+      );
+      addTearDown(client.dispose);
+      await client.start(withGroups);
+      await settled(client);
+
+      expect(
+        (await client.proxies()).single.all,
+        <String>['node-alpha', 'node-beta', 'node-gamma'],
+      );
+    });
+
+    test('a document that says nothing about outbounds changes nothing',
+        () async {
+      final client = build();
+      addTearDown(client.dispose);
+      await client.start(config);
+      await settled(client);
+
+      expect((await client.proxies()).single.tag, 'proxy');
+    });
+  });
+
   group('FakeCoreClient urlTest', () {
     test('answers the configured latency', () async {
       final client = build();

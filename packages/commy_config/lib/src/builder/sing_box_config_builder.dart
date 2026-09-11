@@ -39,6 +39,19 @@ class SingBoxConfigBuilder {
   /// How much better a member has to be before the group switches, in ms.
   static const int autoGroupTolerance = 50;
 
+  /// Whether a document built for [nodeCount] servers carries the Auto group.
+  ///
+  /// Public because the app has to draw the same answer: a screen that offers
+  /// Auto for a single server offers a group the document does not contain,
+  /// and then nothing the user taps can be pointed at. Two conditions, and the
+  /// second is the one that is easy to forget — a group of one measures one
+  /// server against itself and calls the winner a choice.
+  static bool usesAutoGroup({
+    required bool autoSelect,
+    required int nodeCount,
+  }) =>
+      autoSelect && nodeCount > 1;
+
   /// Builds the configuration described by [request].
   Result<ConfigBuildResult, CommyFailure> build(
     SingBoxBuildRequest request,
@@ -75,7 +88,10 @@ class SingBoxConfigBuilder {
     }
 
     final selectedTag = SingBoxTags.forNode(selected);
-    final useAuto = request.autoSelect && request.nodes.length > 1;
+    final useAuto = usesAutoGroup(
+      autoSelect: request.autoSelect,
+      nodeCount: request.nodes.length,
+    );
     if (useAuto) {
       outbounds.add(_autoGroup(request, memberTags));
     }

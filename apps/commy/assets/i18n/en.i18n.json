@@ -44,6 +44,8 @@
     },
     "selectNode": "Choose a server",
     "noNodeSelected": "No server selected",
+    "auto": "Auto",
+    "autoSubtitle": "Picks the quickest server",
     "manualGroup": "Your servers",
     "manualGroupSubtitle": "Added by hand",
     "hiddenCount": "Hidden: $count unavailable",
@@ -53,6 +55,7 @@
     "checkOkWithIp": "Access confirmed: $ms ms · $ip",
     "ipCheckFailed": "Access confirmed: $ms ms · the IP check did not answer",
     "switched": "Switched to $name",
+    "switchedToAuto": "The server is now chosen automatically",
     "measuring": "Measured $done of $total",
     "settingsApplied": "Settings applied to the tunnel"
   },

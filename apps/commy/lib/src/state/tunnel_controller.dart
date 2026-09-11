@@ -57,6 +57,92 @@ final clockProvider = StreamProvider<DateTime>((ref) {
   );
 });
 
+/// How often the app asks the core which member each group is pointed at.
+///
+/// Five seconds, and the number is picked against what actually moves: the
+/// Auto group re-measures every five minutes and only switches when a member
+/// comes back at least `autoGroupTolerance` better. This is not tracking
+/// anything live — it is the delay between the core changing its mind and the
+/// screen saying so.
+const Duration _groupPoll = Duration(seconds: 5);
+
+/// What the running core says its outbound groups are pointed at.
+///
+/// Polled, because there is nothing to subscribe to: libbox pushes status,
+/// traffic, logs and connections, and answers about groups only when asked.
+///
+/// It asks nothing at all unless the user is on Auto and the tunnel is up.
+/// With a server chosen by hand the app already knows the answer — it is the
+/// one the user tapped — and a poll that answers a question nobody asked is
+/// how a battery goes missing.
+final proxyGroupsProvider = StreamProvider<List<ProxyGroup>>((ref) {
+  final core = ref.watch(coreClientProvider);
+  final isUp = switch (ref.watch(coreStatusProvider).value) {
+    TunnelConnected() || TunnelChecking() => true,
+    _ => false,
+  };
+  if (!isUp || !ref.watch(autoSelectedProvider)) {
+    return Stream<List<ProxyGroup>>.value(const <ProxyGroup>[]);
+  }
+
+  final controller = StreamController<List<ProxyGroup>>();
+  var asking = false;
+  Future<void> ask() async {
+    // One question at a time: a channel that answers slower than the interval
+    // would otherwise queue calls until it answers them all at once.
+    if (asking || controller.isClosed) {
+      return;
+    }
+    asking = true;
+    try {
+      final groups = await core.proxies();
+      if (!controller.isClosed) {
+        controller.add(groups);
+      }
+    } on Object catch (error) {
+      // Deliberately not an error state. This drives one line of a row; a
+      // core that will not answer must not turn the server list into a
+      // failure screen.
+      ref.read(appLoggerProvider).debug('proxies failed: $error', tag: _tag);
+    } finally {
+      asking = false;
+    }
+  }
+
+  final timer = Timer.periodic(_groupPoll, (_) => unawaited(ask()));
+  unawaited(ask());
+  ref.onDispose(() {
+    timer.cancel();
+    unawaited(controller.close());
+  });
+  return controller.stream;
+});
+
+/// The server the Auto group is sending traffic through right now.
+///
+/// `null` until the core has answered, and `null` for good on a tunnel that
+/// is down: Auto without a running core is a preference, not a destination.
+final autoNodeProvider = Provider<ProxyNode?>((ref) {
+  final groups = ref.watch(proxyGroupsProvider).value ?? const <ProxyGroup>[];
+  String? id;
+  for (final group in groups) {
+    final member = group.now;
+    if (group.tag == SingBoxTags.autoGroup && member != null) {
+      id = SingBoxTags.nodeIdOf(member);
+      break;
+    }
+  }
+  if (id == null) {
+    return null;
+  }
+  for (final node in ref.watch(nodesProvider).value ?? const <ProxyNode>[]) {
+    if (node.id == id) {
+      return node;
+    }
+  }
+  return null;
+});
+
 /// Pipes the core's log stream and our own logger into the log repository.
 ///
 /// Watched once, from the root widget, so the buffer keeps filling while the
@@ -205,6 +291,11 @@ const Duration _reloadSettle = Duration(milliseconds: 400);
 /// has exactly one place to be added. Everything not listed — theme, language,
 /// the hide-unavailable filter, the launch and boot switches — is the app's
 /// business and must never restart the core.
+///
+/// `autoSelect` is the one field the builder reads that is deliberately absent.
+/// `TunnelController` applies it itself, and only rebuilds when the running
+/// core genuinely lacks the group; listing it here would turn every tap on a
+/// server row into a restart, because turning Auto off is part of that tap.
 typedef _CoreInputs = ({
   bool allowLan,
   String ipCheckUrl,
@@ -392,6 +483,9 @@ enum TunnelNoticeKind {
   /// The outbound was switched inside a running core.
   switched,
 
+  /// The choice of server was handed to the core's own latency group.
+  switchedToAuto,
+
   /// The running core took a changed configuration.
   reloaded,
 
@@ -441,7 +535,8 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// send the user to the import sheet instead of showing an error about a
   /// choice they never made.
   Future<bool> connect({String? nodeId}) async {
-    final target = nodeId ?? ref.read(selectedNodeIdProvider).value;
+    final target =
+        nodeId ?? ref.read(selectedNodeIdProvider).value ?? _autoLeadNodeId();
     if (target == null) {
       return false;
     }
@@ -524,9 +619,22 @@ class TunnelController extends Notifier<TunnelActionState> {
   ///
   /// A restart would drop every open connection, which is exactly what
   /// docs/05-ux-flows.md forbids: "не отключаемся и не подключаемся заново".
+  ///
+  /// Tapping a server is also how Auto is turned off, and the order below is
+  /// the reason this method is not three lines. Auto is ended **last**, once
+  /// the new server is the stored one: turned off first, the mark would leave
+  /// Auto, land for a frame on whichever server the list happened to lead
+  /// with, and only then reach the one under the finger. A switch that failed
+  /// leaves Auto on, because nothing moved.
+  ///
+  /// No rebuild in either case. The running document already holds every node
+  /// in the selector, so pointing it at one of them is the whole change; the
+  /// Auto group stays in that document until the next start, unused and
+  /// unpointed at, which costs a group nobody dials through.
   Future<void> selectNode(ProxyNode node) async {
     if (!_isUp) {
       await ref.read(selectedNodeIdProvider.notifier).select(node.id);
+      await _setAutoSelect(enabled: false);
       return;
     }
     final result = await ref.read(switchNodeUseCaseProvider)(
@@ -539,9 +647,47 @@ class TunnelController extends Notifier<TunnelActionState> {
       return;
     }
     await ref.read(selectedNodeIdProvider.notifier).select(node.id);
+    await _setAutoSelect(enabled: false);
     state = state.copyWith(
       clearFailure: true,
       notice: TunnelNotice(TunnelNoticeKind.switched, name: node.name),
+    );
+  }
+
+  /// Hands the choice of server to the core's own latency group.
+  ///
+  /// Auto is part of the document, not a runtime flag: a core started without
+  /// it has no such outbound for the selector to point at. So the running core
+  /// is asked first and rebuilt only when the group is genuinely missing —
+  /// which makes coming back to Auto inside one session a switch rather than a
+  /// restart, and every open connection survives it.
+  ///
+  /// The stored selection is left alone. It is the server the list leads with
+  /// and the one the user returns to when they turn Auto off; overwriting it
+  /// with whatever the core happens to prefer this minute would quietly lose
+  /// the choice they made by hand.
+  Future<void> selectAuto() async {
+    await _setAutoSelect(enabled: true);
+    if (!_isUp) {
+      return;
+    }
+    final nodeId = ref.read(selectedNodeIdProvider).value;
+    if (nodeId == null || await _autoGroup() == null) {
+      await reload();
+      return;
+    }
+    final result = await ref.read(switchNodeUseCaseProvider)(
+      nodeId: nodeId,
+      outboundTag: SingBoxTags.autoGroup,
+    );
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      state = state.copyWith(failure: failure);
+      return;
+    }
+    state = state.copyWith(
+      clearFailure: true,
+      notice: const TunnelNotice(TunnelNoticeKind.switchedToAuto),
     );
   }
 
@@ -590,9 +736,14 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// automatic probe after a connect leaves it `false`, and nothing else may
   /// pass `true`. With the feature off the flag changes nothing: the use
   /// case reads the setting and answers nothing.
+  ///
+  /// What gets measured is the outbound traffic actually leaves through, which
+  /// on Auto is the core's pick and not the server the user last tapped. A
+  /// check that answers for a different server than the one carrying the
+  /// traffic is worse than no check at all.
   Future<void> check({bool includeIp = false}) async {
-    final node = ref.read(selectedNodeProvider);
-    if (node == null) {
+    final tag = await _liveOutboundTag();
+    if (tag == null) {
       return;
     }
     state = state.copyWith(
@@ -601,7 +752,7 @@ class TunnelController extends Notifier<TunnelActionState> {
       clearFailure: true,
     );
     final result = await ref.read(checkReachabilityUseCaseProvider)(
-      outboundTag: SingBoxTags.forNode(node),
+      outboundTag: tag,
     );
     final failure = result.failureOrNull;
     if (failure != null) {
@@ -671,6 +822,81 @@ class TunnelController extends Notifier<TunnelActionState> {
 
   /// Drops the last notice once it has been shown.
   void clearNotice() => state = state.copyWith(clearNotice: true);
+
+  /// Writes the Auto setting, and only when it actually changes.
+  ///
+  /// Not through `SettingsController`: this is the tunnel's half of the same
+  /// choice, and routing it through the settings screen's notifier would put a
+  /// failure banner about servers on a screen about preferences.
+  ///
+  /// Deliberately outside `_CoreInputs`, so the debounced reload never sees
+  /// it. Both directions are applied here by hand — see [selectAuto] and
+  /// [selectNode] — because a reload on this field would turn every tap on a
+  /// server row into a core restart, which is the one thing switching inside
+  /// the selector exists to avoid.
+  Future<void> _setAutoSelect({required bool enabled}) async {
+    final repository = ref.read(settingsRepositoryProvider);
+    final read = await repository.read();
+    final current = read.valueOrNull ?? AppSettings.defaults;
+    if (current.autoSelect == enabled) {
+      return;
+    }
+    final written = await repository.write(
+      current.copyWith(autoSelect: enabled),
+    );
+    final failure = written.failureOrNull;
+    if (failure != null) {
+      state = state.copyWith(failure: failure);
+    }
+  }
+
+  /// The Auto group as the running core reports it, or `null` when it has none.
+  ///
+  /// A core that will not answer counts as one without the group: the caller
+  /// then rebuilds, which is the answer that works either way.
+  Future<ProxyGroup?> _autoGroup() async {
+    try {
+      for (final group in await ref.read(coreClientProvider).proxies()) {
+        if (group.tag == SingBoxTags.autoGroup) {
+          return group;
+        }
+      }
+    } on Object catch (error) {
+      ref.read(appLoggerProvider).debug('proxies failed: $error', tag: _tag);
+    }
+    return null;
+  }
+
+  /// The outbound traffic is leaving through right now, or `null`.
+  ///
+  /// On Auto the core is asked rather than guessed at: its answer is a member
+  /// tag, and it is used as it comes instead of being resolved to a node and
+  /// back, so a server deleted from the list a moment ago still measures the
+  /// outbound that is carrying the traffic.
+  Future<String?> _liveOutboundTag() async {
+    if (ref.read(autoSelectedProvider)) {
+      final picked = (await _autoGroup())?.now;
+      if (picked != null) {
+        return picked;
+      }
+    }
+    final node = ref.read(selectedNodeProvider);
+    return node == null ? null : SingBoxTags.forNode(node);
+  }
+
+  /// The server a start on Auto begins from, when nothing was ever picked.
+  ///
+  /// The document needs a node to lead with even when the selector defaults to
+  /// the Auto group, and a user who has only ever tapped Auto has picked none.
+  /// The first stored server is as good as any: the core reorders by latency
+  /// the moment it has measured them.
+  String? _autoLeadNodeId() {
+    if (!ref.read(autoSelectedProvider)) {
+      return null;
+    }
+    final all = ref.read(nodesProvider).value ?? const <ProxyNode>[];
+    return all.isEmpty ? null : all.first.id;
+  }
 
   /// Rebuilds the configuration that was just sent, for the diagnostics tab.
   ///
