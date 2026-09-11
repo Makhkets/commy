@@ -166,9 +166,10 @@ final logPumpProvider = Provider<void>((ref) {
   // either in the backlog or on the stream, never both. A check by `LogLine`
   // equality would only ever drop a line the app genuinely wrote twice.
   //
-  // The drain runs once because the three providers above never rebuild. If
-  // one of them ever does (task #17 moves their lifecycle), the backlog would
-  // be replayed again — the guard belongs with that change, not here.
+  // The drain runs once because the three providers above never rebuild.
+  // Queue item #17 gave them disposal, not a new lifecycle: they are closed
+  // with the scope and never invalidated inside one. The day one of them is,
+  // the backlog would be replayed — the guard belongs with that change.
   final backlog = logger.buffer;
   if (backlog.isNotEmpty) {
     unawaited(repository.appendAll(backlog));

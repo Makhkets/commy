@@ -18,6 +18,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 /// Rule R2 lives on the two lines that build `SecretVault`: the keystore is
 /// the only place credentials, subscription URLs and the generated
 /// configuration are allowed to be.
+///
+/// **What is opened here is closed by the scope, not by this function.** The
+/// database and the logger have to exist before the first provider is read —
+/// one because opening it is asynchronous, the other because the line about an
+/// unencrypted file is written before `runApp` — so they are built here and
+/// then *given* to the graph with `ownedOverride`, which registers their
+/// disposal. Handing them over with `overrideWithValue` would put them outside
+/// the graph entirely: the provider body never runs, so nothing ever registers
+/// an `onDispose`, and a container that was torn down would leave the database
+/// open behind it.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LocaleSettings.useDeviceLocale();
@@ -45,9 +55,9 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [
-        appLoggerProvider.overrideWithValue(logger),
+        ownedOverride(appLoggerProvider, logger, (it) => it.dispose()),
         secureStoreProvider.overrideWithValue(secureStore),
-        databaseProvider.overrideWithValue(opened.database),
+        ownedOverride(databaseProvider, opened.database, (it) => it.close()),
         databaseEncryptionProvider.overrideWithValue(opened.encryption),
         appInfoProvider.overrideWithValue(
           AppInfo(

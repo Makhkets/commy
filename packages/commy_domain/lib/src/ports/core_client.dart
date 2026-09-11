@@ -52,4 +52,16 @@ abstract interface class CoreClient {
   ///
   /// Returns `null` when the probe did not come back.
   Future<Duration?> urlTest(String tag, Uri probe);
+
+  /// Releases what the client holds: subscriptions, timers, sockets.
+  ///
+  /// It does **not** take the tunnel down, and must never be mistaken for
+  /// [stop]. On every platform the core outlives the process that talks to it
+  /// — a foreground service on Android, an extension on Apple, a privileged
+  /// helper on the desktops — and closing the client while traffic flows is
+  /// exactly what happens when the user swipes the app away. The tunnel is
+  /// stopped when the user says so, not when a window closes.
+  ///
+  /// Idempotent: a client disposed twice is not an error.
+  Future<void> dispose();
 }

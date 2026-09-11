@@ -163,6 +163,16 @@ class AndroidCoreClient implements CoreClient {
     );
   }
 
+  @override
+  Future<void> dispose() async {
+    // Nothing to release, and that is a statement about this class rather
+    // than an omission. The method channel is a `const` with no state, and
+    // every stream here is an `EventChannel` broadcast: the subscription
+    // belongs to whoever listened, and Flutter tears the platform side down
+    // when the last listener cancels. The tunnel is deliberately untouched —
+    // see `CoreClient.dispose`.
+  }
+
   /// The sing-box version string, for the about screen.
   ///
   /// Not part of [CoreClient]: the domain has no reason to know which core it

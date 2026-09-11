@@ -11,6 +11,8 @@
 /// what it actually cares about.
 library;
 
+import 'dart:async';
+
 import 'package:commy/src/platform/flutter_clipboard.dart';
 import 'package:commy_config/commy_config.dart'
     show CommyLinkParser, ConfigPlatform;
@@ -19,6 +21,31 @@ import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// `Override` is not in flutter_riverpod's default export set; it lives in
+// misc.dart, and `ownedOverride` below returns one.
+import 'package:flutter_riverpod/misc.dart';
+
+/// Hands [value] to [provider] and makes the scope responsible for closing it.
+///
+/// Riverpod's own `overrideWithValue` replaces the provider's body — and the
+/// body is the only place `ref.onDispose` can be registered. An override made
+/// that way therefore has no disposal at all, which is how a database opened
+/// in `main()` stayed open behind a container that had been torn down. This
+/// override brings the disposal with the value.
+///
+/// [close] is allowed to be asynchronous and is not awaited: Riverpod disposes
+/// synchronously, and a teardown that waited on a socket would block the frame
+/// that is tearing the scope down.
+Override ownedOverride<T extends Object>(
+  Provider<T> provider,
+  T value,
+  Future<void> Function(T value) close,
+) {
+  return provider.overrideWith((ref) {
+    ref.onDispose(() => unawaited(close(value)));
+    return value;
+  });
+}
 
 /// Thrown by the providers `main()` is required to override.
 const String _mustOverride =
@@ -50,8 +77,15 @@ final secureStoreProvider = Provider<SecureStore>(
 /// `CoreClientFactory` returns the Android client on Android and the fake
 /// everywhere else, which is what makes every screen below runnable on a
 /// laptop and testable without a device.
+///
+/// Closed with the scope that built it. Closing the client is not stopping the
+/// tunnel — the core outlives this process by design — it is releasing the
+/// timers and controllers on *this* side, which is why the fake used to keep
+/// ticking on a desktop hot restart.
 final coreClientProvider = Provider<CoreClient>((ref) {
-  return CoreClientFactory.create(logger: ref.watch(appLoggerProvider));
+  final client = CoreClientFactory.create(logger: ref.watch(appLoggerProvider));
+  ref.onDispose(() => unawaited(client.dispose()));
+  return client;
 });
 
 /// Application and core version strings, read once at startup.
@@ -106,9 +140,17 @@ final secretVaultProvider = Provider<SecretVault>(
 );
 
 /// The HTTP client. Only ever points at hosts the user typed (rule R1).
+///
+/// Shared by the subscription fetcher and the rule set repository, and closed
+/// here because it is built here: a `Dio` left open holds its connection pool,
+/// and the pool holds sockets to the user's panel.
 final httpClientProvider = Provider<CommyHttpClient>((ref) {
   final info = ref.watch(appInfoProvider);
-  return CommyHttpClient(userAgent: CommyUserAgent.honest(info.version));
+  final client = CommyHttpClient(
+    userAgent: CommyUserAgent.honest(info.version),
+  );
+  ref.onDispose(client.close);
+  return client;
 });
 
 /// Version strings shown on the About screen.

@@ -361,7 +361,15 @@ class FakeCoreClient implements CoreClient {
   /// Outbound types that are groups rather than destinations.
   static const Set<String> _groupTypes = <String>{'selector', 'urltest'};
 
+  /// Whether [dispose] has run.
+  bool get isDisposed => _disposed;
+
   /// Closes every stream and cancels every timer.
+  ///
+  /// The running flag is left alone: a disposed fake reports the tunnel it was
+  /// carrying, because a client that goes away does not take the tunnel with
+  /// it (`CoreClient.dispose`).
+  @override
   Future<void> dispose() async {
     if (_disposed) {
       return;
