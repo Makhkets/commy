@@ -173,6 +173,12 @@ void main() {
     tearDown(() => twoServers.dispose());
 
     Future<List<NodeTile>> pumpTwo(WidgetTester tester) async {
+      // Tall enough for the rows under the hero, the Auto row and the
+      // toolbar: the list is lazy and builds nothing below the viewport.
+      tester.view.physicalSize = const Size(400, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         twoServers.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
@@ -225,6 +231,129 @@ void main() {
         (await twoServers.settingsRepository.read()).valueOrNull!.autoSelect,
         isTrue,
       );
+    });
+  });
+
+  group('search and order', () {
+    late CommyTestHarness three;
+
+    setUp(() {
+      three = CommyTestHarness(
+        nodes: <ProxyNode>[
+          testNode(),
+          testNode(
+            id: 'node-2',
+            name: 'Warsaw 01',
+            countryCode: 'PL',
+            latency: null,
+          ),
+          testNode(
+            id: 'node-3',
+            name: 'Berlin 02',
+            countryCode: 'DE',
+            latency: const Duration(milliseconds: 12),
+          ),
+        ],
+      );
+    });
+
+    tearDown(() => three.dispose());
+
+    /// A phone-wide, very tall surface.
+    ///
+    /// The list is lazy: rows below the default 600-pixel test viewport are
+    /// never built, and with the hero, the Auto row and the toolbar above
+    /// them the server rows sit exactly there. Order assertions need every
+    /// row on screen at once.
+    Future<void> pumpThree(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(400, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        three.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+    }
+
+    /// Server rows in list order, without the Auto row.
+    List<String> serverNames(WidgetTester tester) {
+      final auto = Translations().home.auto;
+      return <String>[
+        for (final tile in tester.widgetList<NodeTile>(find.byType(NodeTile)))
+          if (tile.name != auto) tile.name,
+      ];
+    }
+
+    testWidgets('typing narrows the list to the matching servers',
+        (tester) async {
+      await pumpThree(tester);
+
+      await tester.enterText(find.byType(SearchField), 'war');
+      await settle(tester);
+
+      expect(serverNames(tester), <String>['Warsaw 01']);
+    });
+
+    testWidgets('a country code matches whole, not as two letters',
+        (tester) async {
+      await pumpThree(tester);
+
+      await tester.enterText(find.byType(SearchField), 'de');
+      await settle(tester);
+
+      expect(serverNames(tester), <String>['Berlin 02']);
+    });
+
+    testWidgets('nothing found says so, and its action clears the search',
+        (tester) async {
+      await pumpThree(tester);
+      final t = Translations();
+
+      await tester.enterText(find.byType(SearchField), 'zzz');
+      await settle(tester);
+      expect(serverNames(tester), isEmpty);
+      expect(find.text(t.home.search.nothing), findsOneWidget);
+
+      await tester.tap(find.text(t.home.search.clear));
+      await settle(tester);
+
+      expect(serverNames(tester).length, 3);
+      expect(find.text(t.home.search.nothing), findsNothing);
+    });
+
+    testWidgets(
+        'ordering by latency puts the fastest first and the unmeasured last',
+        (tester) async {
+      await pumpThree(tester);
+      final t = Translations();
+      expect(
+        serverNames(tester),
+        <String>['Amsterdam 03', 'Warsaw 01', 'Berlin 02'],
+      );
+
+      await tester.tap(find.byType(CommyChip));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.home.sort.latency));
+      await tester.pumpAndSettle();
+
+      expect(
+        serverNames(tester),
+        <String>['Berlin 02', 'Amsterdam 03', 'Warsaw 01'],
+      );
+      // The choice is a setting, so it survives a restart.
+      expect(
+        (await three.settingsRepository.read()).valueOrNull!.nodeSort,
+        NodeSort.latency,
+      );
+    });
+
+    testWidgets('one server gets neither a search field nor an order chip',
+        (tester) async {
+      await pumpHome(tester, status: const TunnelStatus.idle());
+
+      expect(find.byType(SearchField), findsNothing);
+      expect(find.byType(CommyChip), findsNothing);
     });
   });
 

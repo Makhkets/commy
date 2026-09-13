@@ -50,6 +50,17 @@
     "manualGroupSubtitle": "Добавлены вручную",
     "hiddenCount": "Скрыто недоступных: $count",
     "showHidden": "Показать",
+    "search": {
+      "nothing": "Ничего не найдено",
+      "nothingBody": "Ни одно имя, адрес или код страны не совпали.",
+      "clear": "Сбросить поиск"
+    },
+    "sort": {
+      "title": "Порядок серверов",
+      "panel": "По порядку",
+      "latency": "По задержке",
+      "name": "По имени"
+    },
     "checkOk": "Доступ есть: $ms мс",
     "checkFailed": "Проверка не прошла",
     "checkOkWithIp": "Доступ есть: $ms мс · $ip",

@@ -1,6 +1,7 @@
 import 'package:commy_domain/src/core/json_map.dart';
 import 'package:commy_domain/src/core/json_read.dart';
 import 'package:commy_domain/src/entities/log_line.dart';
+import 'package:commy_domain/src/entities/node_sort.dart';
 
 /// Theme preference. Deliberately not Flutter's `ThemeMode`: rule R5.
 enum AppThemeMode {
@@ -41,6 +42,7 @@ class AppSettings {
     this.autoSelect = false,
     this.startOnBoot = false,
     this.hideUnavailable = false,
+    this.nodeSort = NodeSort.panel,
     this.latencyProbeUrl = defaultLatencyProbeUrl,
     this.ipCheckUrl = '',
     this.ruleSetSource = defaultRuleSetSource,
@@ -63,6 +65,9 @@ class AppSettings {
           json,
           'hideUnavailable',
           orElse: false,
+        ),
+        nodeSort: NodeSort.values.byName(
+          JsonRead.stringOr(json, 'nodeSort', orElse: 'panel'),
         ),
         latencyProbeUrl: JsonRead.stringOr(
           json,
@@ -160,6 +165,9 @@ class AppSettings {
   /// silently is worse than showing it as unreachable.
   final bool hideUnavailable;
 
+  /// How the servers inside each list are ordered.
+  final NodeSort nodeSort;
+
   /// URL the latency test requests through the proxy.
   ///
   /// Empty disables the test. The request never leaves the tunnel, so it is
@@ -224,6 +232,7 @@ class AppSettings {
     bool? autoSelect,
     bool? startOnBoot,
     bool? hideUnavailable,
+    NodeSort? nodeSort,
     String? latencyProbeUrl,
     String? ipCheckUrl,
     String? ruleSetSource,
@@ -240,6 +249,7 @@ class AppSettings {
       autoSelect: autoSelect ?? this.autoSelect,
       startOnBoot: startOnBoot ?? this.startOnBoot,
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
+      nodeSort: nodeSort ?? this.nodeSort,
       latencyProbeUrl: latencyProbeUrl ?? this.latencyProbeUrl,
       ipCheckUrl: ipCheckUrl ?? this.ipCheckUrl,
       ruleSetSource: ruleSetSource ?? this.ruleSetSource,
@@ -258,6 +268,7 @@ class AppSettings {
         'autoSelect': autoSelect,
         'startOnBoot': startOnBoot,
         'hideUnavailable': hideUnavailable,
+        'nodeSort': nodeSort.name,
         'latencyProbeUrl': latencyProbeUrl,
         'ipCheckUrl': ipCheckUrl,
         'ruleSetSource': ruleSetSource,
@@ -277,6 +288,7 @@ class AppSettings {
           other.autoSelect == autoSelect &&
           other.startOnBoot == startOnBoot &&
           other.hideUnavailable == hideUnavailable &&
+          other.nodeSort == nodeSort &&
           other.latencyProbeUrl == latencyProbeUrl &&
           other.ipCheckUrl == ipCheckUrl &&
           other.ruleSetSource == ruleSetSource &&
@@ -293,6 +305,7 @@ class AppSettings {
         autoSelect,
         startOnBoot,
         hideUnavailable,
+        nodeSort,
         latencyProbeUrl,
         ipCheckUrl,
         ruleSetSource,
@@ -303,7 +316,6 @@ class AppSettings {
       );
 
   @override
-  String toString() =>
-      'AppSettings(${themeMode.name}, ${locale ?? 'system'}, '
+  String toString() => 'AppSettings(${themeMode.name}, ${locale ?? 'system'}, '
       'tun: ${tunStack.name})';
 }

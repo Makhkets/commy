@@ -10,7 +10,16 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
-Nothing since the last pre-release.
+### Added
+
+- **Search and order on the home list.** Above the servers, once there is
+  more than one: a search field that narrows every card and the manual group
+  by name, address or whole country code, and a chip that orders the servers
+  inside each list — as the panel listed them, by latency (measured fastest
+  first, unmeasured next, timed out last) or by name. The order is a setting
+  and survives a restart; the search is not. A search that matches nothing
+  says so and offers to clear itself. Subscriptions keep their own order and
+  are never interleaved (docs/05-ux-flows.md). Queue #15.
 
 ## [0.1.0-alpha.3]
 

@@ -54,54 +54,125 @@ final dnsSettingsProvider = StreamProvider<DnsSettings>((ref) {
   return ref.watch(routingRepositoryProvider).watchDns();
 });
 
-/// Whether unreachable servers are currently kept out of the lists.
+/// What the lists show, and in which order.
 ///
-/// docs/05-ux-flows.md is precise about this: "**timeout** не прячет узел:
-/// сервер мог быть временно недоступен. Скрытие нерабочих — отдельный
+/// docs/05-ux-flows.md is precise about the first part: "**timeout** не прячет
+/// узел: сервер мог быть временно недоступен. Скрытие нерабочих — отдельный
 /// переключатель." So a server that failed a probe stays visible until the
-/// user asks otherwise, and the filter lives behind `AppSettings`.
+/// user asks otherwise, and that switch lives behind `AppSettings`, as does
+/// the order. The search text does not: it is what the user typed a moment
+/// ago, not a preference.
 final nodeFilterProvider = Provider<NodeFilter>((ref) {
   final settings = ref.watch(settingsProvider).value;
   return NodeFilter(
     hideUnavailable: settings?.hideUnavailable ?? false,
+    sort: settings?.nodeSort ?? NodeSort.panel,
+    query: ref.watch(nodeQueryProvider),
   );
 });
 
-/// Applies the "hide unavailable" setting to a list of servers.
+/// How the servers inside each list are ordered.
+final nodeSortProvider = Provider<NodeSort>((ref) {
+  return ref.watch(settingsProvider).value?.nodeSort ?? NodeSort.panel;
+});
+
+/// The text in the search field above the lists; empty when there is none.
+///
+/// A provider rather than field state so that every card, the "nothing found"
+/// state and the field itself read one value — and so that a reset from that
+/// state reaches the field.
+final nodeQueryProvider = NotifierProvider<NodeQuery, String>(NodeQuery.new);
+
+/// Holds the search text.
+class NodeQuery extends Notifier<String> {
+  @override
+  String build() => '';
+
+  /// Replaces the text. Surrounding whitespace is not part of a search.
+  void write(String value) => state = value.trim();
+
+  /// Drops the text.
+  void clear() => state = '';
+}
+
+/// Decides which servers a list shows, and in what order.
 @immutable
 class NodeFilter {
   /// Creates the filter.
-  const NodeFilter({required this.hideUnavailable});
+  const NodeFilter({
+    required this.hideUnavailable,
+    this.sort = NodeSort.panel,
+    this.query = '',
+  });
 
   /// Whether servers that failed their last probe are dropped.
   final bool hideUnavailable;
 
-  /// Whether [node] is shown.
-  ///
-  /// A node nobody has measured yet counts as reachable: it has not failed,
-  /// it simply has not been asked. Hiding it would make a fresh import look
-  /// like a broken one.
-  bool isVisible(ProxyNode node) =>
-      !hideUnavailable || node.latency != null || node.lastCheckedAt == null;
+  /// The order inside each list.
+  final NodeSort sort;
 
-  /// [nodes] with the hidden ones removed.
-  List<ProxyNode> apply(List<ProxyNode> nodes) {
-    if (!hideUnavailable) {
-      return nodes;
+  /// What the user typed into the search field; empty for no search.
+  final String query;
+
+  /// Whether a search is narrowing the lists.
+  bool get isSearching => query.isNotEmpty;
+
+  /// Whether [node] answered its last probe, or has not been asked yet.
+  ///
+  /// A node nobody has measured counts as reachable: it has not failed, it
+  /// simply has not been asked. Hiding it would make a fresh import look
+  /// like a broken one.
+  static bool isReachable(ProxyNode node) =>
+      node.latency != null || node.lastCheckedAt == null;
+
+  /// Whether [node] matches the search text.
+  ///
+  /// Name and host are searched as substrings. The country code has to match
+  /// whole: "de" is a country, not two letters that happen to sit inside
+  /// "Amsterdam".
+  bool matches(ProxyNode node) {
+    if (query.isEmpty) {
+      return true;
     }
-    return <ProxyNode>[
+    final needle = query.toLowerCase();
+    return node.name.toLowerCase().contains(needle) ||
+        node.host.toLowerCase().contains(needle) ||
+        node.countryCode?.toLowerCase() == needle;
+  }
+
+  /// Whether [node] is shown.
+  bool isVisible(ProxyNode node) =>
+      (!hideUnavailable || isReachable(node)) && matches(node);
+
+  /// [nodes] with the hidden ones removed, in [sort] order.
+  List<ProxyNode> apply(List<ProxyNode> nodes) {
+    return sort.apply(<ProxyNode>[
       for (final node in nodes)
         if (isVisible(node)) node,
-    ];
+    ]);
+  }
+
+  /// How many of [nodes] the "hide unavailable" setting takes out.
+  ///
+  /// Counted without the search, so the footer that reports the number does
+  /// not blame the setting for servers a search term left out.
+  int hiddenUnavailable(List<ProxyNode> nodes) {
+    if (!hideUnavailable) {
+      return 0;
+    }
+    return nodes.where((node) => !isReachable(node)).length;
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NodeFilter && other.hideUnavailable == hideUnavailable;
+      other is NodeFilter &&
+          other.hideUnavailable == hideUnavailable &&
+          other.sort == sort &&
+          other.query == query;
 
   @override
-  int get hashCode => hideUnavailable.hashCode;
+  int get hashCode => Object.hash(hideUnavailable, sort, query);
 }
 
 /// Nodes that came from a paste, a QR code or a file rather than a panel.

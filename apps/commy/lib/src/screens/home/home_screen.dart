@@ -5,6 +5,7 @@ import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/first_run_view.dart';
 import 'package:commy/src/screens/home/widgets/hero_area.dart';
+import 'package:commy/src/screens/home/widgets/list_toolbar.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_section.dart';
 import 'package:commy/src/screens/import/import_sheet.dart';
@@ -113,11 +114,12 @@ class _HomeContent extends ConsumerWidget {
     final manual = filter.apply(ref.watch(manualNodesProvider));
     final activeId = ref.watch(activeNodeIdProvider);
     // The same condition the configuration builder applies: with one server
-    // there is no group in the document, so there is nothing to offer.
+    // there is no group in the document, so there is nothing to offer — and
+    // nothing to search or order either.
     final hasChoice = nodes.length > 1;
     // Counted across every list at once so the footer states one number the
     // user can check against, rather than one per card.
-    final hidden = nodes.length - filter.apply(nodes).length;
+    final hidden = filter.hiddenUnavailable(nodes);
     // The banner reads the *folded* status, not just this app's last action:
     // a core that died on its own has to explain itself too, and that arrives
     // as a `TunnelError` on the status stream with nothing local behind it.
@@ -130,6 +132,25 @@ class _HomeContent extends ConsumerWidget {
       TunnelStopping() =>
         null,
     };
+
+    // One card per subscription, each with its own slice of the list. While
+    // a search is on, a card with no match is left out: the user is looking
+    // for a server, and a panel header with nothing under it is not an answer.
+    final cards = <Widget>[];
+    var shown = manual.length;
+    for (final subscription in subscriptions) {
+      final own = filter.apply(<ProxyNode>[
+        for (final node in nodes)
+          if (node.subscriptionId == subscription.id) node,
+      ]);
+      shown += own.length;
+      if (filter.isSearching && own.isEmpty) {
+        continue;
+      }
+      cards
+        ..add(SubscriptionSection(subscription: subscription, nodes: own))
+        ..add(SizedBox(height: spacing.s4));
+    }
 
     return ListView(
       padding: EdgeInsets.only(bottom: spacing.s10),
@@ -150,16 +171,11 @@ class _HomeContent extends ConsumerWidget {
           ),
           SizedBox(height: spacing.s4),
         ],
-        for (final subscription in subscriptions) ...<Widget>[
-          SubscriptionSection(
-            subscription: subscription,
-            nodes: filter.apply(<ProxyNode>[
-              for (final node in nodes)
-                if (node.subscriptionId == subscription.id) node,
-            ]),
-          ),
+        if (hasChoice) ...<Widget>[
+          const ListToolbar(),
           SizedBox(height: spacing.s4),
         ],
+        ...cards,
         if (manual.isNotEmpty) ...<Widget>[
           GroupHeader(
             title: t.home.manualGroup,
@@ -168,6 +184,16 @@ class _HomeContent extends ConsumerWidget {
           for (final node in manual)
             NodeRow(node: node, isActive: node.id == activeId),
         ],
+        // A search that matched nothing is the one empty state this screen
+        // did not have, and it gets the action every other one has.
+        if (filter.isSearching && shown == 0)
+          EmptyState(
+            icon: CommyIcons.search,
+            title: t.home.search.nothing,
+            message: t.home.search.nothingBody,
+            actionLabel: t.home.search.clear,
+            onAction: ref.read(nodeQueryProvider.notifier).clear,
+          ),
         if (hidden > 0) _HiddenFooter(count: hidden),
       ],
     );

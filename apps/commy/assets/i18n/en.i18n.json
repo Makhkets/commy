@@ -50,6 +50,17 @@
     "manualGroupSubtitle": "Added by hand",
     "hiddenCount": "Hidden: $count unavailable",
     "showHidden": "Show",
+    "search": {
+      "nothing": "Nothing found",
+      "nothingBody": "No name, address or country code matched.",
+      "clear": "Clear the search"
+    },
+    "sort": {
+      "title": "Server order",
+      "panel": "As listed",
+      "latency": "By latency",
+      "name": "By name"
+    },
     "checkOk": "Access confirmed: $ms ms",
     "checkFailed": "The check did not pass",
     "checkOkWithIp": "Access confirmed: $ms ms · $ip",

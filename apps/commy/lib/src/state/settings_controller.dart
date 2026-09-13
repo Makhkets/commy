@@ -92,6 +92,11 @@ class SettingsController extends Notifier<CommyFailure?> {
     await save((await _settings()).copyWith(hideUnavailable: enabled));
   }
 
+  /// Changes how the servers inside each list are ordered.
+  Future<void> setNodeSort(NodeSort sort) async {
+    await save((await _settings()).copyWith(nodeSort: sort));
+  }
+
   /// Switches the theme.
   Future<void> setThemeMode(AppThemeMode mode) async {
     await save((await _settings()).copyWith(themeMode: mode));
