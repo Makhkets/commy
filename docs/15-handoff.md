@@ -79,10 +79,10 @@
 | 12 | ✅ **Выбор приложений (per-app).** Десятый метод канала `installedApps` через `<queries>`, без `QUERY_ALL_PACKAGES`; экран — один режим и один список | крупно | `apps_screen.dart`, `CoreMethodHandler.kt` |
 | 13 | ✅ **Наборы правил, исключение E-2.** Загрузка по кнопке **и** передача `ruleSetDirectory`/`availableRuleSets` в сборщик — работали обе половины сразу. Хранилище — директория, а не таблица | крупно | `file_rule_set_repository.dart`, `rule_sets_screen.dart` |
 | 14 | ✅ **Группа «Авто» (urltest).** `AppSettings.autoSelect` доходит до сборщика, строка «Авто» стоит над списком и показывает узел, на который группа встала. Включение на живом туннеле пересобирает документ только если группы в нём нет | средне | `auto_row.dart`, `tunnel_controller.dart` |
-| 15 | **Список узлов**: поиск, сортировка, судьба ручных групп | средне | `home_screen.dart`, `drift_node_repository.dart` |
+| 15 | ✅ **Список узлов**: поиск (имя и адрес — подстрокой, код страны — целиком) и порядок (панель / задержка / имя) в тулбаре над карточками, начиная с двух серверов; порядок — настройка, поиск — нет. **Ручные группы оставлены как есть**: схема и репозиторий их знают, создать их в приложении негде, а заголовок для группы, которую нельзя сделать, — не фича | средне | `list_toolbar.dart`, `library_providers.dart`, `node_sort.dart` |
 | 16 | **Виджет- и golden-тесты приложения.** Девять экранов из десяти не рендерятся ни одним тестом | крупно | `test/support/*`, `melos.yaml` |
 | 17 | ✅ **Закрытие ресурсов.** `CoreClient` получил `dispose()` в порту, core client и HTTP-клиент закрываются своим провайдером, а БД и логгер `main()` теперь **отдаёт** графу через `ownedOverride` вместо `overrideWithValue` — у последнего тело провайдера не выполняется, и регистрировать `onDispose` негде | мелко | `main.dart`, `infrastructure_providers.dart` |
-| 18 | **Статистика по дням.** `DriftTrafficHistoryStore` написан и не подключён — либо подключить, либо убрать строку из роадмапа | средне | `repository_providers.dart`, `stats_screen.dart` |
+| 18 | ✅ **Статистика по дням.** `DriftTrafficHistoryStore` подключён через доменный порт `TrafficHistoryRepository` (`TrafficDay` переехал в домен); `trafficHistoryPumpProvider` смотрится с корня, пишет дельты и сбрасывает базу, когда туннель падает; экран статистики показывает неделю и с выключенным туннелем | средне | `traffic_history.dart`, `stats_screen.dart` |
 | 19 | **Планшет** — сейчас растянутый телефон: нет rail-назначений и правой панели | средне | `app_router.dart`, `home_screen.dart` |
 
 **Подписка владельца не отдаёт узлы.** Панель возвращает одну заглушку
@@ -346,6 +346,39 @@ composition root и передать в `CoreClientFactory.create(logger: ...)` 
 
 Под bash JDK в PATH добавлять как `/c/dev/jdk17/bin` — Windows-путь для
 дочерних процессов невидим.
+
+### Linux — машина владельца, поставлено 2026-09-14
+
+Без root, всё в домашней директории. `mise` на машине уже был.
+
+| Что | Где |
+|---|---|
+| fvm 4.3.1 | `~/.local/bin/fvm` |
+| Flutter 3.44.8 (Dart 3.12.2) | `~/fvm/versions/3.44.8`; `fvm global` → `~/fvm/default/bin` |
+| JDK 17.0.20 Temurin, Go 1.24.13 | `mise use -g java@temurin-17.0.20+8 go@1.24` → `~/.local/share/mise/installs/` |
+| Android SDK: platform-tools, platform 36, build-tools 36.0.0 | `~/Android/Sdk` |
+| NDK 28.0.13004108 | `~/Android/Sdk/ndk/28.0.13004108` |
+| melos 6.3.3 | `~/.pub-cache/bin` |
+| gomobile (форк SagerNet) | `~/go/bin`, ставит сам `build_core.sh` |
+
+В PATH для сборки: `~/fvm/default/bin`, `~/.pub-cache/bin`,
+`$(mise where java)/bin`, `$(mise where go)/bin`. Для ядра —
+`ANDROID_HOME=~/Android/Sdk`, `ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.0.13004108`.
+
+Готовые сборки складываются в `~/Work/commy-builds/` вместе с `SHA256SUMS.txt`.
+Release-APK собирается из отдельного worktree `~/Work/commy-release`
+(`git worktree add --detach … main`), чтобы незакоммиченные правки основного
+дерева не попадали в артефакт.
+
+**Грабли build_runner 3.x.** Флаг `--delete-conflicting-outputs` удалён. Если
+снести `apps/commy/.dart_tool/build`, build_runner перестаёт считать
+`lib/gen/*.g.dart` своими и молча их пропускает (`1 skipped`, `wrote 0
+outputs`). Лечится только вместе: `rm -rf apps/commy/.dart_tool/build
+apps/commy/lib/gen/strings*.g.dart`, потом `dart run build_runner build`.
+Удаление файла в *другом* пакете (так переезжал `traffic_day.dart` из
+`commy_data`) ломает инкрементальный граф приложения тем же концом —
+`InvalidOutputException … Tried to delete from package not in the build` — и
+лечится так же.
 
 ---
 
