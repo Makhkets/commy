@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:collection';
 
+import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
@@ -75,3 +78,77 @@ class TrafficHistory extends Notifier<TrafficWindow> {
   /// The window the chart draws, for tests and for the widget alike.
   static Duration get window => CommyThresholds.chartWindow;
 }
+
+const String _tag = 'traffic';
+
+/// Writes what the tunnel carries into the daily totals.
+///
+/// Watched from the root like the log pump: recording must not depend on the
+/// statistics screen ever having been opened. The store keeps a baseline
+/// between samples, and the baseline is dropped when the tunnel goes down so
+/// the first sample of the next session is not read as a change from the
+/// last one of the previous.
+final trafficHistoryPumpProvider = Provider<void>((ref) {
+  final repository = ref.watch(trafficHistoryRepositoryProvider);
+  final logger = ref.watch(appLoggerProvider);
+  // Once, not once a second: a database that refused one write will refuse
+  // the next, and the log has better things to hold.
+  var warned = false;
+
+  ref
+    ..listen<AsyncValue<TrafficSample>>(trafficProvider, (previous, next) {
+      final sample = next.value;
+      if (sample == null) {
+        return;
+      }
+      unawaited(
+        repository.recordSample(sample).then((result) {
+          final failure = result.failureOrNull;
+          if (failure != null && !warned) {
+            warned = true;
+            logger.warn(
+              'traffic history write failed: ${failure.code}',
+              tag: _tag,
+            );
+          }
+        }),
+      );
+    })
+    ..listen<AsyncValue<TunnelStatus>>(coreStatusProvider, (previous, next) {
+      switch (next.value) {
+        case TunnelIdle() || TunnelError():
+          repository.resetSession();
+        case TunnelStarting() ||
+              TunnelConnected() ||
+              TunnelChecking() ||
+              TunnelStopping() ||
+              null:
+          break;
+      }
+    });
+});
+
+/// How many days the statistics screen lists.
+const int trafficDaysShown = 7;
+
+/// The last [trafficDaysShown] days of totals, oldest first.
+///
+/// Keyed on the *day* of the clock, not on its every tick: the database watch
+/// is re-opened at midnight, not once a second. Auto-disposed, so a visit to
+/// the screen tomorrow asks for tomorrow's week.
+final StreamProvider<List<TrafficDay>> trafficDaysProvider =
+    StreamProvider.autoDispose((ref) {
+  final today = ref.watch(
+    clockProvider.select((clock) => _dayOf(clock.value ?? DateTime.now())),
+  );
+  return ref.watch(trafficHistoryRepositoryProvider).watchRange(
+        // Arithmetic on the day number, not a Duration: across a daylight
+        // saving change six times 24 hours is not six days.
+        from:
+            DateTime(today.year, today.month, today.day - trafficDaysShown + 1),
+        to: today,
+      );
+});
+
+DateTime _dayOf(DateTime moment) =>
+    DateTime(moment.year, moment.month, moment.day);

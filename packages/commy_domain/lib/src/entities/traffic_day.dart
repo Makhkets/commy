@@ -1,14 +1,10 @@
-import 'package:flutter/foundation.dart' show immutable;
-
-/// Traffic totals for one calendar day.
+/// One day of traffic, as two totals.
 ///
-/// A data-layer type, not a domain entity: the domain models the live tick
-/// (`TrafficSample`), while this is the aggregate the statistics screen draws.
-/// The distinction is the point — raw connections are never persisted, only
-/// two numbers per day (docs/06-data-model.md).
-@immutable
+/// Two numbers a day and nothing else. There is no per-connection record and
+/// there will not be one — that would be a browsing history, which is the
+/// artefact this project exists not to keep (docs/09-security-privacy.md).
 class TrafficDay {
-  /// Creates a day total.
+  /// Creates a day.
   const TrafficDay({
     required this.day,
     required this.scope,
@@ -16,22 +12,22 @@ class TrafficDay {
     required this.downBytes,
   });
 
-  /// Value of [scope] meaning "everything, not attributed to a node".
+  /// The scope of the unattributed total: every server together.
   static const String allScope = '';
 
-  /// Local calendar day, at midnight.
+  /// Local midnight of the day the bytes belong to.
   final DateTime day;
 
-  /// Node id the row counts, or [allScope].
+  /// A node id, or [allScope].
   final String scope;
 
-  /// Bytes sent that day.
+  /// Bytes sent.
   final int upBytes;
 
-  /// Bytes received that day.
+  /// Bytes received.
   final int downBytes;
 
-  /// Bytes moved in either direction.
+  /// Sent and received together.
   int get totalBytes => upBytes + downBytes;
 
   @override

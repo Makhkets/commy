@@ -129,4 +129,32 @@ void main() {
     expect(empty.actionLabel, t.diagnostics.goConnect);
     expect(empty.onAction, isNotNull);
   });
+
+  testWidgets('stats: a recorded day is shown without a live tunnel',
+      (tester) async {
+    final now = CommyTestHarness.now;
+    final withDays = CommyTestHarness(
+      trafficDays: <TrafficDay>[
+        TrafficDay(
+          day: DateTime(now.year, now.month, now.day),
+          scope: TrafficDay.allScope,
+          upBytes: 1024,
+          downBytes: 4096,
+        ),
+      ],
+    );
+    addTearDown(withDays.dispose);
+
+    await tester.pumpWidget(
+      withDays.wrap(const StatsScreen(), status: const TunnelStatus.idle()),
+    );
+    await settle(tester);
+
+    expect(find.byType(EmptyState), findsNothing);
+    // Section labels are drawn in capitals.
+    expect(find.text(t.diagnostics.statsDays.toUpperCase()), findsOneWidget);
+    expect(find.text(CommyByteFormat.bytes(5120)), findsOneWidget);
+    // The live sections have nothing to say with the tunnel down.
+    expect(find.text(t.diagnostics.statsWindow), findsNothing);
+  });
 }

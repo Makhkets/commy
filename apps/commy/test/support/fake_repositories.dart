@@ -482,6 +482,77 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
 ///
 /// The real Drift streams do this, and a screen that only ever sees the
 /// *next* write would sit on its skeleton forever.
+/// Daily totals in memory. Remembers every sample it was handed.
+class FakeTrafficHistoryRepository implements TrafficHistoryRepository {
+  /// Creates the repository, seeded with [days].
+  FakeTrafficHistoryRepository([List<TrafficDay> days = const <TrafficDay>[]]) {
+    _days.addAll(days);
+  }
+
+  final List<TrafficDay> _days = <TrafficDay>[];
+  final StreamController<List<TrafficDay>> _changes =
+      StreamController<List<TrafficDay>>.broadcast();
+
+  /// Every sample handed to [recordSample], in order.
+  final List<TrafficSample> recorded = <TrafficSample>[];
+
+  /// How many times the baseline was dropped.
+  int resets = 0;
+
+  /// The stored days.
+  List<TrafficDay> get days => List<TrafficDay>.unmodifiable(_days);
+
+  /// Closes the change stream.
+  Future<void> dispose() => _changes.close();
+
+  @override
+  Future<Result<void, CommyFailure>> recordSample(
+    TrafficSample sample, {
+    String scope = TrafficDay.allScope,
+  }) async {
+    recorded.add(sample);
+    return const Ok<void, CommyFailure>(null);
+  }
+
+  @override
+  void resetSession() => resets++;
+
+  @override
+  Future<Result<List<TrafficDay>, CommyFailure>> readRange({
+    required DateTime from,
+    required DateTime to,
+    String scope = TrafficDay.allScope,
+  }) async =>
+      Ok<List<TrafficDay>, CommyFailure>(_inRange(from, to, scope));
+
+  @override
+  Stream<List<TrafficDay>> watchRange({
+    required DateTime from,
+    required DateTime to,
+    String scope = TrafficDay.allScope,
+  }) =>
+      _replay(_changes, () => _inRange(from, to, scope));
+
+  @override
+  Future<Result<void, CommyFailure>> clear() async {
+    _days.clear();
+    _changes.add(days);
+    return const Ok<void, CommyFailure>(null);
+  }
+
+  List<TrafficDay> _inRange(DateTime from, DateTime to, String scope) {
+    final start = DateTime(from.year, from.month, from.day);
+    final end = DateTime(to.year, to.month, to.day);
+    return <TrafficDay>[
+      for (final day in _days)
+        if (day.scope == scope &&
+            !day.day.isBefore(start) &&
+            !day.day.isAfter(end))
+          day,
+    ];
+  }
+}
+
 Stream<T> _replay<T>(StreamController<T> controller, T Function() current) {
   return Stream<T>.multi((listener) {
     listener.add(current());

@@ -42,7 +42,6 @@ export 'src/mappers/node_mapper.dart';
 export 'src/mappers/routing_rule_mapper.dart';
 export 'src/mappers/subscription_mapper.dart';
 export 'src/models/stored_import_failure.dart';
-export 'src/models/traffic_day.dart';
 export 'src/repositories/drift_import_failure_store.dart';
 export 'src/repositories/drift_node_repository.dart';
 export 'src/repositories/drift_routing_repository.dart';

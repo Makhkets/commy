@@ -67,10 +67,12 @@ final subscriptionFetcherProvider = Provider<SubscriptionFetcher>((ref) {
   );
 });
 
-// Not wired here: `DriftImportFailureStore` and `DriftTrafficHistoryStore`.
-// Both exist in commy_data and both work, but the screens that would read
-// them do not need a database round trip yet — the import sheet already holds
-// this run's skipped lines in memory, and the statistics tab charts the live
-// stream. Wiring them would put the database on the path of every widget test
-// that renders the home screen, for data nothing displays. They go in when a
-// screen asks for history rather than for the present.
+/// Daily traffic totals: two numbers a day, nothing per connection.
+final trafficHistoryRepositoryProvider =
+    Provider<TrafficHistoryRepository>((ref) {
+  return DriftTrafficHistoryStore(database: ref.watch(databaseProvider));
+});
+
+// Not wired here: `DriftImportFailureStore`. It exists in commy_data and
+// works, but the import sheet already holds this run's skipped lines in
+// memory and no screen asks for older ones. It goes in when one does.

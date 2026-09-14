@@ -35,7 +35,9 @@ class CommyTestHarness {
     String? clipboard,
     AppSettings settings = AppSettings.defaults,
     List<ProxyGroup>? coreGroups,
+    List<TrafficDay> trafficDays = const <TrafficDay>[],
   })  : _coreGroups = coreGroups,
+        trafficHistory = FakeTrafficHistoryRepository(trafficDays),
         nodeRepository = FakeNodeRepository(nodes),
         subscriptionRepository = FakeSubscriptionRepository(subscriptions),
         settingsRepository = FakeSettingsRepository(settings: settings),
@@ -61,11 +63,13 @@ class CommyTestHarness {
   final FakeClipboard clipboard;
 
   /// The subscription server. Answers from a field, never opens a socket.
-  final FakeSubscriptionFetcher subscriptionFetcher =
-      FakeSubscriptionFetcher();
+  final FakeSubscriptionFetcher subscriptionFetcher = FakeSubscriptionFetcher();
 
   /// The geoip and geosite files. Exception E-2, without a socket.
   final FakeRuleSetRepository ruleSetRepository = FakeRuleSetRepository();
+
+  /// Daily traffic totals.
+  final FakeTrafficHistoryRepository trafficHistory;
 
   final List<ProxyGroup>? _coreGroups;
 
@@ -94,6 +98,7 @@ class CommyTestHarness {
     await settingsRepository.dispose();
     await routingRepository.dispose();
     await ruleSetRepository.dispose();
+    await trafficHistory.dispose();
   }
 
   /// The overrides a test scope needs.
@@ -116,6 +121,7 @@ class CommyTestHarness {
       logRepositoryProvider.overrideWithValue(logRepository),
       subscriptionFetcherProvider.overrideWithValue(subscriptionFetcher),
       ruleSetRepositoryProvider.overrideWithValue(ruleSetRepository),
+      trafficHistoryRepositoryProvider.overrideWithValue(trafficHistory),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
       if (status != null)
         coreStatusProvider.overrideWith(

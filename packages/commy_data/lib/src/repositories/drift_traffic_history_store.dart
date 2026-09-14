@@ -1,5 +1,4 @@
 import 'package:commy_data/src/database/commy_database.dart';
-import 'package:commy_data/src/models/traffic_day.dart';
 import 'package:commy_data/src/util/day_key.dart';
 import 'package:commy_data/src/util/storage_guard.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -15,7 +14,7 @@ import 'package:drift/drift.dart';
 /// Two numbers a day and nothing else. There is no per-connection table and
 /// there will not be one — that would be a browsing history, which is the
 /// artefact this project exists not to keep.
-class DriftTrafficHistoryStore {
+class DriftTrafficHistoryStore implements TrafficHistoryRepository {
   /// Creates the store.
   DriftTrafficHistoryStore({required CommyDatabase database}) : _db = database;
 
@@ -28,6 +27,7 @@ class DriftTrafficHistoryStore {
   /// [scope] is a node id, or `TrafficDay.allScope` for the unattributed total.
   /// Call it with every tick the core emits; the first tick of a session only
   /// establishes the baseline and stores nothing.
+  @override
   Future<Result<void, CommyFailure>> recordSample(
     TrafficSample sample, {
     String scope = TrafficDay.allScope,
@@ -51,6 +51,7 @@ class DriftTrafficHistoryStore {
   }
 
   /// Forgets the baseline. Call it when the tunnel goes down.
+  @override
   void resetSession() => _previous = null;
 
   /// Adds [upBytes] and [downBytes] to the bucket of [day].
@@ -81,6 +82,7 @@ class DriftTrafficHistoryStore {
   }
 
   /// The days from [from] to [to] inclusive, oldest first.
+  @override
   Future<Result<List<TrafficDay>, CommyFailure>> readRange({
     required DateTime from,
     required DateTime to,
@@ -93,6 +95,7 @@ class DriftTrafficHistoryStore {
   }
 
   /// The days from [from] to [to] inclusive, refreshed on every change.
+  @override
   Stream<List<TrafficDay>> watchRange({
     required DateTime from,
     required DateTime to,
@@ -102,6 +105,7 @@ class DriftTrafficHistoryStore {
   }
 
   /// Drops every recorded day. Part of "erase all data".
+  @override
   Future<Result<void, CommyFailure>> clear() {
     return StorageGuard.runVoid(() async {
       await _db.delete(_db.trafficDailyRows).go();

@@ -46,6 +46,7 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // screen.
       ..watch(logPumpProvider)
       ..watch(trafficHistoryProvider)
+      ..watch(trafficHistoryPumpProvider)
       // The `checking` step. It belongs to the connection, not to whichever
       // screen happens to be on top when the tunnel comes up.
       ..watch(autoCheckProvider)
@@ -75,7 +76,6 @@ class _CommyAppState extends ConsumerState<CommyApp> {
 
     final router = ref.watch(routerProvider);
     final settings = ref.watch(settingsProvider).value ?? AppSettings.defaults;
-
 
     return TranslationProvider(
       child: Builder(

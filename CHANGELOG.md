@@ -20,6 +20,12 @@ matching the tag out of this file and uses it as the release notes.
   and survives a restart; the search is not. A search that matches nothing
   says so and offers to clear itself. Subscriptions keep their own order and
   are never interleaved (docs/05-ux-flows.md). Queue #15.
+- **Traffic by day.** The statistics tab keeps the last week as two numbers
+  a day — sent and received — under the live chart and the session totals,
+  and shows them with the tunnel down too. Nothing finer is recorded: a table
+  of connections would be a browsing history. The store had been written and
+  never wired (queue #18); it now sits behind a domain port, and a pump
+  watched from the root feeds it whether or not the tab is ever opened.
 
 ## [0.1.0-alpha.3]
 
