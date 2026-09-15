@@ -141,3 +141,23 @@ labels:
   - name: dependencies
     color: 24272C
     description: Dependency updates. Mostly opened by Dependabot
+
+  # Dependabot invents one label per ecosystem the first time it opens a pull
+  # request there, and picks the colour itself — which is how this repository
+  # ended up with an orange `java` and a cyan `go`. Declared here for the same
+  # reason `dependencies` is.
+  - name: dart
+    color: 24272C
+    description: Pull requests that update Dart code
+
+  - name: go
+    color: 24272C
+    description: Pull requests that update Go code
+
+  - name: java
+    color: 24272C
+    description: Pull requests that update Java or Kotlin code
+
+  - name: github_actions
+    color: 24272C
+    description: Pull requests that update GitHub Actions workflows
