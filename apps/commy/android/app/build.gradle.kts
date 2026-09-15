@@ -36,7 +36,15 @@ val isBundleTask = gradle.startParameter.taskNames.any {
 
 android {
     namespace = "dev.commy.app"
-    compileSdk = 36
+
+    // 37, one ahead of the targetSdk below, and that gap is the point:
+    // compileSdk decides which APIs the compiler can see, targetSdk decides
+    // which runtime behaviour the app opts into. androidx.core 1.19.0 is built
+    // against 37 and AGP refuses to link a project compiled against less, so
+    // this had to move for the library. Nothing about how the app behaves on a
+    // device changes until targetSdk moves too, which is its own decision with
+    // its own reading of the behaviour changes.
+    compileSdk = 37
 
     // Pinned, not flutter.ndkVersion. Gradle compiles nothing native here — we
     // link a prebuilt AAR — but AGP still insists the NDK it was told about is
