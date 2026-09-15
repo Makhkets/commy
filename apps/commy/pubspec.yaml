@@ -28,7 +28,7 @@ dependencies:
   # Riverpod 3 without riverpod_generator: providers are declared by hand.
   # See docs/adr/0006-codegen-and-native-layout.md.
   flutter_riverpod: ^3.4.3
-  go_router: '>=14.0.0 <18.0.0'
+  go_router: ^18.0.1
   mobile_scanner: ^7.0.0
   package_info_plus: '>=8.0.0 <11.0.0'
   share_plus: '>=11.0.0 <14.0.0'
