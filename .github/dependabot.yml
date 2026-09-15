@@ -34,6 +34,14 @@ updates:
       # unresolvable for that reason alone. Drop this entry with the Flutter bump.
       - dependency-name: very_good_analysis
         versions: ['>=11.0.0']
+      # melos 7 dropped melos.yaml for a `melos:` block inside the root pubspec
+      # and moved bootstrap onto Dart pub workspaces. melos.yaml says the 6.x
+      # pin is deliberate: taking that major is a repo-wide migration — every
+      # package pubspec, both workflows, CONTRIBUTING — and not a bump anyone
+      # can review as one. PR #12 was closed for that reason. Drop this entry
+      # when the migration is its own pull request.
+      - dependency-name: melos
+        versions: ['>=7.0.0']
 
   - package-ecosystem: gomod
     directory: /core
