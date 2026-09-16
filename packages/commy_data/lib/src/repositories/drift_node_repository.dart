@@ -133,10 +133,18 @@ class DriftNodeRepository implements NodeRepository {
         byEndpoint.putIfAbsent(NodeMapper.endpointKeyOfRow(row), () => row);
       }
 
+      // One server can appear twice in a perfectly ordinary payload — the same
+      // endpoint listed in two of the panel's groups. Both entries arrive under
+      // one id, because a node's identity leaves the display name out
+      // (`NodeIdFactory`), so they are folded before anything is written: two
+      // companions sharing a primary key fail the insert, and the user is told
+      // their subscription did not update when nothing was wrong with it.
+      final unique = _foldDuplicates(nodes);
+
       final reusedIds = <String>{};
       final incoming = <ProxyNode>[];
-      for (var index = 0; index < nodes.length; index++) {
-        final node = nodes[index];
+      for (var index = 0; index < unique.length; index++) {
+        final node = unique[index];
         final previous = byEndpoint[NodeMapper.endpointKeyOf(node)];
         final carried = previous == null || reusedIds.contains(previous.id)
             ? node
@@ -150,14 +158,20 @@ class DriftNodeRepository implements NodeRepository {
         if (previous != null) {
           reusedIds.add(previous.id);
         }
+        // Positions are handed out after the fold, so a repeat leaves no gap
+        // in the order the user scrolls through.
         incoming.add(
           carried.copyWith(subscriptionId: subscriptionId, sortIndex: index),
         );
       }
 
+      final writtenIds = incoming.map((node) => node.id).toSet();
       final droppedIds = existing
           .map((row) => row.id)
-          .where((id) => !reusedIds.contains(id))
+          // `writtenIds` on top of `reusedIds`: the keystore is cleaned after
+          // the commit, so an id that is about to be stored must never be on
+          // that list, whatever the endpoint match concluded (R2).
+          .where((id) => !reusedIds.contains(id) && !writtenIds.contains(id))
           .toList();
 
       // Secure storage is not transactional, so it is updated around the
@@ -175,7 +189,11 @@ class DriftNodeRepository implements NodeRepository {
             _db.nodeRows,
             (table) => table.subscriptionId.equals(subscriptionId),
           )
-          ..insertAll(
+          // Last write wins, exactly as in `upsertAll`. The delete above has
+          // already taken every row of this subscription, so the only conflict
+          // left is one payload naming a row twice — and the fold above has
+          // settled which of the two the user should end up with.
+          ..insertAllOnConflictUpdate(
             _db.nodeRows,
             incoming.map(NodeMapper.toCompanion).toList(),
           );
@@ -257,6 +275,24 @@ class DriftNodeRepository implements NodeRepository {
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
+
+  /// Folds entries that name the same server into the single row they become.
+  ///
+  /// The last of them wins the fields and the first keeps its place in the
+  /// list — the rule `upsertAll` gets for free from `insertAllOnConflictUpdate`
+  /// and the one `ImportLinksUseCase` applies to a paste, so a server listed
+  /// twice lands where it would have landed had the two entries arrived one
+  /// after another.
+  ///
+  /// Only survivors reach `_writeSecrets`, so the credentials in the keystore
+  /// belong to the row that was actually stored (R2).
+  static List<ProxyNode> _foldDuplicates(List<ProxyNode> nodes) {
+    final byId = <String, ProxyNode>{};
+    for (final node in nodes) {
+      byId[node.id] = node;
+    }
+    return byId.values.toList();
+  }
 
   SimpleSelectStatement<$NodeRowsTable, NodeRow> _orderedNodes() {
     return _db.select(_db.nodeRows)

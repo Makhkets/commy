@@ -16,6 +16,11 @@ import 'package:commy_domain/src/ports/subscription_repository.dart';
 /// The fetch goes around the tunnel. Sending it through would make the first
 /// refresh after a reinstall impossible — there is nothing to route through
 /// yet (docs/05-ux-flows.md, scenario 3).
+///
+/// The outcome it returns describes the store, not the parser: its nodes are
+/// the rows the subscription left behind, so a panel that lists one server in
+/// two of its groups is reported as the one server it is. `ImportLinksUseCase`
+/// says the same of a paste.
 class AddSubscriptionUseCase {
   /// Creates the use case.
   const AddSubscriptionUseCase({
@@ -89,9 +94,10 @@ class AddSubscriptionUseCase {
       final owned = <ProxyNode>[
         for (final node in outcome.nodes) node.copyWith(subscriptionId: id),
       ];
+      final storedNodes = _collapseDuplicates(owned);
       final replaced = await nodes.replaceForSubscription(
         subscriptionId: id,
-        nodes: owned,
+        nodes: storedNodes,
       );
       final replaceFailure = replaced.failureOrNull;
       if (replaceFailure != null) {
@@ -101,7 +107,7 @@ class AddSubscriptionUseCase {
       return Ok<SubscriptionSyncResult, CommyFailure>(
         SubscriptionSyncResult(
           subscription: subscription,
-          outcome: outcome.copyWith(nodes: owned),
+          outcome: outcome.copyWith(nodes: storedNodes),
         ),
       );
     } on Object catch (error, stackTrace) {
@@ -109,6 +115,24 @@ class AddSubscriptionUseCase {
         UnknownFailure(error, stackTrace),
       );
     }
+  }
+
+  /// Folds entries that name the same server into the single row they become.
+  ///
+  /// A node's identity leaves the display name out on purpose, so one endpoint
+  /// listed in two of the panel's groups is one row in the store. Handing the
+  /// caller the parser's list would promise two servers where one was kept, and
+  /// an import is reported once with no history to correct it afterwards.
+  ///
+  /// The later entry wins the fields, the earlier one its place in the list —
+  /// the rule `ImportLinksUseCase` applies to a paste and the store applies to
+  /// a write.
+  static List<ProxyNode> _collapseDuplicates(List<ProxyNode> nodes) {
+    final byId = <String, ProxyNode>{};
+    for (final node in nodes) {
+      byId[node.id] = node;
+    }
+    return List<ProxyNode>.unmodifiable(byId.values);
   }
 
   String _pickName(String? given, SubscriptionPayload payload, Uri url) {

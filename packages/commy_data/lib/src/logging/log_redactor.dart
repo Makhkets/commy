@@ -92,6 +92,9 @@ class LogRedactor {
     });
     result = result.replaceAllMapped(urlPattern, _redactUrlMatch);
     result = result.replaceAllMapped(credentialPattern, (match) {
+      if (_isAlreadyRedacted(match)) {
+        return match.group(0)!;
+      }
       return '${match.group(1)}=${Redact.placeholder}';
     });
     result = result.replaceAllMapped(idFieldPattern, _redactIdMatch);
@@ -135,9 +138,14 @@ class LogRedactor {
 
     // The fragment survives: on a proxy link it is the display name of the
     // node, and "failed to parse vless://…#🇩🇪 Frankfurt" is a readable error
-    // while "failed to parse vless://…" is not. Same call `Redact.link` makes.
+    // while "failed to parse vless://…" is not. It survives through
+    // `Redact.link` and not as raw text, so the logs screen and the import
+    // sheet answer "what is this node called" with the same string.
     final hash = rest.indexOf('#');
-    final fragment = hash < 0 ? '' : rest.substring(hash);
+    final name = hash < 0 ? '' : _redactNodeName(rest.substring(hash + 1));
+    // A name that redacted away to nothing leaves no lone `#` behind: it is
+    // noise at the end of a line and it names no node.
+    final fragment = name.isEmpty ? '' : '#$name';
     final beforeFragment = hash < 0 ? rest : rest.substring(0, hash);
 
     // A bare origin (`tls://1.1.1.1`, `https://panel.example.com/`) carries no
@@ -145,6 +153,71 @@ class LogRedactor {
     final hasPayload = beforeFragment.isNotEmpty && beforeFragment != '/';
     final tail = hasPayload ? '/${Redact.placeholder}' : beforeFragment;
     return '$scheme://$safeAuthority$tail$fragment';
+  }
+
+  /// The shortest link that parses, used to reach `Redact.link` with nothing
+  /// but a fragment on it.
+  ///
+  /// The scheme and host are ours, so they contribute no `#` of their own and
+  /// the first `#` in the answer is always the separator — whatever the name
+  /// turns out to contain.
+  static const String _nameProbe = 'x://h';
+
+  /// Runs a log line's fragment through the same redactor an import error uses.
+  ///
+  /// `Redact.link` is where the decision about a node name lives: it decodes
+  /// `%20` so `Amsterdam%2003` reads as a name, drops the control characters
+  /// that would forge a second log record, and blanks credential-shaped text
+  /// for the link pasted with its parameters on the wrong side of the `#`. A
+  /// name is attacker-controlled, so none of that may be re-derived here with
+  /// a second set of rules that drift apart from the first.
+  ///
+  /// It takes a whole link rather than a fragment, hence [_nameProbe].
+  static String _redactNodeName(String fragment) {
+    final redacted = Redact.link('$_nameProbe#$fragment');
+    final hash = redacted.indexOf('#');
+    if (hash < 0) {
+      // `Redact.link` refused the link and answered with its placeholder. That
+      // cannot happen for a fragment hung on [_nameProbe], but the fallback is
+      // the text as the core wrote it: escaped, and still scrubbed by the
+      // credential and uuid passes that run after this one.
+      return fragment;
+    }
+    return redacted.substring(hash + 1);
+  }
+
+  /// The placeholder, but only where a value ends right after it.
+  ///
+  /// The terminator lookahead is the whole point: without it
+  /// `password=[redacted]hunter2` would read as already redacted and walk out
+  /// of the log intact.
+  static final RegExp _redactedValuePattern = RegExp(
+    '${RegExp.escape(Redact.placeholder)}'
+    r'''(?=$|[\s,;&}\)\]"'])''',
+  );
+
+  /// True when the value [match] found is one this redactor already blanked.
+  ///
+  /// `[redacted]` ends in `]`, which is one of the characters that terminate a
+  /// value, so [credentialPattern] matches only `[redacted` of it and a second
+  /// pass would write `password=[redacted]]`, a third `]]]`. Redaction has to
+  /// be idempotent: an export redacts a buffer the live view has redacted
+  /// already, and a line that grows a bracket per pass is a line the user
+  /// stops believing.
+  static bool _isAlreadyRedacted(Match match) {
+    // A quoted value is delimited by its own quotes, so it is the placeholder
+    // or it is not. Leaving it alone also keeps a JSON line parseable, which
+    // rewriting it to `password=[redacted]` does not.
+    final quoted = match.group(2) ?? match.group(3);
+    if (quoted != null) {
+      return quoted == Redact.placeholder;
+    }
+    // A bare value stops at `]`, so what was captured is only the head of the
+    // placeholder; the tail has to be read back off the line itself.
+    final value = match.group(4) ?? '';
+    final start = match.end - value.length;
+    return start >= 0 &&
+        _redactedValuePattern.matchAsPrefix(match.input, start) != null;
   }
 
   static String _redactIdMatch(Match match) {

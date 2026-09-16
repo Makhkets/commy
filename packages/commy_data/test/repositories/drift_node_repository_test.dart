@@ -236,6 +236,97 @@ void main() {
       expect(all.first.id, equals('node-trojan'));
     });
 
+    test('a server the panel listed twice is stored once', () async {
+      // An ordinary panel layout: one endpoint in two of its groups. A node's
+      // identity leaves the display name out on purpose, so both entries
+      // arrive under one id — and the refresh must survive that instead of
+      // failing the whole subscription on a UNIQUE constraint.
+      const subscriptionId = 'sub-1';
+
+      final result = await repository.replaceForSubscription(
+        subscriptionId: subscriptionId,
+        nodes: <ProxyNode>[
+          Fixtures.vlessNode(subscriptionId: subscriptionId),
+          Fixtures.vlessNode(subscriptionId: subscriptionId, sortIndex: 1)
+              .copyWith(name: 'Frankfurt (Games)'),
+        ],
+      );
+
+      final all = (await repository.getAll()).valueOrNull!;
+
+      expect(result.isOk, isTrue);
+      expect(all, hasLength(1));
+      // The last entry wins the fields, which is where storing the two of them
+      // one after another would have landed.
+      expect(all.single.name, equals('Frankfurt (Games)'));
+      // R2: the row that survived kept its credentials.
+      expect(all.single.param('uuid'), equals(Fixtures.uuid));
+    });
+
+    test('a repeated server leaves no hole in the display order', () async {
+      const subscriptionId = 'sub-1';
+
+      await repository.replaceForSubscription(
+        subscriptionId: subscriptionId,
+        nodes: <ProxyNode>[
+          Fixtures.vlessNode(subscriptionId: subscriptionId),
+          Fixtures.trojanNode(subscriptionId: subscriptionId, sortIndex: 1),
+          Fixtures.vlessNode(subscriptionId: subscriptionId, sortIndex: 2)
+              .copyWith(name: 'Frankfurt (Games)'),
+        ],
+      );
+
+      final all = (await repository.getAll()).valueOrNull!;
+
+      // The survivor keeps the first entry's place, so a repeat further down
+      // the list neither moves Amsterdam nor leaves a gap behind it.
+      expect(
+        all.map((node) => node.id).toList(),
+        equals(<String>['node-vless', 'node-trojan']),
+      );
+      expect(all.map((node) => node.sortIndex).toList(), equals(<int>[0, 1]));
+    });
+
+    test('a repeated server still carries the local id and its latency',
+        () async {
+      const subscriptionId = 'sub-1';
+      await repository.upsertAll(<ProxyNode>[
+        Fixtures.vlessNode(id: 'local-id', subscriptionId: subscriptionId),
+      ]);
+      await repository.updateLatency(
+        id: 'local-id',
+        latency: const Duration(milliseconds: 90),
+        checkedAt: DateTime.utc(2026, 8, 4),
+      );
+
+      await repository.replaceForSubscription(
+        subscriptionId: subscriptionId,
+        nodes: <ProxyNode>[
+          Fixtures.vlessNode(id: 'panel-id', subscriptionId: subscriptionId),
+          Fixtures.vlessNode(
+            id: 'panel-id',
+            subscriptionId: subscriptionId,
+            sortIndex: 1,
+          ).copyWith(name: 'Frankfurt (Games)'),
+        ],
+      );
+
+      final all = (await repository.getAll()).valueOrNull!;
+
+      expect(all, hasLength(1));
+      expect(all.single.id, equals('local-id'));
+      expect(all.single.latency, equals(const Duration(milliseconds: 90)));
+      expect(all.single.param('uuid'), equals(Fixtures.uuid));
+      // R2 from the other side: the keystore holds the row that survived and
+      // nothing under the id the panel made up.
+      expect(
+        stack.store.snapshot.keys
+            .where((key) => key.startsWith(SecretKeys.nodePrefix))
+            .toList(),
+        equals(<String>[SecretKeys.nodeParams('local-id')]),
+      );
+    });
+
     test('leaves nodes of another subscription alone', () async {
       await repository.upsertAll(<ProxyNode>[
         Fixtures.socksNode(),
