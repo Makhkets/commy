@@ -12,6 +12,24 @@ matching the tag out of this file and uses it as the release notes.
 
 ### Added
 
+- **Navigation on tablets and desktops.** Every screen already built an
+  `AdaptiveScaffold` and every one of them handed it an empty list of
+  sections, so above 600 dp the app was a stretched phone with the rail and
+  the sidebar that `commy_ui` ships never drawn. There are now four sections —
+  Home, Routing, Diagnostics, Settings — declared once (`AppSection`) and used
+  by all nine screens; a screen inside a section lights its parent, so the DNS
+  screen shows Routing. From roughly 810 dp, where two panes actually fit, the
+  home screen splits the way docs/05-ux-flows.md asks: servers on the left,
+  the connection — disc, status, chosen server — in the pane beside them.
+  Below 600 dp nothing changed: one root screen, sections from the header.
+  Queue #19.
+- **Widget tests for the screens that had none.** Nine of the ten screens were
+  rendered by no test at all. Settings, routing, appearance, about, the import
+  and subscription sheets, the import result panel, the diagnostics frame and
+  the shared widgets (`FailureView`, `AsyncSection`, `SettingsTile`,
+  `ToastMessenger`) are now covered, and the switches are asserted through
+  what *reads* them rather than through the field they write. The app went
+  from 135 tests to 353; the monorepo from 925 to 1187. Queue #16.
 - **Search and order on the home list.** Above the servers, once there is
   more than one: a search field that narrows every card and the manual group
   by name, address or whole country code, and a chip that orders the servers
@@ -26,6 +44,66 @@ matching the tag out of this file and uses it as the release notes.
   of connections would be a browsing history. The store had been written and
   never wired (queue #18); it now sits behind a domain port, and a pump
   watched from the root feeds it whether or not the tab is ever opened.
+
+### Fixed
+
+Everything in this list was found by the tests above, and each is the same
+defect the project has been chasing since docs/15-handoff.md §0: a screen
+stating something the rest of the app does not do.
+
+- **A subscription listing one server twice could not refresh at all.**
+  `replaceForSubscription` deleted the subscription's rows and re-inserted
+  with a plain insert, so two entries carrying one node id — an ordinary panel
+  layout, the same endpoint in two groups — hit a UNIQUE constraint and the
+  whole refresh failed with a storage error. Duplicates now fold into the row
+  they become, by the same last-wins rule the import path uses.
+- **The routing screen promised the tunnel in Direct mode.** The final row was
+  hardcoded to `PROXY` while `RouteSectionBuilder.finalOutbound` answers
+  `direct` for that mode — the screen said everything unmatched goes through
+  the tunnel while the generated document sent it outside. The row now reads
+  the builder.
+- **Rules edited outside Rules mode did nothing, silently.** The builder walks
+  the rule list only in Rules mode; the screen offered the same list, the same
+  Add button and the same reordering in all three. The rules are still kept
+  and still editable — a mode change must not throw a user's work away — and
+  the screen now says they are not in force, with one tap to make them so.
+- **Imports reported the parser's count, not the library's.** Two links naming
+  the same server are one stored row, and the panel said two. It now reports
+  what the store gained, on the paste path and the subscription path both.
+- **A dismissed import sheet left its result behind.** Dropping the sheet by
+  the scrim, the drag handle or the back gesture never cleared the import
+  state, so the next sheet opened on the previous import's result panel — and
+  while a modal showed a result, the sheet underneath had already replaced its
+  four choices with a second copy of it. Sheets now clear on route end, and an
+  import that finishes after its sheet is gone drops the report instead of
+  parking it for whatever opens next.
+- **Every failure offered the wrong button.** The import panel derived its
+  action from `retryable` alone and always added a link to the logs, throwing
+  away the action each failure declares — so a storage failure was offered
+  "Close" instead of "Retry" and an invalid config was sent to the logs rather
+  than to the config. All nine action strings in both languages were dead.
+- **First-run imports had nowhere to report.** The file tile and the clipboard
+  offer on the empty home screen called the importer directly and rendered no
+  result, so a failed import said nothing at all and its result sat waiting
+  for the next sheet to open on it.
+- **"Imported 1 servers".** Four counted strings interpolated a number next to
+  a noun with no plural form; Russian was also wrong for 2–4. They are CLDR
+  plurals now, in both languages.
+- **Node names came out escaped.** The redactor keeps a link's fragment on
+  purpose — it holds the display name that makes an import error readable —
+  and then printed it percent-encoded: `#Amsterdam%2003`, in the clipboard
+  card, the skipped-lines list, the log screen and the log export.
+- **The selected-server chip never scrolled.** It asked for the scrollable
+  from a context above the list, got null, and did nothing on every phone.
+
+### Security
+
+- **The kept fragment is scrubbed before it is shown.** A display name is
+  whatever the user or the panel put after the `#`: control characters that
+  would forge a second log line are dropped, and credential-shaped text that
+  landed on the wrong side of the separator is redacted (R3). Log redaction
+  became idempotent with it — a second pass over an exported line used to add
+  a bracket to every placeholder.
 
 ## [0.1.0-alpha.3]
 
