@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy_data/commy_data.dart';
 import 'package:commy_ui/commy_ui.dart';
@@ -30,6 +31,9 @@ class AboutScreen extends ConsumerWidget {
     final encryption = ref.watch(databaseEncryptionProvider);
 
     return AdaptiveScaffold(
+      destinations: AppSection.destinationsFor(t),
+      selectedIndex: AppSection.settings.index,
+      onDestinationSelected: (index) => AppSection.select(context, index),
       appBar: CommyAppBar.section(
         title: t.about.title,
         backSemanticLabel: t.a11y.back,

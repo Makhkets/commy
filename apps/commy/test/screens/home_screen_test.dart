@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
+import 'package:commy/src/screens/import/import_result_panel.dart';
+import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/commy_test_app.dart';
@@ -158,6 +164,212 @@ void main() {
     });
   });
 
+  /// What an import started from the first-run view does with its result.
+  ///
+  /// The four sheets report through [ImportResultPanel] because each owns a
+  /// route. The file tile and the clipboard offer own nothing: they used to
+  /// call the shared import controller and render none of it, so a parse that
+  /// failed left the screen silent — and the next sheet opened on that stale
+  /// failure instead of on its own controls.
+  group('imports started from the first-run view', () {
+    final t = Translations();
+
+    const link = 'vless://11111111-2222-3333-4444-555555555555'
+        '@nl-03.example.net:443?security=reality&type=tcp'
+        '&pbk=aGVsbG8td29ybGQtcHVibGljLWtleQ&sid=ab12cd34#Amsterdam%2003';
+    const junk = 'a shopping list, copied by accident';
+
+    late CommyTestHarness firstRun;
+
+    /// The home screen with nothing in it, and [clipboard] in the buffer.
+    Future<void> pumpFirstRun(WidgetTester tester, {String? clipboard}) async {
+      firstRun = CommyTestHarness(clipboard: clipboard);
+      addTearDown(firstRun.dispose);
+      await tester.pumpWidget(
+        firstRun.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+    }
+
+    /// Runs an import out, along with the modal that reports it.
+    ///
+    /// Two clocks are in play. A file import is started in the real one (see
+    /// [tapFileTile]) and so is the route future the sheet clears itself on,
+    /// while the modal animates on the fake clock a widget test pumps. So
+    /// each round hands the event loop back once and pumps twice, and there
+    /// are two rounds: one to get the result reported, one to let the route
+    /// that carries it finish opening or closing.
+    ///
+    /// Not `pumpAndSettle`: the clipboard path ends with the fake core
+    /// running, and its stats ticker never lets the tree go quiet.
+    Future<void> settleModal(WidgetTester tester) async {
+      for (var round = 0; round < 2; round++) {
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+      }
+    }
+
+    /// What the shared import controller is holding right now.
+    ImportState importState(WidgetTester tester) {
+      return ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+        listen: false,
+      ).read(importControllerProvider);
+    }
+
+    /// Points `FilePicker.pickFile` at [path] for the rest of the test.
+    ///
+    /// The static delegates to `FilePickerPlatform.instance`, and the method
+    /// channel behind the default instance has nothing on the other end here.
+    /// `null` stands for a picker the user dismissed.
+    void usePicker(String? path) {
+      final previous = FilePickerPlatform.instance;
+      FilePickerPlatform.instance = _FakePicker(
+        path == null ? null : _PickedFile(Uri.file(path)),
+      );
+      addTearDown(() => FilePickerPlatform.instance = previous);
+    }
+
+    /// A config file on disk, holding [contents] and removed with the test.
+    String configFile(String contents) {
+      final directory = Directory.systemTemp.createTempSync('commy_first_run');
+      addTearDown(() => directory.deleteSync(recursive: true));
+      final file = File('${directory.path}/servers.txt')
+        ..writeAsStringSync(contents);
+      return file.path;
+    }
+
+    /// Opens the file tile and lets the import behind it report.
+    ///
+    /// The tap is made outside the fake clock on purpose: the import opens
+    /// the picked file with `dart:io`, and a read started under that clock
+    /// never comes back however many frames are pumped at it.
+    Future<void> tapFileTile(WidgetTester tester) async {
+      await tester.runAsync(() async {
+        await tester.tap(find.text(t.home.empty.file));
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await settleModal(tester);
+    }
+
+    /// Dismisses the modal by the scrim: the way out that goes through none
+    /// of the result panel's own buttons.
+    Future<void> tapScrim(WidgetTester tester) async {
+      await tester.tapAt(
+        Offset(
+          tester.getCenter(find.byType(CommySheetSurface)).dx,
+          tester.getTopLeft(find.byType(CommySheetSurface)).dy / 2,
+        ),
+      );
+      await settleModal(tester);
+    }
+
+    testWidgets('a file that does not parse names the cause, not silence',
+        (tester) async {
+      usePicker(configFile(junk));
+      await pumpFirstRun(tester);
+
+      await tapFileTile(tester);
+
+      // Cause, action and the route to the logs — CLAUDE.md §6. This screen
+      // used to show none of the three: the failure sat on the shared
+      // controller with nothing rendering it.
+      expect(find.byType(ImportResultPanel), findsOneWidget);
+      expect(find.text(t.error.title), findsOneWidget);
+      expect(find.text(t.error.subscriptionMalformed.message), findsOneWidget);
+      expect(find.text(t.error.openLogs), findsOneWidget);
+    });
+
+    testWidgets('a reported failure does not follow the user into the next '
+        'sheet', (tester) async {
+      usePicker(configFile(junk));
+      await pumpFirstRun(tester);
+      await tapFileTile(tester);
+      expect(find.text(t.error.title), findsOneWidget);
+
+      await tapScrim(tester);
+      await tester.tap(find.text(t.home.empty.subscription));
+      await settleModal(tester);
+
+      // The subscription sheet with its own field, not the last import's
+      // error sitting on it with no way back to the controls.
+      expect(find.text(t.error.title), findsNothing);
+      expect(find.text(t.import.subscription.url), findsOneWidget);
+    });
+
+    testWidgets('a file that imports says how much landed and hands over the '
+        'list', (tester) async {
+      usePicker(configFile(link));
+      await pumpFirstRun(tester);
+
+      await tapFileTile(tester);
+      expect(find.text(t.import.result.imported(count: 1)), findsOneWidget);
+
+      await tester.tap(find.text(t.common.done));
+      await settleModal(tester);
+
+      // Closing the report leaves the user on a home screen with the server
+      // on it, and nothing on the controller the next sheet would open on.
+      expect(find.byType(ImportResultPanel), findsNothing);
+      expect(find.byType(NodeTile), findsOneWidget);
+      expect(importState(tester), ImportState.idle);
+    });
+
+    testWidgets('a dismissed picker reports nothing', (tester) async {
+      usePicker(null);
+      await pumpFirstRun(tester);
+
+      await tapFileTile(tester);
+
+      // Nothing was asked for, so there is nothing to say: no modal, and the
+      // four ways in are still where they were.
+      expect(find.byType(ImportResultPanel), findsNothing);
+      expect(find.text(t.home.empty.file), findsOneWidget);
+      expect(importState(tester), ImportState.idle);
+    });
+
+    testWidgets('a clipboard import that fails reports the cause',
+        (tester) async {
+      await pumpFirstRun(tester, clipboard: link);
+      firstRun.nodeRepository.failure = const StorageFailure('disk is full');
+
+      await tester.tap(find.text(t.home.empty.pasteAndConnect));
+      await settleModal(tester);
+
+      expect(firstRun.nodeRepository.nodes, isEmpty);
+      expect(find.byType(ImportResultPanel), findsOneWidget);
+      expect(find.text(t.error.storage.message), findsOneWidget);
+      expect(find.text(t.error.storage.action), findsOneWidget);
+      expect(find.text(t.error.openLogs), findsOneWidget);
+    });
+
+    testWidgets('a clipboard import that works lands on the server list',
+        (tester) async {
+      await pumpFirstRun(tester, clipboard: link);
+
+      await tester.tap(find.text(t.home.empty.pasteAndConnect));
+      await settleModal(tester);
+
+      // The success reports itself: the server list, with the tunnel coming
+      // up on it. No modal in the way of the sixty-second path, and nothing
+      // left on the controller for the next sheet to open on.
+      expect(find.byType(NodeTile), findsOneWidget);
+      expect(find.byType(ImportResultPanel), findsNothing);
+      expect(firstRun.core.startCalls, 1);
+      expect(importState(tester), ImportState.idle);
+
+      // The fake core is running by now; its stats ticker has to be stopped
+      // inside the body, because a timer that outlives the tree fails a
+      // widget test.
+      firstRun.core.reset();
+      await tester.pump();
+    });
+  });
+
   group('the Auto row', () {
     late CommyTestHarness twoServers;
 
@@ -231,6 +443,61 @@ void main() {
         (await twoServers.settingsRepository.read()).valueOrNull!.autoSelect,
         isTrue,
       );
+    });
+  });
+
+  /// The chip under the disc, which is how the hero hands over to the list.
+  ///
+  /// It scrolls the servers up under the app bar rather than opening a
+  /// picker: the rows are already on this screen and a modal over them would
+  /// be the same list twice. It did nothing at all until the list was given a
+  /// controller of its own — the callback closes over the context *above* the
+  /// `ListView`, and `Scrollable.maybeOf` walks up from there, past the list,
+  /// to nothing.
+  group('the selected-server chip', () {
+    late CommyTestHarness several;
+
+    setUp(() {
+      several = CommyTestHarness(
+        nodes: <ProxyNode>[
+          testNode(),
+          testNode(id: 'node-2', name: 'Warsaw 01', countryCode: 'PL'),
+          testNode(id: 'node-3', name: 'Berlin 02', countryCode: 'DE'),
+        ],
+      );
+    });
+
+    tearDown(() => several.dispose());
+
+    /// Where the list has been scrolled to, or zero when it cannot scroll.
+    double listOffset(WidgetTester tester) {
+      final list = tester.widget<ListView>(find.byType(ListView));
+      return list.controller?.offset ?? 0;
+    }
+
+    testWidgets('scrolls the servers into view', (tester) async {
+      // A phone-sized window, so the rows really are below the fold: this is
+      // the only size where the chip has anything to do.
+      tester.view.physicalSize = const Size(400, 600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        several.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+      expect(listOffset(tester), 0);
+
+      await tester.tap(find.byType(SelectedNode));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(
+        listOffset(tester),
+        greaterThan(0),
+        reason: 'The chip promises the list; a tap that moves nothing lies.',
+      );
+      expect(find.byType(NodeTile), findsWidgets);
     });
   });
 
@@ -377,4 +644,65 @@ void main() {
         .join('\n');
     expect(shown.contains(uuid), isFalse, reason: 'rule R3');
   });
+}
+
+/// A file picker that answers with a fixed file instead of the platform's.
+///
+/// `FilePicker.pickFile` is a static that delegates to
+/// `FilePickerPlatform.instance`, which is the only seam: the method channel
+/// behind the default instance has nothing on the other end in a widget test.
+final class _FakePicker extends FilePickerPlatform {
+  _FakePicker(this.file);
+
+  /// What the picker comes back with. `null` is a picker the user dismissed.
+  final PlatformFile? file;
+
+  @override
+  Future<PlatformFile?> pickFile({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    // Spelled out where the interface leaves it implicit: `strict-inference`
+    // will not take a function type with an inferred return.
+    dynamic Function(FilePickerStatus)? onFileLoading,
+    int compressionQuality = 0,
+    AndroidOptions androidOptions = const AndroidOptions(),
+    DarwinOptions darwinOptions = const DarwinOptions(),
+    WindowsOptions windowsOptions = const WindowsOptions(),
+    LinuxOptions linuxOptions = const LinuxOptions(),
+    WebOptions webOptions = const WebOptions(),
+  }) async {
+    return file;
+  }
+}
+
+/// The one thing the import reads off a picked file: where it is on disk.
+///
+/// `ImportController.importFile` takes the path and opens the file itself, so
+/// the members below would need `XFile` — a type `file_picker` does not
+/// re-export — and nothing in this flow reaches them.
+final class _PickedFile extends PlatformFile {
+  _PickedFile(this.uri);
+
+  @override
+  final Uri uri;
+
+  @override
+  String get name => uri.pathSegments.last;
+
+  @override
+  Never get xFile => throw UnimplementedError();
+
+  @override
+  Never lengthSync() => throw UnimplementedError();
+
+  @override
+  Never length() => throw UnimplementedError();
+
+  @override
+  Never readAsBytes() => throw UnimplementedError();
+
+  @override
+  Never readAsByteStream() => throw UnimplementedError();
 }

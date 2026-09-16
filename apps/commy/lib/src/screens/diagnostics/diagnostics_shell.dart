@@ -1,5 +1,6 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/router/app_sections.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +34,9 @@ class DiagnosticsShell extends StatelessWidget {
     final spacing = context.spacing;
 
     return AdaptiveScaffold(
+      destinations: AppSection.destinationsFor(t),
+      selectedIndex: AppSection.diagnostics.index,
+      onDestinationSelected: (index) => AppSection.select(context, index),
       appBar: CommyAppBar.section(
         title: t.diagnostics.title,
         backSemanticLabel: t.a11y.back,

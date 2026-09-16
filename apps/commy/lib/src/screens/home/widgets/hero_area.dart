@@ -20,8 +20,12 @@ class HeroArea extends ConsumerWidget {
   /// Creates the area.
   const HeroArea({required this.onChooseNode, super.key});
 
-  /// Opens the server picker.
-  final VoidCallback onChooseNode;
+  /// Opens the server picker, or `null` when there is no picker to open.
+  ///
+  /// `null` is the two-pane case: the list is the pane on the other side of
+  /// the seam, permanently on screen, so `SelectedNode` drops its chevron
+  /// rather than promise a list that is already there.
+  final VoidCallback? onChooseNode;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

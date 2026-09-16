@@ -5,7 +5,6 @@ import 'package:commy/src/screens/import/paste_sheet.dart';
 import 'package:commy/src/screens/import/qr_scan_sheet.dart';
 import 'package:commy/src/screens/import/subscription_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
-import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,12 +18,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// Layout follows docs/design-refs/01-first-run.png: explanation, then the
 /// clipboard offer if there is one, then the three remaining ways in.
+///
+/// Three of the five ways in open a sheet, which is what reports the import
+/// afterwards. The other two — the file tile and the clipboard offer — have no
+/// sheet of their own, so they only *start* the import and hand it back to the
+/// screen: this view is torn down the moment an import lands a server, and a
+/// result reported from here would be reported by a widget that is already
+/// gone. The home screen owns both callbacks for that reason.
 class FirstRunView extends ConsumerWidget {
   /// Creates the view.
-  const FirstRunView({required this.onImport, super.key});
+  const FirstRunView({
+    required this.onImportFile,
+    required this.onPasteAndConnect,
+    super.key,
+  });
 
-  /// Opens the full import sheet.
-  final VoidCallback onImport;
+  /// Picks a config file and imports it.
+  final VoidCallback onImportFile;
+
+  /// Imports the clipboard text handed back, then connects to what it held.
+  final ValueChanged<String> onPasteAndConnect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,7 +60,11 @@ class FirstRunView extends ConsumerWidget {
               ),
             ),
             if (clipboard != null && clipboard.hasContent) ...<Widget>[
-              _ClipboardOffer(preview: clipboard, isBusy: state.isBusy),
+              _ClipboardOffer(
+                preview: clipboard,
+                isBusy: state.isBusy,
+                onPaste: () => onPasteAndConnect(clipboard.text),
+              ),
               SizedBox(height: spacing.s3),
             ],
             Row(
@@ -72,11 +89,7 @@ class FirstRunView extends ConsumerWidget {
                   child: _ImportChoice(
                     icon: CommyIcons.document,
                     label: t.home.empty.file,
-                    onTap: () => unawaited(
-                      ref
-                          .read(importControllerProvider.notifier)
-                          .importFile(),
-                    ),
+                    onTap: onImportFile,
                   ),
                 ),
               ],
@@ -96,14 +109,25 @@ class FirstRunView extends ConsumerWidget {
 }
 
 /// The highlighted "there is already a link in your clipboard" card.
-class _ClipboardOffer extends ConsumerWidget {
-  const _ClipboardOffer({required this.preview, required this.isBusy});
+class _ClipboardOffer extends StatelessWidget {
+  const _ClipboardOffer({
+    required this.preview,
+    required this.isBusy,
+    required this.onPaste,
+  });
 
   final ClipboardPreview preview;
   final bool isBusy;
 
+  /// Import, then hand the first server straight to the connect flow.
+  ///
+  /// This is the sixty-second path from docs/00-vision.md compressed into one
+  /// tap: nothing else on this screen gets the user to a running tunnel with
+  /// fewer decisions.
+  final VoidCallback onPaste;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final t = Translations.of(context);
     final colors = context.colors;
     final spacing = context.spacing;
@@ -149,27 +173,11 @@ class _ClipboardOffer extends ConsumerWidget {
           CommyButton(
             label: t.home.empty.pasteAndConnect,
             isLoading: isBusy,
-            onPressed: () => unawaited(_importAndConnect(ref)),
+            onPressed: onPaste,
           ),
         ],
       ),
     );
-  }
-
-  /// Import, then hand the first server straight to the connect flow.
-  ///
-  /// This is the sixty-second path from docs/00-vision.md compressed into one
-  /// tap: nothing else on this screen gets the user to a running tunnel with
-  /// fewer decisions.
-  Future<void> _importAndConnect(WidgetRef ref) async {
-    final nodeId =
-        await ref.read(importControllerProvider.notifier).importText(
-              preview.text,
-            );
-    if (nodeId == null) {
-      return;
-    }
-    await ref.read(tunnelControllerProvider.notifier).connect(nodeId: nodeId);
   }
 }
 

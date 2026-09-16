@@ -4,6 +4,7 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/rule_set_controller.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -58,6 +59,9 @@ class RuleSetsScreen extends ConsumerWidget {
     ]..sort();
 
     return AdaptiveScaffold(
+      destinations: AppSection.destinationsFor(t),
+      selectedIndex: AppSection.routing.index,
+      onDestinationSelected: (index) => AppSection.select(context, index),
       appBar: CommyAppBar.section(
         title: t.ruleSets.title,
         backSemanticLabel: t.a11y.back,
