@@ -32,6 +32,7 @@
   },
 
   "home": {
+    "title": "Главная",
     "empty": {
       "title": "Ни одного сервера",
       "body": "Commy пустой до первого импорта. Своих серверов мы не держим и не продаём.",
@@ -76,7 +77,12 @@
     "clipboard": {
       "found": "В буфере: $count",
       "one": "1 ссылка $protocol",
-      "many": "$count ссылок",
+      "many(plural, param=count)": {
+        "one": "$count ссылка",
+        "few": "$count ссылки",
+        "many": "$count ссылок",
+        "other": "$count ссылок"
+      },
       "paste": "Вставить"
     },
     "paste": {
@@ -110,7 +116,12 @@
       "unreadable": "Файл не удалось прочитать"
     },
     "result": {
-      "imported": "Импортировано узлов: $count",
+      "imported(plural, param=count)": {
+        "one": "Импортирован $count узел",
+        "few": "Импортировано $count узла",
+        "many": "Импортировано $count узлов",
+        "other": "Импортировано $count узлов"
+      },
       "skipped": "Пропущено: $count",
       "showSkipped": "Показать причины",
       "skippedTitle": "Пропущенные строки",
@@ -129,13 +140,23 @@
     "daysLeft": "осталось $count",
     "days": "$count дн.",
     "expired": "срок истёк",
-    "nodes": "узлов: $count",
+    "nodes(plural, param=count)": {
+      "one": "$count узел",
+      "few": "$count узла",
+      "many": "$count узлов",
+      "other": "$count узлов"
+    },
     "refresh": "Обновить",
     "pingAll": "Замерить все",
     "more": "Ещё",
     "support": "Поддержка",
     "website": "Сайт",
-    "refreshed": "Обновлено: узлов $count",
+    "refreshed(plural, param=count)": {
+      "one": "Обновлён $count узел",
+      "few": "Обновлено $count узла",
+      "many": "Обновлено $count узлов",
+      "other": "Обновлено $count узлов"
+    },
     "menu": {
       "collapse": "Свернуть",
       "expand": "Развернуть",
@@ -305,6 +326,10 @@
     },
     "rules": "Правила",
     "rulesHint": "Правила · порядок = приоритет",
+    "inactive": {
+      "body": "Сейчас эти правила не применяются: их читает только режим «Правила».",
+      "action": "Включить режим «Правила»"
+    },
     "addRule": "Добавить",
     "finalRule": "Остальное",
     "finalRuleHint": "Правило «Остальное» всегда последнее и неудаляемое: у маршрутизации обязан быть финальный исход.",

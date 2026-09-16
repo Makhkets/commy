@@ -4,6 +4,7 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
@@ -31,6 +32,9 @@ class RoutingScreen extends ConsumerWidget {
     final policy = ref.watch(routingPolicyProvider);
 
     return AdaptiveScaffold(
+      destinations: AppSection.destinationsFor(t),
+      selectedIndex: AppSection.routing.index,
+      onDestinationSelected: (index) => AppSection.select(context, index),
       appBar: CommyAppBar.section(
         title: t.routing.title,
         backSemanticLabel: t.a11y.back,
@@ -70,6 +74,16 @@ class _Body extends ConsumerWidget {
 
     final warnings = ref.watch(configWarningsProvider);
 
+    // Where a packet that matched nothing actually goes. This row has to
+    // agree with `RouteSectionBuilder.finalOutbound`, which answers `direct`
+    // in Direct mode and the proxy group in the other two; reading the
+    // builder keeps the screen from becoming a second copy of that map that
+    // can drift away from the document the core is handed.
+    final finalAction =
+        RouteSectionBuilder.finalOutbound(policy.mode) == SingBoxTags.direct
+            ? RuleAction.direct
+            : RuleAction.proxy;
+
     return ListView(
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
@@ -95,6 +109,22 @@ class _Body extends ConsumerWidget {
             onChanged: (mode) => unawaited(controller.setRoutingMode(mode)),
           ),
         ),
+        // `RouteSectionBuilder` walks `activeRules` only in Rules mode, so in
+        // the other two everything below this line is stored but not in
+        // force. The rules are kept — a mode change must not throw a user's
+        // work away — and this says so instead, with the one tap that makes
+        // them real again.
+        if (policy.mode != RoutingMode.rules)
+          Padding(
+            padding: EdgeInsets.fromLTRB(spacing.s4, 0, spacing.s4, spacing.s3),
+            child: ErrorBanner(
+              message: t.routing.inactive.body,
+              tone: CommyTone.info,
+              actionLabel: t.routing.inactive.action,
+              onAction: () =>
+                  unawaited(controller.setRoutingMode(RoutingMode.rules)),
+            ),
+          ),
         Padding(
           padding: EdgeInsetsDirectional.only(
             start: spacing.s4,
@@ -139,8 +169,8 @@ class _Body extends ConsumerWidget {
         // drag above the last one is a rule that can be made unreachable.
         RuleRow(
           matcher: t.routing.finalRule,
-          actionLabel: t.routing.action.proxy,
-          action: RuleAction.proxy,
+          actionLabel: _actionLabel(t, finalAction),
+          action: finalAction,
           isFinal: true,
         ),
         Padding(
@@ -320,7 +350,7 @@ class _RuleList extends ConsumerWidget {
           background: ColoredBox(color: context.colors.statusErrorWash),
           child: RuleRow(
             matcher: rule.matcher,
-            actionLabel: _label(t, rule.action),
+            actionLabel: _actionLabel(t, rule.action),
             action: rule.action,
             dragIndex: index,
             dragHandleLabel: t.a11y.dragRule,
@@ -330,13 +360,15 @@ class _RuleList extends ConsumerWidget {
       },
     );
   }
-
-  String _label(Translations t, RuleAction action) => switch (action) {
-        RuleAction.proxy => t.routing.action.proxy,
-        RuleAction.direct => t.routing.action.direct,
-        RuleAction.block => t.routing.action.block,
-      };
 }
+
+/// The word a badge wears for [action]. Shared so the final outcome and the
+/// user's own rules can never disagree about what `direct` is called.
+String _actionLabel(Translations t, RuleAction action) => switch (action) {
+      RuleAction.proxy => t.routing.action.proxy,
+      RuleAction.direct => t.routing.action.direct,
+      RuleAction.block => t.routing.action.block,
+    };
 
 class _RuleDraft {
   const _RuleDraft(this.matcher, this.action);

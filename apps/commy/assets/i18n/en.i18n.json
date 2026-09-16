@@ -32,6 +32,7 @@
   },
 
   "home": {
+    "title": "Home",
     "empty": {
       "title": "No servers yet",
       "body": "Commy stays empty until you import something. We run no servers of our own and sell none.",
@@ -76,7 +77,10 @@
     "clipboard": {
       "found": "In the clipboard: $count",
       "one": "1 $protocol link",
-      "many": "$count links",
+      "many(plural, param=count)": {
+        "one": "$count link",
+        "other": "$count links"
+      },
       "paste": "Paste"
     },
     "paste": {
@@ -110,7 +114,10 @@
       "unreadable": "The file could not be read"
     },
     "result": {
-      "imported": "Imported $count servers",
+      "imported(plural, param=count)": {
+        "one": "Imported $count server",
+        "other": "Imported $count servers"
+      },
       "skipped": "$count skipped",
       "showSkipped": "Show reasons",
       "skippedTitle": "Skipped lines",
@@ -129,13 +136,19 @@
     "daysLeft": "$count left",
     "days": "$count d",
     "expired": "expired",
-    "nodes": "$count servers",
+    "nodes(plural, param=count)": {
+      "one": "$count server",
+      "other": "$count servers"
+    },
     "refresh": "Refresh",
     "pingAll": "Measure all",
     "more": "More",
     "support": "Support",
     "website": "Website",
-    "refreshed": "Refreshed: $count servers",
+    "refreshed(plural, param=count)": {
+      "one": "Refreshed $count server",
+      "other": "Refreshed $count servers"
+    },
     "menu": {
       "collapse": "Collapse",
       "expand": "Expand",
@@ -305,6 +318,10 @@
     },
     "rules": "Rules",
     "rulesHint": "Rules · order = priority",
+    "inactive": {
+      "body": "These rules are not in force right now: only Rules mode reads them.",
+      "action": "Switch to Rules"
+    },
     "addRule": "Add",
     "finalRule": "Everything else",
     "finalRuleHint": "The last rule is always there and cannot be removed: routing must have a final outcome.",
