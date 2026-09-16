@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
+import 'package:commy/src/screens/import/import_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -24,10 +25,14 @@ class PasteSheet extends ConsumerStatefulWidget {
   final String? initialText;
 
   /// Opens the sheet, optionally pre-filled with [initialText].
+  ///
+  /// Through [ImportSheet.present], so that a sheet dismissed by the scrim or
+  /// the back gesture — which is how a deep link's sheet usually ends — leaves
+  /// no result behind for the next one to open on.
   static Future<void> show(BuildContext context, {String? initialText}) {
     final title = Translations.of(context).import.paste.title;
-    return CommySheet.show<void>(
-      context: context,
+    return ImportSheet.present(
+      context,
       title: title,
       builder: (context) => PasteSheet(initialText: initialText),
     );

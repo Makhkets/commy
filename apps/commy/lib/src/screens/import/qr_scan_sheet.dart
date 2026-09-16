@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
+import 'package:commy/src/screens/import/import_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -22,10 +23,14 @@ class QrScanSheet extends ConsumerStatefulWidget {
   const QrScanSheet({super.key});
 
   /// Opens the scanner.
+  ///
+  /// Through [ImportSheet.present]: a scan is the sheet most likely to be
+  /// dismissed by the gesture rather than by a button, and the result it
+  /// leaves behind would otherwise be what the next sheet opens on.
   static Future<void> show(BuildContext context) {
     final title = Translations.of(context).import.qr.title;
-    return CommySheet.show<void>(
-      context: context,
+    return ImportSheet.present(
+      context,
       title: title,
       builder: (context) => const QrScanSheet(),
     );

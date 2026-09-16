@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
+import 'package:commy/src/screens/import/import_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
@@ -22,10 +23,14 @@ class SubscriptionSheet extends ConsumerStatefulWidget {
   static const List<int> intervals = <int>[1, 6, 12, 24];
 
   /// Opens the sheet.
+  ///
+  /// Through [ImportSheet.present]: this sheet is opened from the import sheet
+  /// and from the first-run view, and neither has anything that would clear a
+  /// result left on the controller by a sheet the user dragged away.
   static Future<void> show(BuildContext context) {
     final title = Translations.of(context).import.subscription.title;
-    return CommySheet.show<void>(
-      context: context,
+    return ImportSheet.present(
+      context,
       title: title,
       builder: (context) => const SubscriptionSheet(),
     );

@@ -142,8 +142,31 @@ class ImportController extends Notifier<ImportState> {
     'conf',
   ];
 
+  /// The import still allowed to write its result here.
+  ///
+  /// A subscription download takes seconds, and the sheet that started it can
+  /// be dismissed in the middle of one — by the scrim, the drag handle or the
+  /// back gesture, none of which stop the request. The route's end clears the
+  /// controller (`ImportSheet.present` calls [reset]), and a result landing
+  /// after that clear used to write itself straight back in: a report with
+  /// nothing left on screen to draw it, sitting here until the next sheet
+  /// opened on it.
+  ///
+  /// So every import takes a ticket when it starts and [reset] burns whatever
+  /// is outstanding. A result on a burnt ticket is dropped, not queued: the
+  /// servers it stored are on the home screen either way, and the only thing
+  /// lost is a report the user walked away from. Nothing burns a ticket while
+  /// the sheet that owns it is still open, which is the other half of the
+  /// rule — an import running in a sheet the user is looking at always lands.
+  int _ticket = 0;
+
   @override
-  ImportState build() => ImportState.idle;
+  ImportState build() {
+    // A rebuild is the same event as a [reset] for anything in flight: the
+    // state it was going to land on is not there any more.
+    _ticket++;
+    return ImportState.idle;
+  }
 
   /// Parses [input] and stores whatever it holds.
   ///
@@ -153,9 +176,7 @@ class ImportController extends Notifier<ImportState> {
     if (input.trim().isEmpty) {
       return null;
     }
-    state = const ImportState(isBusy: true);
-    final result = await ref.read(importLinksUseCaseProvider)(input);
-    return _finish(result);
+    return _importText(_begin(), input);
   }
 
   /// Downloads [url] and stores it as a subscription.
@@ -170,19 +191,25 @@ class ImportController extends Notifier<ImportState> {
     bool autoUpdate = true,
     int? intervalHours,
   }) async {
-    state = const ImportState(isBusy: true);
+    final ticket = _begin();
     final result = await ref.read(addSubscriptionUseCaseProvider)(
       url: url,
       name: name,
       autoUpdate: autoUpdate,
     );
+    if (!ref.mounted) {
+      // The container went away while the download was in the air. There is
+      // no logger to read, no repository to write to and no state to set, and
+      // reaching for any of them from here throws into a future nobody awaits.
+      return null;
+    }
     final failure = result.failureOrNull;
     if (failure != null) {
       ref.read(appLoggerProvider).warn(
             'subscription import failed: ${failure.code}',
             tag: logTag,
           );
-      state = ImportState(failure: failure);
+      _publish(ticket, ImportState(failure: failure));
       return null;
     }
     final synced = result.valueOrNull;
@@ -190,12 +217,16 @@ class ImportController extends Notifier<ImportState> {
     if (subscription != null &&
         intervalHours != null &&
         subscription.updateIntervalHours == null) {
+      // Written whether or not the sheet is still there to hear about it: the
+      // subscription itself landed, and a row left on the default interval
+      // would refresh on a schedule the user did not choose. Only the report
+      // below belongs to the sheet.
       await ref.read(subscriptionRepositoryProvider).upsert(
             subscription.copyWith(updateIntervalHours: intervalHours),
           );
     }
     final outcome = synced?.outcome ?? ParseOutcome.empty;
-    state = ImportState(outcome: outcome);
+    _publish(ticket, ImportState(outcome: outcome));
     return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;
   }
 
@@ -205,7 +236,7 @@ class ImportController extends Notifier<ImportState> {
   /// throwing: a config exported by some panel in cp1251 should produce a
   /// parse failure the user can read, not a crash.
   Future<String?> importFile() async {
-    state = const ImportState(isBusy: true);
+    final ticket = _begin();
     try {
       // One file: `pickFile`, not `pickFiles` — since file_picker 12 the
       // latter selects several by default and returns a list.
@@ -215,32 +246,79 @@ class ImportController extends Notifier<ImportState> {
       );
       final path = picked?.path;
       if (path == null) {
-        state = ImportState.idle;
+        _publish(ticket, ImportState.idle);
         return null;
       }
       final bytes = await File(path).readAsBytes();
-      return importText(const Utf8Decoder(allowMalformed: true).convert(bytes));
+      // The ticket the pick started on, not a fresh one: the sheet this has to
+      // report to is the one that opened the picker, and going through
+      // [importText] would hand the import a ticket no dismissal had burnt.
+      return _importText(
+        ticket,
+        const Utf8Decoder(allowMalformed: true).convert(bytes),
+      );
     } on Object catch (error, stackTrace) {
-      state = ImportState(failure: UnknownFailure(error, stackTrace));
+      _publish(ticket, ImportState(failure: UnknownFailure(error, stackTrace)));
       return null;
     }
   }
 
   /// Drops the last result so the sheet opens clean next time.
-  void reset() => state = ImportState.idle;
+  ///
+  /// And burns the ticket of anything still running with it: every caller is
+  /// a route that has ended or a sheet about to open, and in both cases an
+  /// import in flight has lost the screen it was going to report to.
+  void reset() {
+    _ticket++;
+    state = ImportState.idle;
+  }
 
-  Future<String?> _finish(Result<ParseOutcome, CommyFailure> result) async {
+  /// Marks an import as started and returns the ticket that lets it report.
+  int _begin() {
+    state = const ImportState(isBusy: true);
+    return ++_ticket;
+  }
+
+  /// Writes [next] unless the import holding [ticket] has lost its audience.
+  ///
+  /// Two ways to lose one, and both are checked here because this is the only
+  /// place a *result* is written: [reset] burnt the ticket, so the sheet that
+  /// was going to draw it is gone; or the container went with it, where the
+  /// write throws rather than landing.
+  void _publish(int ticket, ImportState next) {
+    if (ticket != _ticket || !ref.mounted) {
+      return;
+    }
+    state = next;
+  }
+
+  Future<String?> _importText(int ticket, String input) async {
+    final result = await ref.read(importLinksUseCaseProvider)(input);
+    if (!ref.mounted) {
+      // Nothing left to read the logger out of, let alone to report to.
+      return null;
+    }
+    return _finish(ticket, result);
+  }
+
+  String? _finish(int ticket, Result<ParseOutcome, CommyFailure> result) {
     final failure = result.failureOrNull;
     if (failure != null) {
+      // Logged even when the report is dropped: the import did fail, and the
+      // log is the one record of it the diagnostics screen can still show.
       ref.read(appLoggerProvider).warn(
             'import failed: ${failure.code}',
             tag: logTag,
           );
-      state = ImportState(failure: failure);
+      _publish(ticket, ImportState(failure: failure));
       return null;
     }
+    // What the use case returns is what the repository holds, not what the
+    // parser counted: two links naming the same server are one row, and the
+    // panel reads `outcome.nodes.length` straight off this state. An import
+    // is reported once and there is no history to correct an over-count in.
     final outcome = result.valueOrNull ?? ParseOutcome.empty;
-    state = ImportState(outcome: outcome);
+    _publish(ticket, ImportState(outcome: outcome));
     return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;
   }
 }

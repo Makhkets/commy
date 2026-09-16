@@ -18,27 +18,74 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// clipboard card is at the top because it is the path that gets a new user to
 /// a working tunnel fastest, and the sixty-second target in
 /// docs/00-vision.md is what this screen is designed against.
-class ImportSheet extends ConsumerWidget {
+///
+/// This is also where the four sheets' shared housekeeping lives: they all
+/// write to one `importControllerProvider`, so [present] is what keeps the
+/// result on it from outliving the route that produced it.
+class ImportSheet extends ConsumerStatefulWidget {
   /// Creates the sheet body.
   const ImportSheet({super.key});
 
   /// Opens the sheet.
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(BuildContext context) => present(
+        context,
+        builder: (context) => const ImportSheet(),
+      );
+
+  /// Presents one of the import sheets and drops its result when it closes.
+  ///
+  /// The result belongs to the route that produced it. [ImportResultPanel]'s
+  /// buttons clear it, but the scrim, the drag handle and the back gesture do
+  /// not go through them — and until the controller is cleared, the next sheet
+  /// opens on the last import's outcome with no way back to its own controls.
+  /// Only the `+` on the home screen used to recover from that; a deep link
+  /// and the first-run view open the same sheets and do not.
+  ///
+  /// The route's future is the only thing that knows about all four ways out,
+  /// which is why the reset hangs off it rather than off a button.
+  ///
+  /// It covers an import that is still running, too, and not because it gets
+  /// there first — a download dismissed halfway through lands seconds after
+  /// this. `ImportController.reset` burns the ticket of whatever is in flight,
+  /// so the result of an import whose sheet is gone is dropped where it is
+  /// produced rather than written back in behind this call.
+  static Future<void> present(
+    BuildContext context, {
+    required WidgetBuilder builder,
+    String? title,
+  }) {
+    final container = ProviderScope.containerOf(context, listen: false);
     return CommySheet.show<void>(
       context: context,
-      builder: (context) => const ImportSheet(),
+      title: title,
+      builder: builder,
+    ).whenComplete(
+      () => container.read(importControllerProvider.notifier).reset(),
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ImportSheet> createState() => _ImportSheetState();
+}
+
+class _ImportSheetState extends ConsumerState<ImportSheet> {
+  /// Whether one of the three nested sheets is on top of this one.
+  ///
+  /// The sheet on top owns the import it started, result panel included.
+  /// Without this the chooser under the scrim would swap its four tiles for a
+  /// second copy of that panel, and a modal dragged away instead of closed
+  /// would drop the user onto it with no route back to the choices.
+  bool _childIsOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
     final t = Translations.of(context);
     final colors = context.colors;
     final spacing = context.spacing;
     final clipboard = ref.watch(clipboardPreviewProvider);
     final import = ref.watch(importControllerProvider);
 
-    if (import.outcome != null || import.failure != null) {
+    if (!_childIsOpen && (import.outcome != null || import.failure != null)) {
       return const ImportResultPanel();
     }
 
@@ -82,19 +129,20 @@ class ImportSheet extends ConsumerWidget {
               icon: CommyIcons.link,
               title: t.import.subscription.title,
               subtitle: t.import.subscription.subtitle,
-              onTap: () => unawaited(SubscriptionSheet.show(context)),
+              onTap: () =>
+                  unawaited(_openChild(SubscriptionSheet.show(context))),
             ),
             SettingsTile(
               icon: CommyIcons.copy,
               title: t.import.paste.title,
               subtitle: t.import.paste.hint,
-              onTap: () => unawaited(PasteSheet.show(context)),
+              onTap: () => unawaited(_openChild(PasteSheet.show(context))),
             ),
             SettingsTile(
               icon: CommyIcons.search,
               title: t.import.qr.title,
               subtitle: t.import.qr.permissionBody,
-              onTap: () => unawaited(QrScanSheet.show(context)),
+              onTap: () => unawaited(_openChild(QrScanSheet.show(context))),
             ),
             SettingsTile(
               icon: CommyIcons.document,
@@ -109,6 +157,21 @@ class ImportSheet extends ConsumerWidget {
         SizedBox(height: spacing.s4),
       ],
     );
+  }
+
+  /// Keeps the chooser out of the way until [sheet] is gone.
+  ///
+  /// [sheet] has already cleared the controller by the time it completes
+  /// ([ImportSheet.present]), so what comes back here is the four tiles.
+  Future<void> _openChild(Future<void> sheet) async {
+    setState(() => _childIsOpen = true);
+    try {
+      await sheet;
+    } finally {
+      if (mounted) {
+        setState(() => _childIsOpen = false);
+      }
+    }
   }
 }
 

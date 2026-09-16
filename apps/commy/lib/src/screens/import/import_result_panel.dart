@@ -118,29 +118,60 @@ class _FailurePanel extends ConsumerWidget {
         children: <Widget>[
           ErrorBanner(message: text.message, title: t.error.title),
           SizedBox(height: spacing.s4),
+          // The failure names its own action. Labelling the button off
+          // `retryable` instead offered "close" for a storage error the
+          // failure itself asks the user to retry, and sent the "show the
+          // config" of an invalid configuration to the log tab.
           CommyButton(
-            label: text.retryable ? t.common.retry : t.common.close,
-            onPressed: () {
-              ref.read(importControllerProvider.notifier).reset();
-              if (!text.retryable) {
-                Navigator.of(context).pop();
-              }
-            },
+            label: text.actionLabel,
+            icon: text.action == FailureAction.retry
+                ? CommyIcons.refresh
+                : CommyIcons.diagnostics,
+            onPressed: () => _act(context, ref, text),
           ),
-          SizedBox(height: spacing.s2),
-          CommyButton(
-            label: t.error.openLogs,
-            variant: CommyButtonVariant.ghost,
-            icon: CommyIcons.document,
-            onPressed: () {
-              ref.read(importControllerProvider.notifier).reset();
-              Navigator.of(context).pop();
-              context.go(FailureAction.openLogs.route!);
-            },
-          ),
+          // Only where the action does not already land in diagnostics: two
+          // buttons to the same screen are noise, not a second way out.
+          if (text.needsLogRoute) ...<Widget>[
+            SizedBox(height: spacing.s2),
+            CommyButton(
+              label: t.error.openLogs,
+              variant: CommyButtonVariant.ghost,
+              icon: CommyIcons.document,
+              onPressed: () => _leaveFor(
+                context,
+                ref,
+                FailureAction.openLogs.route!,
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Does what [FailureText.action] declared.
+  ///
+  /// A retry stays in the sheet: popping would throw away the URL that was
+  /// typed, which is the one thing a retry needs (docs/05-ux-flows.md,
+  /// scenario 1). Clearing the failure hands the sheet its input back.
+  void _act(BuildContext context, WidgetRef ref, FailureText text) {
+    final route = text.action.route;
+    if (route == null) {
+      ref.read(importControllerProvider.notifier).reset();
+      return;
+    }
+    _leaveFor(context, ref, route);
+  }
+
+  /// Clears the result and gets the sheet out of the way before navigating.
+  ///
+  /// The order matters: a sheet left open would sit on top of the very screen
+  /// the user was just sent to, and a result left in the controller is the one
+  /// the next open of the sheet would show instead of the import options.
+  void _leaveFor(BuildContext context, WidgetRef ref, String route) {
+    ref.read(importControllerProvider.notifier).reset();
+    Navigator.of(context).pop();
+    context.go(route);
   }
 }
 
