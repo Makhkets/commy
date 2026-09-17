@@ -1,5 +1,6 @@
 import 'package:commy_domain/src/core/failure.dart';
 import 'package:commy_domain/src/core/result.dart';
+import 'package:commy_domain/src/entities/node_duplicates.dart';
 import 'package:commy_domain/src/entities/parse_outcome.dart';
 import 'package:commy_domain/src/entities/proxy_node.dart';
 import 'package:commy_domain/src/ports/link_parser.dart';
@@ -48,7 +49,7 @@ class ImportLinksUseCase {
       final assigned = <ProxyNode>[
         for (final node in outcome.nodes) node.copyWith(groupId: groupId),
       ];
-      final stored = _collapseDuplicates(assigned);
+      final stored = NodeDuplicates.folded(assigned);
       final saved = await nodes.upsertAll(stored);
       final saveFailure = saved.failureOrNull;
       if (saveFailure != null) {
@@ -62,24 +63,5 @@ class ImportLinksUseCase {
         UnknownFailure(error, stackTrace),
       );
     }
-  }
-
-  /// Folds entries that name the same server into the single row they become.
-  ///
-  /// A node's identity leaves the display name out on purpose, so two links
-  /// that differ only by name are one server and the store holds one row for
-  /// them. Handing the caller the parser's list would therefore promise two
-  /// servers where one was stored, and an import is reported once with no
-  /// history to correct it afterwards.
-  ///
-  /// The later entry wins the fields, the earlier one its place in the list,
-  /// which is what a store that upserts does anyway: importing "A then B" in
-  /// one go leaves what importing A and then B separately would.
-  static List<ProxyNode> _collapseDuplicates(List<ProxyNode> nodes) {
-    final byId = <String, ProxyNode>{};
-    for (final node in nodes) {
-      byId[node.id] = node;
-    }
-    return List<ProxyNode>.unmodifiable(byId.values);
   }
 }

@@ -19,6 +19,7 @@ export 'src/entities/dns_settings.dart';
 export 'src/entities/import_failure.dart';
 export 'src/entities/ip_check_result.dart';
 export 'src/entities/log_line.dart';
+export 'src/entities/node_duplicates.dart';
 export 'src/entities/node_group.dart';
 export 'src/entities/node_sort.dart';
 export 'src/entities/parse_outcome.dart';

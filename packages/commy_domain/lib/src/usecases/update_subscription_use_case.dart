@@ -1,5 +1,6 @@
 import 'package:commy_domain/src/core/failure.dart';
 import 'package:commy_domain/src/core/result.dart';
+import 'package:commy_domain/src/entities/node_duplicates.dart';
 import 'package:commy_domain/src/entities/parse_outcome.dart';
 import 'package:commy_domain/src/entities/proxy_node.dart';
 import 'package:commy_domain/src/entities/subscription_sync_result.dart';
@@ -96,7 +97,7 @@ class UpdateSubscriptionUseCase {
         for (final node in outcome.nodes)
           node.copyWith(subscriptionId: subscriptionId),
       ];
-      final storedNodes = _collapseDuplicates(owned);
+      final storedNodes = NodeDuplicates.folded(owned);
       final replaced = await nodes.replaceForSubscription(
         subscriptionId: subscriptionId,
         nodes: storedNodes,
@@ -117,23 +118,5 @@ class UpdateSubscriptionUseCase {
         UnknownFailure(error, stackTrace),
       );
     }
-  }
-
-  /// Folds entries that name the same server into the single row they become.
-  ///
-  /// A node's identity leaves the display name out on purpose, so one endpoint
-  /// listed in two of the panel's groups is one row in the store. Reporting the
-  /// parser's list instead would tell the user their subscription gained
-  /// servers it never held, and a refresh is reported once.
-  ///
-  /// The later entry wins the fields, the earlier one its place in the list —
-  /// the rule `ImportLinksUseCase` applies to a paste and the store applies to
-  /// a write.
-  static List<ProxyNode> _collapseDuplicates(List<ProxyNode> nodes) {
-    final byId = <String, ProxyNode>{};
-    for (final node in nodes) {
-      byId[node.id] = node;
-    }
-    return List<ProxyNode>.unmodifiable(byId.values);
   }
 }

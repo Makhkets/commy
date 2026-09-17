@@ -133,13 +133,12 @@ class DriftNodeRepository implements NodeRepository {
         byEndpoint.putIfAbsent(NodeMapper.endpointKeyOfRow(row), () => row);
       }
 
-      // One server can appear twice in a perfectly ordinary payload — the same
-      // endpoint listed in two of the panel's groups. Both entries arrive under
-      // one id, because a node's identity leaves the display name out
-      // (`NodeIdFactory`), so they are folded before anything is written: two
-      // companions sharing a primary key fail the insert, and the user is told
-      // their subscription did not update when nothing was wrong with it.
-      final unique = _foldDuplicates(nodes);
+      // Folded before anything is written: two companions sharing a primary
+      // key fail the insert, and the user is told their subscription did not
+      // update when nothing was wrong with it. Only survivors reach
+      // `_writeSecrets`, so the keystore holds the credentials of the row that
+      // was actually stored (R2).
+      final unique = NodeDuplicates.folded(nodes);
 
       final reusedIds = <String>{};
       final incoming = <ProxyNode>[];
@@ -275,24 +274,6 @@ class DriftNodeRepository implements NodeRepository {
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
-
-  /// Folds entries that name the same server into the single row they become.
-  ///
-  /// The last of them wins the fields and the first keeps its place in the
-  /// list — the rule `upsertAll` gets for free from `insertAllOnConflictUpdate`
-  /// and the one `ImportLinksUseCase` applies to a paste, so a server listed
-  /// twice lands where it would have landed had the two entries arrived one
-  /// after another.
-  ///
-  /// Only survivors reach `_writeSecrets`, so the credentials in the keystore
-  /// belong to the row that was actually stored (R2).
-  static List<ProxyNode> _foldDuplicates(List<ProxyNode> nodes) {
-    final byId = <String, ProxyNode>{};
-    for (final node in nodes) {
-      byId[node.id] = node;
-    }
-    return byId.values.toList();
-  }
 
   SimpleSelectStatement<$NodeRowsTable, NodeRow> _orderedNodes() {
     return _db.select(_db.nodeRows)
