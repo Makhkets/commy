@@ -45,6 +45,29 @@ matching the tag out of this file and uses it as the release notes.
   never wired (queue #18); it now sits behind a domain port, and a pump
   watched from the root feeds it whether or not the tab is ever opened.
 
+### Changed
+
+- **One home for the rule that folds a server listed twice.** It had four,
+  and the four agreed — but a rule living in four houses is a rule that can
+  drift apart without anyone noticing, and these four were already explaining
+  themselves differently: three were reasoning about reporting an honest
+  count, the fourth about not failing an insert on a primary key.
+  `NodeDuplicates.folded` states it once, in `commy_domain` beside the entity
+  it is about — the last entry wins the fields, the first keeps its place in
+  the list. The paste import, the subscription add, the subscription refresh
+  and the node store all call it, and each keeps the one line saying why the
+  fold belongs at that particular boundary. The store's copy returned a
+  growable list where the other three returned an unmodifiable one; nothing
+  ever mutated it, and the shared rule is unmodifiable for all four.
+- **The cog on the home screen stops duplicating the navigation.**
+  docs/05-ux-flows.md gives the header the sections below 600 dp and the
+  navigation everything from 600 up, but the cog was drawn at every width — so
+  from the first breakpoint it stood beside a Settings entry in the rail, two
+  doors into the same room in the same frame. It now appears only where there
+  is no rail to carry it. The `+` is unchanged and stays at every width: the
+  navigation has no twin for it, and outside the first-run view it is the only
+  way into import.
+
 ### Fixed
 
 Everything in this list was found by the tests above, and each is the same
