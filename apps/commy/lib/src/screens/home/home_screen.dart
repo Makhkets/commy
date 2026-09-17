@@ -81,12 +81,19 @@ class HomeScreen extends ConsumerWidget {
       appBar: CommyAppBar(
         title: t.app.wordmark,
         leading: <Widget>[
-          CommyIconButton(
-            icon: CommyIcons.settings,
-            semanticLabel: t.a11y.settings,
-            tooltip: t.settings.title,
-            onPressed: () => context.go(AppRoutes.settings),
-          ),
+          // Only where there is no rail to carry it. docs/05-ux-flows.md gives
+          // the header the sections below 600 dp and the navigation everything
+          // from 600 up, so a cog drawn at both would be two doors into one
+          // room in the same frame. The `+` in `actions` has no such twin —
+          // outside the first-run view it is the only way into import — and
+          // stays at every width.
+          if (context.layoutSize.isCompact)
+            CommyIconButton(
+              icon: CommyIcons.settings,
+              semanticLabel: t.a11y.settings,
+              tooltip: t.settings.title,
+              onPressed: () => context.go(AppRoutes.settings),
+            ),
         ],
         actions: <Widget>[
           CommyIconButton(

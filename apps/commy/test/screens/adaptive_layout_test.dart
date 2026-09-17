@@ -652,14 +652,22 @@ void main() {
     });
   });
 
-  /// The home app bar's own two controls, across all three shells.
+  /// The home app bar's controls, across all three shells.
   ///
-  /// Both live in the app bar, and the app bar is handed to the shell — so a
-  /// screen that starts choosing between shells is a screen that can lose
-  /// them. The `+` matters most: outside the first-run view it is the only
-  /// way to import anything, and on the two wide layouts the app bar sits
-  /// over the list pane only, which is one more place for it to go missing.
-  group('the app bar keeps its two controls at every width', () {
+  /// The app bar is handed to the shell, so a screen that starts choosing
+  /// between shells is a screen that can lose what it put in there. The `+`
+  /// is the one that must survive that choice: outside the first-run view it
+  /// is the only way to import anything, and on the two wide layouts the app
+  /// bar sits over the list pane alone, which is one more place for it to go
+  /// missing. Nothing draws a second `+`, so it is asserted at every width.
+  ///
+  /// The cog is the opposite case, and it is the one that changed.
+  /// docs/05-ux-flows.md gives the header the sections below 600 dp and the
+  /// navigation everything from 600 up — so from the first breakpoint the
+  /// rail already carries Settings, and a cog beside it was a second door
+  /// into the same room. The screen now offers it only where there is no rail
+  /// to carry it.
+  group('the app bar across the widths', () {
     /// The bar's own buttons: everything the rail did not draw.
     Finder barButton(IconData icon) => find.byWidgetPredicate(
           (widget) =>
@@ -669,12 +677,36 @@ void main() {
         );
 
     for (final width in <int>[420, 700, 900, 1100]) {
-      testWidgets('at $width dp', (tester) async {
+      testWidgets('the + is there at $width dp', (tester) async {
         await pumpAt(tester, const HomeScreen(), width: width.toDouble());
 
         expect(barButton(CommyIcons.add), findsOneWidget);
-        expect(barButton(CommyIcons.settings), findsOneWidget);
       });
     }
+
+    /// 600 is the breakpoint itself, where a comparison written the wrong way
+    /// round would first show; 700 and 900 are the widths the file already
+    /// argues at. 1100 is a shell further on and gets its own case below.
+    for (final width in <int>[600, 700, 900]) {
+      testWidgets('at $width dp the rail carries settings, not the bar',
+          (tester) async {
+        await pumpAt(tester, const HomeScreen(), width: width.toDouble());
+
+        // The screen stops handing the cog over rather than the shell hiding
+        // it, so the only Settings on screen is the one the navigation draws.
+        expect(barButton(CommyIcons.settings), findsNothing);
+        expect(railButtonFor(AppSection.settings), findsOneWidget);
+      });
+    }
+
+    testWidgets('at 1100 dp the sidebar carries it, spelled out',
+        (tester) async {
+      await pumpAt(tester, const HomeScreen(), width: 1100);
+
+      // `DesktopShell` writes the section names rather than drawing the rail's
+      // icon buttons, so the entry is found by its word, not by its size.
+      expect(barButton(CommyIcons.settings), findsNothing);
+      expect(find.text(t.settings.title), findsOneWidget);
+    });
   });
 }
