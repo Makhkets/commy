@@ -64,12 +64,11 @@ Future<void> loadCommyFonts() async {
     'fonts/JetBrainsMono-Medium.ttf',
   ]);
 
-  // Lucide lives in another package, so it can only be reached through the
-  // asset bundle the test runner assembled.
-  const lucide = 'packages/lucide_icons_flutter/assets/lucide.ttf';
-  final icons = FontLoader('packages/lucide_icons_flutter/Lucide')
-    ..addFont(rootBundle.load(lucide));
-  await icons.load();
+  // The icon font is vendored like the two above, so it loads the same way —
+  // and the goldens photograph the very file the app ships, which was not
+  // true while it came from a package resolved separately per workspace
+  // member.
+  await _loadFamily('Lucide', const <String>['fonts/Lucide.ttf']);
 }
 
 Future<void> _loadFamily(String family, List<String> paths) async {

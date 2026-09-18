@@ -56,7 +56,7 @@ Unlicense · CC0 · SIL OFL 1.1 (для шрифтов как отдельных
 | Go | BSD-3-Clause | Ядро |
 | Wintun | GPL-2.0 (в составе sing-box) | TUN на Windows |
 | Inter, JetBrains Mono | SIL OFL 1.1 | Шрифты |
-| Lucide | ISC | Иконки |
+| Lucide | ISC (иконки) + MIT (сборка шрифта из `lucide_icons_flutter`) | Иконки. Шрифт **вендорен** в `packages/commy_ui/fonts/Lucide.ttf`, оба текста лицензий лежат рядом — `LICENSE-Lucide.txt` |
 | Пакеты pub.dev | MIT / BSD / Apache-2.0 | Проверяются поштучно |
 
 Список обновляется при каждом добавлении зависимости. Расхождение между этим

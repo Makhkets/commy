@@ -276,10 +276,7 @@ Future<void> _loadFonts() async {
     '$uiRoot/JetBrainsMono-Medium.ttf',
   ]);
 
-  const lucide = 'packages/lucide_icons_flutter/assets/lucide.ttf';
-  final icons = FontLoader('packages/lucide_icons_flutter/Lucide')
-    ..addFont(rootBundle.load(lucide));
-  await icons.load();
+  await _loadFamily('Lucide', const <String>['$uiRoot/Lucide.ttf']);
 }
 
 Future<void> _loadFamily(String family, List<String> paths) async {

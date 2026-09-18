@@ -13,10 +13,6 @@ dependencies:
     path: ../commy_domain
   flutter:
     sdk: flutter
-  # `lucide_icons_flutter` is the maintained, actively published port named in
-  # docs/01-stack.md. The similarly named `lucide_icons` also exists on pub.dev
-  # but tracks a much older upstream and is not the one we picked.
-  lucide_icons_flutter: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -47,3 +43,10 @@ flutter:
           weight: 400
         - asset: fonts/JetBrainsMono-Medium.ttf
           weight: 500
+    # The icon font, vendored from lucide_icons_flutter 3.1.19 instead of
+    # depended on: that package declares seven families and every one of them
+    # is bundled into the app, used or not. See `CommyIcons`. Licence:
+    # fonts/LICENSE-Lucide.txt.
+    - family: Lucide
+      fonts:
+        - asset: fonts/Lucide.ttf
