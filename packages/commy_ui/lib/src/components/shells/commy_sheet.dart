@@ -56,10 +56,21 @@ abstract final class CommySheet {
       backgroundColor: CommyColors.transparent,
       barrierColor: colors.bgScrim,
       elevation: 0,
-      builder: (context) => CommySheetSurface(
-        title: title,
-        showHandle: isDismissible,
-        child: Builder(builder: builder),
+      builder: (context) => Padding(
+        // The sheet rides above the keyboard. `isScrollControlled` lets a
+        // sheet be as tall as it likes and leaves the insets to us; without
+        // this the keyboard opens *over* the sheet, and the field the user
+        // is typing into — a link, a subscription address, a new name — is
+        // the part it covers. Seen on a device, never in a widget test: the
+        // test binding has no keyboard.
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: CommySheetSurface(
+          title: title,
+          showHandle: isDismissible,
+          child: Builder(builder: builder),
+        ),
       ),
     );
   }
@@ -142,12 +153,17 @@ class CommySheetSurface extends StatelessWidget {
               ),
             ),
           ],
-          Padding(
-            padding: EdgeInsets.only(
-              top: spacing.s4,
-              bottom: spacing.s5,
+          // Loose and scrollable: content that fits is laid out exactly as
+          // before, and content that does not — a tall form squeezed between
+          // the status bar and the keyboard — scrolls instead of overflowing.
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                top: spacing.s4,
+                bottom: spacing.s5,
+              ),
+              child: child,
             ),
-            child: child,
           ),
         ],
       ),

@@ -270,6 +270,59 @@ void main() {
       );
     });
 
+    testWidgets('rides above the keyboard instead of under it', (
+      tester,
+    ) async {
+      // The test binding has no keyboard, which is how this went unnoticed
+      // until a device: `viewInsets` is what a real one reports, so it is set
+      // by hand. 300 is a phone keyboard, give or take.
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await pumpCommy(
+        tester,
+        size: const Size(390, 800),
+        padding: EdgeInsets.zero,
+        child: opener(),
+      );
+      await tester.tap(find.text('Открыть'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getRect(find.byType(CommySheetSurface)).bottom,
+        moreOrLessEquals(500, epsilon: 1),
+        reason: 'The field being typed into is the part a keyboard covers.',
+      );
+    });
+
+    testWidgets('scrolls what does not fit instead of overflowing', (
+      tester,
+    ) async {
+      await pumpCommy(
+        tester,
+        size: const Size(390, 400),
+        padding: EdgeInsets.zero,
+        child: Builder(
+          builder: (context) => Center(
+            child: CommyButton(
+              label: 'Открыть',
+              onPressed: () => CommySheet.show<void>(
+                context: context,
+                builder: (context) => const SizedBox(height: 900),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Открыть'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.getRect(find.byType(CommySheetSurface)).height,
+        lessThanOrEqualTo(400),
+      );
+    });
+
     testWidgets('is a dialog above it, without the caller asking', (
       tester,
     ) async {
