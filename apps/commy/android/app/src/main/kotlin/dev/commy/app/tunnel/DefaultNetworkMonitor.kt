@@ -9,6 +9,7 @@ import android.util.Log
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
+import java.net.InterfaceAddress
 import java.net.NetworkInterface
 import java.util.concurrent.CopyOnWriteArrayList
 import io.nekohasekai.libbox.NetworkInterface as LibboxNetworkInterface
@@ -197,9 +198,7 @@ internal class DefaultNetworkMonitor(context: Context) {
                 runCatching { setMTU(source.mtu) }
                 setAddresses(
                     StringArray(
-                        source.interfaceAddresses.mapNotNull { entry ->
-                            entry.address.hostAddress?.let { "$it/${entry.networkPrefixLength}" }
-                        },
+                        source.interfaceAddresses.mapNotNull(::goPrefix),
                     ),
                 )
                 setFlags(goFlags(source))
@@ -208,6 +207,27 @@ internal class DefaultNetworkMonitor(context: Context) {
                 setDNSServer(StringArray(extra?.dnsServers.orEmpty()))
             }
         }
+    }
+
+    /**
+     * One interface address the way Go's `netip.ParsePrefix` will take it.
+     *
+     * Java prints a link-local IPv6 address with its scope — `fe80::1%wlan0` —
+     * and every interface that is up has one. Go refuses a zone inside a
+     * prefix, and libbox parses these with `MustParsePrefix`: not an error
+     * returned, a panic, in our process. Every connect on a real device died
+     * here, on an address the tunnel never uses. The scope is dropped as text
+     * rather than by rebuilding the address from its bytes, because
+     * `InetAddress.getByAddress` turns an IPv4-mapped address into an
+     * `Inet4Address`, and that next to a prefix length of 96 is the same panic
+     * by another road.
+     */
+    private fun goPrefix(entry: InterfaceAddress): String? {
+        val host = entry.address?.hostAddress?.substringBefore('%')
+        if (host.isNullOrEmpty()) {
+            return null
+        }
+        return "$host/${entry.networkPrefixLength}"
     }
 
     @Suppress("DEPRECATION")

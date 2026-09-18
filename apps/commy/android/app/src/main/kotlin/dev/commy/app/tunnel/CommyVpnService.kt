@@ -19,6 +19,7 @@ import dev.commy.app.wire.WireException
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
 import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import kotlinx.coroutines.CoroutineScope
@@ -46,10 +47,18 @@ import java.net.InetAddress
  * Libbox.setup(SetupOptions)                     once per process
  * Libbox.newCommandServer(handler, platform)
  * commandServer.start()
- * commandServer.startOrReloadService(json, null) ← the tunnel comes up here
+ * commandServer.startOrReloadService(json, OverrideOptions()) ← the tunnel
+ *     │                                        comes up here
  *     └─ calls back into PlatformInterface.openTun(), which is where the
  *        VpnService.Builder is assembled and the fd handed over
  * ```
+ *
+ * The second argument is never `null`, whatever the Java signature allows.
+ * libbox reads `options.AutoRedirect` with no nil check (command_server.go,
+ * sing-box 1.13), so `null` is a nil-pointer panic inside Go — and the core
+ * lives in this process, so the panic takes the app down with it. That was the
+ * first thing a real device ever said about this service: every connect
+ * crashed. See [noOverrides].
  */
 class CommyVpnService : VpnService(), CommandServerHandler {
 
@@ -141,7 +150,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             "reload needs a running core",
         )
         withContext(Dispatchers.IO) {
-            runCatching { server.startOrReloadService(config, null) }
+            runCatching { server.startOrReloadService(config, noOverrides()) }
                 .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
         }
     }
@@ -200,7 +209,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             bridge = events
 
             withContext(Dispatchers.IO) {
-                runCatching { server.startOrReloadService(config, null) }
+                runCatching { server.startOrReloadService(config, noOverrides()) }
                     .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
             }
 
@@ -520,6 +529,18 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             .addCategory(Intent.CATEGORY_LAUNCHER),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+
+    /**
+     * Override options that override nothing.
+     *
+     * An object, never `null` — see the class comment for what `null` costs.
+     * Empty is also the right content: libbox *appends* these package lists to
+     * the ones in the config, and the config is where ours already are
+     * (`commy_config` writes `include_package` / `exclude_package` into the TUN
+     * inbound). `autoRedirect` stays false; it needs root, and we never ask
+     * for it.
+     */
+    private fun noOverrides(): OverrideOptions = OverrideOptions()
 
     private fun requireBridge(): CoreEventBridge = bridge
         ?: throw WireException(Wire.Errors.NOT_RUNNING, "the core is not running")

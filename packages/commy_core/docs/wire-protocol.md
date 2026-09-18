@@ -73,7 +73,9 @@ Kotlin:
 2. `Libbox.setup(SetupOptions)` — один раз за процесс;
 3. поднять foreground-сервис;
 4. `CommandServer(handler, platformInterface).start()`;
-5. `commandServer.startOrReloadService(config, null)`.
+5. `commandServer.startOrReloadService(config, OverrideOptions())` — пустой
+   объект, **не `null`**: libbox читает `options.AutoRedirect` без проверки на
+   nil, и `null` роняет процесс паникой Go.
 
 Успех метода означает **«ядро запускается»**, а не «туннель работает».
 Фактическое состояние приходит потоком в `/status`.
@@ -91,7 +93,7 @@ Kotlin:
 
 ### `reload(config: String) → null`
 
-`commandServer.startOrReloadService(config, null)` без пересоздания TUN.
+`commandServer.startOrReloadService(config, OverrideOptions())` без пересоздания TUN.
 Аргумент — та же строка конфига, что у `start`.
 Для смены узла **не использовать** — есть `select`.
 

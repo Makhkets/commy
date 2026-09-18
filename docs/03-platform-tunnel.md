@@ -9,7 +9,9 @@
 >
 > Три вещи, на которых ошибается любая реконструкция по памяти:
 > 1. **Функции `NewService` не существует.** Туннель поднимается через
->    `CommandServer.startOrReloadService(configJSON, null)`.
+>    `CommandServer.startOrReloadService(configJSON, OverrideOptions())` —
+>    второй аргумент **не `null`**: libbox 1.13 разыменовывает его без проверки,
+>    и `null` — это паника Go, которая роняет весь процесс приложения.
 > 2. **Методов `packageNameByUid`, `writeLog`, `usePlatformDefaultInterfaceMonitor`
 >    в `PlatformInterface` нет.** Там ровно 15 методов, они перечислены в справочнике.
 > 3. **Смена сети и Doze не рестартят сервис**: `updateDefaultInterface(...)` +
