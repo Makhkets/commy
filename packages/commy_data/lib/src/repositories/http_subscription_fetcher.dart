@@ -33,6 +33,9 @@ typedef SubscriptionPayloadMapper = SubscriptionPayload Function(
 /// * **Identification.** The honest `Commy/<version>` unless the subscription
 ///   carries an override the user set (docs/06-data-model.md, "User-Agent имеет
 ///   значение").
+/// * **Device identity.** `x-hwid` and the platform headers, from
+///   [DeviceIdentity], unless the user switched them off. Panels that limit
+///   devices answer a client without them with a placeholder, not a list.
 /// * **Trust.** An empty body, a body that is not text, or one larger than the
 ///   client's cap becomes a typed failure rather than something the parser has
 ///   to survive.
@@ -41,11 +44,21 @@ class HttpSubscriptionFetcher implements SubscriptionFetcher {
   const HttpSubscriptionFetcher({
     required CommyHttpClient client,
     required SubscriptionPayloadMapper payloadMapper,
+    DeviceIdentity? identity,
   })  : _client = client,
-        _payloadMapper = payloadMapper;
+        _payloadMapper = payloadMapper,
+        _identity = identity;
 
   final CommyHttpClient _client;
   final SubscriptionPayloadMapper _payloadMapper;
+
+  /// Who the request says it is — `x-hwid` and the platform headers.
+  ///
+  /// Asked on every fetch rather than once: the user can switch the
+  /// identifier off, or reset it, between two refreshes. This is the only
+  /// caller, which is the point — the headers go to subscription hosts and to
+  /// nothing else this client talks to.
+  final DeviceIdentity? _identity;
 
   @override
   Future<Result<SubscriptionPayload, CommyFailure>> fetch(
@@ -57,6 +70,8 @@ class HttpSubscriptionFetcher implements SubscriptionFetcher {
       url,
       throughTunnel: throughTunnel,
       userAgentOverride: userAgent,
+      extraHeaders:
+          await _identity?.subscriptionHeaders() ?? const <String, String>{},
     );
 
     return response.flatMap((value) {

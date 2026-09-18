@@ -25,6 +25,18 @@ void main() {
       expect(result, contains('outbound/vless[proxy]'));
     });
 
+    test('removes the device identifier sent as x-hwid', () {
+      // Queue #21. The identifier is a UUID v4 on purpose, so the rule above
+      // already covers it; this pins that, because it is the one value that
+      // links every subscription request of an installation together.
+      final hwid = RandomIdGenerator().newId();
+      final line = 'GET https://panel.example.net/sub x-hwid: $hwid';
+      final result = redactor.redact(line);
+
+      expect(result, isNot(contains(hwid)));
+      expect(result, contains(Redact.placeholder));
+    });
+
     test('removes credentials from a vless link but keeps the node name', () {
       const line = 'failed to parse vless://${Fixtures.uuid}'
           '@de1.vpn.example.com:443?security=reality&sid=${Fixtures.shortId}'

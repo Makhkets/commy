@@ -57,6 +57,7 @@ export 'src/secure/node_secret_parts.dart';
 export 'src/secure/secret_keys.dart';
 export 'src/secure/secret_vault.dart';
 export 'src/secure/secure_store.dart';
+export 'src/secure/stored_device_identity.dart';
 export 'src/util/day_key.dart';
 export 'src/util/random_id_generator.dart';
 export 'src/util/storage_guard.dart';

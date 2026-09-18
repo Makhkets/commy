@@ -8,6 +8,7 @@ import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -96,6 +97,34 @@ class _Body extends ConsumerWidget {
         ),
         SizedBox(height: spacing.s5),
         _SilencePanel(settings: settings),
+        // Right under the list of what leaves the device, because it is one
+        // more thing that does — to a host the user entered, so not an
+        // exception to rule R1, but an identifier all the same, and an
+        // identifier sent without a word here would make the panel above a
+        // half-truth.
+        SectionLabel(t.settings.identity.title),
+        SettingsSection(
+          children: <Widget>[
+            SettingsTile(
+              icon: CommyIcons.server,
+              title: t.settings.identity.send,
+              subtitle: t.settings.identity.sendHint,
+              trailing: CommySwitch(
+                value: settings.sendDeviceId,
+                semanticLabel: t.settings.identity.send,
+                onChanged: (value) => unawaited(
+                  controller.setSendDeviceId(enabled: value),
+                ),
+              ),
+            ),
+            SettingsTile(
+              icon: CommyIcons.refresh,
+              title: t.settings.identity.reset,
+              subtitle: t.settings.identity.resetHint,
+              onTap: () => unawaited(_resetDeviceId(context, controller)),
+            ),
+          ],
+        ),
         SectionLabel(t.settings.connection.title),
         SettingsSection(
           children: <Widget>[
@@ -323,4 +352,26 @@ class _SilencePanel extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Forgets the device identifier and says which of the two things happened.
+///
+/// A row that acts with no feedback reads as a row that did nothing, and this
+/// one changes what a panel sees on the next refresh.
+Future<void> _resetDeviceId(
+  BuildContext context,
+  SettingsController controller,
+) async {
+  final t = Translations.of(context);
+  final done = await controller.resetDeviceId();
+  if (!context.mounted) {
+    return;
+  }
+  ToastMessenger.show(
+    context,
+    message:
+        done ? t.settings.identity.resetDone : t.settings.identity.resetFailed,
+    tone: done ? CommyTone.info : CommyTone.error,
+    icon: done ? CommyIcons.refresh : CommyIcons.warning,
+  );
 }

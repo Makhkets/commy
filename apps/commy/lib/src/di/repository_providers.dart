@@ -6,6 +6,8 @@
 /// SQLite.
 library;
 
+import 'dart:io';
+
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_data/commy_data.dart';
@@ -64,8 +66,45 @@ final subscriptionFetcherProvider = Provider<SubscriptionFetcher>((ref) {
     client: ref.watch(httpClientProvider),
     payloadMapper: (body, headers) =>
         parser.parse(body: body, headers: headers).payload,
+    identity: ref.watch(deviceIdentityProvider),
   );
 });
+
+/// Who this installation says it is to a subscription host (`x-hwid`).
+///
+/// Queue #21, the owner's decision of 2026-09-18. The identifier lives in the
+/// encrypted store and the switch in the settings; both are read on every
+/// fetch, so turning it off or resetting it takes effect on the next refresh.
+///
+/// The version of the OS and the model of the device are deliberately absent
+/// for now: `dart:io` reports a build string for the first and nothing for the
+/// second, and a header with a guess in it is worse than no header. They
+/// arrive with the `deviceInfo` channel method — docs/15-handoff.md § 0.1.
+final deviceIdentityProvider = Provider<DeviceIdentity>((ref) {
+  return StoredDeviceIdentity(
+    store: ref.watch(secureStoreProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    ids: ref.watch(idGeneratorProvider),
+    platformName: _platformName(),
+  );
+});
+
+/// The platform's name, spelled the way panels list devices.
+String _platformName() {
+  if (Platform.isAndroid) {
+    return 'Android';
+  }
+  if (Platform.isIOS) {
+    return 'iOS';
+  }
+  if (Platform.isWindows) {
+    return 'Windows';
+  }
+  if (Platform.isMacOS) {
+    return 'macOS';
+  }
+  return 'Linux';
+}
 
 /// Daily traffic totals: two numbers a day, nothing per connection.
 final trafficHistoryRepositoryProvider =

@@ -56,6 +56,13 @@ behaves the same way.
   empty until you import something;
 - there are no accounts, no backend, no telemetry.
 
+One thing does identify an installation, and it is said here rather than left
+to be found: subscription requests carry an `x-hwid` header — a random UUID made
+on this install, not a hardware serial — because panels that limit devices per
+subscription answer a client without one with a placeholder instead of servers.
+It goes to the subscription host you entered and nowhere else, and Settings →
+Device identifier turns it off or resets it.
+
 ## Status
 
 **Alpha.** Pre-release APKs are cut from tags and published on

@@ -35,6 +35,13 @@ abstract final class SecretKeys {
   /// Key of the token the desktop UI authenticates to the helper with.
   static const String helperToken = '${prefix}core.helper_token';
 
+  /// The installation's identifier, sent to subscription hosts as `x-hwid`.
+  ///
+  /// Not a credential, and kept here anyway: it is the one value that links
+  /// this installation's requests together, and the open database is read by
+  /// every backup tool that touches the app's files.
+  static const String deviceId = '${prefix}device.id';
+
   /// Key holding the credential params of the node [nodeId].
   static String nodeParams(String nodeId) => '$nodePrefix$nodeId$nodeSuffix';
 

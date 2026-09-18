@@ -92,6 +92,21 @@ class SettingsController extends Notifier<CommyFailure?> {
     await save((await _settings()).copyWith(hideUnavailable: enabled));
   }
 
+  /// Switches the device identifier (HWID) on subscription requests.
+  ///
+  /// Read by `StoredDeviceIdentity` on the next fetch; nothing is sent, and
+  /// nothing is even generated, while it is off.
+  Future<void> setSendDeviceId({required bool enabled}) async {
+    await save((await _settings()).copyWith(sendDeviceId: enabled));
+  }
+
+  /// Forgets the device identifier; the next subscription request makes a new
+  /// one. Returns whether the store let go of it.
+  Future<bool> resetDeviceId() async {
+    final result = await ref.read(deviceIdentityProvider).reset();
+    return result.isOk;
+  }
+
   /// Changes how the servers inside each list are ordered.
   Future<void> setNodeSort(NodeSort sort) async {
     await save((await _settings()).copyWith(nodeSort: sort));

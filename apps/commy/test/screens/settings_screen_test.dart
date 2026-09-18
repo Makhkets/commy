@@ -146,11 +146,32 @@ void main() {
     expect(switchFor(t.settings.silence.blockLists), findsOneWidget);
     expect(find.text(t.settings.silence.footer), findsOneWidget);
 
-    // Rule R1 made countable. Three exceptions plus the four connection
-    // switches; a fourth outgoing request cannot appear here without this
+    // Rule R1 made countable. Three exceptions, the four connection
+    // switches, and — since the owner's decision of 2026-09-18 — the device
+    // identifier; a fourth outgoing request cannot appear here without this
     // number moving, which is exactly what the footer promises. The kill
     // switch is deliberately not among them — it is a row, not a switch.
-    expect(find.byType(CommySwitch), findsNWidgets(7));
+    //
+    // The identifier moved the number on purpose and is *not* a fourth
+    // exception: it adds a header to requests that already go to the host the
+    // user entered, and no new host. That is why it sits in a section of its
+    // own under the panel rather than as a fourth row inside it, and why the
+    // panel's three are still counted separately below.
+    expect(find.byType(CommySwitch), findsNWidgets(8));
+    expect(switchFor(t.settings.identity.send), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find
+            .ancestor(
+              of: find.text(t.settings.silence.footer),
+              matching: find.byType(Column),
+            )
+            .first,
+        matching: find.byType(CommySwitch),
+      ),
+      findsNWidgets(3),
+      reason: 'The closed list of R1 exceptions is still three.',
+    );
   });
 
   testWidgets('every section row leads somewhere', (tester) async {
@@ -251,6 +272,52 @@ void main() {
     // about, so the assertion is made of the reader: every list in the app
     // narrows itself through this filter.
     expect(scope(tester).read(nodeFilterProvider).hideUnavailable, isTrue);
+  });
+
+  /// Queue #21. The switch is asserted through its reader — the headers a
+  /// subscription request would carry — not through the field it writes.
+  testWidgets('the HWID switch decides what a subscription request carries',
+      (tester) async {
+    await pumpScreen(tester);
+    final identity = scope(tester).read(deviceIdentityProvider);
+
+    // On by default: the owner's decision, and what Happ and INCY do.
+    expect(switchValue(tester, t.settings.identity.send), isTrue);
+    final sent = await identity.subscriptionHeaders();
+    expect(sent[DeviceIdentity.hwidHeader], isNotEmpty);
+    expect(sent[DeviceIdentity.osHeader], isNotEmpty);
+
+    await tester.ensureVisible(switchFor(t.settings.identity.send));
+    await tester.tap(switchFor(t.settings.identity.send));
+    await tester.pumpAndSettle();
+
+    expect((await stored()).sendDeviceId, isFalse);
+    expect(
+      await identity.subscriptionHeaders(),
+      isEmpty,
+      reason: 'Off means nothing is sent, not "a little less".',
+    );
+  });
+
+  testWidgets('resetting the identifier gives the panel a new device',
+      (tester) async {
+    await pumpScreen(tester);
+    final identity = scope(tester).read(deviceIdentityProvider);
+    final before =
+        (await identity.subscriptionHeaders())[DeviceIdentity.hwidHeader];
+
+    await tester.ensureVisible(find.text(t.settings.identity.reset));
+    await tester.tap(find.text(t.settings.identity.reset));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text(t.settings.identity.resetDone), findsOneWidget);
+    final after =
+        (await identity.subscriptionHeaders())[DeviceIdentity.hwidHeader];
+    expect(after, isNotEmpty);
+    expect(after, isNot(before));
+    // Let the toast run out, so no timer outlives the test.
+    await tester.pump(const Duration(seconds: 10));
   });
 
   testWidgets('start on boot moves the setting and the receiver together',

@@ -38,6 +38,7 @@ export 'src/entities/tunnel_status.dart';
 export 'src/ports/clipboard_port.dart';
 export 'src/ports/config_generator.dart';
 export 'src/ports/core_client.dart';
+export 'src/ports/device_identity.dart';
 export 'src/ports/id_generator.dart';
 export 'src/ports/ip_check_probe.dart';
 export 'src/ports/latency_probe.dart';

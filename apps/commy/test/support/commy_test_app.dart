@@ -45,6 +45,9 @@ class CommyTestHarness {
         routingRepository = FakeRoutingRepository(),
         clipboard = FakeClipboard(clipboard);
 
+  /// Where the device identifier lands, so a test can look at it.
+  final InMemorySecureStore secureStore = InMemorySecureStore();
+
   /// What answers a latency probe while the fake tunnel is down.
   final FakeLatencyProbe latencyProbe = FakeLatencyProbe();
 
@@ -129,6 +132,9 @@ class CommyTestHarness {
       // Never the real one: it opens a socket, and a test that dials out is
       // rule R1 with a different blast radius.
       latencyProbeProvider.overrideWithValue(latencyProbe),
+      // In memory, so `deviceIdentityProvider` — the one reader of this store
+      // a screen test can reach — builds instead of throwing "must override".
+      secureStoreProvider.overrideWithValue(secureStore),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
       if (status != null)
         coreStatusProvider.overrideWith(

@@ -298,6 +298,15 @@
       "blockListsHint": "source is configurable",
       "footer": "A fourth exception cannot appear without changing this screen."
     },
+    "identity": {
+      "title": "Device identifier",
+      "send": "Send HWID with subscription requests",
+      "sendHint": "Only to your subscription's host. Panels that limit devices answer without it with a placeholder instead of servers. It is a random number for this install, not your phone's serial.",
+      "reset": "Reset the identifier",
+      "resetHint": "The panel will see a new device",
+      "resetDone": "Identifier reset",
+      "resetFailed": "Could not reset the identifier"
+    },
     "connection": {
       "title": "Connection",
       "autoConnect": "Auto connect",

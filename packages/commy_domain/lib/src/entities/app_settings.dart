@@ -42,6 +42,7 @@ class AppSettings {
     this.autoSelect = false,
     this.startOnBoot = false,
     this.hideUnavailable = false,
+    this.sendDeviceId = true,
     this.nodeSort = NodeSort.panel,
     this.latencyProbeUrl = defaultLatencyProbeUrl,
     this.ipCheckUrl = '',
@@ -66,6 +67,7 @@ class AppSettings {
           'hideUnavailable',
           orElse: false,
         ),
+        sendDeviceId: JsonRead.boolean(json, 'sendDeviceId', orElse: true),
         nodeSort: NodeSort.values.byName(
           JsonRead.stringOr(json, 'nodeSort', orElse: 'panel'),
         ),
@@ -165,6 +167,16 @@ class AppSettings {
   /// silently is worse than showing it as unreachable.
   final bool hideUnavailable;
 
+  /// Whether subscription requests carry the installation's identifier
+  /// (HWID) and the name of the platform.
+  ///
+  /// On by default, which is the owner's decision of 2026-09-18 and what
+  /// Happ and INCY do: a panel that limits devices answers a client without
+  /// an identifier with a placeholder instead of servers, and a user who
+  /// imported a subscription and got "App not supported" has no way to guess
+  /// why. See `DeviceIdentity` for what the identifier is and is not.
+  final bool sendDeviceId;
+
   /// How the servers inside each list are ordered.
   final NodeSort nodeSort;
 
@@ -232,6 +244,7 @@ class AppSettings {
     bool? autoSelect,
     bool? startOnBoot,
     bool? hideUnavailable,
+    bool? sendDeviceId,
     NodeSort? nodeSort,
     String? latencyProbeUrl,
     String? ipCheckUrl,
@@ -249,6 +262,7 @@ class AppSettings {
       autoSelect: autoSelect ?? this.autoSelect,
       startOnBoot: startOnBoot ?? this.startOnBoot,
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
+      sendDeviceId: sendDeviceId ?? this.sendDeviceId,
       nodeSort: nodeSort ?? this.nodeSort,
       latencyProbeUrl: latencyProbeUrl ?? this.latencyProbeUrl,
       ipCheckUrl: ipCheckUrl ?? this.ipCheckUrl,
@@ -268,6 +282,7 @@ class AppSettings {
         'autoSelect': autoSelect,
         'startOnBoot': startOnBoot,
         'hideUnavailable': hideUnavailable,
+        'sendDeviceId': sendDeviceId,
         'nodeSort': nodeSort.name,
         'latencyProbeUrl': latencyProbeUrl,
         'ipCheckUrl': ipCheckUrl,
@@ -288,6 +303,7 @@ class AppSettings {
           other.autoSelect == autoSelect &&
           other.startOnBoot == startOnBoot &&
           other.hideUnavailable == hideUnavailable &&
+          other.sendDeviceId == sendDeviceId &&
           other.nodeSort == nodeSort &&
           other.latencyProbeUrl == latencyProbeUrl &&
           other.ipCheckUrl == ipCheckUrl &&
@@ -305,6 +321,7 @@ class AppSettings {
         autoSelect,
         startOnBoot,
         hideUnavailable,
+        sendDeviceId,
         nodeSort,
         latencyProbeUrl,
         ipCheckUrl,
