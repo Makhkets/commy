@@ -5,6 +5,8 @@
 **An open-source proxy client for your own servers.**
 Android · iOS · Windows · macOS · Linux
 
+[![RU README](https://img.shields.io/badge/README-RU-blue.svg)](readme_ru.md)
+
 [![CI](https://github.com/Makhkets/commy/actions/workflows/ci.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/ci.yml)
 [![Core](https://github.com/Makhkets/commy/actions/workflows/core.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/core.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
