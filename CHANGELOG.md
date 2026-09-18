@@ -10,7 +10,56 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4]
+
+The first release that has met a real Android runtime, and the first to be
+held to a size budget. Two things matter more than the rest of this list.
+**Every earlier build crashed on connect** — two Go panics inside our own
+process — so this is the first version that can bring a tunnel up at all. And
+the file to download is **28 MB instead of 202**: take `arm64-v8a` for a phone;
+there is no "universal" APK any more, because it was the same app three times.
+
 ### Added
+
+- **A size budget, and rule R11.** The app is to be fast and light, and that is
+  now measured rather than hoped for: `scripts/check_apk_size.sh` fails a
+  release whose `arm64-v8a` APK is over 32 MB, and the release workflow runs it
+  before collecting anything. The number moves only in a commit that says what
+  the bytes bought. CLAUDE.md R11; docs/08-build-release.md has the table of
+  where 202 MB went.
+- **A server picker under the connect button.** The chosen-server chip draws
+  a chevron, and on a device it opened nothing: on a phone it scrolled the
+  page, beside a list pane it had no callback at all. It now opens a sheet
+  with the servers of the chosen subscription — or the hand-added ones, or all
+  of them when nothing is chosen yet — plus Auto, using the same rows as the
+  list, so a tap is the same in-core switch. The search typed over the list
+  is deliberately not applied to it. One server is not a choice and gets no
+  chevron.
+- **Latency with the tunnel down.** The ping button failed on every press
+  until the user had already connected — the only way to measure was to ask a
+  core that was not running. With the tunnel down the app now times the
+  server's TCP handshake itself (`LatencyProbe`, `SocketLatencyProbe`): one
+  connection to the host the user entered, nothing sent, closed. Which method
+  a run uses is decided once, so numbers inside one run stay comparable.
+  Hysteria2, TUIC, WireGuard and QUIC/KCP transports listen on UDP; they are
+  left unmeasured and the run says how many, instead of marking a healthy
+  server offline.
+- **46 more country flags**, described as data (`_FlagSpec`: bands plus marks)
+  rather than painted by hand, and a fallback for the rest: a country with no
+  drawing gets its two letters on the neutral chip instead of a globe.
+- **HWID on subscription requests** (queue #21, owner decision 2026-09-18,
+  "like Happ / INCY"). Subscription fetches now carry `x-hwid` and
+  `x-device-os`. Panels that limit devices per subscription answer a client
+  without an identifier with a single "App not supported" placeholder — which
+  is what the owner's own panel had been doing, and why trying nineteen
+  User-Agents never helped. The identifier is a random UUID of this install,
+  not a hardware serial; it lives in the encrypted store, is made on first
+  need, goes to the subscription host and nowhere else, and Settings → Device
+  identifier turns it off (nothing is sent, nothing is even created) or resets
+  it. On by default. `x-ver-os` and `x-device-model` wait for a channel
+  method: `dart:io` has no honest value for either. Described in
+  docs/09-security-privacy.md and the README, because "no telemetry" stays
+  true only if this is said out loud.
 
 - **Navigation on tablets and desktops.** Every screen already built an
   `AdaptiveScaffold` and every one of them handed it an empty list of
@@ -47,6 +96,30 @@ matching the tag out of this file and uses it as the release notes.
 
 ### Changed
 
+- **Releases are one APK per ABI; the universal APK is gone.** It carried one
+  copy of the core, the engine and the Dart snapshot for each of three ABIs —
+  202 MB — and "universal" is the file people take off a releases page. Gradle
+  still produces one for `flutter run`, which looks for that file name; the
+  release workflow no longer builds it and the size check rejects it.
+- **Native libraries are compressed inside the APK.** 66 of the 69 MB of an
+  arm64 APK were libraries stored as-is; `libbox.so` alone is 39 MB that
+  deflates to 13. An APK from the releases page is downloaded exactly as built,
+  so that was 40 MB of download for nothing visible. The price is on the
+  device — the installer unpacks them, so the installed size grows by about
+  what the download shrank — and it is paid once, at install. Bundles keep
+  them stored: Play compresses the transfer itself.
+- **The icon font is vendored, not depended on.** `lucide_icons_flutter`
+  declares seven font families, one per stroke weight, and Flutter bundles
+  every font a dependency declares, used or not: six unused weights, 2.6 MB,
+  in every APK. `commy_ui` now ships the one font, which tree-shaking cuts to
+  11 KB, and names its 35 glyphs by code point. A second gain came free: the
+  package resolved to a different version in each workspace member, so the
+  goldens were drawn with one set of glyphs while the app shipped another. A
+  file in the repository cannot drift. The goldens are pixel-identical.
+- **Start-up waits run together.** The locale, the keystore-and-database open
+  and the package info were awaited one after another before the first frame;
+  they have nothing to do with each other and now cost the slowest of the
+  three rather than their sum.
 - **One home for the rule that folds a server listed twice.** It had four,
   and the four agreed — but a rule living in four houses is a rule that can
   drift apart without anyone noticing, and these four were already explaining
@@ -69,6 +142,44 @@ matching the tag out of this file and uses it as the release notes.
   way into import.
 
 ### Fixed
+
+- **The connect button did nothing until a row had been tapped.** One link
+  imported, nothing selected, and the only large control on the screen was
+  dead: `connect()` had no target and returned quietly. It now starts on the
+  first server there is and makes it the selection, which is what the press
+  meant. With no server at all it still reports that, so the screen can offer
+  the import sheet.
+- **Every connect crashed the app on a real device.** Two Go panics inside
+  our own process, found the first time the build met an Android runtime.
+  `startOrReloadService(config, null)`: libbox 1.13 reads
+  `options.AutoRedirect` with no nil check, so `null` is a nil-pointer panic;
+  an empty `OverrideOptions()` is passed now, on start and on reload. Then
+  `netip.MustParsePrefix("fe80::…%wlan0/64")`: Java prints a link-local IPv6
+  address with its scope, every live interface has one, and Go refuses a zone
+  inside a prefix; the scope is dropped before the address reaches libbox.
+  docs/03, docs/13 and the wire protocol all prescribed the `null`.
+- **A failed ping painted the connect button red.** The single-server probe
+  wrote its failure into the tunnel's state, so "measure" on a server while
+  disconnected produced a red disc and "something went wrong" on a tunnel
+  nobody had asked for anything. Measuring moved to `MeasurementController`;
+  its failures are a toast about a measurement.
+- **Typed failures reached the screen as "something went wrong".** All eleven
+  use cases ended in `UnknownFailure(error, stackTrace)`, which buried the
+  `CoreClientException` a core client throws — so declining the VPN dialog,
+  the named M1 acceptance case, told the user nothing. `FailureCarrier` and
+  `CommyFailure.fromCaught` keep a failure that arrives typed, typed.
+- **The flag a panel types into a server name is drawn as a flag.** Nothing
+  ever filled `ProxyNode.countryCode`, so every row showed the neutral globe
+  with the emoji flag next to it. `NodeLabel` reads the regional-indicator
+  pair out of the name, the slot draws the country, and the label drops the
+  emoji; search by country code and sort by name follow the label. The stored
+  name is untouched.
+- **Sheets opened under the keyboard.** `CommySheet` left the keyboard insets
+  to nobody, so the field being typed into — a link, a subscription address —
+  was the part the keyboard covered. The sheet now rides above it and scrolls
+  what does not fit.
+- **An unlimited plan's card said only "unlimited".** It now shows what was
+  used next to the word.
 
 Everything in this list was found by the tests above, and each is the same
 defect the project has been chasing since docs/15-handoff.md §0: a screen
@@ -221,7 +332,8 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.3...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.4...main
+[0.1.0-alpha.4]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.4
 [0.1.0-alpha.3]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.2
 [0.1.0-alpha.1]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.1
