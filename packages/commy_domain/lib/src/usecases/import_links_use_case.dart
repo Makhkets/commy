@@ -60,7 +60,7 @@ class ImportLinksUseCase {
       );
     } on Object catch (error, stackTrace) {
       return Err<ParseOutcome, CommyFailure>(
-        UnknownFailure(error, stackTrace),
+        CommyFailure.fromCaught(error, stackTrace),
       );
     }
   }

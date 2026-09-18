@@ -49,7 +49,9 @@ class CheckReachabilityUseCase {
       final latency = await core.urlTest(outboundTag, probe);
       return Ok<Duration?, CommyFailure>(latency);
     } on Object catch (error, stackTrace) {
-      return Err<Duration?, CommyFailure>(UnknownFailure(error, stackTrace));
+      return Err<Duration?, CommyFailure>(
+        CommyFailure.fromCaught(error, stackTrace),
+      );
     }
   }
 }

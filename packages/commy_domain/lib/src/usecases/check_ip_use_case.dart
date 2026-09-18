@@ -52,7 +52,7 @@ class CheckIpUseCase {
       return Ok<IpCheckResult?, CommyFailure>(probed.valueOrNull);
     } on Object catch (error, stackTrace) {
       return Err<IpCheckResult?, CommyFailure>(
-        UnknownFailure(error, stackTrace),
+        CommyFailure.fromCaught(error, stackTrace),
       );
     }
   }

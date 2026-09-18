@@ -1,5 +1,17 @@
 import 'package:commy_domain/src/core/redaction.dart';
 
+/// An exception that already knows which [CommyFailure] it is.
+///
+/// Adapters throw across their own boundary — `CoreClientException` in
+/// `commy_core` is the one that matters — and the domain cannot import them.
+/// This is the one thing it needs to know about such an exception, so that
+/// [CommyFailure.fromCaught] can take the typed failure back out instead of
+/// burying it in an [UnknownFailure].
+abstract interface class FailureCarrier {
+  /// The typed failure this exception was thrown for.
+  CommyFailure get failure;
+}
+
 /// Everything that can go wrong, as a closed set.
 ///
 /// Each variant carries the data needed to explain itself. The UI turns [code]
@@ -45,6 +57,26 @@ sealed class CommyFailure {
   /// Anything we failed to classify. Always a bug worth reading.
   const factory CommyFailure.unknown(Object cause, StackTrace stackTrace) =
       UnknownFailure;
+
+  /// The failure behind whatever a use case caught.
+  ///
+  /// Every use case ends in a blanket `catch`, because nothing may be thrown
+  /// across a layer. Written as `UnknownFailure(error, stackTrace)` that catch
+  /// flattened the one answer worth keeping: a core client that threw
+  /// "permission denied" reached the screen as "something went wrong", and the
+  /// user who declined the VPN dialog was told nothing they could act on —
+  /// which docs/07-roadmap.md names as an M1 acceptance failure. A failure
+  /// that arrives already typed — as itself, or inside a [FailureCarrier] —
+  /// stays typed; only what nobody classified becomes [UnknownFailure].
+  static CommyFailure fromCaught(Object error, StackTrace stackTrace) {
+    if (error is CommyFailure) {
+      return error;
+    }
+    if (error is FailureCarrier) {
+      return error.failure;
+    }
+    return UnknownFailure(error, stackTrace);
+  }
 
   /// Stable machine key for the i18n lookup.
   ///
@@ -232,8 +264,7 @@ final class CoreCrashedFailure extends CommyFailure {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CoreCrashedFailure && other.log == log;
+      identical(this, other) || other is CoreCrashedFailure && other.log == log;
 
   @override
   int get hashCode => Object.hash(runtimeType, log);
@@ -259,8 +290,7 @@ final class StorageFailure extends CommyFailure {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is StorageFailure && other.cause == cause;
+      identical(this, other) || other is StorageFailure && other.cause == cause;
 
   @override
   int get hashCode => Object.hash(runtimeType, cause);

@@ -102,4 +102,35 @@ void main() {
       );
     });
   });
+  group('CommyFailure.fromCaught', () {
+    test('a failure that was thrown as itself stays what it was', () {
+      const thrown = CommyFailure.permissionDenied();
+
+      expect(CommyFailure.fromCaught(thrown, StackTrace.empty), same(thrown));
+    });
+
+    test('a carrier hands back the failure it was thrown for', () {
+      final caught = CommyFailure.fromCaught(
+        const _Carrier(CommyFailure.helperUnavailable()),
+        StackTrace.empty,
+      );
+
+      expect(caught, const CommyFailure.helperUnavailable());
+    });
+
+    test('only what nobody classified becomes unknown', () {
+      final error = StateError('boom');
+      final caught = CommyFailure.fromCaught(error, StackTrace.empty);
+
+      expect(caught, isA<UnknownFailure>());
+      expect((caught as UnknownFailure).cause, same(error));
+    });
+  });
+}
+
+class _Carrier implements Exception, FailureCarrier {
+  const _Carrier(this.failure);
+
+  @override
+  final CommyFailure failure;
 }

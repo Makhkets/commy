@@ -101,7 +101,9 @@ class BuildConfigUseCase {
       }
       return Ok<CoreConfig, CommyFailure>(config);
     } on Object catch (error, stackTrace) {
-      return Err<CoreConfig, CommyFailure>(UnknownFailure(error, stackTrace));
+      return Err<CoreConfig, CommyFailure>(
+        CommyFailure.fromCaught(error, stackTrace),
+      );
     }
   }
 }

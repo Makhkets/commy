@@ -115,7 +115,7 @@ class UpdateSubscriptionUseCase {
       );
     } on Object catch (error, stackTrace) {
       return Err<SubscriptionSyncResult, CommyFailure>(
-        UnknownFailure(error, stackTrace),
+        CommyFailure.fromCaught(error, stackTrace),
       );
     }
   }

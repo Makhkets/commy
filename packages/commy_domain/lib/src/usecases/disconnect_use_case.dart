@@ -16,7 +16,9 @@ class DisconnectUseCase {
       await core.stop();
       return const Ok<void, CommyFailure>(null);
     } on Object catch (error, stackTrace) {
-      return Err<void, CommyFailure>(UnknownFailure(error, stackTrace));
+      return Err<void, CommyFailure>(
+        CommyFailure.fromCaught(error, stackTrace),
+      );
     }
   }
 }

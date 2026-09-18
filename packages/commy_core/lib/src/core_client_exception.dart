@@ -10,11 +10,12 @@ import 'package:commy_domain/commy_domain.dart';
 ///
 /// Callers that want the typed failure back out of a caught object use
 /// [failureOf].
-class CoreClientException implements Exception {
+class CoreClientException implements Exception, FailureCarrier {
   /// Wraps [failure], optionally keeping the [cause] it came from.
   const CoreClientException(this.failure, {this.cause, this.stackTrace});
 
   /// The typed failure, ready for the UI.
+  @override
   final CommyFailure failure;
 
   /// The platform error this was built from, when there was one.
