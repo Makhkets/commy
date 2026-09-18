@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
+import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -284,7 +285,8 @@ void main() {
       expect(find.text(t.error.openLogs), findsOneWidget);
     });
 
-    testWidgets('a reported failure does not follow the user into the next '
+    testWidgets(
+        'a reported failure does not follow the user into the next '
         'sheet', (tester) async {
       usePicker(configFile(junk));
       await pumpFirstRun(tester);
@@ -301,7 +303,8 @@ void main() {
       expect(find.text(t.import.subscription.url), findsOneWidget);
     });
 
-    testWidgets('a file that imports says how much landed and hands over the '
+    testWidgets(
+        'a file that imports says how much landed and hands over the '
         'list', (tester) async {
       usePicker(configFile(link));
       await pumpFirstRun(tester);
@@ -446,58 +449,189 @@ void main() {
     });
   });
 
-  /// The chip under the disc, which is how the hero hands over to the list.
+  /// The chip under the disc, and the list its chevron opens.
   ///
-  /// It scrolls the servers up under the app bar rather than opening a
-  /// picker: the rows are already on this screen and a modal over them would
-  /// be the same list twice. It did nothing at all until the list was given a
-  /// controller of its own — the callback closes over the context *above* the
-  /// `ListView`, and `Scrollable.maybeOf` walks up from there, past the list,
-  /// to nothing.
+  /// It used to scroll the screen's own list instead — on the argument that a
+  /// modal over those rows would be the same list twice — and on a real
+  /// device that read as a chevron that does nothing. It opens a picker now:
+  /// the servers of the chosen subscription, one tap from the button.
   group('the selected-server chip', () {
     late CommyTestHarness several;
 
-    setUp(() {
+    setUp(() async {
       several = CommyTestHarness(
+        subscriptions: <Subscription>[
+          testSubscription(),
+          testSubscription(id: 'sub-2', name: 'Second panel'),
+        ],
         nodes: <ProxyNode>[
-          testNode(),
-          testNode(id: 'node-2', name: 'Warsaw 01', countryCode: 'PL'),
-          testNode(id: 'node-3', name: 'Berlin 02', countryCode: 'DE'),
+          testNode(subscriptionId: 'sub-1'),
+          testNode(id: 'node-2', name: 'Warsaw 01', subscriptionId: 'sub-1'),
+          testNode(id: 'node-3', name: 'Berlin 02', subscriptionId: 'sub-2'),
         ],
       );
+      await several.settingsRepository.writeSelectedNodeId('node-1');
     });
 
     tearDown(() => several.dispose());
 
-    /// Where the list has been scrolled to, or zero when it cannot scroll.
-    double listOffset(WidgetTester tester) {
-      final list = tester.widget<ListView>(find.byType(ListView));
-      return list.controller?.offset ?? 0;
-    }
+    Finder inSheet(Finder matching) => find.descendant(
+          of: find.byType(CommySheetSurface),
+          matching: matching,
+        );
 
-    testWidgets('scrolls the servers into view', (tester) async {
-      // A phone-sized window, so the rows really are below the fold: this is
-      // the only size where the chip has anything to do.
-      tester.view.physicalSize = const Size(400, 600);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+    Future<void> openPicker(WidgetTester tester) async {
       await tester.pumpWidget(
         several.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
       await settle(tester);
-      expect(listOffset(tester), 0);
+      await tester.tap(find.byType(SelectedNode));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    testWidgets('opens the servers of the chosen subscription, and only them',
+        (tester) async {
+      await openPicker(tester);
+
+      expect(find.byType(CommySheetSurface), findsOneWidget);
+      expect(inSheet(find.text('My panel')), findsOneWidget);
+      expect(inSheet(find.text('Amsterdam 03')), findsOneWidget);
+      expect(inSheet(find.text('Warsaw 01')), findsOneWidget);
+      expect(
+        inSheet(find.text('Berlin 02')),
+        findsNothing,
+        reason: 'That server belongs to the other panel.',
+      );
+      // Auto is a choice of server too, and it belongs to no panel.
+      expect(inSheet(find.byType(AutoRow)), findsOneWidget);
+    });
+
+    testWidgets('a tap picks the server and closes the list', (tester) async {
+      await openPicker(tester);
+
+      await tester.tap(inSheet(find.text('Warsaw 01')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(find.byType(CommySheetSurface), findsNothing);
+      final stored = await several.settingsRepository.readSelectedNodeId();
+      expect(stored.valueOrNull, 'node-2');
+      expect(
+        tester.widget<SelectedNode>(find.byType(SelectedNode)).name,
+        'Warsaw 01',
+      );
+    });
+
+    testWidgets('ignores the search typed over the list underneath',
+        (tester) async {
+      await tester.pumpWidget(
+        several.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+      await tester.enterText(find.byType(EditableText), 'berlin');
+      await settle(tester);
 
       await tester.tap(find.byType(SelectedNode));
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
-      expect(
-        listOffset(tester),
-        greaterThan(0),
-        reason: 'The chip promises the list; a tap that moves nothing lies.',
+      expect(inSheet(find.text('Amsterdam 03')), findsOneWidget);
+      expect(inSheet(find.text('Warsaw 01')), findsOneWidget);
+    });
+
+    testWidgets('draws no chevron over a single server', (tester) async {
+      final one = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
+      addTearDown(one.dispose);
+      await tester.pumpWidget(
+        one.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
-      expect(find.byType(NodeTile), findsWidgets);
+      await settle(tester);
+
+      expect(
+        tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
+        isNull,
+        reason: 'One server is not a choice; a chevron would promise one.',
+      );
+    });
+  });
+
+  /// A panel types the country into the name as a flag emoji, and that is the
+  /// only place it exists. On a device the list drew a globe in the flag slot
+  /// and the emoji beside it; the flag belongs in the slot.
+  group('a flag typed into the name', () {
+    late CommyTestHarness flagged;
+
+    setUp(() async {
+      flagged = CommyTestHarness(
+        nodes: <ProxyNode>[
+          testNode(name: '🇨🇿 AXM VPN - Czech', countryCode: null),
+          testNode(
+            id: 'node-2',
+            name: '🇮🇹 AXM VPN - Italy',
+            countryCode: null,
+          ),
+        ],
+      );
+      await flagged.settingsRepository.writeSelectedNodeId('node-1');
+    });
+
+    tearDown(() => flagged.dispose());
+
+    /// Tall enough that the rows under the hero are really built: a lazy list
+    /// does not lay out what is below the fold, and these tests read the rows.
+    void useTallWindow(WidgetTester tester) {
+      tester.view
+        ..physicalSize = const Size(420, 1600)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+    }
+
+    testWidgets('is drawn in the flag slot of the row, not in its text',
+        (tester) async {
+      useTallWindow(tester);
+      await tester.pumpWidget(
+        flagged.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+
+      final tiles = tester.widgetList<NodeTile>(find.byType(NodeTile)).toList();
+      final czech = tiles.firstWhere((tile) => tile.countryCode == 'CZ');
+      expect(czech.name, 'AXM VPN - Czech');
+      final italy = tiles.firstWhere((tile) => tile.countryCode == 'IT');
+      expect(italy.name, 'AXM VPN - Italy');
+    });
+
+    testWidgets('is drawn in the chip under the button as well',
+        (tester) async {
+      await tester.pumpWidget(
+        flagged.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+
+      final chip = tester.widget<SelectedNode>(find.byType(SelectedNode));
+      expect(chip.name, 'AXM VPN - Czech');
+      expect((chip.flag! as CountryFlag).countryCode, 'CZ');
+    });
+
+    testWidgets('is found by typing the country it names', (tester) async {
+      useTallWindow(tester);
+      await tester.pumpWidget(
+        flagged.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+      await tester.enterText(find.byType(EditableText), 'it');
+      await settle(tester);
+
+      // Scoped to the rows: the chip under the button goes on naming the
+      // chosen server whatever the search says.
+      Finder row(String name) => find.descendant(
+            of: find.byType(NodeTile),
+            matching: find.text(name),
+          );
+      expect(row('AXM VPN - Italy'), findsOneWidget);
+      expect(row('AXM VPN - Czech'), findsNothing);
     });
   });
 

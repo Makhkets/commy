@@ -293,12 +293,7 @@ class _ConnectionPane extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                // No callback, so `SelectedNode` drops its chevron: the list
-                // the chip used to scroll into view is the pane on the other
-                // side of the seam and never leaves the screen, so there is
-                // nothing left for a tap to do. A chevron here would promise
-                // a picker that is already open.
-                HeroArea(onChooseNode: null),
+                HeroArea(),
                 _TunnelFailureBanner(),
               ],
             ),
@@ -360,7 +355,7 @@ class _TunnelFailureBanner extends ConsumerWidget {
 /// With a connection pane beside it the first two are already on screen and
 /// this is the list alone. The order of the single column is untouched by
 /// that: hero, the Auto row, the failure banner, the toolbar, the cards.
-class _HomeContent extends ConsumerStatefulWidget {
+class _HomeContent extends ConsumerWidget {
   const _HomeContent({
     required this.subscriptions,
     required this.nodes,
@@ -374,26 +369,7 @@ class _HomeContent extends ConsumerStatefulWidget {
   final bool hasConnectionPane;
 
   @override
-  ConsumerState<_HomeContent> createState() => _HomeContentState();
-}
-
-class _HomeContentState extends ConsumerState<_HomeContent> {
-  /// The list's own controller, so the selected-server chip can reach it.
-  ///
-  /// `Scrollable.maybeOf` cannot, and that is not a style point: the chip's
-  /// callback closes over the context of *this* widget, which sits above the
-  /// list rather than inside it, so the lookup walked up past the ListView
-  /// and found nothing. The tap did nothing at all.
-  final ScrollController _controller = ScrollController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final spacing = context.spacing;
     final filter = ref.watch(nodeFilterProvider);
@@ -402,19 +378,19 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     // The same condition the configuration builder applies: with one server
     // there is no group in the document, so there is nothing to offer — and
     // nothing to search or order either.
-    final hasChoice = widget.nodes.length > 1;
+    final hasChoice = nodes.length > 1;
     // Counted across every list at once so the footer states one number the
     // user can check against, rather than one per card.
-    final hidden = filter.hiddenUnavailable(widget.nodes);
+    final hidden = filter.hiddenUnavailable(nodes);
 
     // One card per subscription, each with its own slice of the list. While
     // a search is on, a card with no match is left out: the user is looking
     // for a server, and a panel header with nothing under it is not an answer.
     final cards = <Widget>[];
     var shown = manual.length;
-    for (final subscription in widget.subscriptions) {
+    for (final subscription in subscriptions) {
       final own = filter.apply(<ProxyNode>[
-        for (final node in widget.nodes)
+        for (final node in nodes)
           if (node.subscriptionId == subscription.id) node,
       ]);
       shown += own.length;
@@ -427,18 +403,17 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     }
 
     return ListView(
-      controller: _controller,
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
         // The two that move: with a pane beside it the list starts at the
         // Auto row. Without one the order is the phone's, unchanged — hero,
         // Auto row, failure banner, toolbar, cards.
-        if (!widget.hasConnectionPane) HeroArea(onChooseNode: _scrollToList),
+        if (!hasConnectionPane) const HeroArea(),
         if (hasChoice) ...<Widget>[
           const AutoRow(),
           SizedBox(height: spacing.s4),
         ],
-        if (!widget.hasConnectionPane) const _TunnelFailureBanner(),
+        if (!hasConnectionPane) const _TunnelFailureBanner(),
         if (hasChoice) ...<Widget>[
           const ListToolbar(),
           SizedBox(height: spacing.s4),
@@ -466,30 +441,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
       ],
     );
   }
-
-  /// The selected-server chip scrolls to the list rather than opening a
-  /// picker: the list is already on this screen, and a modal over it would be
-  /// the same rows twice.
-  ///
-  /// Only ever wired up in the single column. With a connection pane the chip
-  /// has no callback at all — see [_ConnectionPane].
-  void _scrollToList() {
-    if (!_controller.hasClients) {
-      return;
-    }
-    final position = _controller.position;
-    unawaited(
-      position.animateTo(
-        _listOffset.clamp(0, position.maxScrollExtent),
-        duration: context.motion.base,
-        curve: context.motion.baseCurve,
-      ),
-    );
-  }
-
-  /// Roughly the height of the hero area: enough to put the first card under
-  /// the app bar without hunting for a render box.
-  static const double _listOffset = 360;
 }
 
 /// Says how many servers the "hide unavailable" setting took out of the list.

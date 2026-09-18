@@ -1,6 +1,7 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_core/commy_core.dart';
 import 'package:commy_data/commy_data.dart';
@@ -43,6 +44,9 @@ class CommyTestHarness {
         settingsRepository = FakeSettingsRepository(settings: settings),
         routingRepository = FakeRoutingRepository(),
         clipboard = FakeClipboard(clipboard);
+
+  /// What answers a latency probe while the fake tunnel is down.
+  final FakeLatencyProbe latencyProbe = FakeLatencyProbe();
 
   /// A fixed moment, so the session timer never moves under an assertion.
   static final DateTime now = DateTime.utc(2026, 8, 4, 12);
@@ -122,6 +126,9 @@ class CommyTestHarness {
       subscriptionFetcherProvider.overrideWithValue(subscriptionFetcher),
       ruleSetRepositoryProvider.overrideWithValue(ruleSetRepository),
       trafficHistoryRepositoryProvider.overrideWithValue(trafficHistory),
+      // Never the real one: it opens a socket, and a test that dials out is
+      // rule R1 with a different blast radius.
+      latencyProbeProvider.overrideWithValue(latencyProbe),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
       if (status != null)
         coreStatusProvider.overrideWith(
@@ -163,7 +170,7 @@ class CommyTestHarness {
 ProxyNode testNode({
   String id = 'node-1',
   String name = 'Amsterdam 03',
-  String countryCode = 'NL',
+  String? countryCode = 'NL',
   String? subscriptionId,
   Duration? latency = const Duration(milliseconds: 48),
 }) {

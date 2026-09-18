@@ -530,14 +530,22 @@ class TunnelController extends Notifier<TunnelActionState> {
   @override
   TunnelActionState build() => TunnelActionState.initial;
 
-  /// Starts the tunnel on [nodeId], or on the current selection.
+  /// Starts the tunnel on [nodeId], or on the current selection, or — when
+  /// nothing was ever picked — on the first server there is.
   ///
-  /// Returns `false` when there was nothing to connect to, so the caller can
+  /// That last fallback is what the button owes a first-time user. Someone who
+  /// imported one link and pressed the only large control on the screen has
+  /// made their choice; answering with nothing, because no row had been
+  /// tapped, read on a device as a dead button. The server it lands on becomes
+  /// the selection, so the chip under the button names it the moment the
+  /// tunnel is up.
+  ///
+  /// Returns `false` only when there is no server at all, so the caller can
   /// send the user to the import sheet instead of showing an error about a
   /// choice they never made.
   Future<bool> connect({String? nodeId}) async {
     final target =
-        nodeId ?? ref.read(selectedNodeIdProvider).value ?? _autoLeadNodeId();
+        nodeId ?? ref.read(selectedNodeIdProvider).value ?? _leadNodeId();
     if (target == null) {
       return false;
     }
@@ -651,7 +659,10 @@ class TunnelController extends Notifier<TunnelActionState> {
     await _setAutoSelect(enabled: false);
     state = state.copyWith(
       clearFailure: true,
-      notice: TunnelNotice(TunnelNoticeKind.switched, name: node.name),
+      notice: TunnelNotice(
+        TunnelNoticeKind.switched,
+        name: NodeLabel.of(node).text,
+      ),
     );
   }
 
@@ -806,18 +817,6 @@ class TunnelController extends Notifier<TunnelActionState> {
     );
   }
 
-  /// Measures one node and stores the result.
-  Future<void> measure(ProxyNode node) async {
-    final result = await ref.read(measureLatencyUseCaseProvider)(
-      nodeId: node.id,
-      outboundTag: SingBoxTags.forNode(node),
-    );
-    final failure = result.failureOrNull;
-    if (failure != null) {
-      state = state.copyWith(failure: failure);
-    }
-  }
-
   /// Drops the last failure, e.g. when the user dismisses the banner.
   void clearFailure() => state = state.copyWith(clearFailure: true);
 
@@ -885,16 +884,15 @@ class TunnelController extends Notifier<TunnelActionState> {
     return node == null ? null : SingBoxTags.forNode(node);
   }
 
-  /// The server a start on Auto begins from, when nothing was ever picked.
+  /// The server a start begins from when nothing was ever picked.
   ///
-  /// The document needs a node to lead with even when the selector defaults to
-  /// the Auto group, and a user who has only ever tapped Auto has picked none.
-  /// The first stored server is as good as any: the core reorders by latency
-  /// the moment it has measured them.
-  String? _autoLeadNodeId() {
-    if (!ref.read(autoSelectedProvider)) {
-      return null;
-    }
+  /// On Auto the document needs a node to lead with even though the selector
+  /// defaults to the group, and a user who has only ever tapped Auto has picked
+  /// none. With Auto off it is the same answer for a plainer reason: there are
+  /// servers, the user asked to connect, and the first one in the list is the
+  /// one they are looking at. The core reorders by latency on Auto the moment
+  /// it has measured them; off Auto the user can switch without reconnecting.
+  String? _leadNodeId() {
     final all = ref.read(nodesProvider).value ?? const <ProxyNode>[];
     return all.isEmpty ? null : all.first.id;
   }

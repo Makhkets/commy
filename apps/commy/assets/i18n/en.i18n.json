@@ -69,6 +69,10 @@
     "switched": "Switched to $name",
     "switchedToAuto": "The server is now chosen automatically",
     "measuring": "Measured $done of $total",
+    "measureNeedsTunnel(plural, param=count)": {
+      "one": "$count server can only be measured while connected",
+      "other": "$count servers can only be measured while connected"
+    },
     "settingsApplied": "Settings applied to the tunnel"
   },
 
@@ -133,6 +137,7 @@
     "never": "never refreshed",
     "quota": "$used of $total",
     "unlimited": "unlimited",
+    "usedUnlimited": "$used · unlimited",
     "daysLeft": "$count left",
     "days": "$count d",
     "expired": "expired",

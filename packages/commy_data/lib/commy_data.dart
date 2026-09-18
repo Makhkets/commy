@@ -34,6 +34,7 @@ export 'src/http/http_text_response.dart';
 export 'src/http/http_transport_error.dart';
 export 'src/http/network_failure_mapper.dart';
 export 'src/http/proxy_endpoint.dart';
+export 'src/http/socket_latency_probe.dart';
 export 'src/http/user_agent.dart';
 export 'src/logging/log_redactor.dart';
 export 'src/logging/ring_buffer_log_repository.dart';

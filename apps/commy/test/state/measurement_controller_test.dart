@@ -149,4 +149,124 @@ void main() {
 
     expect(container.read(measurementProvider), MeasurementState.idle);
   });
+
+  /// The header's ping button failed on every press while the tunnel was
+  /// down: the only way to measure was to ask a core that was not running.
+  /// That is the moment the numbers are wanted — before choosing a server.
+  group('with the tunnel down', () {
+    Future<void> startIdle(List<ProxyNode> nodes) async {
+      harness = CommyTestHarness(nodes: nodes);
+      container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(() async {
+        container.dispose();
+        await harness.dispose();
+      });
+      final handles = <ProviderSubscription<Object?>>[
+        container.listen(nodesProvider, (_, __) {}),
+        container.listen(coreStatusProvider, (_, __) {}),
+      ];
+      addTearDown(() {
+        for (final handle in handles) {
+          handle.close();
+        }
+      });
+      await container.read(nodesProvider.future);
+    }
+
+    ProxyNode udpNode() => const ProxyNode(
+          id: 'node-udp',
+          name: 'Hysteria',
+          protocol: Protocol.hysteria2,
+          host: 'hy.example.net',
+          port: 8443,
+        );
+
+    test('a run times the servers directly and asks the core nothing',
+        () async {
+      final nodes = manyNodes(5);
+      await startIdle(nodes);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(harness.latencyProbe.asked, hasLength(5));
+      expect(
+        harness.nodeRepository.nodes.map((node) => node.latency),
+        everyElement(const Duration(milliseconds: 37)),
+      );
+      final state = container.read(measurementProvider);
+      expect(state.isRunning, isFalse);
+      expect(state.failure, isNull, reason: 'Not running is not a failure.');
+    });
+
+    test('a server that did not answer is recorded as that, not as a failure',
+        () async {
+      final nodes = manyNodes(2);
+      await startIdle(nodes);
+      harness.latencyProbe.answer = null;
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(container.read(measurementProvider).failure, isNull);
+      expect(
+        harness.nodeRepository.nodes.every(
+          (node) => node.latency == null && node.lastCheckedAt != null,
+        ),
+        isTrue,
+      );
+    });
+
+    test('a UDP server is left alone and counted, not marked offline',
+        () async {
+      final nodes = <ProxyNode>[...manyNodes(2), udpNode()];
+      await startIdle(nodes);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(harness.latencyProbe.asked, hasLength(2));
+      expect(container.read(measurementProvider).needTunnel, 1);
+      final udp = harness.nodeRepository.nodes.firstWhere(
+        (node) => node.id == 'node-udp',
+      );
+      expect(
+        udp.lastCheckedAt,
+        isNull,
+        reason: 'Nothing listens on TCP there; "offline" would be a lie.',
+      );
+    });
+
+    test('measuring one UDP server says it needs the tunnel', () async {
+      await startIdle(<ProxyNode>[udpNode()]);
+
+      await controller().measureOne(udpNode());
+
+      expect(harness.latencyProbe.asked, isEmpty);
+      expect(container.read(measurementProvider).needTunnel, 1);
+    });
+
+    test('measuring one server never touches the tunnel state', () async {
+      final nodes = manyNodes(1);
+      await startIdle(nodes);
+
+      await controller().measureOne(nodes.single);
+
+      // The regression this pins: a ping used to write its failure into the
+      // tunnel controller, which painted the connect button red.
+      expect(container.read(tunnelControllerProvider).failure, isNull);
+      expect(container.read(tunnelStatusProvider), isA<TunnelIdle>());
+      expect(
+        harness.nodeRepository.nodes.single.latency,
+        const Duration(milliseconds: 37),
+      );
+    });
+  });
+
+  test('with the tunnel up the core measures, and the direct probe is unused',
+      () async {
+    final nodes = manyNodes(3);
+    await start(nodes);
+
+    await controller().measureAll(nodes, scopeId: 'sub-1');
+
+    expect(harness.latencyProbe.asked, isEmpty);
+  });
 }

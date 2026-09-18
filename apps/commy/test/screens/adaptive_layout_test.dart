@@ -436,6 +436,13 @@ void main() {
   /// not a degenerate one — a window wide enough for the rail and too narrow
   /// for a second pane — and what it must do is keep the column it had.
   group('the home screen splits into two panes', () {
+    /// Two servers, because one is not a choice: over a single server the chip
+    /// draws no chevron at any width, and these tests are about the width.
+    List<ProxyNode> twoServers() => <ProxyNode>[
+          testNode(),
+          testNode(id: 'node-2', name: 'Warsaw 01', countryCode: 'PL'),
+        ];
+
     /// The hero drawn inside the server list, which is the single column.
     Finder heroInList() => find.descendant(
           of: find.byType(ListView),
@@ -514,7 +521,7 @@ void main() {
     });
 
     testWidgets('the chip keeps its picker in one column', (tester) async {
-      await pumpAt(tester, const HomeScreen(), width: 420);
+      await pumpAt(tester, const HomeScreen(), width: 420, nodes: twoServers());
 
       expect(
         tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
@@ -522,15 +529,20 @@ void main() {
       );
     });
 
-    testWidgets('the chip drops its picker once the list is a pane',
-        (tester) async {
-      await pumpAt(tester, const HomeScreen(), width: 1100);
+    testWidgets('the chip keeps its picker beside a list pane', (tester) async {
+      await pumpAt(
+        tester,
+        const HomeScreen(),
+        width: 1100,
+        nodes: twoServers(),
+      );
 
-      // No callback, so `SelectedNode` draws no chevron: the list it would
-      // scroll to is across the seam and never leaves the screen.
+      // The chevron promises a list at every width. Beside a pane the rows
+      // are on screen already, and the picker is still the shorter way: it
+      // opens under the button, narrowed to the chosen subscription.
       expect(
         tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
-        isNull,
+        isNotNull,
       );
     });
 

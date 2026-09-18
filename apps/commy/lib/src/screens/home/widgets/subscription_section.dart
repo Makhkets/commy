@@ -115,7 +115,12 @@ class SubscriptionSection extends ConsumerWidget {
       return null;
     }
     if (total == null || total <= 0) {
-      return t.subscription.unlimited;
+      // No ceiling to draw a bar against, but the panel still said how much
+      // went through, and that is the one number an unlimited plan has. The
+      // bare word alone read as a stray caption under the card's header.
+      return used > 0
+          ? t.subscription.usedUnlimited(used: CommyByteFormat.bytes(used))
+          : t.subscription.unlimited;
     }
     return t.subscription.quota(
       used: CommyByteFormat.bytes(used),

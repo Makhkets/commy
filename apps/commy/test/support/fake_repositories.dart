@@ -564,3 +564,25 @@ Stream<T> _replay<T>(StreamController<T> controller, T Function() current) {
     listener.onCancel = subscription.cancel;
   });
 }
+
+/// A [LatencyProbe] that answers from a script and remembers who it was asked
+/// about.
+///
+/// The real one opens a TCP connection. Nothing in a test may.
+class FakeLatencyProbe implements LatencyProbe {
+  /// What every server answers with. `null` is "did not answer".
+  Duration? answer = const Duration(milliseconds: 37);
+
+  /// Every `host:port` the probe was asked to time, in order.
+  final List<String> asked = <String>[];
+
+  @override
+  Future<Duration?> connectTime(
+    String host,
+    int port, {
+    required Duration timeout,
+  }) async {
+    asked.add('$host:$port');
+    return answer;
+  }
+}

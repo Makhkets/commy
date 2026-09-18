@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/screens/home/widgets/node_picker_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -16,16 +17,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// list. The check button appears rather than being disabled: there is nothing
 /// to check when there is no tunnel, and a permanently greyed control teaches
 /// people to ignore it.
+///
+/// The chosen-server chip opens [NodePickerSheet] at every width. It used to
+/// scroll the list on a phone and do nothing beside a list pane, on the
+/// argument that the rows were already on screen; the chevron it draws says
+/// "a list opens here", and the owner's verdict on a chevron that did not was
+/// that it is broken. It loses the chevron only when there is nothing to pick
+/// between.
 class HeroArea extends ConsumerWidget {
   /// Creates the area.
-  const HeroArea({required this.onChooseNode, super.key});
-
-  /// Opens the server picker, or `null` when there is no picker to open.
-  ///
-  /// `null` is the two-pane case: the list is the pane on the other side of
-  /// the seam, permanently on screen, so `SelectedNode` drops its chevron
-  /// rather than promise a list that is already there.
-  final VoidCallback? onChooseNode;
+  const HeroArea({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,6 +41,12 @@ class HeroArea extends ConsumerWidget {
     final isAuto = ref.watch(autoSelectedProvider);
     final node =
         isAuto ? ref.watch(autoNodeProvider) : ref.watch(selectedNodeProvider);
+    // The flag a panel typed into the name goes into the flag slot, exactly
+    // as in the list below.
+    final label = node == null ? null : NodeLabel.of(node);
+    final hasChoice = NodePickerSheet.isOffered(
+      ref.watch(nodesProvider).value ?? const <ProxyNode>[],
+    );
     final traffic = ref.watch(trafficProvider).value;
     final now = ref.watch(clockProvider).value ?? DateTime.now();
 
@@ -73,17 +80,18 @@ class HeroArea extends ConsumerWidget {
         ),
         SizedBox(height: spacing.s5),
         SelectedNode(
-          name: _nodeLabel(t, isAuto: isAuto, node: node),
+          name: _nodeLabel(t, isAuto: isAuto, name: label?.text),
           semanticLabel: t.home.selectNode,
-          flag: node == null
+          flag: label == null
               ? null
               : CountryFlag(
-                  countryCode: node.countryCode,
-                  semanticLabel: node.countryCode == null
+                  countryCode: label.countryCode,
+                  semanticLabel: label.countryCode == null
                       ? null
-                      : t.a11y.flag(country: node.countryCode!),
+                      : t.a11y.flag(country: label.countryCode!),
                 ),
-          onTap: onChooseNode,
+          onTap:
+              hasChoice ? () => unawaited(NodePickerSheet.show(context)) : null,
         ),
         if (connectState.showsCheckButton) ...<Widget>[
           SizedBox(height: spacing.s4),
@@ -105,15 +113,15 @@ class HeroArea extends ConsumerWidget {
   String _nodeLabel(
     Translations t, {
     required bool isAuto,
-    required ProxyNode? node,
+    required String? name,
   }) {
     if (!isAuto) {
-      return node?.name ?? t.home.noNodeSelected;
+      return name ?? t.home.noNodeSelected;
     }
-    if (node == null) {
+    if (name == null) {
       return t.home.auto;
     }
-    return '${t.home.auto}${NodeTile.descriptorSeparator}${node.name}';
+    return '${t.home.auto}${NodeTile.descriptorSeparator}$name';
   }
 
   void _toggle(WidgetRef ref) {

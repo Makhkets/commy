@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,25 +23,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// what the group does instead of naming a server it has not picked yet.
 class AutoRow extends ConsumerWidget {
   /// Creates the row.
-  const AutoRow({super.key});
+  const AutoRow({this.onChosen, super.key});
+
+  /// Called once a tap has chosen Auto. The picker sheet closes itself with
+  /// it; the list leaves it `null`.
+  final VoidCallback? onChosen;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final isActive = ref.watch(autoSelectedProvider);
     final picked = isActive ? ref.watch(autoNodeProvider) : null;
+    final label = picked == null ? null : NodeLabel.of(picked);
 
     return NodeTile(
       name: t.home.auto,
-      descriptors: <String>[
-        if (picked == null) t.home.autoSubtitle else picked.name,
-      ],
+      descriptors: <String>[label?.text ?? t.home.autoSubtitle],
       latency: picked?.latency,
-      countryCode: picked?.countryCode,
+      countryCode: label?.countryCode,
       isActive: isActive,
-      onTap: () => unawaited(
-        ref.read(tunnelControllerProvider.notifier).selectAuto(),
-      ),
+      onTap: () {
+        unawaited(ref.read(tunnelControllerProvider.notifier).selectAuto());
+        onChosen?.call();
+      },
     );
   }
 }

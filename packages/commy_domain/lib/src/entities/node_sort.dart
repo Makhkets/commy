@@ -1,3 +1,4 @@
+import 'package:commy_domain/src/entities/node_label.dart';
 import 'package:commy_domain/src/entities/proxy_node.dart';
 
 /// How the servers inside one list are ordered on screen.
@@ -18,6 +19,11 @@ enum NodeSort {
   latency,
 
   /// By name, case-insensitive.
+  ///
+  /// By the name as it is shown, that is — [NodeLabel.text], without the flag
+  /// a panel typed in front of it. Sorted raw, every name that opens with an
+  /// emoji lands after every name that does not, and the emoji order among
+  /// themselves is the alphabet of country *codes*, not of anything on screen.
   name;
 
   /// [nodes] in this order.
@@ -57,8 +63,10 @@ enum NodeSort {
     return node.lastCheckedAt == null ? 1 : 2;
   }
 
-  static int _byName(ProxyNode a, ProxyNode b) =>
-      a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  static int _byName(ProxyNode a, ProxyNode b) => NodeLabel.of(a)
+      .text
+      .toLowerCase()
+      .compareTo(NodeLabel.of(b).text.toLowerCase());
 
   /// `List.sort` makes no promise about equal elements; this one does.
   static List<ProxyNode> _stableSorted(

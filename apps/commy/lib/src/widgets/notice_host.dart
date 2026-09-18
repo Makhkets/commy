@@ -48,10 +48,17 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
       // read by nobody, and the run just looked like it did nothing.
       ..listen<MeasurementState>(measurementProvider, (previous, next) {
         final failure = next.failure;
-        if (failure == null || failure == previous?.failure) {
+        if (failure != null && failure != previous?.failure) {
+          _showFailure(failure);
           return;
         }
-        _showFailure(failure);
+        // Servers the run left alone — UDP protocols, with the tunnel down.
+        // Said once, at the end, rather than per row: it is one fact about
+        // the run, and it tells the user what would measure them.
+        final needTunnel = next.needTunnel;
+        if (needTunnel > 0 && needTunnel != previous?.needTunnel) {
+          _showNeedsTunnel(needTunnel);
+        }
       });
     return widget.child;
   }
@@ -63,6 +70,16 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
       message: text.message,
       tone: CommyTone.error,
       icon: CommyIcons.warning,
+    );
+    ref.read(measurementProvider.notifier).clearFailure();
+  }
+
+  void _showNeedsTunnel(int count) {
+    ToastMessenger.show(
+      context,
+      message: Translations.of(context).home.measureNeedsTunnel(count: count),
+      tone: CommyTone.info,
+      icon: CommyIcons.diagnostics,
     );
     ref.read(measurementProvider.notifier).clearFailure();
   }

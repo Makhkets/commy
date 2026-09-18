@@ -24,7 +24,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// is now the first row of that menu.
 class NodeRow extends ConsumerWidget {
   /// Creates the row.
-  const NodeRow({required this.node, required this.isActive, super.key});
+  const NodeRow({
+    required this.node,
+    required this.isActive,
+    this.onChosen,
+    super.key,
+  });
 
   /// What joins the descriptor parts, and the subscription subtitle parts.
   static const String separator = ' · ';
@@ -35,20 +40,32 @@ class NodeRow extends ConsumerWidget {
   /// Whether this is the chosen server.
   final bool isActive;
 
+  /// Called once a tap has chosen this server, after the switch is under way.
+  ///
+  /// The picker sheet closes itself with it. The list leaves it `null`: there
+  /// the row stays where it is and the active bar moving is the whole answer.
+  final VoidCallback? onChosen;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
+    // The flag a panel typed into the name is drawn in the flag slot, not
+    // left in the text beside an empty one.
+    final label = NodeLabel.of(node);
     return NodeTile(
-      name: node.name,
+      name: label.text,
       descriptors: NodeDescriptors.of(node),
       latency: node.latency,
-      countryCode: node.countryCode,
+      countryCode: label.countryCode,
       isActive: isActive,
       isReachable: node.latency != null || node.lastCheckedAt == null,
       offlineSemanticLabel: t.a11y.offline,
-      onTap: () => unawaited(
-        ref.read(tunnelControllerProvider.notifier).selectNode(node),
-      ),
+      onTap: () {
+        unawaited(
+          ref.read(tunnelControllerProvider.notifier).selectNode(node),
+        );
+        onChosen?.call();
+      },
       onLongPress: () => unawaited(
         NodeMenuSheet.show(context: context, node: node),
       ),

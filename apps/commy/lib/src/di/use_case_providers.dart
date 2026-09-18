@@ -150,6 +150,7 @@ final switchNodeUseCaseProvider = Provider<SwitchNodeUseCase>((ref) {
 final measureLatencyUseCaseProvider = Provider<MeasureLatencyUseCase>((ref) {
   return MeasureLatencyUseCase(
     core: ref.watch(coreClientProvider),
+    probe: ref.watch(latencyProbeProvider),
     nodes: ref.watch(nodeRepositoryProvider),
     settings: ref.watch(settingsRepositoryProvider),
   );
@@ -162,6 +163,15 @@ final checkReachabilityUseCaseProvider =
     core: ref.watch(coreClientProvider),
     settings: ref.watch(settingsRepositoryProvider),
   );
+});
+
+/// Times a server's TCP handshake while there is no core to measure through.
+///
+/// A provider of its own so a test can put a scripted probe in its place: the
+/// real one opens a socket, and a widget test that dials out is rule R1 with a
+/// different blast radius.
+final latencyProbeProvider = Provider<LatencyProbe>((ref) {
+  return const SocketLatencyProbe();
 });
 
 /// Exception E-1, the external IP check — the data half.

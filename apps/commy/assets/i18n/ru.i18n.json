@@ -69,6 +69,12 @@
     "switched": "Переключено на $name",
     "switchedToAuto": "Сервер теперь выбирается автоматически",
     "measuring": "Замерено $done из $total",
+    "measureNeedsTunnel(plural, param=count)": {
+      "one": "$count сервер замеряется только при включённом туннеле",
+      "few": "$count сервера замеряются только при включённом туннеле",
+      "many": "$count серверов замеряются только при включённом туннеле",
+      "other": "$count сервера замеряются только при включённом туннеле"
+    },
     "settingsApplied": "Настройки применены к туннелю"
   },
 
@@ -137,6 +143,7 @@
     "never": "ещё не обновлялась",
     "quota": "$used из $total",
     "unlimited": "без лимита",
+    "usedUnlimited": "$used · без лимита",
     "daysLeft": "осталось $count",
     "days": "$count дн.",
     "expired": "срок истёк",

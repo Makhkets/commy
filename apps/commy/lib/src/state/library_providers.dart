@@ -130,6 +130,10 @@ class NodeFilter {
   /// Name and host are searched as substrings. The country code has to match
   /// whole: "de" is a country, not two letters that happen to sit inside
   /// "Amsterdam".
+  ///
+  /// The code is the one the row draws its flag from — [NodeLabel] — so a
+  /// server a panel marked with nothing but a flag emoji is still found by
+  /// typing its country.
   bool matches(ProxyNode node) {
     if (query.isEmpty) {
       return true;
@@ -137,7 +141,7 @@ class NodeFilter {
     final needle = query.toLowerCase();
     return node.name.toLowerCase().contains(needle) ||
         node.host.toLowerCase().contains(needle) ||
-        node.countryCode?.toLowerCase() == needle;
+        NodeLabel.of(node).countryCode?.toLowerCase() == needle;
   }
 
   /// Whether [node] is shown.

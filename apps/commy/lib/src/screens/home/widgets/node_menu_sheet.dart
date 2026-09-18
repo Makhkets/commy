@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/node_controller.dart';
-import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/node_descriptors.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
@@ -51,7 +51,7 @@ class NodeMenuSheet extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Text(
-                node.name,
+                NodeLabel.of(node).text,
                 style: context.typography.title2.copyWith(
                   color: colors.textPrimary,
                 ),
@@ -74,7 +74,7 @@ class NodeMenuSheet extends ConsumerWidget {
               title: t.node.measure,
               onTap: () {
                 unawaited(
-                  ref.read(tunnelControllerProvider.notifier).measure(node),
+                  ref.read(measurementProvider.notifier).measureOne(node),
                 );
                 Navigator.of(context).pop();
               },

@@ -181,6 +181,53 @@ void main() {
     });
   });
 
+  /// Found on a device: one link imported, no row tapped, and the only large
+  /// control on the screen did nothing at all.
+  group('the connect button with nothing picked yet', () {
+    test('connects to the first server and makes it the selection', () async {
+      final harness = CommyTestHarness(
+        nodes: <ProxyNode>[
+          testNode(),
+          testNode(id: 'node-2', name: 'Warsaw 01', countryCode: 'PL'),
+        ],
+      );
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+      container
+        ..listen(nodesProvider, (_, __) {})
+        ..listen(coreStatusProvider, (_, __) {});
+      await container.read(nodesProvider.future);
+      await container.read(selectedNodeIdProvider.future);
+
+      final acted =
+          await container.read(tunnelControllerProvider.notifier).toggle();
+
+      expect(acted, isTrue, reason: 'A dead button is the defect.');
+      expect(harness.core.isRunning, isTrue);
+      expect(container.read(selectedNodeIdProvider).value, 'node-1');
+    });
+
+    test('with no server at all it still answers false, for the import sheet',
+        () async {
+      final harness = CommyTestHarness();
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+      container
+        ..listen(nodesProvider, (_, __) {})
+        ..listen(coreStatusProvider, (_, __) {});
+      await container.read(nodesProvider.future);
+      await container.read(selectedNodeIdProvider.future);
+
+      final acted =
+          await container.read(tunnelControllerProvider.notifier).toggle();
+
+      expect(acted, isFalse);
+      expect(harness.core.isRunning, isFalse);
+    });
+  });
+
   group('autoConnect', () {
     test('on, the tunnel comes up with nobody touching the button', () async {
       final harness = CommyTestHarness(
