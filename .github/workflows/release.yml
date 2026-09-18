@@ -105,12 +105,13 @@ jobs:
         working-directory: apps/commy
         run: flutter build appbundle --release
 
-      # One APK per ABI and no universal one (rule R11). The universal APK is
-      # the app three times over: 202 MB against 28 for the file a phone runs,
-      # and "universal" is the one people pick off a releases page.
-      - name: Build APKs
+      # One APK, because one file is what a releases page should offer: three
+      # per-ABI files left people guessing which to take (owner's decision,
+      # 2026-09-18). Built for the two ABIs phones have; the Gradle build
+      # packages native libraries for those and nothing for x86_64 (rule R11).
+      - name: Build the APK
         working-directory: apps/commy
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --target-platform android-arm,android-arm64
 
       # Before anything is collected: a release that outgrew its budget should
       # fail here, with the largest entries listed, not on somebody's phone.
@@ -124,7 +125,7 @@ jobs:
         working-directory: apps/commy
         run: |
           out=build/app/outputs/flutter-apk
-          for apk in "$out"/app-*-release.apk; do
+          for apk in "$out"/app-release.apk; do
             [ -f "$apk" ] || continue
             abi=$(basename "$apk")
             # The underscore matters: the ABI directory is `x86_64`, and a
@@ -145,15 +146,26 @@ jobs:
           suffix=""
           [ "${{ steps.signing.outputs.signed }}" = "true" ] || suffix="-UNSIGNED"
           out=apps/commy/build/app/outputs
-          for f in "$out"/flutter-apk/app-*-release.apk; do
-            [ -f "$f" ] || continue
-            abi=$(basename "$f" | sed -E 's/app-(.*)-release\.apk/\1/')
-            cp "$f" "dist/commy-${v}-${abi}${suffix}.apk"
-          done
-          [ -f "$out/bundle/release/app-release.aab" ] && \
-            cp "$out/bundle/release/app-release.aab" "dist/commy-${v}${suffix}.aab"
-          cp apps/commy/android/app/libs/libbox.aar "dist/libbox-${v}.aar"
+          cp "$out/flutter-apk/app-release.apk" "dist/commy-${v}${suffix}.apk"
           cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      # Not release assets. An .aab does not install on a phone and an .aar is
+      # a library; on the releases page both were two more files to pick the
+      # wrong one from. They stay available here, on the workflow run.
+      - name: Collect what is not for end users
+        run: |
+          mkdir -p extras
+          v="${GITHUB_REF_NAME#v}"
+          out=apps/commy/build/app/outputs
+          [ -f "$out/bundle/release/app-release.aab" ] && \
+            cp "$out/bundle/release/app-release.aab" "extras/commy-${v}.aab"
+          cp apps/commy/android/app/libs/libbox.aar "extras/libbox-${v}.aar"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android-extras
+          path: extras/
+          retention-days: 30
 
       - uses: actions/upload-artifact@v7
         with:

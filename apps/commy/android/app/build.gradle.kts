@@ -41,6 +41,27 @@ val isBundleTask = gradle.startParameter.taskNames.any {
 val isSplitPerAbi =
     (findProperty("split-per-abi")?.toString()?.toBoolean()) ?: false
 
+// `--target-platform android-arm,android-arm64` arrives as this property.
+// Flutter uses it to decide which engine and which Dart snapshot go in; the
+// core comes from libbox.aar, which Flutter knows nothing about, so without
+// help an APK "for two platforms" still carried the 13 MB x86_64 core next to
+// an engine that was not there to load it. The ABIs named here are the only
+// ones whose native libraries are packaged. Absent — `flutter run`, the CI
+// debug build — nothing is excluded.
+val targetAbis: Set<String>? =
+    findProperty("target-platform")?.toString()
+        ?.split(',')
+        ?.mapNotNull {
+            when (it.trim()) {
+                "android-arm" -> "armeabi-v7a"
+                "android-arm64" -> "arm64-v8a"
+                "android-x64" -> "x86_64"
+                else -> null
+            }
+        }
+        ?.toSet()
+        ?.takeIf { it.isNotEmpty() }
+
 android {
     namespace = "dev.commy.app"
 
@@ -128,23 +149,24 @@ android {
             // https://issuetracker.google.com/402800800. The release workflow
             // builds split APKs, a universal APK and an AAB in one job, so this
             // has to be decided per invocation rather than once.
-            isEnable = !isBundleTask
+            // Only when asked for. Left on for every APK build, a universal
+            // build also dropped three per-ABI files beside the one it was
+            // for — among them an x86_64 APK with no core in it, because the
+            // excludes below had done their job on it too.
+            isEnable = isSplitPerAbi && !isBundleTask
             reset()
             // 32-bit ARM is still worth carrying: plenty of cheap phones in the
             // regions this app exists for have never seen an arm64 build.
             include("arm64-v8a", "armeabi-v7a", "x86_64")
-            // The universal APK exists for tooling and for nothing else:
-            // `flutter run` and the CI debug job look for `app-<mode>.apk` by
-            // that exact name and fail without it. It is the same app three
-            // times over — one copy of the core, the engine and the Dart
-            // snapshot per ABI — and as a release it weighed 202 MB against 28
-            // for the one a phone actually runs. It was published once, and
-            // "universal" is the file people pick. So it is built only when
-            // nobody asked for per-ABI files: a release is built with
-            // `--split-per-abi`, gets three APKs and no fourth, and
-            // scripts/check_apk_size.sh fails a release directory that has
-            // one anyway. Rule R11, CLAUDE.md.
-            isUniversalApk = !isSplitPerAbi
+            // One file on the releases page — the owner's decision of
+            // 2026-09-18: three per-ABI APKs left people guessing which to
+            // take. The universal APK is that file. It is built for the two
+            // ABIs phones have (`--target-platform android-arm,android-arm64`)
+            // and carries nothing for x86_64, which only emulators run — see
+            // `targetAbis` above and the `jniLibs` excludes below. Per-ABI
+            // files are still produced by `--split-per-abi` for whoever wants
+            // them; they are not published. Rule R11, CLAUDE.md.
+            isUniversalApk = false
         }
     }
 
@@ -171,6 +193,14 @@ android {
             // itself and serves per-device splits, so there stored libraries
             // cost nothing in transit and save the unpacked copy on disk.
             useLegacyPackaging = !isBundleTask
+            // Only a universal APK needs this: a split already holds one ABI.
+            if (!isSplitPerAbi && !isBundleTask) {
+                targetAbis?.let { wanted ->
+                    listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+                        .filterNot(wanted::contains)
+                        .forEach { excludes += "lib/$it/**" }
+                }
+            }
         }
     }
 

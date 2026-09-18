@@ -16,14 +16,14 @@ The first release that has met a real Android runtime, and the first to be
 held to a size budget. Two things matter more than the rest of this list.
 **Every earlier build crashed on connect** — two Go panics inside our own
 process — so this is the first version that can bring a tunnel up at all. And
-the file to download is **28 MB instead of 202**: take `arm64-v8a` for a phone;
-there is no "universal" APK any more, because it was the same app three times.
+the file to download is **51 MB instead of 202** — and it is the only file
+there is, so there is nothing to choose between.
 
 ### Added
 
 - **A size budget, and rule R11.** The app is to be fast and light, and that is
   now measured rather than hoped for: `scripts/check_apk_size.sh` fails a
-  release whose `arm64-v8a` APK is over 32 MB, and the release workflow runs it
+  release whose APK is over 56 MB, and the release workflow runs it
   before collecting anything. The number moves only in a commit that says what
   the bytes bought. CLAUDE.md R11; docs/08-build-release.md has the table of
   where 202 MB went.
@@ -96,11 +96,16 @@ there is no "universal" APK any more, because it was the same app three times.
 
 ### Changed
 
-- **Releases are one APK per ABI; the universal APK is gone.** It carried one
-  copy of the core, the engine and the Dart snapshot for each of three ABIs —
-  202 MB — and "universal" is the file people take off a releases page. Gradle
-  still produces one for `flutter run`, which looks for that file name; the
-  release workflow no longer builds it and the size check rejects it.
+- **A release is one APK.** Three per-ABI files on the releases page left
+  people guessing which to take, so there is one again — but not the old one.
+  That carried a copy of the core, the engine and the Dart snapshot for three
+  ABIs, x86_64 included, which only emulators run: 202 MB. This one is built
+  for the two ABIs phones have, and the Gradle build now packages native
+  libraries only for the platforms it was asked for — before, the 13 MB
+  x86_64 core rode along even in an APK with no x86_64 engine to load it.
+  51 MB. The `.aab` and `libbox.aar` are no longer release assets either;
+  they stay on the workflow run. Per-ABI APKs can still be built locally with
+  `--split-per-abi`.
 - **Native libraries are compressed inside the APK.** 66 of the 69 MB of an
   arm64 APK were libraries stored as-is; `libbox.so` alone is 39 MB that
   deflates to 13. An APK from the releases page is downloaded exactly as built,
