@@ -30,7 +30,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 /// open behind it.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LocaleSettings.useDeviceLocale();
 
   // The redactor is commy_data's, not commy_core's thinner default: the core
   // package cannot depend on commy_data, so this line is the only thing
@@ -38,9 +37,17 @@ Future<void> main() async {
   final logger = AppLogger(redact: const LogRedactor().redact);
   final secureStore = FlutterSecureStore();
   final vault = SecretVault(store: secureStore);
-  final opened = await openCommyDatabase(
-    encryption: DatabaseEncryption(vault: vault),
-  );
+
+  // Everything the first frame waits for, started together (rule R11). The
+  // three have nothing to do with one another — the locale, a keystore read
+  // plus a database open, and a plugin call — and awaited one after another
+  // the splash screen stayed up for their sum rather than for the slowest of
+  // them, which is the database by a wide margin.
+  final (_, opened, package) = await (
+    LocaleSettings.useDeviceLocale(),
+    openCommyDatabase(encryption: DatabaseEncryption(vault: vault)),
+    PackageInfo.fromPlatform(),
+  ).wait;
   if (opened.isDegraded) {
     // Said out loud rather than swallowed. docs/adr/0007 accepts an
     // unencrypted database file for 1.0; it does not accept pretending.
@@ -49,8 +56,6 @@ Future<void> main() async {
       tag: bootLogTag,
     );
   }
-
-  final package = await PackageInfo.fromPlatform();
 
   runApp(
     ProviderScope(

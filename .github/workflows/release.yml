@@ -105,13 +105,17 @@ jobs:
         working-directory: apps/commy
         run: flutter build appbundle --release
 
+      # One APK per ABI and no universal one (rule R11). The universal APK is
+      # the app three times over: 202 MB against 28 for the file a phone runs,
+      # and "universal" is the one people pick off a releases page.
       - name: Build APKs
         working-directory: apps/commy
         run: flutter build apk --release --split-per-abi
 
-      - name: Build universal APK
-        working-directory: apps/commy
-        run: flutter build apk --release
+      # Before anything is collected: a release that outgrew its budget should
+      # fail here, with the largest entries listed, not on somebody's phone.
+      - name: Hold the APKs to their size budget
+        run: scripts/check_apk_size.sh
 
       # Gradle happily produces an APK with no native library in it. That
       # installs, opens, and cannot connect to anything — the worst possible
@@ -120,7 +124,7 @@ jobs:
         working-directory: apps/commy
         run: |
           out=build/app/outputs/flutter-apk
-          for apk in "$out"/app-*-release.apk "$out"/app-release.apk; do
+          for apk in "$out"/app-*-release.apk; do
             [ -f "$apk" ] || continue
             abi=$(basename "$apk")
             # The underscore matters: the ABI directory is `x86_64`, and a
@@ -146,8 +150,6 @@ jobs:
             abi=$(basename "$f" | sed -E 's/app-(.*)-release\.apk/\1/')
             cp "$f" "dist/commy-${v}-${abi}${suffix}.apk"
           done
-          [ -f "$out/flutter-apk/app-release.apk" ] && \
-            cp "$out/flutter-apk/app-release.apk" "dist/commy-${v}-universal${suffix}.apk"
           [ -f "$out/bundle/release/app-release.aab" ] && \
             cp "$out/bundle/release/app-release.aab" "dist/commy-${v}${suffix}.aab"
           cp apps/commy/android/app/libs/libbox.aar "dist/libbox-${v}.aar"

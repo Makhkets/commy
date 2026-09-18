@@ -34,6 +34,13 @@ val isBundleTask = gradle.startParameter.taskNames.any {
     it.contains("bundle", ignoreCase = true)
 }
 
+// `flutter build apk --split-per-abi` arrives here as this Gradle property.
+// Flutter's own plugin reads it too and switches the universal APK off — but
+// it configures `splits` before the block below runs, so whatever that block
+// says about `isUniversalApk` wins. It has to ask the same question itself.
+val isSplitPerAbi =
+    (findProperty("split-per-abi")?.toString()?.toBoolean()) ?: false
+
 android {
     namespace = "dev.commy.app"
 
@@ -126,16 +133,44 @@ android {
             // 32-bit ARM is still worth carrying: plenty of cheap phones in the
             // regions this app exists for have never seen an arm64 build.
             include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = true
+            // The universal APK exists for tooling and for nothing else:
+            // `flutter run` and the CI debug job look for `app-<mode>.apk` by
+            // that exact name and fail without it. It is the same app three
+            // times over — one copy of the core, the engine and the Dart
+            // snapshot per ABI — and as a release it weighed 202 MB against 28
+            // for the one a phone actually runs. It was published once, and
+            // "universal" is the file people pick. So it is built only when
+            // nobody asked for per-ABI files: a release is built with
+            // `--split-per-abi`, gets three APKs and no fourth, and
+            // scripts/check_apk_size.sh fails a release directory that has
+            // one anyway. Rule R11, CLAUDE.md.
+            isUniversalApk = !isSplitPerAbi
         }
     }
 
     packaging {
         jniLibs {
-            // libbox.so is ~39 MB uncompressed. Keeping it uncompressed lets the
-            // loader mmap it straight out of the APK instead of unpacking a copy
-            // into the data partition on install.
-            useLegacyPackaging = false
+            // Compressed inside an APK, stored inside a bundle.
+            //
+            // 66 of the 69 MB of an arm64 APK were native libraries stored
+            // as-is, and libbox.so alone is 39 MB that deflates to 13. An APK
+            // from the releases page is downloaded exactly as it is built —
+            // nothing between GitHub and the phone compresses it — so stored
+            // libraries cost every user 40 MB of download for nothing they can
+            // see. Compressed, the same app is a 28 MB file.
+            //
+            // The price is on the device: the installer unpacks the libraries
+            // next to the APK, so the installed size grows by roughly what the
+            // download shrank. It is paid once, at install, and buys nothing
+            // back at run time either way — a library mapped from the APK and
+            // one mapped from a file start equally fast. For a client people
+            // fetch over the very connection it is meant to fix, the download
+            // is the number that matters.
+            //
+            // A bundle is the opposite case: Play compresses the download
+            // itself and serves per-device splits, so there stored libraries
+            // cost nothing in transit and save the unpacked copy on disk.
+            useLegacyPackaging = !isBundleTask
         }
     }
 
