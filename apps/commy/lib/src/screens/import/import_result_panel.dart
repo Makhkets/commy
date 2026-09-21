@@ -33,6 +33,10 @@ class ImportResultPanel extends ConsumerWidget {
 
     final outcome = state.outcome ?? ParseOutcome.empty;
     if (!outcome.hasNodes) {
+      // A panel that refused said why, and its words beat our guess about
+      // the link. "Check that the text holds a vless:// link" is the wrong
+      // advice for a link that was fine and an answer that was "no".
+      final refused = state.panelNotices.isNotEmpty;
       return Padding(
         padding: EdgeInsets.all(spacing.s4),
         child: Column(
@@ -40,9 +44,13 @@ class ImportResultPanel extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             EmptyState(
-              icon: CommyIcons.empty,
-              title: t.import.result.nothing,
-              message: t.import.result.nothingBody,
+              icon: refused ? CommyIcons.warning : CommyIcons.empty,
+              title: refused
+                  ? t.subscription.panelSaid
+                  : t.import.result.nothing,
+              message: refused
+                  ? state.panelNotices.join('\n')
+                  : t.import.result.nothingBody,
             ),
             SizedBox(height: spacing.s4),
             CommyButton(

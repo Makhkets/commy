@@ -11,32 +11,35 @@ class StoredDeviceIdentity implements DeviceIdentity {
   /// Creates the identity.
   ///
   /// [platformName] is what `x-device-os` carries — `Android`, `iOS`,
-  /// `Windows`, `macOS`, `Linux`, spelled the way panels list them.
-  /// [platformVersion] and [deviceModel] are sent only when known; a header
-  /// with a guess in it is worse than a header that is absent.
-  const StoredDeviceIdentity({
+  /// `Windows`, `macOS`, `Linux`, spelled the way panels list them. It is the
+  /// one field `dart:io` can answer, so it is the one that is not asked for.
+  ///
+  /// [describeDevice] supplies the other two, and it is a supplier rather than
+  /// a pair of values because only the platform channel knows them and a
+  /// channel call is asynchronous. Asked **once** and remembered: the model of
+  /// a phone does not change while the app is open, and the version only does
+  /// across a reboot that takes the process with it.
+  StoredDeviceIdentity({
     required SecureStore store,
     required SettingsRepository settings,
     required IdGenerator ids,
     required this.platformName,
-    this.platformVersion,
-    this.deviceModel,
+    Future<DeviceDescription?> Function()? describeDevice,
   })  : _store = store,
         _settings = settings,
-        _ids = ids;
+        _ids = ids,
+        _describeDevice = describeDevice;
 
   final SecureStore _store;
   final SettingsRepository _settings;
   final IdGenerator _ids;
+  final Future<DeviceDescription?> Function()? _describeDevice;
 
   /// Name of the operating system, as panels spell it.
   final String platformName;
 
-  /// Version of the operating system, when it could be read.
-  final String? platformVersion;
-
-  /// Model of the device, when it could be read.
-  final String? deviceModel;
+  /// The answer to [_describeDevice], once it has been asked.
+  Future<DeviceDescription?>? _described;
 
   @override
   Future<Map<String, String>> subscriptionHeaders() async {
@@ -47,8 +50,9 @@ class StoredDeviceIdentity implements DeviceIdentity {
       if (!allowed) {
         return const <String, String>{};
       }
-      final version = platformVersion?.trim() ?? '';
-      final model = deviceModel?.trim() ?? '';
+      final described = await _describe();
+      final version = described?.osVersion ?? '';
+      final model = described?.model ?? '';
       return <String, String>{
         DeviceIdentity.hwidHeader: await _readOrCreate(),
         DeviceIdentity.osHeader: platformName,
@@ -71,6 +75,23 @@ class StoredDeviceIdentity implements DeviceIdentity {
     } on Object catch (error) {
       return Err<void, CommyFailure>(StorageFailure(error));
     }
+  }
+
+  /// The device description, asked for at most once.
+  ///
+  /// The future is cached rather than its value, so two refreshes racing at
+  /// launch make one channel call between them instead of two.
+  Future<DeviceDescription?> _describe() {
+    final supplier = _describeDevice;
+    if (supplier == null) {
+      return Future<DeviceDescription?>.value();
+    }
+    return _described ??= supplier().catchError(
+      // A platform that will not answer leaves the two optional headers out.
+      // It must not turn a subscription refresh into a failure about
+      // something the user never asked for.
+      (Object _) => null,
+    );
   }
 
   Future<String> _readOrCreate() async {

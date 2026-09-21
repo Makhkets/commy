@@ -58,6 +58,11 @@ internal object Wire {
      *
      * [INSTALLED_APPS] is the third. Per-app routing is stored and generated
      * entirely on the Dart side, but only this side can say which apps exist.
+     *
+     * [DEVICE_INFO] is the fourth, and it exists so that a dependency does
+     * not. `dart:io` reports a kernel build string where a panel wants
+     * "16" and has no word at all for the model; `device_info_plus` would
+     * bring native code along for three strings (CLAUDE.md §7.2).
      */
     object Methods {
         const val START = "start"
@@ -70,6 +75,7 @@ internal object Wire {
         const val OPEN_VPN_SETTINGS = "openVpnSettings"
         const val SET_START_ON_BOOT = "setStartOnBoot"
         const val INSTALLED_APPS = "installedApps"
+        const val DEVICE_INFO = "deviceInfo"
     }
 
     /** JSON field names. Matches `WireKeys`. */
@@ -123,6 +129,11 @@ internal object Wire {
         const val PACKAGE = "package"
         const val LABEL = "label"
         const val IS_SYSTEM = "isSystem"
+
+        // deviceInfo.
+        const val OS = "os"
+        const val OS_VERSION = "osVersion"
+        const val MODEL = "model"
     }
 
     /** `/status` state values. Matches `WireStates`. */

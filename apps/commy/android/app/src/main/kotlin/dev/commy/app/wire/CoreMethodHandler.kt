@@ -134,8 +134,31 @@ internal class CoreMethodHandler(
 
         Wire.Methods.INSTALLED_APPS -> installedApps()
 
+        Wire.Methods.DEVICE_INFO -> deviceInfo()
+
         else -> null
     }
+
+    /**
+     * What this device calls itself, as `{os, osVersion, model}`.
+     *
+     * Three strings for the subscription request (#21, queue): panels that
+     * limit devices list them by `x-device-os`, `x-ver-os` and
+     * `x-device-model`, and `dart:io` can supply none of them honestly — it
+     * reports a kernel build string where a panel wants `16`, and has no
+     * notion of a model at all.
+     *
+     * `Build.MODEL` is the marketing name of the hardware ("Pixel 8"), the
+     * same string Happ and INCY send. It is not an identifier: millions of
+     * devices share it, it does not change when the app is reinstalled, and
+     * it is one of the values the device sends to every website in its
+     * user agent already.
+     */
+    private fun deviceInfo(): String = JSONObject()
+        .put(Wire.Keys.OS, ANDROID)
+        .put(Wire.Keys.OS_VERSION, Build.VERSION.RELEASE.orEmpty())
+        .put(Wire.Keys.MODEL, Build.MODEL.orEmpty())
+        .toString()
 
     /**
      * Every app the launcher can start, as `[{package, label, isSystem}]`.
@@ -221,6 +244,9 @@ internal class CoreMethodHandler(
 
         const val DEFAULT_TIMEOUT_MS = 5_000L
 
+        /** `x-device-os`, spelled the way panels list devices. */
+        const val ANDROID = "Android"
+
         val KNOWN = setOf(
             Wire.Methods.START,
             Wire.Methods.STOP,
@@ -232,6 +258,7 @@ internal class CoreMethodHandler(
             Wire.Methods.OPEN_VPN_SETTINGS,
             Wire.Methods.SET_START_ON_BOOT,
             Wire.Methods.INSTALLED_APPS,
+            Wire.Methods.DEVICE_INFO,
         )
     }
 }

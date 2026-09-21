@@ -76,16 +76,18 @@ final subscriptionFetcherProvider = Provider<SubscriptionFetcher>((ref) {
 /// encrypted store and the switch in the settings; both are read on every
 /// fetch, so turning it off or resetting it takes effect on the next refresh.
 ///
-/// The version of the OS and the model of the device are deliberately absent
-/// for now: `dart:io` reports a build string for the first and nothing for the
-/// second, and a header with a guess in it is worse than no header. They
-/// arrive with the `deviceInfo` channel method — docs/15-handoff.md § 0.1.
+/// The version of the OS and the model of the device come from the platform
+/// channel rather than from `dart:io`, which reports a kernel build string for
+/// the first and nothing at all for the second. Asked once, lazily, and only
+/// if the switch is on — see `SystemSettings.deviceInfo`.
 final deviceIdentityProvider = Provider<DeviceIdentity>((ref) {
+  final system = ref.watch(systemSettingsProvider);
   return StoredDeviceIdentity(
     store: ref.watch(secureStoreProvider),
     settings: ref.watch(settingsRepositoryProvider),
     ids: ref.watch(idGeneratorProvider),
     platformName: _platformName(),
+    describeDevice: system.deviceInfo,
   );
 });
 

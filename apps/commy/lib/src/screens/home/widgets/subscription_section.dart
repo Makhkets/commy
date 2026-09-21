@@ -4,6 +4,7 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/screens/home/widgets/measure_progress_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
+import 'package:commy/src/screens/home/widgets/panel_notice_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/measurement_controller.dart';
@@ -44,6 +45,8 @@ class SubscriptionSection extends ConsumerWidget {
     final measuring = ref.watch(measurementProvider);
     final isMeasuringThis = measuring.scopeId == subscription.id;
     final info = subscription.userInfo;
+    final notices =
+        ref.watch(panelNoticesProvider)[subscription.id] ?? const <String>[];
     final now = ref.watch(clockProvider).value ?? DateTime.now();
 
     return SubscriptionCard(
@@ -80,6 +83,9 @@ class SubscriptionSection extends ConsumerWidget {
         ),
       ),
       nodes: <Widget>[
+        // Above the servers, because when it is there they are usually not:
+        // a panel that answers with a notice answers with nothing else.
+        if (notices.isNotEmpty) PanelNoticeRow(messages: notices),
         if (isMeasuringThis) const MeasureProgressRow(),
         for (final node in nodes)
           NodeRow(node: node, isActive: node.id == activeId),

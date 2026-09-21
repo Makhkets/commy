@@ -49,6 +49,16 @@ abstract final class WireMethods {
   /// not a trade worth making.
   static const String installedApps = 'installedApps';
 
+  /// What the device calls itself: `{os, osVersion, model}`, as a string.
+  ///
+  /// No argument. Not a tunnel command, and it exists so that a dependency
+  /// does not: panels that limit devices per subscription list them by
+  /// `x-device-os`, `x-ver-os` and `x-device-model`, and `dart:io` answers
+  /// none of the three honestly — a kernel build string where a panel wants
+  /// `16`, and no notion of a model at all. `device_info_plus` would bring
+  /// native code along for three strings (CLAUDE.md §7, point 2).
+  static const String deviceInfo = 'deviceInfo';
+
   /// Turns the boot receiver on or off. Argument: a bare `bool`. No result.
   ///
   /// Not a tunnel command either. "Connect on boot" is a stored setting on

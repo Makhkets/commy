@@ -483,6 +483,35 @@ void main() {
       expect(result.failureOrNull, isA<ConfigInvalidFailure>());
     });
 
+    test('refuses a panel notice, however it got into the selection', () {
+      // The app keeps these out of every list, so the user cannot pick one —
+      // but a stored selection outlives the panel that changed its mind, and
+      // `0.0.0.0` in an outbound is a tunnel that comes up and dials nowhere.
+      const notice = ProxyNode(
+        id: 'x',
+        name: 'App not supported',
+        protocol: Protocol.vless,
+        host: '0.0.0.0',
+        port: 1,
+        params: <String, Object?>{'uuid': 'u'},
+      );
+      final result = const SingBoxConfigBuilder().build(
+        SingBoxBuildRequest.single(
+          node: notice,
+          routing: RoutingPolicy.defaults,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+
+      final failure = result.failureOrNull;
+      expect(failure, isA<ConfigInvalidFailure>());
+      // The message has to name the entry, because the user's question is
+      // "which of my servers is this about".
+      expect((failure! as ConfigInvalidFailure).detail, contains('App not'));
+    });
+
     test('refuses a Reality node with no public key', () {
       const broken = ProxyNode(
         id: 'x',

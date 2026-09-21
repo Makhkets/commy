@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:commy_core/src/android/installed_app.dart';
 import 'package:commy_core/src/wire/wire_channels.dart';
 import 'package:commy_core/src/wire/wire_json.dart';
 import 'package:commy_core/src/wire/wire_methods.dart';
+import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/services.dart';
 
 /// The system-side switches Commy can flip but cannot replace.
 ///
-/// Three so far. [openVpnSettings] exists for a reason worth stating: an
+/// Four so far. [openVpnSettings] exists for a reason worth stating: an
 /// application-level kill switch is a promise an application cannot keep. If
 /// the process is killed — by the user, by the system, by an out-of-memory
 /// reaper — there is nothing left running to block traffic with. Android's own
@@ -22,6 +25,12 @@ class SystemSettings {
       : _channel = channel ?? const MethodChannel(WireChannels.method);
 
   final MethodChannel _channel;
+
+  /// How long [deviceInfo] waits for the platform before giving up.
+  ///
+  /// Generous for three strings read out of `Build`, and short enough that a
+  /// platform which never answers cannot hold a subscription refresh.
+  static const Duration answerWithin = Duration(seconds: 2);
 
   /// Opens the system VPN settings screen.
   ///
@@ -53,6 +62,45 @@ class SystemSettings {
       return false;
     } on PlatformException {
       return false;
+    }
+  }
+
+  /// What the device calls itself, or `null` where nothing can say.
+  ///
+  /// Exists so that a dependency does not. A panel that limits devices per
+  /// subscription lists them by name and version, and `dart:io` answers
+  /// neither honestly: `Platform.operatingSystemVersion` on Android is a
+  /// kernel build string where the panel wants `16`, and there is no model at
+  /// all. `device_info_plus` would bring native code along for three strings
+  /// (CLAUDE.md §7, point 2).
+  ///
+  /// Null on every platform without the method, and null rather than a
+  /// half-filled description: the caller sends the headers it has, and a
+  /// header holding a guess is worse than one that is absent, because the
+  /// panel stores it and shows it back to the user.
+  Future<DeviceDescription?> deviceInfo() async {
+    final String? raw;
+    try {
+      raw = await _channel
+          .invokeMethod<String>(WireMethods.deviceInfo)
+          // Bounded, because the caller is a subscription refresh and these
+          // two headers are optional to it. A platform that answers nothing
+          // must cost the headers, not the refresh.
+          .timeout(answerWithin, onTimeout: () => null);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      return DeviceDescription.fromJson(
+        WireJson.object(raw, WireMethods.deviceInfo),
+      );
+    } on Object {
+      return null;
     }
   }
 

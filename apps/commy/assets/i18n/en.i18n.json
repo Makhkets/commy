@@ -180,7 +180,8 @@
       "confirm": "Delete",
       "cancel": "Cancel"
     },
-    "linkCopied": "Link copied"
+    "linkCopied": "Link copied",
+    "panelSaid": "Your panel sent this instead of servers:"
   },
 
   "node": {

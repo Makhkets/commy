@@ -195,6 +195,17 @@ class SingBoxConfigBuilder {
       if (node.host.trim().isEmpty) {
         throw ConfigBuildException('Node "${node.name}" has no server address');
       }
+      // The backstop for a panel notice. The app keeps these out of every
+      // list, so the user cannot pick one — but a stored selection can outlive
+      // the panel that changed its mind, and `0.0.0.0` in an outbound is a
+      // tunnel that comes up and dials nowhere, which is the failure that is
+      // hardest to read from the outside.
+      if (PanelNotice.isUnspecified(node.host)) {
+        throw ConfigBuildException(
+          '"${node.name}" is a message from the panel, not a server: its '
+          'address is ${node.host.trim()}',
+        );
+      }
       if (node.port < 1 || node.port > 65535) {
         throw ConfigBuildException(
           'Node "${node.name}" has port ${node.port}, which is not a port',

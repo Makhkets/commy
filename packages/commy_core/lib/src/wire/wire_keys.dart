@@ -121,4 +121,15 @@ abstract final class WireKeys {
 
   /// Whether the app shipped with the system image.
   static const String isSystem = 'isSystem';
+
+  // deviceInfo()
+
+  /// Operating system name, spelled the way panels list devices.
+  static const String os = 'os';
+
+  /// Operating system version, as a user would read it: `16`, not a build.
+  static const String osVersion = 'osVersion';
+
+  /// Marketing name of the hardware, e.g. `Pixel 8`.
+  static const String model = 'model';
 }

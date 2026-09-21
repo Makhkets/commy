@@ -11,6 +11,7 @@ class SubscriptionSyncResult {
     required this.subscription,
     required this.outcome,
     this.updatedExisting = false,
+    this.panelNotices = const <String>[],
   });
 
   /// The stored subscription, metadata already refreshed.
@@ -18,6 +19,13 @@ class SubscriptionSyncResult {
 
   /// Nodes that were imported and entries that were skipped.
   final ParseOutcome outcome;
+
+  /// What the panel sent in place of servers, in its own words.
+  ///
+  /// Empty for a panel that behaved. When it is not, [outcome] is usually
+  /// empty too — a panel that answers with a notice answers with nothing
+  /// else — and this is the only part of the response worth reading.
+  final List<String> panelNotices;
 
   /// Whether this landed on a subscription the user already had.
   ///
@@ -39,10 +47,28 @@ class SubscriptionSyncResult {
       other is SubscriptionSyncResult &&
           other.subscription == subscription &&
           other.outcome == outcome &&
-          other.updatedExisting == updatedExisting;
+          other.updatedExisting == updatedExisting &&
+          _sameNotices(other.panelNotices);
 
   @override
-  int get hashCode => Object.hash(subscription, outcome, updatedExisting);
+  int get hashCode => Object.hash(
+        subscription,
+        outcome,
+        updatedExisting,
+        Object.hashAll(panelNotices),
+      );
+
+  bool _sameNotices(List<String> other) {
+    if (other.length != panelNotices.length) {
+      return false;
+    }
+    for (var index = 0; index < other.length; index++) {
+      if (other[index] != panelNotices[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   @override
   String toString() =>

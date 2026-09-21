@@ -568,6 +568,20 @@ class _RecordingSystemSettings extends SystemSettings {
     startOnBootCalls.add(enabled);
     return true;
   }
+
+  /// Answers what a device would, without a channel.
+  ///
+  /// Overridden for a reason worth naming: the real one invokes a method
+  /// channel, and awaiting that inside `testWidgets` never completes — the
+  /// reply arrives on a queue the test's fake clock does not drive. A test
+  /// that touches the device identity would hang rather than fail, which is
+  /// the worst way for a test to be wrong.
+  @override
+  Future<DeviceDescription?> deviceInfo() async => const DeviceDescription(
+        os: 'Android',
+        osVersion: '16',
+        model: 'Pixel Test',
+      );
 }
 
 /// A [SettingsRepository] that reads like the harness's one and saves nothing.

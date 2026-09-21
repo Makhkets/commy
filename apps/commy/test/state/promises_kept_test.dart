@@ -228,6 +228,77 @@ void main() {
     });
   });
 
+  group('a panel notice is not a server', () {
+    /// What a panel that will not serve this client sends instead of a list:
+    /// one entry addressed at nowhere, with the reason where the name goes.
+    ProxyNode notice({String name = 'App not supported'}) => ProxyNode(
+          id: 'notice-1',
+          name: name,
+          protocol: Protocol.vless,
+          host: '0.0.0.0',
+          port: 1,
+          subscriptionId: 'sub-1',
+        );
+
+    test('never reaches the server list', () async {
+      // The filter lives on `nodesProvider`, which is the one place the whole
+      // app reads the list from — so this also keeps it out of the Auto
+      // group, out of the generated document, and out of the row the connect
+      // button falls back to.
+      final harness = CommyTestHarness(
+        nodes: <ProxyNode>[notice(), testNode()],
+      );
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+      container.listen(nodesProvider, (_, __) {});
+
+      final listed = await container.read(nodesProvider.future);
+
+      expect(listed.map((node) => node.id), <String>['node-1']);
+    });
+
+    test('the connect button does not fall back to it', () async {
+      // The failure this closes: one entry imported, nothing selected, and
+      // the large control on the screen dialling `0.0.0.0`.
+      final harness = CommyTestHarness(nodes: <ProxyNode>[notice()]);
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+      container
+        ..listen(nodesProvider, (_, __) {})
+        ..listen(coreStatusProvider, (_, __) {});
+      await container.read(nodesProvider.future);
+      await container.read(selectedNodeIdProvider.future);
+
+      final acted =
+          await container.read(tunnelControllerProvider.notifier).toggle();
+
+      // False, not "connected to nothing": there is no server, so the caller
+      // sends the user to the import sheet.
+      expect(acted, isFalse);
+      expect(harness.core.isRunning, isFalse);
+    });
+
+    test('what the panel said is kept, under its subscription', () async {
+      final harness = CommyTestHarness(
+        nodes: <ProxyNode>[notice(name: 'Device limit reached')],
+      );
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+      container.listen(storedRowsProvider, (_, __) {});
+      await container.read(storedRowsProvider.future);
+
+      expect(
+        container.read(panelNoticesProvider),
+        <String, List<String>>{
+          'sub-1': <String>['Device limit reached'],
+        },
+      );
+    });
+  });
+
   group('the log after a connect', () {
     /// Silent: the default sink writes to the platform log viewer, which in a
     /// test run is just noise.
@@ -757,6 +828,15 @@ class _RecordingSystemSettings extends SystemSettings {
     startOnBoot.add(enabled);
     return true;
   }
+
+  /// Answers what a device would, without a channel.
+  ///
+  /// The real one invokes a method channel, and awaiting that inside a
+  /// widget test never completes — the reply arrives on a queue the test's
+  /// fake clock does not drive.
+  @override
+  Future<DeviceDescription?> deviceInfo() async =>
+      const DeviceDescription(os: 'Android', osVersion: '16');
 }
 
 /// A core whose reachability probe answers only when the test says so.

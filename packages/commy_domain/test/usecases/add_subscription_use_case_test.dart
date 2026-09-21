@@ -277,6 +277,44 @@ void main() {
       });
     });
 
+    group('a panel that answers with a notice', () {
+      ProxyNode notice() => buildNode(id: 'stub', name: 'App not supported')
+          .copyWith(host: '0.0.0.0', port: 1);
+
+      test('reports no servers, and says what the panel said', () async {
+        // "Imported 1 server" for an entry addressed at nowhere is the
+        // report that sent the owner looking for a server that was never
+        // there.
+        final useCase = _useCase(
+          parser: StubLinkParser(ParseOutcome(nodes: <ProxyNode>[notice()])),
+          nodes: RecordingNodeRepository(),
+        );
+
+        final result = await useCase(url: _url);
+
+        expect(result.valueOrNull?.importedCount, 0);
+        expect(
+          result.valueOrNull?.panelNotices,
+          <String>['App not supported'],
+        );
+      });
+
+      test('keeps the row, so the card can show it later', () async {
+        // Reported as not-a-server, stored all the same: the subscription
+        // card reads it back after a restart, when the import sheet is long
+        // gone.
+        final nodes = RecordingNodeRepository();
+        final useCase = _useCase(
+          parser: StubLinkParser(ParseOutcome(nodes: <ProxyNode>[notice()])),
+          nodes: nodes,
+        );
+
+        await useCase(url: _url);
+
+        expect(nodes.stored.single.host, '0.0.0.0');
+      });
+    });
+
     test('a stored URL the keystore lost stops the add rather than guessing',
         () async {
       // The placeholder a row falls back to could be this very subscription.

@@ -1,6 +1,7 @@
 import 'package:commy_domain/src/core/failure.dart';
 import 'package:commy_domain/src/core/result.dart';
 import 'package:commy_domain/src/entities/node_duplicates.dart';
+import 'package:commy_domain/src/entities/panel_notice.dart';
 import 'package:commy_domain/src/entities/parse_outcome.dart';
 import 'package:commy_domain/src/entities/proxy_node.dart';
 import 'package:commy_domain/src/entities/subscription_sync_result.dart';
@@ -107,10 +108,15 @@ class UpdateSubscriptionUseCase {
         return Err<SubscriptionSyncResult, CommyFailure>(replaceFailure);
       }
 
+      // Stored whole, reported as servers. The notices stay in the store so
+      // the subscription card can show what the panel said; they are not
+      // servers, so they are not what "imported 3" counts.
+      final servers = PanelNotice.servers(storedNodes);
       return Ok<SubscriptionSyncResult, CommyFailure>(
         SubscriptionSyncResult(
           subscription: refreshed,
-          outcome: outcome.copyWith(nodes: storedNodes),
+          outcome: outcome.copyWith(nodes: servers),
+          panelNotices: PanelNotice.messages(storedNodes),
         ),
       );
     } on Object catch (error, stackTrace) {

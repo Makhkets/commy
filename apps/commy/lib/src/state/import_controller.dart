@@ -100,6 +100,7 @@ class ImportState {
     this.outcome,
     this.failure,
     this.updatedExisting = false,
+    this.panelNotices = const <String>[],
   });
 
   /// Nothing has been tried.
@@ -113,6 +114,14 @@ class ImportState {
 
   /// What the last import failed with.
   final CommyFailure? failure;
+
+  /// What the panel sent in place of servers, in its own words.
+  ///
+  /// A panel that will not serve this client answers with one entry addressed
+  /// at nowhere and the reason where a name goes. The sheet has to say it:
+  /// "no servers found, check your link" is the wrong advice when the link
+  /// was fine and the panel simply refused.
+  final List<String> panelNotices;
 
   /// Whether the last import landed on a subscription the user already had.
   ///
@@ -131,11 +140,18 @@ class ImportState {
           other.isBusy == isBusy &&
           other.outcome == outcome &&
           other.failure == failure &&
-          other.updatedExisting == updatedExisting;
+          other.updatedExisting == updatedExisting &&
+          other.panelNotices.length == panelNotices.length &&
+          other.panelNotices.join() == panelNotices.join();
 
   @override
-  int get hashCode =>
-      Object.hash(isBusy, outcome, failure, updatedExisting);
+  int get hashCode => Object.hash(
+        isBusy,
+        outcome,
+        failure,
+        updatedExisting,
+        Object.hashAll(panelNotices),
+      );
 
   @override
   String toString() => 'ImportState(busy: $isBusy, $outcome, $failure)';
@@ -238,6 +254,7 @@ class ImportController extends Notifier<ImportState> {
       ImportState(
         outcome: outcome,
         updatedExisting: synced?.updatedExisting ?? false,
+        panelNotices: synced?.panelNotices ?? const <String>[],
       ),
     );
     return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;

@@ -11,8 +11,45 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Every stored server, in display order.
+///
+/// Servers only: a panel that will not serve this client answers with one
+/// entry addressed at `0.0.0.0` and the explanation where the name goes, and
+/// that entry is a message, not somewhere to connect. It is filtered out here,
+/// at the one place the whole app reads the list from, so it cannot appear as
+/// a row, be counted towards the Auto group, be the server a first connect
+/// falls back to, or end up in the generated document. What the panel actually
+/// said is [panelNoticesProvider].
 final nodesProvider = StreamProvider<List<ProxyNode>>((ref) {
+  return ref
+      .watch(nodeRepositoryProvider)
+      .watchAll()
+      .map(PanelNotice.servers);
+});
+
+/// Every stored row, including the ones that are messages rather than servers.
+///
+/// Only [panelNoticesProvider] has any business with this. Everything else
+/// wants [nodesProvider], and the difference is the whole point.
+final storedRowsProvider = StreamProvider<List<ProxyNode>>((ref) {
   return ref.watch(nodeRepositoryProvider).watchAll();
+});
+
+/// What each subscription's panel said instead of sending servers.
+///
+/// Keyed by subscription id. Empty for a panel that behaved: a subscription
+/// with servers has nothing to explain.
+final panelNoticesProvider = Provider<Map<String, List<String>>>((ref) {
+  final rows = ref.watch(storedRowsProvider).value ?? const <ProxyNode>[];
+  final bySubscription = <String, List<String>>{};
+  for (final row in rows) {
+    final subscriptionId = row.subscriptionId;
+    final message = PanelNotice.messageOf(row);
+    if (subscriptionId == null || message == null) {
+      continue;
+    }
+    bySubscription.putIfAbsent(subscriptionId, () => <String>[]).add(message);
+  }
+  return Map<String, List<String>>.unmodifiable(bySubscription);
 });
 
 /// Hand-made groups (a subscription is not one of these).

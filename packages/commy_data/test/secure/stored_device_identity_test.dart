@@ -45,8 +45,14 @@ void main() {
         settings: settings,
         ids: _Ids(),
         platformName: 'Android',
-        platformVersion: '15',
-        deviceModel: model,
+        // Version and model arrive from the platform channel now, so the test
+        // stands in for it rather than passing two literals the class no
+        // longer knows how to be told.
+        describeDevice: () async => DeviceDescription(
+          os: 'Android',
+          osVersion: '15',
+          model: model,
+        ),
       );
 
   setUp(() {
@@ -128,6 +134,69 @@ void main() {
       final sent = adapter.requests.single.headers;
       expect(sent['x-hwid'], 'hwid-1');
       expect(sent['x-device-os'], 'Android');
+    });
+
+    test('carries the version and model the platform reported', () async {
+      // The pair #21 was missing: `dart:io` answers a kernel build string for
+      // the version and nothing at all for the model, so they come from the
+      // `deviceInfo` channel method instead.
+      final adapter = StubHttpAdapter.text('vless://a@b:443#One');
+      final fetcher = HttpSubscriptionFetcher(
+        client: clientWith(adapter),
+        payloadMapper: testMapper,
+        identity: identity(model: 'Pixel 8'),
+      );
+
+      await fetcher.fetch(Fixtures.subscriptionUrl, throughTunnel: false);
+
+      final sent = adapter.requests.single.headers;
+      expect(sent['x-ver-os'], '15');
+      expect(sent['x-device-model'], 'Pixel 8');
+    });
+
+    test('leaves out what the platform could not answer', () async {
+      // A header holding a guess is worse than one that is absent: the panel
+      // stores it and shows it back to the user as the name of their device.
+      final adapter = StubHttpAdapter.text('vless://a@b:443#One');
+      final fetcher = HttpSubscriptionFetcher(
+        client: clientWith(adapter),
+        payloadMapper: testMapper,
+        identity: StoredDeviceIdentity(
+          store: store,
+          settings: settings,
+          ids: _Ids(),
+          platformName: 'Linux',
+          describeDevice: () async => null,
+        ),
+      );
+
+      await fetcher.fetch(Fixtures.subscriptionUrl, throughTunnel: false);
+
+      final sent = adapter.requests.single.headers;
+      expect(sent['x-device-os'], 'Linux');
+      expect(sent.containsKey('x-ver-os'), isFalse);
+      expect(sent.containsKey('x-device-model'), isFalse);
+    });
+
+    test('asks the platform once, however many refreshes there are', () async {
+      // The model of a phone does not change while the app is open, and a
+      // channel call per refresh is a round trip for an answer we have.
+      var asked = 0;
+      final subject = StoredDeviceIdentity(
+        store: store,
+        settings: settings,
+        ids: _Ids(),
+        platformName: 'Android',
+        describeDevice: () async {
+          asked++;
+          return const DeviceDescription(os: 'Android', osVersion: '15');
+        },
+      );
+
+      await subject.subscriptionHeaders();
+      await subject.subscriptionHeaders();
+
+      expect(asked, 1);
     });
 
     test('sends none of them once the user switched the identifier off',
