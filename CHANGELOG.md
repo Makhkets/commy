@@ -23,6 +23,16 @@ matching the tag out of this file and uses it as the release notes.
 
 ### Changed
 
+- **A panel's refusal reads as a refusal, not as a server.** A panel that will
+  not serve this client answers with one entry addressed at `0.0.0.0` and the
+  reason where a server's name goes — "App not supported", "Device limit
+  reached", "Subscription expired". The app imported it, drew it in the list
+  with a flag and a ping button, offered to connect through it, and reported
+  "imported 1 server"; the one thing it never did was show what the panel had
+  said. The rule is the address, not the wording (an admin writes that in their
+  own language): such an entry is kept out of the server list, out of the Auto
+  group, out of the generated document and out of the count, and its text is
+  shown in the subscription card and in the import sheet, untranslated.
 - **Adding a subscription you already have refreshes it instead of making a
   second card** (owner's decision, 2026-09-17). It was never only a duplicate
   in the list: a node's id comes from the server, so the same server fetched
@@ -35,6 +45,21 @@ matching the tag out of this file and uses it as the release notes.
   give back stops the add rather than guessing. Rules and reasoning in
   docs/adr/0008-subscription-identity.md. An existing pair of duplicates is not
   merged; that is a decision for a screen, not for an import.
+- **`x-ver-os` and `x-device-model` are sent with the subscription request**,
+  completing the header set #21 asked for. They come from an eleventh channel
+  method rather than from a new dependency: `dart:io` reports a kernel build
+  string where a panel wants `16`, and has no notion of a model at all, and
+  `device_info_plus` would bring native code along for three strings. A field
+  the platform cannot answer is left out rather than guessed — the panel stores
+  what it is sent and shows it back as the name of the user's device. Neither
+  value identifies anybody; both are in every browser's user agent already.
+  Reasoning in docs/adr/0009-device-identifier.md.
+- **The tunnel notification stops flickering.** It hung off the traffic stream,
+  which ticks once a second whether or not anything moved, so an idle tunnel
+  re-posted an identical notification sixty times a minute — visible in the
+  shade and, measured on a device, sixty notification-removed events. It is now
+  posted only when what the user would read has changed: zero in twenty seconds
+  where there were twenty.
 - **The refresh interval picked on the import sheet is applied on a repeat
   add.** The panel's own `profile-update-interval` still wins, but only when it
   sends one in that response — the rule used to be "when nothing is stored
