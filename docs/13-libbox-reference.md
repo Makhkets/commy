@@ -487,6 +487,23 @@ func Version() string
 | `grpc` | `service_name`, `idle_timeout`, `ping_timeout`, `permit_without_stream` |
 | `http` | `host` (список), `path`, `method`, `headers`, `idle_timeout`, `ping_timeout` |
 | `httpupgrade` | `host` (строка, **не список**), `path`, `headers` |
+| `xhttp` ⚠️ | `mode`, `host` (строка), `path`, `headers` (строка → строка, без `Host`), `x_padding_bytes`, `no_grpc_header`, `sc_max_each_post_bytes`, `sc_min_posts_interval_ms`, `xmux` {`max_concurrency`, `max_connections`, `c_max_reuse_times`, `h_max_request_times`, `h_max_reusable_secs`, `h_keep_alive_period`}, `x_padding_obfs_mode`, `x_padding_key`, `x_padding_header`, `x_padding_placement`, `x_padding_method`, `uplink_http_method`, `session_placement`, `session_key`, `seq_placement`, `seq_key`, `uplink_data_placement`, `uplink_data_key`, `uplink_chunk_size`, `session_id_table`, `session_id_length` |
+
+⚠️ **`xhttp` в sing-box нет — он есть только в нашей сборке.** Транспорт живёт в
+`core/xhttp`, блок опций — `core/xhttp/config`, в ядро попадает оверлеем сборки
+([ADR-0010](adr/0010-xhttp-transport.md)). Диапазоны пишутся числом или строкой
+`"from-to"`. Ядро из апстрима на `"type": "xhttp"` ответит `unknown transport
+type` — собирать только через `scripts/build_core.sh`, он сам проверит, что
+транспорт попал в библиотеку.
+
+**Контракт, который стоил дня и которого нет ни в одном интерфейсе:**
+`V2RayClientTransport.Close()` — это **сброс, а не конец**. Аутбаунд зовёт его
+не только при остановке, но и из `InterfaceUpdated()` — при каждой смене сети по
+умолчанию, а на Android это происходит в первую же секунду после старта
+туннеля. Транспорт обязан после `Close()` принимать новые соединения. Наш
+первый вариант считал `Close()` финальным и на телефоне отвечал на каждый
+дозвон `use of closed network connection`; на десктопе, где интерфейс никто не
+сообщает, это не проявлялось вообще.
 
 `server` / `server_port` приходят из общего `ServerOptions`, `detour` и прочее —
 из `DialerOptions`.

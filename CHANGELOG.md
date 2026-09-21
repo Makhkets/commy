@@ -12,6 +12,23 @@ matching the tag out of this file and uses it as the release notes.
 
 ### Added
 
+- **XHTTP servers connect.** XHTTP is Xray's transport — the proxied connection
+  rides ordinary HTTP requests, which is what survives a CDN — and sing-box does
+  not have it, so until now a server of this kind was refused at import with
+  "transport is not supported by the core" while the same link worked in Happ.
+  The client is ours (`core/xhttp`): `packet-up`, `stream-up`, `stream-one` and
+  `auto`; HTTP/1.1, HTTP/2 and HTTP/3; REALITY; XMUX; padding and every
+  placement a link's `extra` can name. It reaches the pinned sing-box through a
+  build overlay — eleven added lines in two upstream files, checked by hash —
+  so the core in `go.mod` is still the published v1.13.16 and no new module was
+  added; the AAR grew by 177 KB across three ABIs. Links (VLESS, VMess, Trojan),
+  Clash.Meta `xhttp-opts`, sing-box and Xray JSON all import and export without
+  loss. Verified against real Xray binaries — the 26.3.27 release and 26.9.9 —
+  in every mode over every HTTP version, 24 MiB down and 16 MiB up with
+  checksums, and on an Android emulator. `downloadSettings` (a second route for
+  the download) is not implemented. Reasoning in
+  docs/adr/0010-xhttp-transport.md.
+
 - **A QR code for a server and for a subscription.** Reading one has worked
   since the import sheet existed; drawing one did not, so moving a server to a
   second phone meant pasting a credential into a messenger. Both menus now
@@ -67,6 +84,37 @@ matching the tag out of this file and uses it as the release notes.
   interval silently did not.
 
 ### Fixed
+
+- **REALITY keeps working against Xray 26.9.8 and later.** Found while testing
+  XHTTP, and nothing to do with it: plain VLESS + REALITY stopped connecting to
+  a current Xray. sing-box strips the `X25519MLKEM768` key share from its
+  REALITY ClientHello, because servers older than Xray 25.5 cannot finish a
+  handshake that offers it — and since 26.9.8 the server refuses a ClientHello
+  that does *not* offer it, as one no browser sends. No released sing-box copes
+  with both. The client now sends the hello Chrome sends, and falls back to the
+  stripped one only after a server has answered with somebody else's
+  certificate; a timeout switches nothing. Tested against eight Xray
+  generations from 1.8.4 to 26.9.9: all connect, the old ones on the second
+  attempt. Fingerprints other than `chrome` still fail on new servers — their
+  hellos have no such share in this uTLS — and that needs a core bump.
+  docs/adr/0011-reality-client-hello.md; **awaiting the owner's confirmation**.
+- **One malformed server no longer stops every other server connecting.** The
+  document holds every stored server, so that switching does not mean
+  reconnecting — and one entry the builder could not express (Reality with no
+  public key, a port of 70000, a duplicate id) made the whole build fail, so
+  the user who had picked a perfectly good server could connect to none. Such a
+  server is now left out and named in the log; the build still fails, with the
+  reason, when it is the server that was asked for.
+- **A server that appeared while the tunnel was up can be switched to.** The
+  running document is a snapshot taken at start; a server imported after that,
+  or brought in by a subscription refresh, was in the list and not in the core,
+  and tapping it answered "could not switch" until the user disconnected
+  first. The core is asked, and the document is rebuilt around the new server
+  when it has to be — `reload` keeps the TUN device. A rebuild that fails
+  leaves the old server selected, because traffic still leaves through it.
+- **A uTLS fingerprint never reaches a QUIC protocol.** The core answers a
+  `utls` block under Hysteria 2 or TUIC with "unsupported usage for uTLS" on
+  every connection, and Clash configs set the fingerprint globally.
 
 - **The tunnel carries traffic.** Up to this release a connection came up, the
   key appeared in the status bar, and nothing worked — and the log did not say

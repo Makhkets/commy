@@ -112,6 +112,13 @@ that carries all of your traffic, being auditable is not a nice-to-have.
 VLESS (including Reality) · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC ·
 WireGuard · ShadowTLS · SOCKS · HTTP
 
+Transports for VLESS, VMess and Trojan: TCP · WebSocket · gRPC · HTTP/2 ·
+HTTPUpgrade · QUIC · **XHTTP** (`packet-up`, `stream-up`, `stream-one`; over
+HTTP/1.1, HTTP/2 and HTTP/3, with Reality). sing-box itself has no XHTTP — the
+client is ours, in [`core/xhttp`](core/xhttp), and the build adds it to the
+pinned core without forking it
+([how and why](docs/adr/0010-xhttp-transport.md)).
+
 Imported from a share link, a subscription URL, a QR code, a file, a deep link or the
 clipboard. Subscription responses are read as a plain list, base64, Clash YAML or
 sing-box JSON, and `subscription-userinfo` headers become the quota and expiry shown

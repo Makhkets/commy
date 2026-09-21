@@ -75,6 +75,12 @@ UI. Прогресс отслеживается в [roadmap](https://github.com/
 VLESS (включая Reality) · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC ·
 WireGuard · ShadowTLS · SOCKS · HTTP
 
+Транспорты для VLESS, VMess и Trojan: TCP · WebSocket · gRPC · HTTP/2 ·
+HTTPUpgrade · QUIC · **XHTTP** (`packet-up`, `stream-up`, `stream-one`; поверх
+HTTP/1.1, HTTP/2 и HTTP/3, с Reality). В самом sing-box XHTTP нет — клиент наш,
+лежит в [`core/xhttp`](core/xhttp), и сборка добавляет его в закреплённое ядро
+без форка ([как и почему](docs/adr/0010-xhttp-transport.md)).
+
 Импорт по ссылке-подписке, из share-ссылки, QR-кода, файла, диплинка или буфера обмена.
 Ответы подписок читаются как обычный список, base64, Clash YAML или sing-box JSON, а
 заголовки `subscription-userinfo` превращаются в отображаемые на карточке квоту и срок действия.

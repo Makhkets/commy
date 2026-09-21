@@ -43,3 +43,5 @@
 | [0007](0007-database-encryption.md) | Два хранилища вместо шифрования всей БД | Accepted |
 | [0008](0008-subscription-identity.md) | Что значит «та же подписка» и что делает повторное добавление | Accepted |
 | [0009](0009-device-identifier.md) | Идентификатор устройства для подписки (HWID) и заглушки панели | Accepted |
+| [0010](0010-xhttp-transport.md) | Транспорт XHTTP: свой клиент в `core/xhttp`, в sing-box — оверлеем сборки | Accepted |
+| [0011](0011-reality-client-hello.md) | ClientHello REALITY: сначала современный, обрезанный — после отказа сервера | Accepted, ждёт подтверждения владельца |

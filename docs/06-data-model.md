@@ -82,7 +82,9 @@ sealed class TunnelStatus {
 ### Секретная часть · `flutter_secure_storage`
 
 - URL подписок (в них токен доступа);
-- `NodeSecrets`: UUID, пароли, приватные ключи, Reality short-id;
+- `NodeSecrets`: UUID, пароли, приватные ключи, Reality short-id, `extra`
+  XHTTP-узла (в нём бывают заголовки с токеном CDN и второй сервер вместе с его
+  short-id);
 - ключ шифрования БД;
 - токен доступа к десктопному хелперу.
 
@@ -147,7 +149,7 @@ Drift-миграции нумерованные, вперёд-только. На
 
 | Схема | Комментарий |
 |---|---|
-| `vless://` | Включая Reality: `pbk`, `sid`, `fp`, `spx` |
+| `vless://` | Включая Reality: `pbk`, `sid`, `fp`, `spx`. Транспорт `type=xhttp` (он же `splithttp`): `mode`, `host`, `path` и `extra` — JSON-объект со всем остальным, хранится как пришёл ([ADR-0010](adr/0010-xhttp-transport.md)) |
 | `vmess://` | Base64-JSON, историческая каша форматов — нужен снисходительный парсер |
 | `trojan://` | |
 | `ss://` | Два формата: legacy base64 и SIP002 |
