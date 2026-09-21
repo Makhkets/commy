@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/node_controller.dart';
 import 'package:commy/src/widgets/node_descriptors.dart';
+import 'package:commy/src/widgets/qr_sheet.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -85,6 +87,11 @@ class NodeMenuSheet extends ConsumerWidget {
               onTap: () => unawaited(_copyLink(context, ref)),
             ),
             SettingsTile(
+              icon: CommyIcons.qrCode,
+              title: t.node.showQr,
+              onTap: () => unawaited(_showQr(context, ref)),
+            ),
+            SettingsTile(
               icon: CommyIcons.delete,
               title: t.node.delete,
               tone: CommyTone.error,
@@ -119,6 +126,45 @@ class NodeMenuSheet extends ConsumerWidget {
     if (navigator.canPop()) {
       navigator.pop();
     }
+  }
+
+  /// Shows the share link as a code another client can read.
+  ///
+  /// Same refusals as the copy button, and for the same reason: a protocol
+  /// with no link format has nothing to encode, and a payload past what a
+  /// camera can resolve would draw a square nobody can scan. Both are said out
+  /// loud rather than shown as an empty sheet.
+  Future<void> _showQr(BuildContext context, WidgetRef ref) async {
+    final t = Translations.of(context);
+    final navigator = Navigator.of(context);
+    final built = ref.read(qrPayloadProvider).forNode(node);
+    final payload = built.valueOrNull;
+    if (payload == null) {
+      ToastMessenger.show(
+        context,
+        message: t.node.noLink,
+        tone: CommyTone.error,
+        icon: CommyIcons.warning,
+      );
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      return;
+    }
+    // The menu closes first: two stacked sheets on a phone leave the code
+    // behind a scrim, which is exactly the thing that has to be readable.
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+    if (!context.mounted) {
+      return;
+    }
+    await QrSheet.show(
+      context: context,
+      title: t.qr.nodeTitle,
+      payload: payload,
+      caption: t.qr.nodeCaption,
+    );
   }
 
   /// Deleting takes a credential with it, so it asks first and says what goes.

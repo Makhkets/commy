@@ -31,6 +31,11 @@ dependencies:
   go_router: ^18.0.1
   mobile_scanner: ^7.0.0
   package_info_plus: '>=8.0.0 <11.0.0'
+  # Rendering only. Reading a QR is mobile_scanner's job and has been
+  # since #9; this draws one. Pure Dart over CustomPainter — no native
+  # code, no assets, nothing measurable in the APK (rule R11).
+  # Approved by the owner 2026-09-17 (CLAUDE.md §7, point 2).
+  qr_flutter: ^4.1.0
   share_plus: '>=11.0.0 <14.0.0'
   slang: ^4.19.1
   slang_flutter: ^4.0.0

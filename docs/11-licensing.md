@@ -57,6 +57,7 @@ Unlicense · CC0 · SIL OFL 1.1 (для шрифтов как отдельных
 | Wintun | GPL-2.0 (в составе sing-box) | TUN на Windows |
 | Inter, JetBrains Mono | SIL OFL 1.1 | Шрифты |
 | Lucide | ISC (иконки) + MIT (сборка шрифта из `lucide_icons_flutter`) | Иконки. Шрифт **вендорен** в `packages/commy_ui/fonts/Lucide.ttf`, оба текста лицензий лежат рядом — `LICENSE-Lucide.txt` |
+| `qr_flutter` | BSD-3-Clause | Рисование QR. Чистый Dart поверх `CustomPainter`: ни нативного кода, ни ассетов — на вес APK не влияет (R11). Чтение кода — `mobile_scanner`, оно уже было |
 | Пакеты pub.dev | MIT / BSD / Apache-2.0 | Проверяются поштучно |
 
 Список обновляется при каждом добавлении зависимости. Расхождение между этим

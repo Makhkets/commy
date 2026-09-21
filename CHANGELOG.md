@@ -10,6 +10,17 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+### Added
+
+- **A QR code for a server and for a subscription.** Reading one has worked
+  since the import sheet existed; drawing one did not, so moving a server to a
+  second phone meant pasting a credential into a messenger. Both menus now
+  offer it, over `qr_flutter` (BSD-3-Clause, pure Dart, nothing measurable in
+  the APK). The subscription code says what it hands over before it is on
+  screen — it is the access token, not a server. A protocol with no link
+  format, and a payload too long to scan, are both said out loud rather than
+  shown as a blank square.
+
 ### Fixed
 
 - **The tunnel carries traffic.** Up to this release a connection came up, the

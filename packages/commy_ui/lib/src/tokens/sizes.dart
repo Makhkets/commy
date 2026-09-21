@@ -114,6 +114,21 @@ abstract final class CommySizes {
   /// Height of that bar — 24.
   static const double activeMarkerHeight = 24;
 
+  /// Edge of a QR code — 220.
+  ///
+  /// Sized for the camera, not for the layout: a phone reading a code off
+  /// another phone wants modules it can separate, and the longest payload we
+  /// will draw (2 000 characters, `QrPayload.maxLength`) is a version-40
+  /// symbol of 177 modules. Below roughly this edge those modules fall under
+  /// a pixel each on a compact screen.
+  static const double qrSize = 220;
+
+  /// The quiet zone drawn around a QR code — 16.
+  ///
+  /// A decoder needs clear ground on all four sides; without it a code that
+  /// reaches the edge of its card scans on some phones and not on others.
+  static const double qrQuietZone = 16;
+
   /// Width of the drag handle at the top of a bottom sheet — 36.
   static const double sheetHandleWidth = 36;
 

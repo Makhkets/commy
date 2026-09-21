@@ -79,6 +79,7 @@ export 'src/tokens/fonts.dart';
 export 'src/tokens/layout_size.dart';
 export 'src/tokens/motion.dart';
 export 'src/tokens/power_glyph.dart';
+export 'src/tokens/qr_palette.dart';
 export 'src/tokens/radii.dart';
 export 'src/tokens/sizes.dart';
 export 'src/tokens/spacing.dart';

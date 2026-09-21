@@ -207,4 +207,8 @@ abstract final class CommyIcons {
   /// Diagnostics.
   static const IconData diagnostics =
       IconData(0xe038, fontFamily: _family, fontPackage: _package); // activity
+
+  /// Share a server or a subscription as a code another client can read.
+  static const IconData qrCode =
+      IconData(0xe1df, fontFamily: _family, fontPackage: _package); // qr-code
 }

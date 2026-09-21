@@ -209,3 +209,11 @@ final checkIpUseCaseProvider = Provider<CheckIpUseCase>((ref) {
 final nodeLinkExporterProvider = Provider<NodeLinkExporter>(
   (ref) => NodeLinkExporter(),
 );
+
+/// Turns a node or a subscription into the text a QR code carries.
+///
+/// Built over the same exporter as the copy button, so a code and a copied
+/// link can never describe the same server differently.
+final qrPayloadProvider = Provider<QrPayload>(
+  (ref) => QrPayload(exporter: ref.watch(nodeLinkExporterProvider)),
+);

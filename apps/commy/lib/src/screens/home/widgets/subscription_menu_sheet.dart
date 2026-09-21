@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/screens/import/subscription_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/subscription_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/qr_sheet.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -132,6 +134,11 @@ class SubscriptionMenuSheet extends ConsumerWidget {
                   unawaited(_pickInterval(context, controller, current)),
             ),
             SettingsTile(
+              icon: CommyIcons.qrCode,
+              title: t.subscription.menu.showQr,
+              onTap: () => unawaited(_showQr(context, ref, current)),
+            ),
+            SettingsTile(
               icon: CommyIcons.delete,
               title: t.subscription.menu.delete,
               tone: CommyTone.error,
@@ -199,6 +206,49 @@ class SubscriptionMenuSheet extends ConsumerWidget {
     if (navigator.canPop()) {
       navigator.pop();
     }
+  }
+
+  /// Shows the subscription URL as a code, after saying what that means.
+  ///
+  /// A subscription QR is not a share link: it is the access token, and
+  /// whoever photographs it has the whole panel. The warning stands above the
+  /// code rather than behind a confirmation because the sheet has to be
+  /// dismissible with the code never having been on screen long enough to
+  /// scan, and a dialog the user taps through achieves the opposite.
+  Future<void> _showQr(
+    BuildContext context,
+    WidgetRef ref,
+    Subscription current,
+  ) async {
+    final t = Translations.of(context);
+    final navigator = Navigator.of(context);
+    final payload =
+        ref.read(qrPayloadProvider).forSubscription(current).valueOrNull;
+    if (payload == null) {
+      ToastMessenger.show(
+        context,
+        message: t.qr.tooLong,
+        tone: CommyTone.error,
+        icon: CommyIcons.warning,
+      );
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      return;
+    }
+    if (navigator.canPop()) {
+      navigator.pop();
+    }
+    if (!context.mounted) {
+      return;
+    }
+    await QrSheet.show(
+      context: context,
+      title: t.qr.subscriptionTitle,
+      payload: payload,
+      caption: t.qr.subscriptionCaption,
+      warning: t.qr.subscriptionWarning,
+    );
   }
 
   /// Asks for a refresh interval and writes it.

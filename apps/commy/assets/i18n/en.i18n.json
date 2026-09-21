@@ -161,6 +161,7 @@
       "copyLink": "Copy link",
       "autoUpdate": "Auto refresh",
       "interval": "Refresh interval",
+      "showQr": "Show QR code",
       "delete": "Delete"
     },
     "rename": {
@@ -189,6 +190,7 @@
     "delete": "Delete server",
     "copyLink": "Copy link",
     "measure": "Measure latency",
+    "showQr": "Show QR code",
     "linkCopied": "Link copied",
     "noLink": "This protocol has no share link format",
     "deleteConfirm": {
@@ -274,6 +276,15 @@
       "unsupportedScheme": "The core has no transport for that scheme",
       "missingAddress": "There is no address after the scheme"
     }
+  },
+
+  "qr": {
+    "nodeTitle": "Server QR code",
+    "subscriptionTitle": "Subscription QR code",
+    "nodeCaption": "Scan it in another client to add this server.",
+    "subscriptionCaption": "Scan it in another client to add this subscription.",
+    "subscriptionWarning": "Anyone who scans this gets your subscription link, and with it every server on it. Show it only to a device you own.",
+    "tooLong": "This one is too long to scan. Copy the link instead."
   },
 
   "settings": {

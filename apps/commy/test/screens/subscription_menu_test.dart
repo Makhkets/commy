@@ -1,5 +1,6 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
+import 'package:commy/src/widgets/qr_sheet.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +41,23 @@ void main() {
   }
 
   Subscription stored() => harness.subscriptionRepository.items.single;
+
+  group('QR', () {
+    testWidgets('shows the subscription URL, and says what that hands over',
+        (tester) async {
+      // Sharing a subscription shares the access token, not a server. The
+      // warning is the difference between this sheet and the node one, and
+      // it has to be on screen with the code rather than behind it.
+      await pumpMenu(tester);
+
+      await tester.tap(find.text(t.subscription.menu.showQr));
+      await tester.pumpAndSettle();
+
+      final sheet = tester.widget<QrSheet>(find.byType(QrSheet));
+      expect(sheet.payload, stored().url.toString());
+      expect(find.text(t.qr.subscriptionWarning), findsOneWidget);
+    });
+  });
 
   group('rename', () {
     testWidgets('writes the trimmed name and the header follows it',
