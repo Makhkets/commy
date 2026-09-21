@@ -12,7 +12,9 @@ import 'package:commy_domain/commy_domain.dart';
 /// 1. `sniff`, so later rules can see what the connection actually is;
 /// 2. DNS hijack, so no query escapes the policy (rule R6);
 /// 3. LAN bypass, when the user asked for it;
-/// 4. ad blocking, when the user turned it on and the list is on disk;
+/// 4. ad blocking, when the user turned it on and the list is on disk — the
+///    connection half of it; the query itself is refused by
+///    `DnsSectionBuilder`, one layer earlier;
 /// 5. per-app exclusions, where the platform expresses them as processes;
 /// 6. the user's own rules, in their own order.
 ///
@@ -24,8 +26,23 @@ abstract final class RouteSectionBuilder {
   /// Port plain DNS uses.
   static const int dnsPort = 53;
 
-  /// Rule set tag the ad blocking feature looks for.
-  static const String adsRuleSetName = 'ads';
+  /// The geosite list the ad blocking feature applies.
+  ///
+  /// The name is the one the default source actually publishes —
+  /// `geosite-category-ads-all.srs` — rather than one of ours. A tag nobody
+  /// serves is a switch that can never do anything: the download answers 404,
+  /// no file ever lands, and every document is built with the rule left out
+  /// and a warning the user has no way to act on. A test pins this name
+  /// against `AppSettings.defaultRuleSetSource` so the two cannot drift.
+  static const String adsRuleSetName = 'category-ads-all';
+
+  /// The tag both this section and the DNS section look for when ad blocking
+  /// is on.
+  ///
+  /// Derived once, because two sections now name the same list and a document
+  /// where they disagree would block the connection but still resolve the
+  /// name, or the other way round.
+  static final String adsRuleSetTag = SingBoxTags.geosite(adsRuleSetName);
 
   /// Every rule set tag [routing] would need to apply in full.
   ///
@@ -40,7 +57,7 @@ abstract final class RouteSectionBuilder {
     required ConfigPlatform platform,
   }) {
     final tags = <String>{
-      if (routing.blockAds) SingBoxTags.geosite(adsRuleSetName),
+      if (routing.blockAds) adsRuleSetTag,
     };
     if (routing.mode == RoutingMode.rules) {
       for (final rule in routing.activeRules) {
@@ -82,7 +99,7 @@ abstract final class RouteSectionBuilder {
     }
 
     if (routing.blockAds) {
-      final tag = SingBoxTags.geosite(adsRuleSetName);
+      final tag = adsRuleSetTag;
       if (availableRuleSets.contains(tag)) {
         usedRuleSets.add(tag);
         rules.add(<String, Object?>{

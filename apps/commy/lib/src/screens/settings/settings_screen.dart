@@ -9,6 +9,7 @@ import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -247,6 +248,13 @@ class _SilencePanel extends ConsumerWidget {
     final spacing = context.spacing;
     final routing = ref.watch(routingPolicyProvider).value;
     final controller = ref.read(settingsControllerProvider.notifier);
+    // Ad blocking is a switch here and a file somewhere else: the core applies
+    // the list, and until it is on disk the switch changes nothing. The row
+    // says which of the two it is rather than reporting "on" and leaving the
+    // user to learn it from a banner two screens away.
+    final blockListMissing = (routing?.blockAds ?? false) &&
+        !(ref.watch(ruleSetsProvider).value ?? const <RuleSet>[])
+            .any((set) => set.tag == RouteSectionBuilder.adsRuleSetTag);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -323,8 +331,10 @@ class _SilencePanel extends ConsumerWidget {
             SettingsTile(
               icon: CommyIcons.block,
               title: t.settings.silence.blockLists,
-              subtitle: t.settings.silence.blockListsHint,
-              isMonospaceSubtitle: true,
+              subtitle: blockListMissing
+                  ? t.settings.silence.blockListsMissing
+                  : t.settings.silence.blockListsHint,
+              isMonospaceSubtitle: !blockListMissing,
               trailing: CommySwitch(
                 value: routing?.blockAds ?? false,
                 semanticLabel: t.settings.silence.blockLists,
@@ -332,6 +342,9 @@ class _SilencePanel extends ConsumerWidget {
                   controller.setBlockAds(enabled: value),
                 ),
               ),
+              onTap: blockListMissing
+                  ? () => context.go(AppRoutes.ruleSets)
+                  : null,
             ),
           ],
         ),

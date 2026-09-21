@@ -751,4 +751,76 @@ void main() {
       );
     });
   });
+
+  group('ad blocking', () {
+    const adsTag = 'geosite-category-ads-all';
+    const reject = <String, Object?>{
+      'rule_set': <String>[adsTag],
+      'action': 'reject',
+    };
+
+    ConfigBuildResult build({Set<String> onDisk = const <String>{adsTag}}) {
+      final result = const SingBoxConfigBuilder().build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: const RoutingPolicy(blockAds: true),
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          ruleSetDirectory: '/data/rulesets',
+          availableRuleSets: onDisk,
+        ),
+      );
+      expect(result.failureOrNull, isNull, reason: '${result.failureOrNull}');
+      return result.valueOrNull!;
+    }
+
+    test('refuses the query and the connection from the one list', () {
+      final built = build();
+      final document = built.config.document;
+      final dns = document['dns']! as Map<String, Object?>;
+      final route = document['route']! as Map<String, Object?>;
+
+      expect(built.hasWarnings, isFalse);
+      expect((dns['rules']! as List<Object?>).first, reject);
+      expect(route['rules'], contains(equals(reject)));
+      expect(
+        (route['rule_set']! as List<Object?>).single,
+        <String, Object?>{
+          'type': 'local',
+          'tag': adsTag,
+          'format': 'binary',
+          'path': '/data/rulesets/$adsTag.srs',
+        },
+      );
+    });
+
+    test('says so once when the list is not on disk', () {
+      final built = build(onDisk: const <String>{});
+      final document = built.config.document;
+      final route = document['route']! as Map<String, Object?>;
+
+      expect(
+        built.warnings.where((line) => line.contains(adsTag)),
+        hasLength(1),
+      );
+      expect(
+        (document['dns']! as Map<String, Object?>).containsKey('rules'),
+        isFalse,
+      );
+      expect(route['rules'], isNot(contains(equals(reject))));
+      expect(route.containsKey('rule_set'), isFalse);
+    });
+
+    test('asks the default source for a file it actually serves', () {
+      // The switch is worth nothing if the list behind it cannot be
+      // downloaded: the tag goes into the address template, and a tag the
+      // mirror does not publish answers 404 forever.
+      expect(
+        AppSettings.defaults.ruleSetUrl(adsTag).toString(),
+        'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/'
+        '$adsTag.srs',
+      );
+    });
+  });
 }

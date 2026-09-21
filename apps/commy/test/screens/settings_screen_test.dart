@@ -428,6 +428,46 @@ void main() {
     expect(await stored(), AppSettings.defaults);
   });
 
+  testWidgets('the block-list row says when the list is not on disk',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      policy: RoutingPolicy.defaults.copyWith(blockAds: true),
+    );
+
+    // The switch is on and the core has nothing to apply: the list is a file,
+    // and until it is downloaded the feature is a promise. The row is the one
+    // place that knows both halves, so it is the one place that can say it.
+    expect(find.text(t.settings.silence.blockListsMissing), findsOneWidget);
+    expect(find.text(t.settings.silence.blockListsHint), findsNothing);
+  });
+
+  testWidgets('the block-list row goes quiet once the list is downloaded',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      policy: RoutingPolicy.defaults.copyWith(blockAds: true),
+    );
+    await harness.ruleSetRepository.download(
+      tag: RouteSectionBuilder.adsRuleSetTag,
+      from: Uri.parse(
+        'https://mirror.example/${RouteSectionBuilder.adsRuleSetTag}.srs',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.settings.silence.blockListsMissing), findsNothing);
+    expect(find.text(t.settings.silence.blockListsHint), findsOneWidget);
+  });
+
+  testWidgets('a list nobody asked for does not make the row complain',
+      (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.text(t.settings.silence.blockListsMissing), findsNothing);
+    expect(find.text(t.settings.silence.blockListsHint), findsOneWidget);
+  });
+
   testWidgets('the kill-switch row opens the system screen and stores nothing',
       (tester) async {
     await pumpScreen(tester);

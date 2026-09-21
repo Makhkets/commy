@@ -309,6 +309,7 @@
       "ruleSetsHint": "when you tap Refresh",
       "blockLists": "Ad block lists",
       "blockListsHint": "source is configurable",
+      "blockListsMissing": "on, but the list is not downloaded — open Rule sets",
       "footer": "A fourth exception cannot appear without changing this screen."
     },
     "identity": {

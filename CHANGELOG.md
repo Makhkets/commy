@@ -12,6 +12,19 @@ matching the tag out of this file and uses it as the release notes.
 
 ### Added
 
+- **Ad blocking works, and it works in DNS.** The switch had been in settings
+  since the silence panel existed, and nothing behind it could ever apply: it
+  asked for a list called `geosite-ads`, which no mirror publishes, so the
+  download answered 404 and every configuration was built with the rule left
+  out. The list is now `geosite-category-ads-all` — the file the default source
+  actually serves — and a query for an advertising name is refused at the
+  resolver (`action: reject`) rather than answered and then dialled into a
+  rejected connection. The route-level rejection stays for names that never
+  reach DNS. Nothing new goes on the wire: the list is exception E-2's file,
+  downloaded by the same button from the same configurable address, and the
+  settings row now says when the switch is on but the list is not on disk
+  instead of reporting "on".
+
 - **XHTTP servers connect.** XHTTP is Xray's transport — the proxied connection
   rides ordinary HTTP requests, which is what survives a CDN — and sing-box does
   not have it, so until now a server of this kind was refused at import with

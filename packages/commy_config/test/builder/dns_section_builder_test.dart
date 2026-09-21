@@ -315,4 +315,72 @@ void main() {
       });
     });
   });
+
+  group('DnsSectionBuilder ad blocking', () {
+    const adsTag = 'geosite-category-ads-all';
+    const policy = RoutingPolicy(blockAds: true);
+
+    test('refuses the query when the list is on disk', () {
+      final section = _build(
+        DnsSettings.defaults,
+        routing: policy,
+        ruleSets: const <String>{adsTag},
+      );
+      final rules = section['rules']! as List<Object?>;
+
+      expect(rules.first, <String, Object?>{
+        'rule_set': <String>[adsTag],
+        'action': 'reject',
+      });
+    });
+
+    test('writes nothing while the list is not on disk', () {
+      final section = _build(DnsSettings.defaults, routing: policy);
+
+      expect(section.containsKey('rules'), isFalse);
+    });
+
+    test('writes nothing while the feature is off', () {
+      final section = _build(
+        DnsSettings.defaults,
+        ruleSets: const <String>{adsTag},
+      );
+
+      expect(section.containsKey('rules'), isFalse);
+    });
+
+    test('answers before FakeIP does', () {
+      // FakeIP matches every A and AAAA query there is. Behind it the block
+      // would never be reached, and an advertising name would resolve to a
+      // fake address that only the route section refuses afterwards.
+      final section = _build(
+        const DnsSettings(fakeIp: true),
+        routing: policy,
+        ruleSets: const <String>{adsTag},
+      );
+      final rules =
+          (section['rules']! as List<Object?>).cast<Map<String, Object?>>();
+
+      expect(rules.first['action'], 'reject');
+      expect(rules.last['server'], 'dns-fake');
+    });
+
+    test('applies outside rules mode, like the route section', () {
+      final section = _build(
+        DnsSettings.defaults,
+        routing: const RoutingPolicy(mode: RoutingMode.global, blockAds: true),
+        ruleSets: const <String>{adsTag},
+      );
+      final rules = section['rules']! as List<Object?>;
+
+      expect(rules.single, <String, Object?>{
+        'rule_set': <String>[adsTag],
+        'action': 'reject',
+      });
+    });
+
+    test('names the list the route section names', () {
+      expect(RouteSectionBuilder.adsRuleSetTag, adsTag);
+    });
+  });
 }

@@ -1,5 +1,6 @@
 import 'package:commy_config/src/builder/config_platform.dart';
 import 'package:commy_config/src/builder/route_matcher.dart';
+import 'package:commy_config/src/builder/route_section_builder.dart';
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/builder/sing_box_tags.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
@@ -19,6 +20,10 @@ enum ResolverProblem {
 }
 
 /// Builds the `dns` section.
+///
+/// Ad blocking lives here too, one rule ahead of everything else: the query
+/// for an advertising name is refused rather than answered and then dialled
+/// into a rejected connection.
 ///
 /// Two resolvers, always. [SingBoxTags.dnsRemote] answers for names that go
 /// through the tunnel and is queried **through** it; [SingBoxTags.dnsDirect]
@@ -80,6 +85,13 @@ abstract final class DnsSectionBuilder {
     ];
 
     final rules = <Map<String, Object?>>[
+      // First, so that neither the user's own rules nor FakeIP can answer an
+      // advertising name before the block does. It is the same precedence the
+      // route section gives ad blocking.
+      ...adBlockRules(
+        routing: routing,
+        availableRuleSets: availableRuleSets,
+      ),
       ...policyRules(
         routing: routing,
         platform: platform,
@@ -196,6 +208,40 @@ abstract final class DnsSectionBuilder {
       port: address.value,
       path: path,
     );
+  }
+
+  /// The rule that refuses an advertising name outright.
+  ///
+  /// This is the "through DNS" half of ad blocking (docs/07-roadmap.md, M3).
+  /// [RouteSectionBuilder] rejects the *connection* to such a host, which
+  /// works but happens late: the name is resolved first, through the tunnel,
+  /// and only the dial that follows is refused. Refusing the query costs one
+  /// rule, answers instantly, and is what every other client means by a DNS
+  /// blocker.
+  ///
+  /// `action: reject` without a `method` answers REFUSED (`dns/router.go` at
+  /// v1.13.16). Both halves stay: a name already in the system cache, or an
+  /// address a program dials without asking DNS at all, never reaches this
+  /// rule, and the route section is what catches it.
+  ///
+  /// Empty while the list is not on disk. The warning for that case belongs
+  /// to [RouteSectionBuilder], which is built from the same flag and the same
+  /// set — saying it twice would put the same line in the log and in the
+  /// banner two times over.
+  static List<Map<String, Object?>> adBlockRules({
+    required RoutingPolicy routing,
+    required Set<String> availableRuleSets,
+  }) {
+    final tag = RouteSectionBuilder.adsRuleSetTag;
+    if (!routing.blockAds || !availableRuleSets.contains(tag)) {
+      return const <Map<String, Object?>>[];
+    }
+    return <Map<String, Object?>>[
+      <String, Object?>{
+        SingBoxKeys.ruleSet: <String>[tag],
+        SingBoxKeys.action: SingBoxKeys.actionReject,
+      },
+    ];
   }
 
   /// DNS rules derived from the routing policy.
