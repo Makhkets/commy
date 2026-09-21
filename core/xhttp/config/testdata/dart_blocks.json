@@ -1,0 +1,120 @@
+{
+  "_comment": [
+    "One file, two readers.",
+    "packages/commy_config/test/builder/xhttp_contract_test.dart parses each `link` and expects the builder to emit exactly `transport`.",
+    "core/xhttp/config/contract_test.go decodes each `transport` the way the core does - unknown fields refused - and expects it to pass every rule.",
+    "So whatever the app writes for an XHTTP node is something the core accepts, and a change on either side that breaks that fails a test on the other."
+  ],
+  "cases": [
+    {
+      "name": "minimal, TLS",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&sni=example.com&path=%2Fxh#a",
+      "transport": {
+        "type": "xhttp",
+        "path": "/xh"
+      }
+    },
+    {
+      "name": "Reality, auto, host, a path with a query of its own",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@203.0.113.7:443?type=xhttp&security=reality&pbk=KEY&sid=ab12&sni=www.example.com&fp=chrome&mode=auto&host=cdn.example&path=%2Fapi%2Fv1%3Fed%3D2048#b",
+      "transport": {
+        "type": "xhttp",
+        "host": "cdn.example",
+        "path": "/api/v1?ed=2048"
+      }
+    },
+    {
+      "name": "explicit mode, written in capitals",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&mode=Stream-Up&path=%2Fs#c",
+      "transport": {
+        "type": "xhttp",
+        "mode": "stream-up",
+        "path": "/s"
+      }
+    },
+    {
+      "name": "splithttp is the same transport under its first name",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=splithttp&security=tls&path=%2Fold#d",
+      "transport": {
+        "type": "xhttp",
+        "path": "/old"
+      }
+    },
+    {
+      "name": "extra: padding, posts, xmux, no gRPC header",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&mode=packet-up&path=%2Fx&extra=%7B%22xPaddingBytes%22%3A%22200-400%22%2C%22noGRPCHeader%22%3Atrue%2C%22scMaxEachPostBytes%22%3A500000%2C%22scMinPostsIntervalMs%22%3A%2210-50%22%2C%22xmux%22%3A%7B%22maxConcurrency%22%3A%2216-32%22%2C%22cMaxReuseTimes%22%3A0%2C%22hMaxRequestTimes%22%3A%22600-900%22%2C%22hMaxReusableSecs%22%3A%221800-3000%22%2C%22hKeepAlivePeriod%22%3A30%7D%7D#e",
+      "transport": {
+        "type": "xhttp",
+        "mode": "packet-up",
+        "path": "/x",
+        "x_padding_bytes": "200-400",
+        "no_grpc_header": true,
+        "sc_max_each_post_bytes": 500000,
+        "sc_min_posts_interval_ms": "10-50",
+        "xmux": {
+          "max_concurrency": "16-32",
+          "h_max_request_times": "600-900",
+          "h_max_reusable_secs": "1800-3000",
+          "h_keep_alive_period": 30
+        }
+      }
+    },
+    {
+      "name": "extra: obfuscation, as Xray v26.3.27 spells the session keys",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&mode=packet-up&path=%2Fo&extra=%7B%22xPaddingObfsMode%22%3Atrue%2C%22xPaddingPlacement%22%3A%22cookie%22%2C%22xPaddingKey%22%3A%22sid%22%2C%22xPaddingMethod%22%3A%22tokenish%22%2C%22sessionPlacement%22%3A%22header%22%2C%22sessionKey%22%3A%22X-Sess%22%2C%22seqPlacement%22%3A%22query%22%2C%22seqKey%22%3A%22n%22%2C%22uplinkHTTPMethod%22%3A%22PUT%22%2C%22uplinkDataPlacement%22%3A%22body%22%7D#f",
+      "transport": {
+        "type": "xhttp",
+        "mode": "packet-up",
+        "path": "/o",
+        "x_padding_obfs_mode": true,
+        "x_padding_key": "sid",
+        "x_padding_placement": "cookie",
+        "x_padding_method": "tokenish",
+        "uplink_http_method": "PUT",
+        "session_placement": "header",
+        "session_key": "X-Sess",
+        "seq_placement": "query",
+        "seq_key": "n",
+        "uplink_data_placement": "body"
+      }
+    },
+    {
+      "name": "extra: the same keys as Xray spells them after the rename",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&mode=packet-up&path=%2Fo&extra=%7B%22sessionIDPlacement%22%3A%22cookie%22%2C%22sessionIDKey%22%3A%22s%22%2C%22uplinkDataPlacement%22%3A%22header%22%2C%22uplinkChunkSize%22%3A%223000-4000%22%2C%22scMaxEachPostBytes%22%3A4000%2C%22sessionIDTable%22%3A%22base36%22%2C%22sessionIDLength%22%3A%2216-24%22%7D#g",
+      "transport": {
+        "type": "xhttp",
+        "mode": "packet-up",
+        "path": "/o",
+        "sc_max_each_post_bytes": 4000,
+        "session_placement": "cookie",
+        "session_key": "s",
+        "uplink_data_placement": "header",
+        "uplink_chunk_size": "3000-4000",
+        "session_id_table": "base36",
+        "session_id_length": "16-24"
+      }
+    },
+    {
+      "name": "extra: headers keep their case, Host becomes the host, server-side keys and the download route are left out",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&path=%2Fh&extra=%7B%22headers%22%3A%7B%22Host%22%3A%22front.example%22%2C%22X-Api-Key%22%3A%22k%22%2C%22User-Agent%22%3A%22chrome%22%7D%2C%22noSSEHeader%22%3Atrue%2C%22scMaxBufferedPosts%22%3A30%2C%22scStreamUpServerSecs%22%3A%2220-80%22%2C%22serverMaxHeaderBytes%22%3A8192%2C%22downloadSettings%22%3A%7B%22address%22%3A%22dl.example%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fh%22%7D%7D%7D#h",
+      "transport": {
+        "type": "xhttp",
+        "host": "front.example",
+        "path": "/h",
+        "headers": {
+          "X-Api-Key": "k",
+          "User-Agent": "chrome"
+        }
+      }
+    },
+    {
+      "name": "Trojan carries it too",
+      "link": "trojan://secret@example.com:443?type=xhttp&security=tls&path=%2Ft&mode=stream-one#i",
+      "transport": {
+        "type": "xhttp",
+        "mode": "stream-one",
+        "path": "/t"
+      }
+    }
+  ]
+}

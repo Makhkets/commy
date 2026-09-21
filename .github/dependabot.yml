@@ -56,6 +56,14 @@ updates:
     # changelog, because it changes what happens to every user's traffic.
     ignore:
       - dependency-name: github.com/sagernet/sing-box
+      # Same rule, same reason. These three are not dependencies of ours in any
+      # sense that matters: they are the versions sing-box v1.13.16 was built
+      # and tested with, and go.mod lists them as direct only because core/xhttp
+      # imports the packages by name. Moved on their own they would put the core
+      # on a combination nobody upstream ever ran. They move with sing-box.
+      - dependency-name: github.com/sagernet/sing
+      - dependency-name: github.com/sagernet/quic-go
+      - dependency-name: golang.org/x/net
 
   - package-ecosystem: gradle
     directory: /apps/commy/android

@@ -10,7 +10,9 @@
 #
 # We do not wrap sing-box by hand. It already ships experimental/libbox, which is
 # built for exactly this and is what the official sing-box Android app binds with
-# gomobile. core/ exists to pin the version and choose build tags.
+# gomobile. core/ exists to pin the version, choose build tags, and add the one
+# transport sing-box does not have: XHTTP (core/xhttp, applied as a build
+# overlay — see prepare_overlay below and docs/adr/0010-xhttp-transport.md).
 #
 # Every value below is verified against the sing-box source, not copied from a
 # blog post. See docs/13-libbox-reference.md.
@@ -88,6 +90,83 @@ sync_modules() {
   ( cd "${CORE_DIR}" && GOFLAGS="-tags=${TAGS}" go mod tidy )
 }
 
+# Teaches the pinned sing-box the XHTTP transport without forking it.
+#
+# core/cmd/overlaygen patches two upstream files — eleven added lines — and
+# writes a `go build -overlay` map. The module in go.mod stays the published
+# v1.13.16; the transport itself is ordinary code in core/xhttp.
+#
+# Two things here are not optional, and both fail in ways that do not say why:
+#
+#   GODEBUG=goindex=0   The go command takes the import list of a module-cache
+#                       package from its module index, which knows nothing
+#                       about overlays. Both patched files add an import, so
+#                       with the index on the build dies with
+#                         could not import github.com/Makhkets/commy/core/xhttp
+#                         (open : no such file or directory)
+#   no spaces in path   GOFLAGS is split on spaces and has no quoting. An
+#                       overlay under "C:/Users/John Doe/" would be read as two
+#                       flags, the second one nonsense.
+#
+# The flags travel in the environment because gomobile runs `go build` itself.
+readonly XHTTP_MARKER='commy/core/xhttp.NewClient'
+OVERLAY=""
+
+prepare_overlay() {
+  say "generating the sing-box build overlay (XHTTP transport)"
+  # `_overlay`, not `overlay`: Go skips directories that start with an
+  # underscore, and these files must not be mistaken for packages of core/.
+  OVERLAY="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen -out "${BUILD_DIR}/_overlay")" \
+    || die "could not generate the build overlay; the message above says which
+   upstream file changed. A sing-box bump has to re-base core/cmd/overlaygen."
+  [[ -f "${OVERLAY}" ]] || die "overlaygen reported ${OVERLAY}, which does not exist."
+  [[ "${OVERLAY}" != *[[:space:]]* ]] || die \
+    "the overlay path contains whitespace: ${OVERLAY}
+   GOFLAGS cannot carry such a path. Build from a directory without spaces."
+  export GOFLAGS="${GOFLAGS:+${GOFLAGS} }-overlay=${OVERLAY}"
+  export GODEBUG="${GODEBUG:+${GODEBUG},}goindex=0"
+}
+
+# gomobile OVERWRITES GOFLAGS for every Apple target (cmd/gomobile/env.go sets
+# GOFLAGS=-tags=ios), which would drop the overlay without a word and produce a
+# framework that refuses every XHTTP server. A `go` wrapper first on PATH puts
+# the flag back on whatever GOFLAGS it is handed. Android does not need this —
+# gomobile leaves GOFLAGS alone there — and must not rely on it: on Windows
+# gomobile.exe resolves `go` to go.exe and never sees a shell script.
+install_go_shim() {
+  local real_go shim_dir
+  real_go="$(command -v go)"
+  shim_dir="${BUILD_DIR}/goshim"
+  mkdir -p "${shim_dir}"
+  cat > "${shim_dir}/go" <<SHIM
+#!/bin/sh
+GOFLAGS="\${GOFLAGS:+\$GOFLAGS }-overlay=${OVERLAY}"
+GODEBUG="\${GODEBUG:+\$GODEBUG,}goindex=0"
+export GOFLAGS GODEBUG
+exec "${real_go}" "\$@"
+SHIM
+  chmod +x "${shim_dir}/go"
+  export PATH="${shim_dir}:${PATH}"
+}
+
+# An overlay that did not apply still builds a working core. The only honest
+# check is to look inside the artefact: Go keeps function names in the binary
+# even with -s -w, and this one exists only if the transport was linked in.
+verify_xhttp_in() {
+  local label="$1" found
+  shift
+  # Counted, not `grep -q`: -q leaves at the first match, the producer dies of
+  # SIGPIPE, and under `pipefail` a library that HAS the transport reads as one
+  # that has not. That is not a guess — it is how this check first failed.
+  found="$("$@" | grep -a -c "${XHTTP_MARKER}" || true)"
+  if [[ "${found:-0}" -eq 0 ]]; then
+    die "${label} was built WITHOUT the XHTTP transport: the build overlay did
+   not apply. Nothing else would have told you — the core runs, and refuses
+   every xhttp server at connect time."
+  fi
+  say "XHTTP transport is in ${label}"
+}
+
 # SagerNet's fork, pinned to the version sing-box's own Makefile installs.
 #
 # NOT golang.org/x/mobile. Upstream gomobile does not understand -libname, and
@@ -151,6 +230,7 @@ build_android() {
   sync_modules
   ensure_gomobile
   mkdir -p "${BUILD_DIR}"
+  prepare_overlay
 
   say "gomobile bind ${LIBBOX_PKG} for ${ANDROID_ABIS}"
   say "this compiles the whole core once per ABI and is slow on a weak machine;"
@@ -166,6 +246,11 @@ build_android() {
       -o "${BUILD_DIR}/libbox.aar" \
       "${LIBBOX_PKG}" )
 
+  local lib
+  for lib in $(unzip -Z1 "${BUILD_DIR}/libbox.aar" 'jni/*/libbox.so'); do
+    verify_xhttp_in "${lib}" unzip -p "${BUILD_DIR}/libbox.aar" "${lib}"
+  done
+
   # The Gradle build reads it from here.
   local dest="${REPO_ROOT}/apps/commy/android/app/libs"
   mkdir -p "${dest}"
@@ -180,6 +265,8 @@ build_apple() {
   ensure_gomobile
   mkdir -p "${BUILD_DIR}"
   [[ "$(uname -s)" == "Darwin" ]] || die "the Apple target needs macOS with Xcode."
+  prepare_overlay
+  install_go_shim
   say "gomobile bind ${LIBBOX_PKG} for Apple"
   ( cd "${CORE_DIR}" && gomobile bind -v \
       -target=ios,iossimulator,macos \
@@ -188,6 +275,10 @@ build_apple() {
       -trimpath \
       -o "${BUILD_DIR}/Libbox.xcframework" \
       "${LIBBOX_PKG}" )
+  local binary
+  while IFS= read -r binary; do
+    verify_xhttp_in "${binary#"${BUILD_DIR}/"}" cat "${binary}"
+  done < <(find "${BUILD_DIR}/Libbox.xcframework" -type f -name Libbox)
   say "done: ${BUILD_DIR}/Libbox.xcframework"
 }
 
@@ -199,6 +290,7 @@ build_cshared() {
   need_go
   sync_modules
   mkdir -p "${BUILD_DIR}"
+  prepare_overlay
   say "building c-shared core for ${goos}"
   ( cd "${CORE_DIR}" && CGO_ENABLED=1 GOOS="${goos}" go build \
       -buildmode=c-shared \
@@ -207,6 +299,7 @@ build_cshared() {
       -trimpath \
       -o "${BUILD_DIR}/${out}" \
       ./cshared )
+  verify_xhttp_in "${out}" cat "${BUILD_DIR}/${out}"
   say "done: ${BUILD_DIR}/${out}"
 }
 
