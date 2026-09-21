@@ -18,15 +18,15 @@
 /// obviously synthetic (`example.net`, a zero UUID) — rule R2 applies to
 /// screenshots as much as to logs.
 ///
-/// **Known limitation, unfixed.** A case writes its PNG and then does not
-/// return: the run stalls after the capture and `flutter test` eventually
-/// times the case out, so the ones after it never run. The images already in
-/// `docs/screenshots/` were produced this way, one case at a time with
-/// `--plain-name`, and they are correct — the stall happens after the file is
-/// on disk. Suspected cause is the fake core's periodic tick left pending
-/// inside the test's fake-async zone; `harness.dispose()` in a `tearDown`
-/// closes the controllers but the timer is never cancelled. Fix that before
-/// adding more cases, otherwise each new screen costs a ten-minute timeout.
+/// The whole set runs in one go. It did not use to: a case wrote its PNG and
+/// then hung until `flutter test` timed it out, so every screen after the
+/// first had to be shot on its own with `--plain-name`. The cause was not the
+/// fake core's timer, as the note here used to guess — it was the capture
+/// itself. `RenderRepaintBoundary.toImage` is completed by the engine, and a
+/// widget test's fake-async zone never advances real time, so the second
+/// `await` in [_write] waited on a future nothing in that zone could
+/// complete. [WidgetTester.runAsync] steps outside the zone for exactly this,
+/// which is also how `matchesGoldenFile` does it.
 library;
 
 import 'dart:io';
@@ -38,13 +38,12 @@ import 'package:commy/src/screens/settings/routing_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
-import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../support/commy_fonts.dart';
 import '../support/commy_test_app.dart';
 
 /// Where the PNGs land, relative to `apps/commy`.
@@ -61,7 +60,7 @@ const double _density = 3;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUpAll(_loadFonts);
+  setUpAll(loadCommyFonts);
 
   late CommyTestHarness harness;
   tearDown(() => harness.dispose());
@@ -233,64 +232,24 @@ void main() {
 }
 
 /// Photographs the frame and writes it as a PNG.
+///
+/// Every await here is real I/O, so the whole of it runs outside the test's
+/// fake-async zone — see the note at the top of the file.
 Future<void> _write(WidgetTester tester, String name) async {
   final boundary =
       tester.renderObject<RenderRepaintBoundary>(find.byKey(_frame));
-  final image = await boundary.toImage(pixelRatio: _density);
-  final data = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  if (data == null) {
+  final bytes = await tester.runAsync(() async {
+    final image = await boundary.toImage(pixelRatio: _density);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return data?.buffer.asUint8List();
+  });
+  if (bytes == null) {
     fail('$name produced no image data');
   }
   final directory = Directory(_outputDirectory);
   if (!directory.existsSync()) {
     directory.createSync(recursive: true);
   }
-  File('$_outputDirectory/$name.png')
-      .writeAsBytesSync(data.buffer.asUint8List());
-}
-
-bool _fontsLoaded = false;
-
-/// Puts the real typefaces into the engine.
-///
-/// Without this every glyph is the test framework's placeholder box, which
-/// makes for a screenshot of nothing. The faces live in `commy_ui`, so they
-/// are read off disk by path and registered under both the bare family name
-/// and the package-qualified one the type scale asks for — the same two-name
-/// trick `packages/commy_ui/test/support/commy_test_host.dart` uses.
-Future<void> _loadFonts() async {
-  if (_fontsLoaded) {
-    return;
-  }
-  _fontsLoaded = true;
-
-  const uiRoot = '../../packages/commy_ui/fonts';
-  await _loadFamily(CommyFonts.ui, const <String>[
-    '$uiRoot/Inter-Regular.ttf',
-    '$uiRoot/Inter-Medium.ttf',
-    '$uiRoot/Inter-SemiBold.ttf',
-  ]);
-  await _loadFamily(CommyFonts.mono, const <String>[
-    '$uiRoot/JetBrainsMono-Regular.ttf',
-    '$uiRoot/JetBrainsMono-Medium.ttf',
-  ]);
-
-  await _loadFamily('Lucide', const <String>['$uiRoot/Lucide.ttf']);
-}
-
-Future<void> _loadFamily(String family, List<String> paths) async {
-  final loaders = <FontLoader>[
-    FontLoader(family),
-    FontLoader('packages/${CommyFonts.package}/$family'),
-  ];
-  for (final path in paths) {
-    final bytes = await File(path).readAsBytes();
-    for (final loader in loaders) {
-      loader.addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-    }
-  }
-  for (final loader in loaders) {
-    await loader.load();
-  }
+  File('$_outputDirectory/$name.png').writeAsBytesSync(bytes);
 }

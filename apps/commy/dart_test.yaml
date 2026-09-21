@@ -1,0 +1,9 @@
+# Declared so that `flutter test --tags golden` — which is what
+# `melos run test:golden` runs — does not warn about an unknown tag, and so
+# that the tag has one written meaning. Mirrors `packages/commy_ui`.
+tags:
+  golden:
+    description: >-
+      Photographs a whole screen in both themes, through the real providers,
+      with the vendored fonts loaded. Linux owns the images; regenerate with
+      `flutter test --update-goldens --tags golden`.

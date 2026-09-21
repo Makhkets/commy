@@ -149,10 +149,15 @@ class CommyTestHarness {
   /// Not `MaterialApp.router`: a screen test that also stood the router up
   /// would be testing go_router, and a failure in either would look like a
   /// failure in both.
+  ///
+  /// [theme] is dark unless a caller says otherwise. Only the goldens do:
+  /// every other test asserts on widgets and values, which are the same in
+  /// both themes, and pinning one keeps those tests reading as one case.
   Widget wrap(
     Widget child, {
     TunnelStatus? status,
     List<Override> extra = const <Override>[],
+    ThemeData? theme,
   }) {
     return ProviderScope(
       overrides: overrides(status: status, extra: extra),
@@ -160,7 +165,7 @@ class CommyTestHarness {
         child: Builder(
           builder: (context) => MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: CommyTheme.dark,
+            theme: theme ?? CommyTheme.dark,
             locale: TranslationProvider.of(context).flutterLocale,
             supportedLocales: AppLocaleUtils.supportedLocales,
             localizationsDelegates: GlobalMaterialLocalizations.delegates,

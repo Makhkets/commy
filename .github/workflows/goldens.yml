@@ -44,21 +44,28 @@ jobs:
       - run: melos bootstrap
       - run: melos run gen --no-select
 
-      - name: Regenerate
+      - name: Regenerate the design system
         working-directory: packages/commy_ui
         run: flutter test --update-goldens --tags golden
 
+      - name: Regenerate the screens
+        working-directory: apps/commy
+        run: flutter test --update-goldens --tags golden
+
       - name: Show what moved
-        working-directory: packages/commy_ui
         run: |
           echo "### Goldens changed" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          git status --porcelain test/golden/goldens >> "$GITHUB_STEP_SUMMARY" || true
+          git status --porcelain \
+            packages/commy_ui/test/golden/goldens \
+            apps/commy/test/golden/goldens >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "Reason given: ${{ github.event.inputs.reason }}" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v7
         with:
           name: goldens
-          path: packages/commy_ui/test/golden/goldens/
+          path: |
+            packages/commy_ui/test/golden/goldens/
+            apps/commy/test/golden/goldens/
           if-no-files-found: error
