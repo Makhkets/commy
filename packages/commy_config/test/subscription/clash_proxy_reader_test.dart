@@ -172,8 +172,91 @@ void main() {
           'server': 'a.example',
           'port': 443,
           'uuid': 'u',
-          'network': 'xhttp',
+          'network': 'kcp',
         }),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+  });
+
+  group('ClashProxyReader xhttp', () {
+    Map<String, Object?> proxy(Map<String, Object?> options) =>
+        <String, Object?>{
+          'name': 'x',
+          'type': 'vless',
+          'server': 'a.example',
+          'port': 443,
+          'uuid': 'u',
+          'tls': true,
+          'servername': 's.example',
+          'network': 'xhttp',
+          'xhttp-opts': options,
+        };
+
+    test('reads host, path and mode', () {
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'host': 'cdn.example',
+          'mode': 'stream-up',
+        }),
+      );
+
+      expect(node.param('type'), 'xhttp');
+      expect(node.param('path'), '/xh');
+      expect(node.param('host'), 'cdn.example');
+      expect(node.param('mode'), 'stream-up');
+      expect(node.param('extra'), isNull);
+    });
+
+    test('turns the kebab-case settings into the extra a link would carry', () {
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'mode': 'packet-up',
+          'no-grpc-header': true,
+          'x-padding-bytes': '100-500',
+          'sc-max-each-post-bytes': 800000,
+          'headers': <String, Object?>{'X-Forwarded-For': '1.2.3.4'},
+          'reuse-settings': <String, Object?>{
+            'max-concurrency': '16-32',
+            'max-connections': '0',
+            'h-keep-alive-period': 0,
+          },
+        }),
+      );
+      final outbound = OutboundBuilder.build(node: node, tag: 't');
+
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'mode': 'packet-up',
+        'path': '/xh',
+        'headers': <String, String>{'X-Forwarded-For': '1.2.3.4'},
+        'x_padding_bytes': '100-500',
+        'no_grpc_header': true,
+        'sc_max_each_post_bytes': 800000,
+        'xmux': <String, Object?>{'max_concurrency': '16-32'},
+      });
+    });
+
+    test('works with no xhttp-opts at all', () {
+      final node = ClashProxyReader.read(
+        <String, Object?>{
+          'name': 'x',
+          'type': 'vless',
+          'server': 'a.example',
+          'port': 443,
+          'uuid': 'u',
+          'network': 'xhttp',
+        },
+      );
+
+      expect(node.param('type'), 'xhttp');
+    });
+
+    test('rejects a mode that does not exist', () {
+      expect(
+        () => ClashProxyReader.read(proxy(<String, Object?>{'mode': 'turbo'})),
         throwsA(isA<LinkFormatException>()),
       );
     });

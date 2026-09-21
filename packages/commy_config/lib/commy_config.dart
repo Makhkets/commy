@@ -15,6 +15,7 @@ export 'src/builder/config_build_result.dart';
 export 'src/builder/config_platform.dart';
 export 'src/builder/dns_section_builder.dart';
 export 'src/builder/inbound_section_builder.dart';
+export 'src/builder/left_out_node.dart';
 export 'src/builder/outbound_builder.dart';
 export 'src/builder/route_matcher.dart';
 export 'src/builder/route_section_builder.dart';

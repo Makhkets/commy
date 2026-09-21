@@ -3,6 +3,7 @@ import 'package:commy_config/src/internal/link_format_exception.dart';
 import 'package:commy_config/src/internal/map_read.dart';
 import 'package:commy_config/src/internal/node_factory.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
 import 'package:commy_domain/commy_domain.dart';
 
@@ -42,6 +43,8 @@ abstract final class SingBoxOutboundReader {
     'http': 'http',
     'httpupgrade': 'httpupgrade',
     'quic': 'quic',
+    'xhttp': TransportParams.xhttp,
+    'splithttp': TransportParams.xhttp,
   };
 
   /// Whether [outbound] looks like something this reader can turn into a node.
@@ -247,6 +250,15 @@ abstract final class SingBoxOutboundReader {
         params[ParamKeys.host] = host;
       }
     }
+    if (normalised == TransportParams.xhttp) {
+      // The block our own builder writes, and the one the sing-box forks that
+      // carry XHTTP write: Xray's settings in snake_case, flat.
+      TransportParams.readXhttpInto(
+        params,
+        mode: MapRead.text(transport, <String>['mode']),
+        extra: XhttpSettings.read(transport).toExtraJson(),
+      );
+    }
   }
 
   static ProxyNode _readXray(String rawType, Map<String, Object?> outbound) {
@@ -407,6 +419,22 @@ abstract final class SingBoxOutboundReader {
           params[ParamKeys.path] = MapRead.text(options, <String>['path']);
           params[ParamKeys.host] = MapRead.text(options, <String>['host']);
         }
+      case TransportParams.xhttp:
+        final options = MapRead.object(
+              stream,
+              <String>['xhttpSettings', 'splithttpSettings'],
+            ) ??
+            const <String, Object?>{};
+        params[ParamKeys.path] = MapRead.text(options, <String>['path']);
+        params[ParamKeys.host] = MapRead.text(options, <String>['host']);
+        // Xray lets the settings sit beside host and path or inside `extra`,
+        // and when `extra` is there it replaces the rest wholesale.
+        final extra = MapRead.object(options, <String>['extra']);
+        TransportParams.readXhttpInto(
+          params,
+          mode: MapRead.text(options, <String>['mode']),
+          extra: XhttpSettings.read(extra ?? options).toExtraJson(),
+        );
     }
   }
 

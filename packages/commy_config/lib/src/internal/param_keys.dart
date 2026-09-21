@@ -76,6 +76,14 @@ abstract final class ParamKeys {
   /// gRPC or xhttp mode.
   static const String mode = 'mode';
 
+  /// Everything else an xhttp transport is told, as the JSON object a share
+  /// link carries in `extra=`: padding, XMUX, placements, custom headers.
+  ///
+  /// Kept as the text it arrived as, so a node exported again is the node that
+  /// was imported. Secret: it can hold request headers with a token in them
+  /// and, under `downloadSettings`, a second server with its Reality short id.
+  static const String extra = 'extra';
+
   /// Shadowsocks SIP003 plugin name.
   static const String plugin = 'plugin';
 

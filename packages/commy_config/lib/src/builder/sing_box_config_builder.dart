@@ -2,6 +2,7 @@ import 'package:commy_config/src/builder/clash_api_options.dart';
 import 'package:commy_config/src/builder/config_build_result.dart';
 import 'package:commy_config/src/builder/dns_section_builder.dart';
 import 'package:commy_config/src/builder/inbound_section_builder.dart';
+import 'package:commy_config/src/builder/left_out_node.dart';
 import 'package:commy_config/src/builder/outbound_builder.dart';
 import 'package:commy_config/src/builder/route_section_builder.dart';
 import 'package:commy_config/src/builder/sing_box_build_request.dart';
@@ -72,13 +73,38 @@ class SingBoxConfigBuilder {
   ConfigBuildResult _build(SingBoxBuildRequest request) {
     final selected = _validate(request);
     final warnings = <String>[];
+    final leftOut = <LeftOutNode>[];
 
     final outbounds = <Map<String, Object?>>[];
     final endpoints = <Map<String, Object?>>[];
     final memberTags = <String>[];
     for (final node in request.nodes) {
       final tag = SingBoxTags.forNode(node);
-      final built = OutboundBuilder.build(node: node, tag: tag);
+      final Map<String, Object?> built;
+      try {
+        _checkAddress(node);
+        if (memberTags.contains(tag)) {
+          throw ConfigBuildException(
+            'it shares the identifier "${node.id}" with another server',
+          );
+        }
+        built = OutboundBuilder.build(node: node, tag: tag);
+      } on ConfigBuildException catch (error) {
+        // The document holds every server the user has, so that switching
+        // does not mean reconnecting. That must not turn one bad entry in a
+        // subscription into a reason none of the others connects: a server
+        // that cannot be expressed is left out and named. The exception is
+        // the server the user asked for — there the reason IS the answer.
+        // By identity, not by id: a second entry with the selected server's
+        // id is a duplicate to leave out, not the server that was asked for.
+        if (identical(node, selected)) {
+          rethrow;
+        }
+        leftOut.add(
+          LeftOutNode(nodeId: node.id, name: node.name, reason: error.reason),
+        );
+        continue;
+      }
       memberTags.add(tag);
       if (OutboundBuilder.isEndpoint(node.protocol)) {
         endpoints.add(built);
@@ -90,7 +116,9 @@ class SingBoxConfigBuilder {
     final selectedTag = SingBoxTags.forNode(selected);
     final useAuto = usesAutoGroup(
       autoSelect: request.autoSelect,
-      nodeCount: request.nodes.length,
+      // Counted after the loop: a group is made of what was built, and a group
+      // of one is no group.
+      nodeCount: memberTags.length,
     );
     if (useAuto) {
       outbounds.add(_autoGroup(request, memberTags));
@@ -143,6 +171,7 @@ class SingBoxConfigBuilder {
     return ConfigBuildResult(
       config: CoreConfig(document),
       warnings: List<String>.unmodifiable(warnings),
+      leftOut: List<LeftOutNode>.unmodifiable(leftOut),
     );
   }
 
@@ -185,33 +214,6 @@ class SingBoxConfigBuilder {
     if (request.nodes.isEmpty) {
       throw const ConfigBuildException('No node to connect through');
     }
-    final tags = <String>{};
-    for (final node in request.nodes) {
-      if (!tags.add(SingBoxTags.forNode(node))) {
-        throw ConfigBuildException(
-          'Two nodes share the identifier "${node.id}"',
-        );
-      }
-      if (node.host.trim().isEmpty) {
-        throw ConfigBuildException('Node "${node.name}" has no server address');
-      }
-      // The backstop for a panel notice. The app keeps these out of every
-      // list, so the user cannot pick one — but a stored selection can outlive
-      // the panel that changed its mind, and `0.0.0.0` in an outbound is a
-      // tunnel that comes up and dials nowhere, which is the failure that is
-      // hardest to read from the outside.
-      if (PanelNotice.isUnspecified(node.host)) {
-        throw ConfigBuildException(
-          '"${node.name}" is a message from the panel, not a server: its '
-          'address is ${node.host.trim()}',
-        );
-      }
-      if (node.port < 1 || node.port > 65535) {
-        throw ConfigBuildException(
-          'Node "${node.name}" has port ${node.port}, which is not a port',
-        );
-      }
-    }
     final selected = request.selectedNode;
     if (selected == null) {
       throw const ConfigBuildException(
@@ -225,5 +227,28 @@ class SingBoxConfigBuilder {
       );
     }
     return selected;
+  }
+
+  /// Refuses a node whose address the core could not dial.
+  void _checkAddress(ProxyNode node) {
+    if (node.host.trim().isEmpty) {
+      throw ConfigBuildException('Node "${node.name}" has no server address');
+    }
+    // The backstop for a panel notice. The app keeps these out of every
+    // list, so the user cannot pick one — but a stored selection can outlive
+    // the panel that changed its mind, and `0.0.0.0` in an outbound is a
+    // tunnel that comes up and dials nowhere, which is the failure that is
+    // hardest to read from the outside.
+    if (PanelNotice.isUnspecified(node.host)) {
+      throw ConfigBuildException(
+        '"${node.name}" is a message from the panel, not a server: its '
+        'address is ${node.host.trim()}',
+      );
+    }
+    if (node.port < 1 || node.port > 65535) {
+      throw ConfigBuildException(
+        'Node "${node.name}" has port ${node.port}, which is not a port',
+      );
+    }
   }
 }

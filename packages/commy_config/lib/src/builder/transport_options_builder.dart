@@ -1,14 +1,18 @@
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/internal/xhttp_settings.dart';
+import 'package:commy_config/src/parsers/transport_params.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Builds the `transport` block of a VLESS, VMess or Trojan outbound.
 ///
-/// Mirrors `option.V2RayTransportOptions` at tag v1.13.16. The field list per
-/// transport is closed — the core decodes with `DisallowUnknownFields`, so a
-/// field borrowed from another transport is a startup error rather than a
-/// setting that quietly does nothing.
+/// Mirrors `option.V2RayTransportOptions` at tag v1.13.16, plus the one
+/// transport our build of the core adds: `xhttp`, whose block is
+/// `config.Options` in `core/xhttp/config`. The field list per transport is
+/// closed — the core decodes with `DisallowUnknownFields`, so a field borrowed
+/// from another transport is a startup error rather than a setting that
+/// quietly does nothing.
 abstract final class TransportOptionsBuilder {
   /// Transports that need no block at all.
   static const String plainTransport = 'tcp';
@@ -38,6 +42,8 @@ abstract final class TransportOptionsBuilder {
         return _httpUpgrade(node);
       case 'quic':
         return <String, Object?>{SingBoxKeys.type: 'quic'};
+      case TransportParams.xhttp:
+        return _xhttp(node);
       default:
         throw ConfigBuildException(
           'Transport "$transport" is not carried by the sing-box core',
@@ -131,6 +137,40 @@ abstract final class TransportOptionsBuilder {
       options[SingBoxKeys.path] = splitEarlyData(path).path;
     }
     return options;
+  }
+
+  /// The XHTTP mode [node] runs in: what the link said, or `auto`.
+  static String xhttpMode(ProxyNode node) {
+    final mode = node.param(ParamKeys.mode)?.trim().toLowerCase();
+    return mode == null || mode.isEmpty ? XhttpSettings.modeAuto : mode;
+  }
+
+  static Map<String, Object?> _xhttp(ProxyNode node) {
+    final mode = xhttpMode(node);
+    // Checked again here, not only at import: the node may come from a
+    // database written before a rule existed, and what the core refuses it
+    // refuses for the whole document, not for one server.
+    final settings =
+        (XhttpSettings.tryParseExtra(node.param(ParamKeys.extra)) ??
+            XhttpSettings.read(const <String, Object?>{}))
+          ..validate(mode);
+
+    final options = <String, Object?>{SingBoxKeys.type: TransportParams.xhttp};
+    if (mode != XhttpSettings.modeAuto) {
+      options['mode'] = mode;
+    }
+    final host = node.param(ParamKeys.host) ?? settings.hostHeader;
+    if (host != null && host.isNotEmpty) {
+      // One name, unlike `http`: it becomes the Host header as it stands.
+      options[SingBoxKeys.host] = host.split(',').first.trim();
+    }
+    final path = node.param(ParamKeys.path);
+    if (path != null && path.isNotEmpty) {
+      // Left whole. An XHTTP path may carry a query string of its own, and it
+      // is sent to the server as written — `?ed=` means nothing here.
+      options[SingBoxKeys.path] = path;
+    }
+    return options..addAll(settings.toCore());
   }
 
   static bool _isHttpMethod(String value) => const <String>{

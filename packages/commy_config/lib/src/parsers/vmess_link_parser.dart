@@ -7,6 +7,7 @@ import 'package:commy_config/src/internal/node_factory.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
 import 'package:commy_config/src/internal/percent.dart';
 import 'package:commy_config/src/internal/raw_link.dart';
+import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/node_link_parser.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -45,6 +46,8 @@ class VmessLinkParser implements NodeLinkParser {
     'sid',
     'spx',
     'flow',
+    'mode',
+    'extra',
   ];
 
   @override
@@ -104,6 +107,8 @@ class VmessLinkParser implements NodeLinkParser {
       'sid': node.param(ParamKeys.shortId),
       'spx': node.param(ParamKeys.spiderX),
       'flow': node.param(ParamKeys.flow),
+      'mode': node.param(ParamKeys.mode),
+      'extra': node.param(ParamKeys.extra),
     };
     final document = <String, Object?>{
       for (final key in exportKeyOrder)
@@ -146,7 +151,11 @@ class VmessLinkParser implements NodeLinkParser {
         ? ParamKeys.securityReality
         : TransportParams.normaliseSecurity(_text(decoded['tls'])) ??
             ParamKeys.securityNone;
-    final headerType = _text(decoded['type']);
+    final rawHeaderType = _text(decoded['type']);
+    // v2rayN has one `type` field and reuses it per transport: a header type
+    // for tcp and kcp, the mode for xhttp.
+    final isXhttp = transport == TransportParams.xhttp;
+    final headerType = isXhttp ? null : rawHeaderType;
     final path = _text(decoded['path']);
     final params = <String, Object?>{
       ParamKeys.uuid: uuid,
@@ -167,6 +176,17 @@ class VmessLinkParser implements NodeLinkParser {
       ParamKeys.flow: _text(decoded['flow']),
       ParamKeys.mode: _text(decoded['mode']),
     };
+    if (isXhttp) {
+      final extra = decoded['extra'];
+      TransportParams.readXhttpInto(
+        params,
+        mode: _text(decoded['mode']) ??
+            (XhttpSettings.modes.contains(rawHeaderType)
+                ? rawHeaderType
+                : null),
+        extra: extra is Map ? jsonEncode(extra) : _text(extra),
+      );
+    }
     final name = _text(decoded['ps']) ?? _text(decoded['remark']);
     return NodeFactory.build(
       protocol: Protocol.vmess,

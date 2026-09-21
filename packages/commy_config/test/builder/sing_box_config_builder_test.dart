@@ -430,6 +430,158 @@ void main() {
     });
   });
 
+  group('SingBoxConfigBuilder with a server it cannot express', () {
+    // The app hands the builder every server it has stored, so that switching
+    // does not mean reconnecting. Before this group existed, one malformed
+    // entry anywhere in any subscription made `build` fail — and the user,
+    // who had picked a perfectly good server, could connect to none at all.
+    const noKey = ProxyNode(
+      id: 'broken-reality',
+      name: 'Broken',
+      protocol: Protocol.vless,
+      host: 'b.example',
+      port: 443,
+      params: <String, Object?>{
+        'uuid': 'u',
+        'security': 'reality',
+        'sni': 's.example',
+      },
+    );
+    const badPort = ProxyNode(
+      id: 'bad-port',
+      name: 'Port',
+      protocol: Protocol.vless,
+      host: 'c.example',
+      port: 70000,
+      params: <String, Object?>{'uuid': 'u'},
+    );
+    const notice = ProxyNode(
+      id: 'notice',
+      name: 'App not supported',
+      protocol: Protocol.vless,
+      host: '0.0.0.0',
+      port: 1,
+      params: <String, Object?>{'uuid': 'u'},
+    );
+    const badExtra = ProxyNode(
+      id: 'bad-xhttp',
+      name: 'Xhttp',
+      protocol: Protocol.vless,
+      host: 'd.example',
+      port: 443,
+      params: <String, Object?>{
+        'uuid': 'u',
+        'type': 'xhttp',
+        'mode': 'stream-one',
+        'extra': '{"uplinkHTTPMethod":"GET"}',
+      },
+    );
+
+    SingBoxBuildRequest request(
+      List<ProxyNode> nodes, {
+      String selected = 'reality-1',
+      bool autoSelect = false,
+    }) =>
+        SingBoxBuildRequest(
+          nodes: nodes,
+          selectedNodeId: selected,
+          routing: RoutingPolicy.defaults,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          autoSelect: autoSelect,
+        );
+
+    List<String> tagsOf(CoreConfig config) => <String>[
+          for (final outbound in config.document['outbounds']! as List<Object?>)
+            '${(outbound! as Map<String, Object?>)['tag']}',
+        ];
+
+    test('leaves it out, names it, and builds the rest', () {
+      final result = const SingBoxConfigBuilder().build(
+        request(<ProxyNode>[
+          _realityNode,
+          noKey,
+          badPort,
+          notice,
+          badExtra,
+          _hysteriaNode,
+        ]),
+      );
+      final built = result.valueOrNull;
+
+      expect(result.failureOrNull, isNull);
+      expect(tagsOf(built!.config), <String>[
+        SingBoxTags.forNode(_realityNode),
+        SingBoxTags.forNode(_hysteriaNode),
+        SingBoxTags.proxyGroup,
+        SingBoxTags.direct,
+      ]);
+      // Not among the routing warnings: those are shown under a heading about
+      // rules, on a screen about rules.
+      expect(built.warnings, isEmpty);
+      expect(
+        built.leftOut.map((node) => node.nodeId),
+        <String>['broken-reality', 'bad-port', 'notice', 'bad-xhttp'],
+      );
+      expect('${built.leftOut[0]}', allOf(contains('Broken'), contains('key')));
+      expect('${built.leftOut[1]}', allOf(contains('Port'), contains('70000')));
+      expect('${built.leftOut[2]}', contains('App not supported'));
+      expect('${built.leftOut[3]}', allOf(contains('Xhttp'), contains('GET')));
+    });
+
+    test('does not offer the selector a member that was left out', () {
+      final config = _build(request(<ProxyNode>[_realityNode, noKey]));
+      final selector = (config.document['outbounds']! as List<Object?>)
+          .cast<Map<String, Object?>>()
+          .firstWhere((outbound) => outbound['tag'] == SingBoxTags.proxyGroup);
+
+      expect(
+        selector['outbounds'],
+        <String>[SingBoxTags.forNode(_realityNode)],
+      );
+    });
+
+    test('makes no Auto group out of the one server that is left', () {
+      final config = _build(
+        request(<ProxyNode>[_realityNode, noKey], autoSelect: true),
+      );
+
+      expect(tagsOf(config), isNot(contains(SingBoxTags.autoGroup)));
+    });
+
+    test('still refuses when it is the server the user asked for', () {
+      // There the reason is the answer to "why does it not connect".
+      final result = const SingBoxConfigBuilder().build(
+        request(
+          <ProxyNode>[_realityNode, noKey],
+          selected: 'broken-reality',
+        ),
+      );
+      final failure = result.failureOrNull;
+
+      expect(failure, isA<ConfigInvalidFailure>());
+      expect((failure! as ConfigInvalidFailure).detail, contains('public key'));
+    });
+
+    test('keeps the first of two servers that share an identifier', () {
+      const twin = ProxyNode(
+        id: 'reality-1',
+        name: 'Twin',
+        protocol: Protocol.vless,
+        host: 'twin.example',
+        port: 443,
+        params: <String, Object?>{'uuid': 'u'},
+      );
+      final result = const SingBoxConfigBuilder().build(
+        request(<ProxyNode>[_realityNode, twin]),
+      );
+
+      expect(result.failureOrNull, isNull);
+      expect(result.valueOrNull!.leftOut.single.name, 'Twin');
+    });
+  });
+
   group('SingBoxConfigBuilder validation', () {
     test('refuses an empty node list', () {
       final result = const SingBoxConfigBuilder().build(

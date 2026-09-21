@@ -1,7 +1,9 @@
+import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_config/src/internal/link_format_exception.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
 import 'package:commy_config/src/internal/percent.dart';
 import 'package:commy_config/src/internal/query_map.dart';
+import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// The transport and TLS half of a link, shared by VLESS, VMess and Trojan.
@@ -29,14 +31,14 @@ abstract final class TransportParams {
     'splithttp': 'xhttp',
   };
 
-  /// Transports the sing-box core can actually carry.
+  /// Transports the core can actually carry.
   ///
-  /// Read off `option.V2RayTransportOptions` at tag v1.13.16: the core has
-  /// `ws`, `grpc`, `http`, `httpupgrade` and `quic`, and nothing else. `xhttp`
-  /// is an Xray transport and stays out on purpose — recognising it in
-  /// [transportAliases] only so the import failure can name it, and rejecting
-  /// it here, tells the user at import time instead of letting the tunnel fail
-  /// silently at connect time.
+  /// `ws`, `grpc`, `http`, `httpupgrade` and `quic` are sing-box's own, read
+  /// off `option.V2RayTransportOptions` at tag v1.13.16. `xhttp` is Xray's
+  /// transport and sing-box does not have it: ours does, because the build
+  /// adds it (core/xhttp, docs/adr/0010-xhttp-transport.md). Anything outside
+  /// this set is refused at import time, by name, instead of letting the tunnel
+  /// fail at connect time.
   static const Set<String> supported = <String>{
     'tcp',
     'ws',
@@ -44,7 +46,11 @@ abstract final class TransportParams {
     'http',
     'httpupgrade',
     'quic',
+    xhttp,
   };
+
+  /// The name XHTTP is stored under. `splithttp`, its first name, maps to it.
+  static const String xhttp = 'xhttp';
 
   /// Query keys that may hold the transport name.
   static const List<String> transportKeys = <String>[
@@ -192,12 +198,56 @@ abstract final class TransportParams {
     params[ParamKeys.serviceName] = serviceName;
     params[ParamKeys.headerType] = query.firstOf(headerTypeKeys);
     params[ParamKeys.mode] = query.first('mode');
+    if (transport == xhttp) {
+      readXhttpInto(
+        params,
+        mode: query.first('mode'),
+        extra: query.first('extra'),
+      );
+    }
     if (query.firstOf(insecureKeys) != null) {
       params[ParamKeys.allowInsecure] =
           query.flagOf(insecureKeys, orElse: false);
     }
     if (query.first('disablesni') != null) {
       params[ParamKeys.disableSni] = query.flag('disablesni', orElse: false);
+    }
+  }
+
+  /// Checks and stores what only an XHTTP node has: its [mode] and [extra].
+  ///
+  /// [extra] is the JSON object of a share link's `extra=`, as text. Text that
+  /// is not a JSON object is dropped rather than refused — the node still has
+  /// its host and path, and the defaults are what most servers run with. An
+  /// object Xray itself would refuse is refused, by the rule it breaks.
+  static void readXhttpInto(
+    Map<String, Object?> params, {
+    required String? mode,
+    required String? extra,
+  }) {
+    final normalisedMode = mode?.trim().toLowerCase();
+    final effectiveMode = normalisedMode == null || normalisedMode.isEmpty
+        ? XhttpSettings.modeAuto
+        : normalisedMode;
+    if (!XhttpSettings.modes.contains(effectiveMode)) {
+      throw LinkFormatException('XHTTP mode "$mode" does not exist');
+    }
+    params[ParamKeys.mode] = normalisedMode;
+
+    final settings = XhttpSettings.tryParseExtra(extra);
+    if (settings == null || settings.isEmpty) {
+      params[ParamKeys.extra] = null;
+    } else {
+      try {
+        settings.validate(effectiveMode);
+      } on ConfigBuildException catch (error) {
+        throw LinkFormatException(error.reason);
+      }
+      params[ParamKeys.extra] = extra!.trim();
+    }
+    final host = params[ParamKeys.host];
+    if ((host == null || '$host'.isEmpty) && settings?.hostHeader != null) {
+      params[ParamKeys.host] = settings!.hostHeader;
     }
   }
 
@@ -218,6 +268,7 @@ abstract final class TransportParams {
     ParamKeys.serviceName,
     ParamKeys.headerType,
     ParamKeys.mode,
+    ParamKeys.extra,
     ParamKeys.allowInsecure,
   ];
 

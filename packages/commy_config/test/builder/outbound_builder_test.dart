@@ -201,11 +201,107 @@ void main() {
         () => _build(
           _node(Protocol.vless, <String, Object?>{
             'uuid': 'u',
-            'type': 'xhttp',
+            'type': 'kcp',
           }),
         ),
         throwsA(isA<ConfigBuildException>()),
       );
+    });
+  });
+
+  group('OutboundBuilder xhttp', () {
+    test('writes nothing but the type when the node says nothing', () {
+      final outbound = _build(
+        _node(Protocol.vless, <String, Object?>{'uuid': 'u', 'type': 'xhttp'}),
+      );
+
+      expect(outbound['transport'], <String, Object?>{'type': 'xhttp'});
+    });
+
+    test('leaves `auto` out and the path whole', () {
+      final outbound = _build(
+        _node(Protocol.vless, <String, Object?>{
+          'uuid': 'u',
+          'type': 'xhttp',
+          'mode': 'auto',
+          'path': '/api?ed=2048',
+          'host': 'a.example,b.example',
+        }),
+      );
+
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'host': 'a.example',
+        'path': '/api?ed=2048',
+      });
+    });
+
+    test('refuses a node whose extra breaks a rule, naming the rule', () {
+      expect(
+        () => _build(
+          _node(Protocol.vless, <String, Object?>{
+            'uuid': 'u',
+            'type': 'xhttp',
+            'mode': 'stream-one',
+            'extra': '{"uplinkHTTPMethod":"GET"}',
+          }),
+        ),
+        throwsA(
+          isA<ConfigBuildException>().having(
+            (error) => error.reason,
+            'reason',
+            contains('packet-up'),
+          ),
+        ),
+      );
+    });
+
+    test('keeps a browser fingerprint over HTTP/2', () {
+      final outbound = _build(
+        _node(Protocol.vless, <String, Object?>{
+          'uuid': 'u',
+          'type': 'xhttp',
+          'security': 'tls',
+          'fp': 'chrome',
+          'alpn': 'h2,http/1.1',
+        }),
+      );
+      final tls = outbound['tls']! as Map<String, Object?>;
+
+      expect(tls['utls'], isNotNull);
+      expect(tls['alpn'], <String>['h2', 'http/1.1']);
+    });
+
+    test('drops it over HTTP/3, where the core would refuse every dial', () {
+      final outbound = _build(
+        _node(Protocol.vless, <String, Object?>{
+          'uuid': 'u',
+          'type': 'xhttp',
+          'security': 'tls',
+          'fp': 'chrome',
+          'alpn': 'h3',
+        }),
+      );
+      final tls = outbound['tls']! as Map<String, Object?>;
+
+      expect(tls.containsKey('utls'), isFalse);
+      expect(tls['alpn'], <String>['h3']);
+    });
+
+    test('Reality is HTTP/2 whatever the ALPN says, and keeps uTLS', () {
+      final outbound = _build(
+        _node(Protocol.vless, <String, Object?>{
+          'uuid': 'u',
+          'type': 'xhttp',
+          'security': 'reality',
+          'pbk': 'KEY',
+          'sni': 's.example',
+          'alpn': 'h3',
+        }),
+      );
+      final tls = outbound['tls']! as Map<String, Object?>;
+
+      expect(tls['utls'], isNotNull);
     });
   });
 
@@ -251,6 +347,23 @@ void main() {
       );
 
       expect(outbound['server_ports'], <String>['2080:3000']);
+    });
+
+    test('a fingerprint never reaches a QUIC protocol', () {
+      // The core answers a `utls` block over QUIC with "unsupported usage for
+      // uTLS" on every connection; Clash configs set the fingerprint globally.
+      for (final protocol in <Protocol>[Protocol.hysteria2, Protocol.tuic]) {
+        final outbound = _build(
+          _node(protocol, <String, Object?>{
+            'password': 'pw',
+            'uuid': 'u',
+            'fp': 'chrome',
+          }),
+        );
+        final tls = outbound['tls']! as Map<String, Object?>;
+
+        expect(tls.containsKey('utls'), isFalse, reason: protocol.name);
+      }
     });
 
     test('hysteria2 and tuic are always tls', () {

@@ -1,6 +1,7 @@
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/parsers/transport_params.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Builds the `tls` block of an outbound.
@@ -29,7 +30,18 @@ abstract final class TlsOptionsBuilder {
   ///
   /// [alwaysOn] is for the protocols that are TLS by construction — Hysteria 2
   /// and TUIC run over QUIC and have no plaintext mode.
-  static Map<String, Object?>? build(ProxyNode node, {bool alwaysOn = false}) {
+  ///
+  /// [overQuic] is for whatever ends up on QUIC: those two, and XHTTP when its
+  /// ALPN is `h3`. uTLS imitates a browser's TLS-over-TCP handshake and has
+  /// nothing to say about QUIC; the core answers a `utls` block there with
+  /// "unsupported usage for uTLS" on every single connection. A fingerprint in
+  /// the link is therefore left out rather than passed on — Xray ignores it in
+  /// the same place.
+  static Map<String, Object?>? build(
+    ProxyNode node, {
+    bool alwaysOn = false,
+    bool overQuic = false,
+  }) {
     final security = node.param(ParamKeys.security)?.toLowerCase();
     final isReality = security == ParamKeys.securityReality;
     final isTls = alwaysOn || isReality || security == ParamKeys.securityTls;
@@ -70,7 +82,7 @@ abstract final class TlsOptionsBuilder {
             : fingerprint,
       };
       options[SingBoxKeys.reality] = _reality(node);
-    } else if (fingerprint != null && fingerprint.isNotEmpty) {
+    } else if (!overQuic && fingerprint != null && fingerprint.isNotEmpty) {
       options[SingBoxKeys.utls] = <String, Object?>{
         SingBoxKeys.enabled: true,
         SingBoxKeys.fingerprint: fingerprint,
@@ -78,6 +90,23 @@ abstract final class TlsOptionsBuilder {
     }
 
     return options;
+  }
+
+  /// Whether [node] is XHTTP over HTTP/3, which is to say over QUIC.
+  ///
+  /// The version is picked the way the transport picks it: a single ALPN entry
+  /// `h3` means HTTP/3, anything else is HTTP/2 or HTTP/1.1 over TCP. Reality
+  /// is always HTTP/2, whatever the ALPN says.
+  static bool isXhttpOverQuic(ProxyNode node) {
+    if (node.param(ParamKeys.transport) != TransportParams.xhttp) {
+      return false;
+    }
+    if (node.param(ParamKeys.security)?.toLowerCase() ==
+        ParamKeys.securityReality) {
+      return false;
+    }
+    final alpn = readAlpn(node);
+    return alpn.length == 1 && alpn.single.toLowerCase() == 'h3';
   }
 
   /// The SNI to send: the declared one, else the host when it is a name.

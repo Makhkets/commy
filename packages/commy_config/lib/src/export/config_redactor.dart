@@ -34,6 +34,18 @@ abstract final class ConfigRedactor {
   /// Keys that name the user's own server.
   static const Set<String> serverKeys = <String>{'server', 'address'};
 
+  /// The key request headers sit under, in every transport that has them.
+  static const String headersKey = 'headers';
+
+  /// Header names whose value is worth more to a bug report than it costs.
+  ///
+  /// Everything else under [headersKey] is blanked. A header is where a CDN
+  /// access token goes — `Authorization`, `X-Api-Key`, a cookie, whatever the
+  /// operator made up — and an XHTTP link can carry any of them. There is no
+  /// list of secret header names to match against, so the list is of the
+  /// harmless ones.
+  static const Set<String> plainHeaders = <String>{'host', 'user-agent'};
+
   /// Renders [config] as pretty JSON with every credential blanked.
   ///
   /// [hideServers] additionally replaces server addresses, which is what an
@@ -73,6 +85,15 @@ abstract final class ConfigRedactor {
     final key = entry.key.toLowerCase();
     if (secretKeys.contains(key)) {
       return _blank(entry.value);
+    }
+    final value = entry.value;
+    if (key == headersKey && value is Map<String, Object?>) {
+      return <String, Object?>{
+        for (final header in value.entries)
+          header.key: plainHeaders.contains(header.key.toLowerCase())
+              ? header.value
+              : _blank(header.value),
+      };
     }
     if (hideServers && serverKeys.contains(key)) {
       return _replaceServer(entry.value);

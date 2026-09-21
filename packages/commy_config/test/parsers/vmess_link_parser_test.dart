@@ -156,6 +156,51 @@ void main() {
     });
   });
 
+  group('VmessLinkParser xhttp', () {
+    test('reads the mode out of `type`, where v2rayN puts it', () {
+      final node = parser.parse(
+        _legacy(<String, Object?>{
+          'v': '2',
+          'ps': 'n',
+          'add': 'example.com',
+          'port': '443',
+          'id': 'uuid',
+          'net': 'xhttp',
+          'type': 'stream-up',
+          'host': 'cdn.example',
+          'path': '/xh',
+          'tls': 'tls',
+          'extra': <String, Object?>{'noGRPCHeader': true},
+        }),
+      );
+
+      expect(node.param(ParamKeys.transport), 'xhttp');
+      expect(node.param(ParamKeys.mode), 'stream-up');
+      expect(node.param(ParamKeys.headerType), isNull);
+      expect(node.param(ParamKeys.extra), '{"noGRPCHeader":true}');
+    });
+
+    test('exports mode and extra so the link survives a round trip', () {
+      final node = parser.parse(
+        _legacy(<String, Object?>{
+          'ps': 'n',
+          'add': 'example.com',
+          'port': 443,
+          'id': 'uuid',
+          'net': 'xhttp',
+          'mode': 'packet-up',
+          'path': '/xh',
+          'extra': '{"xPaddingBytes":"5-9"}',
+        }),
+      );
+      final again = parser.parse(parser.toLink(node));
+
+      expect(again.param(ParamKeys.mode), 'packet-up');
+      expect(again.param(ParamKeys.extra), '{"xPaddingBytes":"5-9"}');
+      expect(again.id, node.id);
+    });
+  });
+
   group('VmessLinkParser.toLink', () {
     test('round trips through the base64 form', () {
       final node = parser.parse(

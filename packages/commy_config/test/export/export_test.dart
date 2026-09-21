@@ -163,6 +163,44 @@ void main() {
       expect(jsonDecode(exported), config.document);
     });
 
+    test('blanks request headers, where a CDN token goes', () {
+      // An XHTTP link can carry any header the operator made up, and there is
+      // no list of secret header names to match — so the list is of the two
+      // that are worth more to a bug report than they cost.
+      const withHeaders = CoreConfig(<String, Object?>{
+        'outbounds': <Map<String, Object?>>[
+          <String, Object?>{
+            'type': 'vless',
+            'tag': 'proxy',
+            'transport': <String, Object?>{
+              'type': 'xhttp',
+              'path': '/xh',
+              'headers': <String, Object?>{
+                'Host': 'front.example.com',
+                'User-Agent': 'chrome',
+                'Authorization': 'Bearer cdn-token',
+                'X-Api-Key': 'made-up-secret',
+                'Cookie': <String>['session=abc'],
+              },
+            },
+          },
+        ],
+      });
+      final exported = ConfigRedactor.export(withHeaders);
+      final headers = ((((jsonDecode(exported)
+                  as Map<String, Object?>)['outbounds']! as List<Object?>)
+              .single! as Map<String, Object?>)['transport']!
+          as Map<String, Object?>)['headers']! as Map<String, Object?>;
+
+      expect(exported, isNot(contains('cdn-token')));
+      expect(exported, isNot(contains('made-up-secret')));
+      expect(exported, isNot(contains('session=abc')));
+      expect(headers['Host'], 'front.example.com');
+      expect(headers['User-Agent'], 'chrome');
+      // The names stay: which headers a server wants is what the report is for.
+      expect(headers.keys, containsAll(<String>['Authorization', 'X-Api-Key']));
+    });
+
     test('leaves the shape of the document alone', () {
       final exported =
           jsonDecode(ConfigRedactor.export(config)) as Map<String, Object?>;

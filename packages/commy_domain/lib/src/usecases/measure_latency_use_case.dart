@@ -68,13 +68,33 @@ class MeasureLatencyUseCase {
         true,
     };
     final transport = node.param(_transportKey)?.trim().toLowerCase();
+    if (transport == _xhttp && _isHttp3Only(node)) {
+      // XHTTP is HTTP, and HTTP/3 is QUIC. The TCP port of such a server may
+      // well be closed, or belong to something else entirely.
+      return false;
+    }
     return overTcp && !_udpTransports.contains(transport);
+  }
+
+  /// Whether the node's ALPN list is `h3` and nothing else — the one spelling
+  /// that makes an XHTTP transport pick HTTP/3. Reality is always HTTP/2.
+  static bool _isHttp3Only(ProxyNode node) {
+    if (node.param('security')?.trim().toLowerCase() == 'reality') {
+      return false;
+    }
+    final alpn = <String>[
+      for (final entry in (node.param('alpn') ?? '').split(','))
+        if (entry.trim().isNotEmpty) entry.trim().toLowerCase(),
+    ];
+    return alpn.length == 1 && alpn.single == 'h3';
   }
 
   /// The share-link parameter naming the stream transport.
   static const String _transportKey = 'type';
 
   static const Set<String> _udpTransports = <String>{'quic', 'kcp'};
+
+  static const String _xhttp = 'xhttp';
 
   /// Measures [node] and stores the result against it.
   ///

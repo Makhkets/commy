@@ -58,6 +58,10 @@ class ProxyNode {
     'auth',
     'auth_str',
     'authstr',
+    // The JSON a share link carries for an XHTTP transport. It holds request
+    // headers, which is where a CDN access token goes, and may describe a
+    // second server together with its Reality short id.
+    'extra',
     'id',
     'obfs-password',
     'obfs_password',

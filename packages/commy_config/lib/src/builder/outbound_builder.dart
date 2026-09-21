@@ -153,7 +153,8 @@ abstract final class OutboundBuilder {
       };
     }
     // Hysteria 2 rides on QUIC: there is no plaintext mode to fall back to.
-    options[SingBoxKeys.tls] = TlsOptionsBuilder.build(node, alwaysOn: true);
+    options[SingBoxKeys.tls] =
+        TlsOptionsBuilder.build(node, alwaysOn: true, overQuic: true);
     return options;
   }
 
@@ -175,7 +176,8 @@ abstract final class OutboundBuilder {
     if (_flag(node, ParamKeys.udpOverStream)) {
       options[SingBoxKeys.udpOverStream] = true;
     }
-    options[SingBoxKeys.tls] = TlsOptionsBuilder.build(node, alwaysOn: true);
+    options[SingBoxKeys.tls] =
+        TlsOptionsBuilder.build(node, alwaysOn: true, overQuic: true);
     return options;
   }
 
@@ -277,7 +279,10 @@ abstract final class OutboundBuilder {
     Map<String, Object?> options,
     ProxyNode node,
   ) {
-    final tls = TlsOptionsBuilder.build(node);
+    final tls = TlsOptionsBuilder.build(
+      node,
+      overQuic: TlsOptionsBuilder.isXhttpOverQuic(node),
+    );
     if (tls != null) {
       options[SingBoxKeys.tls] = tls;
     }

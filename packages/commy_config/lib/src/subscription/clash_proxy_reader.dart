@@ -3,6 +3,7 @@ import 'package:commy_config/src/internal/link_format_exception.dart';
 import 'package:commy_config/src/internal/map_read.dart';
 import 'package:commy_config/src/internal/node_factory.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
 import 'package:commy_domain/commy_domain.dart';
 
@@ -42,6 +43,8 @@ abstract final class ClashProxyReader {
     'http': 'http',
     'httpupgrade': 'httpupgrade',
     'quic': 'quic',
+    'xhttp': TransportParams.xhttp,
+    'splithttp': TransportParams.xhttp,
   };
 
   /// Reads [proxy], throwing [LinkFormatException] when it cannot.
@@ -325,6 +328,18 @@ abstract final class ClashProxyReader {
         }
         params[ParamKeys.path] = MapRead.text(options, <String>['path']);
         params[ParamKeys.host] = MapRead.text(options, <String>['host']);
+      case TransportParams.xhttp:
+        // Clash.Meta spells Xray's settings in kebab-case, flat in one map,
+        // with XMUX under `reuse-settings`.
+        final options = MapRead.object(proxy, <String>['xhttp-opts']) ??
+            const <String, Object?>{};
+        params[ParamKeys.path] = MapRead.text(options, <String>['path']);
+        params[ParamKeys.host] = MapRead.text(options, <String>['host']);
+        TransportParams.readXhttpInto(
+          params,
+          mode: MapRead.text(options, <String>['mode']),
+          extra: XhttpSettings.read(options).toExtraJson(),
+        );
     }
   }
 

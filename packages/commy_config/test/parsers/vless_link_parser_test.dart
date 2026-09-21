@@ -125,8 +125,14 @@ void main() {
 
     test('rejects a transport the core cannot carry', () {
       expect(
-        () => parser.parse('vless://uuid@example.com:443?type=xhttp#x'),
-        throwsA(isA<LinkFormatException>()),
+        () => parser.parse('vless://uuid@example.com:443?type=kcp#x'),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            contains('kcp'),
+          ),
+        ),
       );
     });
 
@@ -135,6 +141,98 @@ void main() {
         () => parser.parse('trojan://pass@example.com:443#x'),
         throwsA(isA<LinkFormatException>()),
       );
+    });
+  });
+
+  group('VlessLinkParser xhttp', () {
+    test('reads the transport, its mode and its extra', () {
+      final node = parser.parse(
+        'vless://uuid@example.com:443?type=xhttp&security=reality&pbk=KEY'
+        '&sni=s.example&mode=packet-up&host=cdn.example&path=%2Fxh%3Fa%3D1'
+        '&extra=%7B%22xPaddingBytes%22%3A%22200-400%22%7D#x',
+      );
+
+      expect(node.param('type'), 'xhttp');
+      expect(node.param('mode'), 'packet-up');
+      expect(node.param('host'), 'cdn.example');
+      expect(node.param('path'), '/xh?a=1');
+      expect(node.param('extra'), '{"xPaddingBytes":"200-400"}');
+    });
+
+    test('reads splithttp as the same transport', () {
+      final node =
+          parser.parse('vless://uuid@example.com:443?type=splithttp#x');
+
+      expect(node.param('type'), 'xhttp');
+    });
+
+    test('needs neither a mode nor an extra', () {
+      final node = parser.parse('vless://uuid@example.com:443?type=xhttp#x');
+
+      expect(node.param('mode'), isNull);
+      expect(node.param('extra'), isNull);
+    });
+
+    test('rejects a mode that does not exist, by name', () {
+      expect(
+        () => parser.parse(
+          'vless://uuid@example.com:443?type=xhttp&mode=stream-down#x',
+        ),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            contains('stream-down'),
+          ),
+        ),
+      );
+    });
+
+    test('drops an extra that is not JSON and keeps the server', () {
+      final node = parser.parse(
+        'vless://uuid@example.com:443?type=xhttp&path=%2Fp&extra=oops#x',
+      );
+
+      expect(node.param('extra'), isNull);
+      expect(node.param('path'), '/p');
+    });
+
+    test('rejects an extra Xray itself would refuse, by the rule it breaks',
+        () {
+      expect(
+        () => parser.parse(
+          'vless://uuid@example.com:443?type=xhttp&mode=stream-up'
+          '&extra=%7B%22uplinkDataPlacement%22%3A%22header%22%7D#x',
+        ),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            contains('packet-up'),
+          ),
+        ),
+      );
+    });
+
+    test('takes a Host header in the extra as the host', () {
+      final node = parser.parse(
+        'vless://uuid@example.com:443?type=xhttp'
+        '&extra=%7B%22headers%22%3A%7B%22Host%22%3A%22front.example%22%7D%7D#x',
+      );
+
+      expect(node.param('host'), 'front.example');
+    });
+
+    test('exports mode and extra so the link survives a round trip', () {
+      const link = 'vless://uuid@example.com:443?type=xhttp&security=tls'
+          '&sni=s.example&path=%2Fxh&host=cdn.example&mode=stream-up'
+          '&extra=%7B%22noGRPCHeader%22%3Atrue%2C%22xmux%22%3A%7B'
+          '%22maxConcurrency%22%3A%2216-32%22%7D%7D#Node';
+      final node = parser.parse(link);
+      final again = parser.parse(parser.toLink(node));
+
+      expect(again.params, node.params);
+      expect(again.id, node.id);
     });
   });
 

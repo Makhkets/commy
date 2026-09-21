@@ -166,6 +166,84 @@ void main() {
     });
   });
 
+  group('SubscriptionBodyReader with XHTTP servers', () {
+    // What a Remnawave panel serves for a host whose inbound is XHTTP: a
+    // base64 list, empty `host=` and `headerType=`, and an `extra` that mixes
+    // what a client reads with what only the server does. Every one of these
+    // was refused until the core learned the transport.
+    const extra = '{"xmux":{"maxConcurrency":"16-32","hMaxRequestTimes":'
+        '"600-900","hMaxReusableSecs":"1800-3000"},"headers":{},'
+        '"noGRPCHeader":false,"xPaddingBytes":"100-1000",'
+        '"scMaxEachPostBytes":1000000,"scMinPostsIntervalMs":30,'
+        '"scStreamUpServerSecs":"20-80","noSSEHeader":false}';
+    final realityOverXhttp =
+        'vless://11111111-2222-3333-4444-555555555555@nl.example.com:443'
+        '?security=reality&type=xhttp&headerType=&path=%2Fapi%2Fv2&host='
+        '&mode=auto&extra=${Uri.encodeComponent(extra)}'
+        '&sni=www.example.org&fp=chrome&pbk=PUBKEY&sid=ab12'
+        '#%F0%9F%87%B3%F0%9F%87%B1%20NL%20XHTTP';
+    const behindCdn =
+        'vless://11111111-2222-3333-4444-555555555555@cdn.example.com:443'
+        '?security=tls&type=xhttp&path=%2Fcdn&host=front.example.com'
+        '&mode=packet-up&alpn=h2&sni=front.example.com&fp=chrome#CDN';
+    const vision =
+        'vless://11111111-2222-3333-4444-555555555555@de.example.com:443'
+        '?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.example.org'
+        '&fp=chrome&pbk=PUBKEY&sid=ab12#DE%20Vision';
+    final list = <String>[realityOverXhttp, behindCdn, vision].join('\n');
+
+    test('imports every entry of a base64 list, XHTTP ones included', () {
+      final outcome =
+          SubscriptionBodyReader().read(base64.encode(utf8.encode(list)));
+
+      expect(outcome.failures, isEmpty);
+      expect(outcome.nodes, hasLength(3));
+      expect(
+        outcome.nodes.map((node) => node.param(ParamKeys.transport)),
+        <String>['xhttp', 'xhttp', 'tcp'],
+      );
+    });
+
+    test('builds a document the core accepts out of all of them', () {
+      final nodes = SubscriptionBodyReader().read(list).nodes;
+      final result = const SingBoxConfigBuilder().build(
+        SingBoxBuildRequest(
+          nodes: nodes,
+          selectedNodeId: nodes.first.id,
+          routing: RoutingPolicy.defaults,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+      final built = result.valueOrNull;
+
+      expect(result.failureOrNull, isNull);
+      expect(built!.leftOut, isEmpty);
+      final outbounds = (built.config.document['outbounds']! as List<Object?>)
+          .cast<Map<String, Object?>>();
+      expect(outbounds[0]['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'path': '/api/v2',
+        'x_padding_bytes': '100-1000',
+        'sc_max_each_post_bytes': 1000000,
+        'sc_min_posts_interval_ms': 30,
+        'xmux': <String, Object?>{
+          'max_concurrency': '16-32',
+          'h_max_request_times': '600-900',
+          'h_max_reusable_secs': '1800-3000',
+        },
+      });
+      expect(outbounds[1]['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'mode': 'packet-up',
+        'host': 'front.example.com',
+        'path': '/cdn',
+      });
+      expect(outbounds[2].containsKey('transport'), isFalse);
+    });
+  });
+
   group('SubscriptionBodyReader edges', () {
     test('an empty body is a failure, not a crash', () {
       final outcome = reader.read('   ');

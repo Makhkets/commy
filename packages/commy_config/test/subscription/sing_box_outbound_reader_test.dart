@@ -99,6 +99,117 @@ void main() {
     });
   });
 
+  group('SingBoxOutboundReader xhttp', () {
+    test('reads back the block our own builder writes', () {
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'a.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'tls': <String, Object?>{'enabled': true, 'server_name': 's.example'},
+        'transport': <String, Object?>{
+          'type': 'xhttp',
+          'mode': 'packet-up',
+          'host': 'cdn.example',
+          'path': '/xh',
+          'x_padding_bytes': '200-400',
+          'no_grpc_header': true,
+          'xmux': <String, Object?>{'max_concurrency': '16-32'},
+        },
+      });
+      final outbound = OutboundBuilder.build(node: node, tag: 't');
+
+      expect(node.param(ParamKeys.transport), 'xhttp');
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'mode': 'packet-up',
+        'host': 'cdn.example',
+        'path': '/xh',
+        'x_padding_bytes': '200-400',
+        'no_grpc_header': true,
+        'xmux': <String, Object?>{'max_concurrency': '16-32'},
+      });
+    });
+
+    Map<String, Object?> xray(Map<String, Object?> settings, String key) =>
+        <String, Object?>{
+          'tag': 'proxy',
+          'protocol': 'vless',
+          'settings': <String, Object?>{
+            'vnext': <Map<String, Object?>>[
+              <String, Object?>{
+                'address': 'xray.example.com',
+                'port': 443,
+                'users': <Map<String, Object?>>[
+                  <String, Object?>{'id': 'the-uuid', 'encryption': 'none'},
+                ],
+              },
+            ],
+          },
+          'streamSettings': <String, Object?>{
+            'network': 'xhttp',
+            'security': 'tls',
+            'tlsSettings': <String, Object?>{'serverName': 's.example'},
+            key: settings,
+          },
+        };
+
+    test('reads an Xray outbound whose settings sit beside host and path', () {
+      final node = SingBoxOutboundReader.read(
+        xray(
+          <String, Object?>{
+            'host': 'cdn.example',
+            'path': '/xh',
+            'mode': 'stream-up',
+            'noGRPCHeader': true,
+            'xmux': <String, Object?>{'maxConcurrency': '16-32'},
+          },
+          'xhttpSettings',
+        ),
+      );
+      final outbound = OutboundBuilder.build(node: node, tag: 't');
+
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'mode': 'stream-up',
+        'host': 'cdn.example',
+        'path': '/xh',
+        'no_grpc_header': true,
+        'xmux': <String, Object?>{'max_concurrency': '16-32'},
+      });
+    });
+
+    test('lets `extra` replace them wholesale, as Xray does', () {
+      final node = SingBoxOutboundReader.read(
+        xray(
+          <String, Object?>{
+            'path': '/xh',
+            'noGRPCHeader': true,
+            'extra': <String, Object?>{'xPaddingBytes': '5-9'},
+          },
+          'xhttpSettings',
+        ),
+      );
+      final outbound = OutboundBuilder.build(node: node, tag: 't');
+
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'path': '/xh',
+        'x_padding_bytes': '5-9',
+      });
+    });
+
+    test('reads the settings under their first name too', () {
+      final node = SingBoxOutboundReader.read(
+        xray(<String, Object?>{'path': '/old'}, 'splithttpSettings'),
+      );
+
+      expect(node.param(ParamKeys.transport), 'xhttp');
+      expect(node.param(ParamKeys.path), '/old');
+    });
+  });
+
   group('SingBoxOutboundReader (Xray)', () {
     test('reads a vless outbound out of vnext', () {
       final node = SingBoxOutboundReader.read(<String, Object?>{
