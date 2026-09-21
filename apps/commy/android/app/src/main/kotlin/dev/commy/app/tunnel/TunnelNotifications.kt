@@ -27,6 +27,18 @@ internal class TunnelNotifications(private val context: Context) {
 
     private val manager = context.getSystemService(NotificationManager::class.java)
 
+    /**
+     * What the ongoing notification currently says, or null before it says
+     * anything.
+     *
+     * The traffic stream ticks once a second whether or not anything moved,
+     * and [update] hangs off it, so an idle tunnel used to re-post an
+     * identical notification sixty times a minute. On a device that is visible
+     * — the shade re-lays the row out, and every one of those posts shows up
+     * in the system log as a notification being removed and replaced.
+     */
+    private var posted: String? = null
+
     fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return
@@ -55,6 +67,10 @@ internal class TunnelNotifications(private val context: Context) {
      * user's profile, and the wire protocol carries no name for it.
      */
     fun build(state: String, node: String?, up: Long, down: Long): Notification {
+        // Recorded here rather than in [update] so that the notification the
+        // service posts with startForeground counts as posted too: otherwise
+        // the first traffic tick after a start always repeats it.
+        posted = contentKey(state, node, up, down)
         val text = buildString {
             append(stateText(state))
             if (!node.isNullOrBlank()) {
@@ -74,32 +90,34 @@ internal class TunnelNotifications(private val context: Context) {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(openApp())
+            .setContentIntent(openAppIntent)
             .addAction(
                 NotificationCompat.Action.Builder(
                     R.drawable.ic_notification,
                     context.getString(R.string.notification_disconnect),
-                    disconnect(),
+                    disconnectIntent,
                 ).build(),
             )
-        if (up > 0 || down > 0) {
-            builder.setSubText(
-                context.getString(
-                    R.string.notification_speed,
-                    Libbox.formatBytes(up),
-                    Libbox.formatBytes(down),
-                ),
-            )
-        }
+        speedText(up, down)?.let(builder::setSubText)
         return builder.build()
     }
 
-    /** Refreshes the ongoing notification in place, without restarting the service. */
+    /**
+     * Refreshes the ongoing notification in place, and only when it changed.
+     *
+     * The comparison is on what the user would read, not on the numbers: two
+     * different byte counts that format to the same "1.2 MB/s" are the same
+     * notification, and a tick that moved nothing is not news.
+     */
     fun update(state: String, node: String?, up: Long, down: Long) {
+        if (contentKey(state, node, up, down) == posted) {
+            return
+        }
         manager?.notify(ID_TUNNEL, build(state, node, up, down))
     }
 
     fun cancel() {
+        posted = null
         manager?.cancel(ID_TUNNEL)
     }
 
@@ -154,6 +172,22 @@ internal class TunnelNotifications(private val context: Context) {
         manager?.notify(identifier, ID_CORE, notification)
     }
 
+    /** Everything the ongoing notification shows, as one comparable string. */
+    private fun contentKey(state: String, node: String?, up: Long, down: Long): String =
+        "$state|${node.orEmpty()}|${speedText(up, down).orEmpty()}"
+
+    /** The speed line, or null while nothing is moving. */
+    private fun speedText(up: Long, down: Long): String? {
+        if (up <= 0 && down <= 0) {
+            return null
+        }
+        return context.getString(
+            R.string.notification_speed,
+            Libbox.formatBytes(up),
+            Libbox.formatBytes(down),
+        )
+    }
+
     private fun stateText(state: String): String = context.getString(
         when (state) {
             Wire.States.STARTING -> R.string.notification_starting
@@ -163,6 +197,13 @@ internal class TunnelNotifications(private val context: Context) {
             else -> R.string.notification_idle
         },
     )
+
+    // Built once each. A PendingIntent is immutable and these two never vary,
+    // so rebuilding them on every post was work the system had to de-duplicate
+    // for us.
+    private val openAppIntent by lazy { openApp(connect = false) }
+
+    private val disconnectIntent by lazy { disconnect() }
 
     private fun openApp(connect: Boolean = false): PendingIntent {
         val intent = Intent(context, MainActivity::class.java)
