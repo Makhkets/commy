@@ -10,6 +10,45 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The tunnel carries traffic.** Up to this release a connection came up, the
+  key appeared in the status bar, and nothing worked — and the log did not say
+  why. Two faults, both on the Android side of the core, both now verified
+  against a live VLESS server with an emulator in between:
+  - **The core was told our own tunnel was the default network.**
+    `registerDefaultNetworkCallback` answers "the default network for this
+    app", and once a VPN is up that answer is the VPN — for the app that built
+    it as much as for anyone else. sing-box drops its own interface from the
+    candidate list and then looks for one matching the index it was handed,
+    finds none, and every dial fails with *no available network interface*.
+    The watch is now a request for a network carrying
+    `NET_CAPABILITY_NOT_VPN`, which is also what keeps a Wi-Fi ↔ mobile
+    handover visible while the tunnel is up.
+  - **`{"type": "local"}` DNS had nothing to ask.** libbox lets the platform
+    supply the system resolver, and we supplied none, so the core used its own
+    implementation — which reads `/etc/resolv.conf`. **Android has no
+    `/etc/resolv.conf`**, so Go fell back to its compiled-in `127.0.0.1:53`
+    and every direct lookup was refused. That resolver is what
+    `route.default_domain_resolver` points at, which makes it the one that
+    turns a node's hostname into an address, so a node written as a name —
+    which is every node any panel hands out — could never be dialled.
+    `AndroidDnsTransport` now answers through `DnsResolver`, on the underlying
+    network rather than through the tunnel.
+- **The log says something.** On Android the core colours its output
+  (`DisableColors()` answers `GOOS != "android"`), and the escapes were being
+  drawn literally: the severity — the first thing anyone looks for — read as
+  `[31mERROR[0m`. They are stripped now, and the level is recovered from the
+  text underneath. A debug build also sent every line a second time through
+  `writeDebugMessage` with the level hardcoded to `debug`; that copy goes to
+  logcat (`adb logcat -s CommyCore`) instead of onto the screen.
+- **A failed connect says what failed.** The log carried `connect failed:
+  config_invalid` — the code the screen was about to translate, and nothing
+  else. It now carries the failure with its detail, and the line before it
+  names the server the tunnel was pointed at: name, protocol and address, no
+  credentials. A reachability probe that finds no way out of a live tunnel now
+  says so in the log as well as in a toast.
+
 ## [0.1.0-alpha.4]
 
 The first release that has met a real Android runtime, and the first to be

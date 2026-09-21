@@ -228,6 +228,74 @@ void main() {
     });
   });
 
+  group('the log after a connect', () {
+    /// Silent: the default sink writes to the platform log viewer, which in a
+    /// test run is just noise.
+    AppLogger silentLogger() => AppLogger(
+          sink: (_) {},
+          clock: () => CommyTestHarness.now,
+        );
+
+    test('names the server the tunnel was pointed at', () async {
+      // "connect requested" on its own answered none of the questions a
+      // failed connect raises: which of the user's servers, over what, at
+      // what address. The owner reading that log had nothing to act on.
+      final logger = silentLogger();
+      addTearDown(logger.dispose);
+      final harness = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[appLoggerProvider.overrideWithValue(logger)],
+        ),
+      );
+      addTearDown(container.dispose);
+      container
+        ..listen(nodesProvider, (_, __) {})
+        ..listen(coreStatusProvider, (_, __) {});
+      await container.read(nodesProvider.future);
+      await container.read(selectedNodeIdProvider.future);
+
+      await container.read(tunnelControllerProvider.notifier).connect();
+
+      final connectLine = logger.buffer
+          .map((line) => line.message)
+          .firstWhere((message) => message.startsWith('connect requested'));
+      expect(connectLine, contains('Amsterdam 03'));
+      expect(connectLine, contains('vless'));
+      expect(connectLine, contains('nl-03.example.net:443'));
+    });
+
+    test('never writes the credential that gets the tunnel up', () async {
+      // Rule R3 from the other side: the line above is worth having only if
+      // widening it did not put the uuid next to the address.
+      final logger = silentLogger();
+      addTearDown(logger.dispose);
+      final harness = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(
+        overrides: harness.overrides(
+          extra: <Override>[appLoggerProvider.overrideWithValue(logger)],
+        ),
+      );
+      addTearDown(container.dispose);
+      container
+        ..listen(nodesProvider, (_, __) {})
+        ..listen(coreStatusProvider, (_, __) {});
+      await container.read(nodesProvider.future);
+      await container.read(selectedNodeIdProvider.future);
+
+      await container.read(tunnelControllerProvider.notifier).connect();
+
+      for (final line in logger.buffer) {
+        expect(
+          line.message,
+          isNot(contains('11111111-2222-3333-4444-555555555555')),
+        );
+      }
+    });
+  });
+
   group('autoConnect', () {
     test('on, the tunnel comes up with nobody touching the button', () async {
       final harness = CommyTestHarness(

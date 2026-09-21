@@ -184,6 +184,37 @@ void main() {
         LogLevel.info,
       );
     });
+
+    test('drops the colours the core wraps a line in on Android', () {
+      // Exactly what libbox hands over: DisableColors() answers
+      // `GOOS != "android"`, so on a phone every line arrives escaped.
+      final raw = jsonEncode(<String, Object?>{
+        'message': '$_esc[36mINFO$_esc[0m[0001] '
+            'router: sniffed protocol: tls',
+      });
+
+      final line = LogLineCodec.decode(raw);
+
+      expect(line.message, 'INFO[0001] router: sniffed protocol: tls');
+      expect(line.message, isNot(contains(_esc)));
+    });
+
+    test('recovers the level that was hiding behind an escape', () {
+      // The severity is the first thing anyone looks for and it was the one
+      // part the escape made unreadable: the pattern anchors at the start of
+      // the line, and the escape is not a level name.
+      final raw = jsonEncode(<String, Object?>{
+        'message': '$_esc[31mERROR$_esc[0m[0012] dns: exchange failed',
+      });
+
+      expect(LogLineCodec.decode(raw).level, LogLevel.error);
+    });
+
+    test('leaves a line without escapes exactly as it was', () {
+      const message = 'INFO[0001] inbound/tun[tun-in]: started at tun0';
+
+      expect(LogLineCodec.plain(message), same(message));
+    });
   });
 
   group('ConnectionInfoCodec', () {
@@ -348,3 +379,6 @@ void main() {
     });
   });
 }
+
+/// The escape byte the core's colour codes start with.
+const String _esc = '\u001B';

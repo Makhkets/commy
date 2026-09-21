@@ -23,6 +23,18 @@ abstract final class LogLineCodec {
     caseSensitive: false,
   );
 
+  /// Matches an ANSI escape sequence.
+  ///
+  /// The core colours its output on Android and only on Android:
+  /// `platformInterfaceWrapper.DisableColors()` answers `GOOS != "android"`,
+  /// so every line arrives wrapped in `ESC[36m … ESC[0m`. A terminal reads
+  /// that as colour; a Flutter `Text` reads it as `[36mINFO[0m` and the
+  /// severity — the first thing anyone looks for — becomes the least legible
+  /// part of the line. Stripping it here rather than in the screen is what
+  /// keeps the rest honest: [sniffLevel] can then find the level the core
+  /// wrote, and the redactor sees the text a human would.
+  static final RegExp ansiPattern = RegExp(r'\x1B\[[0-9;]*[A-Za-z]');
+
   /// Decodes one or many `/logs` events.
   ///
   /// [fallbackAt] stands in for a missing timestamp.
@@ -63,8 +75,17 @@ abstract final class LogLineCodec {
     return name == null ? null : LogLevel.fromWireName(name);
   }
 
+  /// Removes the colours the core wrapped [message] in.
+  ///
+  /// Public because the same text reaches the screen from more than one
+  /// direction and all of them have to agree on what a line looks like.
+  static String plain(String message) =>
+      message.contains('\x1B') ? message.replaceAll(ansiPattern, '') : message;
+
   static LogLine _decodeObject(JsonMap json, DateTime fallbackAt) {
-    final message = WireJson.stringOr(json, WireKeys.message, orElse: '');
+    final message = plain(
+      WireJson.stringOr(json, WireKeys.message, orElse: ''),
+    );
     final declared = WireJson.stringOrNull(json, WireKeys.level);
     final level = (declared == null ? null : LogLevel.fromWireName(declared)) ??
         sniffLevel(message) ??

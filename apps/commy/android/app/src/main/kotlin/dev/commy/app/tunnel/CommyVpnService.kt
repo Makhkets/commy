@@ -471,8 +471,25 @@ class CommyVpnService : VpnService(), CommandServerHandler {
 
     override fun setSystemProxyEnabled(isEnabled: Boolean) = Unit
 
+    /**
+     * The core's own copy of a line it has already sent us.
+     *
+     * Not forwarded to the app, and that is the fix rather than an oversight.
+     * `StartedService.WriteMessage` emits every line to the log subscriber —
+     * which is what `CoreEventBridge` is subscribed to, with the real severity
+     * attached — and *then*, in a debug build only, hands the same text here
+     * with no level at all. Forwarding it put every line on the log screen
+     * twice, and labelled the second copy `debug` whatever it actually was, so
+     * an error and a routing note read the same. A log that says everything
+     * twice and grades none of it is the log the owner was looking at when they
+     * said there was nothing useful in it.
+     *
+     * logcat is the right home for it: it costs nothing in release (this is
+     * never called), and it gives `adb logcat -s CommyCore` to whoever is
+     * holding the device.
+     */
     override fun writeDebugMessage(message: String) {
-        TunnelController.emitLogs(CoreSnapshots.encodeLogs(listOf("debug" to message)))
+        Log.d("CommyCore", message)
     }
 
     // ── system UI plumbing ────────────────────────────────────────────────

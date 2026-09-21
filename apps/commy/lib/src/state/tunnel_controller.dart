@@ -558,12 +558,16 @@ class TunnelController extends Notifier<TunnelActionState> {
       clearNotice: true,
     );
     final logger = ref.read(appLoggerProvider)
-      ..info('connect requested', tag: _tag);
+      ..info('connect requested: ${_describe(target)}', tag: _tag);
 
     final result = await ref.read(connectUseCaseProvider)(nodeId: target);
     final failure = result.failureOrNull;
     if (failure != null) {
-      logger.error('connect failed: ${failure.code}', tag: _tag);
+      // The failure itself, not just its code. The code is what the screen
+      // translates; the detail inside it — which resolver, which field, which
+      // exception — is the only part that says what to change, and dropping it
+      // here is what left the log with nothing to read after a failed connect.
+      logger.error('connect failed: $failure', tag: _tag);
       state = state.copyWith(isBusy: false, failure: failure);
       return true;
     }
@@ -726,7 +730,7 @@ class TunnelController extends Notifier<TunnelActionState> {
     final result = await ref.read(reloadUseCaseProvider)(nodeId: nodeId);
     final failure = result.failureOrNull;
     if (failure != null) {
-      logger.error('reload failed: ${failure.code}', tag: _tag);
+      logger.error('reload failed: $failure', tag: _tag);
       state = state.copyWith(isBusy: false, failure: failure);
       return;
     }
@@ -766,13 +770,27 @@ class TunnelController extends Notifier<TunnelActionState> {
     final result = await ref.read(checkReachabilityUseCaseProvider)(
       outboundTag: tag,
     );
+    final logger = ref.read(appLoggerProvider);
     final failure = result.failureOrNull;
     if (failure != null) {
+      logger.error(
+        'reachability check failed through $tag: $failure',
+        tag: _tag,
+      );
       state = state.copyWith(isChecking: false, failure: failure);
       return;
     }
     final latency = result.valueOrNull;
     if (latency == null) {
+      // The tunnel is up and nothing came back through it. This is the exact
+      // shape of "connected but the internet does not work", and the log is
+      // where the next question gets answered — so it says so here rather than
+      // only as a toast the user has already dismissed.
+      logger.warn(
+        'reachability check found no way out through $tag; the tunnel is up '
+        'but the probe did not come back',
+        tag: _tag,
+      );
       state = state.copyWith(
         isChecking: false,
         notice: const TunnelNotice(TunnelNoticeKind.checkFailed),
@@ -780,6 +798,10 @@ class TunnelController extends Notifier<TunnelActionState> {
       return;
     }
     final milliseconds = latency.inMilliseconds;
+    logger.info(
+      'reachability check passed through $tag in ${milliseconds}ms',
+      tag: _tag,
+    );
     if (!includeIp) {
       state = state.copyWith(
         isChecking: false,
@@ -795,9 +817,7 @@ class TunnelController extends Notifier<TunnelActionState> {
     final ipResult = await ref.read(checkIpUseCaseProvider)();
     final ipFailure = ipResult.failureOrNull;
     if (ipFailure != null) {
-      ref
-          .read(appLoggerProvider)
-          .warn('ip check failed: ${ipFailure.code}', tag: _tag);
+      logger.warn('ip check failed: $ipFailure', tag: _tag);
       state = state.copyWith(
         isChecking: false,
         notice: TunnelNotice(
@@ -919,6 +939,20 @@ class TunnelController extends Notifier<TunnelActionState> {
           includeClashApi: platform.allowsClashApi,
         );
     return built.valueOrNull;
+  }
+
+  /// One line naming the server a connect is about to use.
+  ///
+  /// Name, protocol and address — the three things that identify which of the
+  /// user's servers this was, and no more than that. The credentials stay out
+  /// by construction rather than by redaction: nothing here reads them.
+  String _describe(String nodeId) {
+    final node = _nodeById(nodeId);
+    if (node == null) {
+      return nodeId;
+    }
+    return '${NodeLabel.of(node).text} · ${node.protocol.wireName} · '
+        '${node.host}:${node.port}';
   }
 
   ProxyNode? _nodeById(String id) {
