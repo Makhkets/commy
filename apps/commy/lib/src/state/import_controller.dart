@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
-import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:file_picker/file_picker.dart';
@@ -96,7 +95,12 @@ class ClipboardPreview {
 @immutable
 class ImportState {
   /// Creates the state.
-  const ImportState({this.isBusy = false, this.outcome, this.failure});
+  const ImportState({
+    this.isBusy = false,
+    this.outcome,
+    this.failure,
+    this.updatedExisting = false,
+  });
 
   /// Nothing has been tried.
   static const ImportState idle = ImportState();
@@ -110,6 +114,13 @@ class ImportState {
   /// What the last import failed with.
   final CommyFailure? failure;
 
+  /// Whether the last import landed on a subscription the user already had.
+  ///
+  /// The sheet says so. Without it, adding a panel a second time looked
+  /// exactly like adding it a first time, and the card the user was looking
+  /// for was the one already on the list.
+  final bool updatedExisting;
+
   /// Whether the last import stored at least one server.
   bool get succeeded => (outcome?.nodes.length ?? 0) > 0;
 
@@ -119,10 +130,12 @@ class ImportState {
       other is ImportState &&
           other.isBusy == isBusy &&
           other.outcome == outcome &&
-          other.failure == failure;
+          other.failure == failure &&
+          other.updatedExisting == updatedExisting;
 
   @override
-  int get hashCode => Object.hash(isBusy, outcome, failure);
+  int get hashCode =>
+      Object.hash(isBusy, outcome, failure, updatedExisting);
 
   @override
   String toString() => 'ImportState(busy: $isBusy, $outcome, $failure)';
@@ -196,6 +209,7 @@ class ImportController extends Notifier<ImportState> {
       url: url,
       name: name,
       autoUpdate: autoUpdate,
+      intervalHours: intervalHours,
     );
     if (!ref.mounted) {
       // The container went away while the download was in the air. There is
@@ -213,20 +227,19 @@ class ImportController extends Notifier<ImportState> {
       return null;
     }
     final synced = result.valueOrNull;
-    final subscription = synced?.subscription;
-    if (subscription != null &&
-        intervalHours != null &&
-        subscription.updateIntervalHours == null) {
-      // Written whether or not the sheet is still there to hear about it: the
-      // subscription itself landed, and a row left on the default interval
-      // would refresh on a schedule the user did not choose. Only the report
-      // below belongs to the sheet.
-      await ref.read(subscriptionRepositoryProvider).upsert(
-            subscription.copyWith(updateIntervalHours: intervalHours),
-          );
-    }
+    // The interval is applied by the use case now, in the same write as the
+    // rest of the subscription. It used to be a second upsert from here, and
+    // only when the stored value was null — so on a second add of the same
+    // panel the auto-refresh switch took and the interval beside it silently
+    // did not.
     final outcome = synced?.outcome ?? ParseOutcome.empty;
-    _publish(ticket, ImportState(outcome: outcome));
+    _publish(
+      ticket,
+      ImportState(
+        outcome: outcome,
+        updatedExisting: synced?.updatedExisting ?? false,
+      ),
+    );
     return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;
   }
 

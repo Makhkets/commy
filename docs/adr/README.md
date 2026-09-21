@@ -40,3 +40,5 @@
 | [0004](0004-mobile-first-order.md) | Mobile-first порядок выпуска платформ | Accepted |
 | [0005](0005-core-ipc.md) | Единый `CoreClient` и транспорты IPC | Accepted |
 | [0006](0006-codegen-and-native-layout.md) | Минимум кодогена и место Kotlin-кода туннеля | Accepted |
+| [0007](0007-database-encryption.md) | Два хранилища вместо шифрования всей БД | Accepted |
+| [0008](0008-subscription-identity.md) | Что значит «та же подписка» и что делает повторное добавление | Accepted |

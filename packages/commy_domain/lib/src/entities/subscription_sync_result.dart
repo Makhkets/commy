@@ -10,6 +10,7 @@ class SubscriptionSyncResult {
   const SubscriptionSyncResult({
     required this.subscription,
     required this.outcome,
+    this.updatedExisting = false,
   });
 
   /// The stored subscription, metadata already refreshed.
@@ -17,6 +18,14 @@ class SubscriptionSyncResult {
 
   /// Nodes that were imported and entries that were skipped.
   final ParseOutcome outcome;
+
+  /// Whether this landed on a subscription the user already had.
+  ///
+  /// Only ever true for an add: a refresh is an update by definition and has
+  /// no second case to tell apart. The import sheet reads it to say "already
+  /// there — updated" instead of announcing a card that is not new, which is
+  /// the difference between a silent no-op and an answer.
+  final bool updatedExisting;
 
   /// How many nodes were imported.
   int get importedCount => outcome.nodes.length;
@@ -29,10 +38,11 @@ class SubscriptionSyncResult {
       identical(this, other) ||
       other is SubscriptionSyncResult &&
           other.subscription == subscription &&
-          other.outcome == outcome;
+          other.outcome == outcome &&
+          other.updatedExisting == updatedExisting;
 
   @override
-  int get hashCode => Object.hash(subscription, outcome);
+  int get hashCode => Object.hash(subscription, outcome, updatedExisting);
 
   @override
   String toString() =>

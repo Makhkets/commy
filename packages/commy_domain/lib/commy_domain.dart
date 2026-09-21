@@ -30,6 +30,7 @@ export 'src/entities/proxy_node.dart';
 export 'src/entities/routing.dart';
 export 'src/entities/rule_set.dart';
 export 'src/entities/subscription.dart';
+export 'src/entities/subscription_identity.dart';
 export 'src/entities/subscription_payload.dart';
 export 'src/entities/subscription_sync_result.dart';
 export 'src/entities/traffic_day.dart';

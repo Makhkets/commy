@@ -21,6 +21,26 @@ matching the tag out of this file and uses it as the release notes.
   format, and a payload too long to scan, are both said out loud rather than
   shown as a blank square.
 
+### Changed
+
+- **Adding a subscription you already have refreshes it instead of making a
+  second card** (owner's decision, 2026-09-17). It was never only a duplicate
+  in the list: a node's id comes from the server, so the same server fetched
+  under a new subscription id takes its row with it — the second card filled up
+  and the first quietly emptied. What counts as the same URL is now one answer
+  in one place: the fragment, a trailing slash, the order of query parameters
+  and a default port are ignored; the path (case included), the userinfo and
+  every parameter value are not, so two accounts on one panel stay two cards.
+  It fails closed — a stored subscription whose URL the keystore can no longer
+  give back stops the add rather than guessing. Rules and reasoning in
+  docs/adr/0008-subscription-identity.md. An existing pair of duplicates is not
+  merged; that is a decision for a screen, not for an import.
+- **The refresh interval picked on the import sheet is applied on a repeat
+  add.** The panel's own `profile-update-interval` still wins, but only when it
+  sends one in that response — the rule used to be "when nothing is stored
+  yet", which on a second add is never, so the switch beside it worked and the
+  interval silently did not.
+
 ### Fixed
 
 - **The tunnel carries traffic.** Up to this release a connection came up, the

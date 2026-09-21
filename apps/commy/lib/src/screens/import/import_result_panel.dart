@@ -79,6 +79,19 @@ class ImportResultPanel extends ConsumerWidget {
               ),
             ],
           ),
+          if (state.updatedExisting) ...<Widget>[
+            SizedBox(height: spacing.s2),
+            // Said rather than left to be noticed. Adding a panel the user
+            // already has now refreshes the card they have instead of making a
+            // second one, and without this line that reads as an import that
+            // did nothing — the list is exactly as long as it was.
+            Text(
+              t.import.result.alreadyThere,
+              style: context.typography.caption.copyWith(
+                color: context.colors.textTertiary,
+              ),
+            ),
+          ],
           if (outcome.hasFailures) ...<Widget>[
             SizedBox(height: spacing.s3),
             _SkippedLines(failures: outcome.failures),

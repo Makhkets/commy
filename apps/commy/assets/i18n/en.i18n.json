@@ -126,7 +126,8 @@
       "showSkipped": "Show reasons",
       "skippedTitle": "Skipped lines",
       "nothing": "No servers found",
-      "nothingBody": "Check that the text holds a vless:// style link or a base64 subscription."
+      "nothingBody": "Check that the text holds a vless:// style link or a base64 subscription.",
+      "alreadyThere": "You already had this subscription — it was refreshed in place."
     }
   },
 
