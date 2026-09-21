@@ -23,6 +23,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
     this.availableRuleSets = _noRuleSets,
     this.builder = const SingBoxConfigBuilder(),
     this.onWarnings,
+    this.onLeftOut,
   });
 
   /// Which sing-box feature set is allowed on this platform.
@@ -60,6 +61,14 @@ class SelectorConfigGenerator implements ConfigGenerator {
   /// listener can clear a stale warning instead of showing it forever.
   final void Function(List<String> warnings)? onWarnings;
 
+  /// Receives the servers the builder could not express and built without.
+  ///
+  /// Every stored server goes into the document, and one malformed entry in a
+  /// subscription is no reason for the rest not to connect — so it is left out.
+  /// Reported apart from [onWarnings] because it is a fact about a server, not
+  /// about routing, and the routing screen is the wrong place to read it.
+  final void Function(List<LeftOutNode> nodes)? onLeftOut;
+
   @override
   Result<CoreConfig, CommyFailure> build({
     required ProxyNode node,
@@ -89,6 +98,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
     );
     return result.map((built) {
       onWarnings?.call(built.warnings);
+      onLeftOut?.call(built.leftOut);
       return built.config;
     });
   }

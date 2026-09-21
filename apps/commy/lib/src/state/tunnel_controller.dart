@@ -640,19 +640,50 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// with, and only then reach the one under the finger. A switch that failed
   /// leaves Auto on, because nothing moved.
   ///
-  /// No rebuild in either case. The running document already holds every node
-  /// in the selector, so pointing it at one of them is the whole change; the
-  /// Auto group stays in that document until the next start, unused and
-  /// unpointed at, which costs a group nobody dials through.
+  /// No rebuild when the running document holds the server, which is the usual
+  /// case: every server known at start is in the selector, so pointing it at
+  /// one of them is the whole change, and the Auto group stays in that document
+  /// until the next start, unused and unpointed at.
+  ///
+  /// A server the document does not hold is the other case, and it is not
+  /// rare: one imported while the tunnel was up, or one a subscription refresh
+  /// brought in an hour into the session. The core answers a `select` of a tag
+  /// it has never heard of with an error, and the user — who did nothing but
+  /// tap a server they can see in the list — got "could not switch" until they
+  /// thought of disconnecting first. So the core is asked, as [selectAuto]
+  /// asks it, and the document is rebuilt around the new server when it has to
+  /// be. `reload` keeps the TUN device; it is a pause, not a window (rule R6).
   Future<void> selectNode(ProxyNode node) async {
     if (!_isUp) {
       await ref.read(selectedNodeIdProvider.notifier).select(node.id);
       await _setAutoSelect(enabled: false);
       return;
     }
+    final tag = SingBoxTags.forNode(node);
+    if (!await _runningCoreHolds(tag)) {
+      final previous = ref.read(selectedNodeIdProvider).value;
+      await ref.read(selectedNodeIdProvider.notifier).select(node.id);
+      await reload();
+      if (state.failure != null) {
+        // Nothing moved: the tunnel still runs through the old server, and a
+        // list that marks the new one would be lying about where traffic goes.
+        if (previous != null) {
+          await ref.read(selectedNodeIdProvider.notifier).select(previous);
+        }
+        return;
+      }
+      await _setAutoSelect(enabled: false);
+      state = state.copyWith(
+        notice: TunnelNotice(
+          TunnelNoticeKind.switched,
+          name: NodeLabel.of(node).text,
+        ),
+      );
+      return;
+    }
     final result = await ref.read(switchNodeUseCaseProvider)(
       nodeId: node.id,
-      outboundTag: SingBoxTags.forNode(node),
+      outboundTag: tag,
     );
     final failure = result.failureOrNull;
     if (failure != null) {
@@ -868,6 +899,24 @@ class TunnelController extends Notifier<TunnelActionState> {
     if (failure != null) {
       state = state.copyWith(failure: failure);
     }
+  }
+
+  /// Whether the selector of the running core has [tag] among its members.
+  ///
+  /// A core that will not answer counts as one that has it: the switch is then
+  /// tried the ordinary way, and its own failure is the one that gets shown.
+  /// Rebuilding on a guess would restart a core that may be perfectly fine.
+  Future<bool> _runningCoreHolds(String tag) async {
+    try {
+      for (final group in await ref.read(coreClientProvider).proxies()) {
+        if (group.tag == SingBoxTags.proxyGroup) {
+          return group.all.contains(tag);
+        }
+      }
+    } on Object catch (error) {
+      ref.read(appLoggerProvider).debug('proxies failed: $error', tag: _tag);
+    }
+    return true;
   }
 
   /// The Auto group as the running core reports it, or `null` when it has none.

@@ -37,6 +37,15 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
         logger.warn(warning, tag: 'config');
       }
     },
+    // Logged, so that "why is this server not in the running core" has an
+    // answer on the diagnostics screen. The name and the reason; never the
+    // node, which carries its credentials.
+    onLeftOut: (nodes) {
+      final logger = ref.read(appLoggerProvider);
+      for (final node in nodes) {
+        logger.warn('$node', tag: 'config');
+      }
+    },
   );
 });
 
