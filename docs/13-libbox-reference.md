@@ -242,13 +242,13 @@ interface io.nekohasekai.libbox.PlatformInterface {
 | `openTun(options)` | собрать `VpnService.Builder` из `options`, вернуть **fd** |
 | `useProcFS` | `false` — на Android 10+ `/proc/net` закрыт |
 | `findConnectionOwner` | `connectivityManager.getConnectionOwnerUid(...)`, затем `setUserId` и `setAndroidPackageNames` |
-| `startDefaultInterfaceMonitor` | зарегистрировать `NetworkCallback`, звать `listener.updateDefaultInterface(...)` |
+| `startDefaultInterfaceMonitor` | `NetworkCallback` на запрос с `NET_CAPABILITY_NOT_VPN` (не `registerDefaultNetworkCallback`: с поднятым туннелем он отдаёт наш же `tun0`), звать `listener.updateDefaultInterface(...)` |
 | `getInterfaces` | `NetworkInterface.getNetworkInterfaces()` → итератор |
 | `underNetworkExtension` | `false` — это про iOS |
 | `includeAllNetworks` | `false` |
 | `readWIFIState` | `Libbox.newWIFIState(ssid, bssid)` или `null` без разрешения на локацию |
 | `systemCertificates` | пустой итератор — Android отдаёт их сам |
-| `localDNSTransport` | `null`, пока не делаем свой DNS-транспорт |
+| `localDNSTransport` | **обязателен на Android.** `null` означает «разбирайся сам», а сам libbox реализует `{"type":"local"}` через `/etc/resolv.conf`, которого на Android нет: Go падает на встроенный `127.0.0.1:53`, и ни одно имя не резолвится — в том числе хост самого узла. Отдаём `AndroidDnsTransport` поверх `DnsResolver` |
 | `clearDNSCache` | no-op |
 | `sendNotification` | системное уведомление |
 
@@ -261,7 +261,7 @@ interface io.nekohasekai.libbox.PlatformInterface {
 | `OpenTun(options)` | строим `VpnService.Builder` из `options`, возвращаем **fd** |
 | `UseProcFS` | `false` — на Android 10+ `/proc/net` недоступен, владельца ищем через `ConnectivityManager` |
 | `FindConnectionOwner` | `connectivityManager.getConnectionOwnerUid(...)` → `ConnectionOwner` с `UserId` и `SetAndroidPackageNames` |
-| `StartDefaultInterfaceMonitor` | регистрируем `NetworkCallback`, на каждое изменение зовём `listener.UpdateDefaultInterface(...)` |
+| `StartDefaultInterfaceMonitor` | регистрируем `NetworkCallback` на запрос с `NET_CAPABILITY_NOT_VPN`, на каждое изменение зовём `listener.UpdateDefaultInterface(...)` |
 | `GetInterfaces` | `NetworkInterface.getNetworkInterfaces()` → итератор |
 | `UnderNetworkExtension` | `false` (это про iOS) |
 | `IncludeAllNetworks` | `false` |

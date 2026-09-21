@@ -34,6 +34,15 @@ internal class CommyPlatformInterface(
 ) : PlatformInterface {
 
     /**
+     * One transport for the life of the core.
+     *
+     * The core asks for it once, before the configuration is parsed, and keeps
+     * what it is given; building a new one per call would hand out an object
+     * nobody uses.
+     */
+    private val dns = AndroidDnsTransport(monitor)
+
+    /**
      * We protect sockets ourselves rather than letting the core guess.
      *
      * Without it the core's own traffic is routed into the tunnel it is trying
@@ -130,8 +139,15 @@ internal class CommyPlatformInterface(
      */
     override fun systemCertificates(): StringIterator = StringArray.EMPTY
 
-    /** No custom DNS transport. The core uses the servers the config names. */
-    override fun localDNSTransport(): LocalDNSTransport? = null
+    /**
+     * The system resolver, and it is not optional on Android.
+     *
+     * Returning null here leaves the core to implement `{"type": "local"}` by
+     * reading `/etc/resolv.conf`, which Android does not have — so it falls
+     * back to `127.0.0.1:53` and every direct lookup dies, the proxy server's
+     * own hostname first. See [AndroidDnsTransport].
+     */
+    override fun localDNSTransport(): LocalDNSTransport = dns
 
     /** Nothing to flush: we run no resolver cache of our own. */
     override fun clearDNSCache() = Unit
