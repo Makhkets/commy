@@ -68,6 +68,34 @@ class TrafficChart extends StatelessWidget {
     return points;
   }
 
+  /// The tallest combined rate [samples] would be drawn against.
+  ///
+  /// Public because the number lives nowhere else. The line is a picture, and
+  /// the sentence a screen reader reads is written by the screen — which
+  /// therefore needs the same peak the painter scales to, taken over the same
+  /// window, rather than a guess over whatever the caller happens to hold.
+  /// Zero when there is nothing in the window; the painter's own floor of one
+  /// is a drawing detail and has no business in a sentence.
+  static int peakRate(
+    List<TrafficSample> samples, {
+    Duration window = CommyThresholds.chartWindow,
+  }) {
+    if (samples.isEmpty) {
+      return 0;
+    }
+    final start = samples.last.at.subtract(window);
+    var peak = 0;
+    for (final sample in samples) {
+      if (sample.at.isBefore(start)) {
+        continue;
+      }
+      if (sample.rate > peak) {
+        peak = sample.rate;
+      }
+    }
+    return peak;
+  }
+
   /// Tallest sample in the window, and never zero: a line that never moved
   /// still needs a scale to be drawn against.
   static double _peakOf(List<Offset> points) {

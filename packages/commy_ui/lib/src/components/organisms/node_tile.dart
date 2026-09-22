@@ -90,8 +90,16 @@ class NodeTile extends StatelessWidget {
     final type = context.typography;
     final motion = context.motion;
 
-    final nameColor = isReachable ? colors.textPrimary : colors.textDisabled;
-    final metaColor = isReachable ? colors.textSecondary : colors.textDisabled;
+    // A server that did not answer is dimmed by one step down the text ramp,
+    // not painted in `textDisabled`. `textDisabled` is for a control a tap
+    // cannot reach; this row is still tappable, and its name is the single
+    // thing the user came to read — which of my servers is down. In the light
+    // theme that colour is 2.0:1 against the surface, so the answer arrived
+    // as a ghost. One step down is 7.7:1 for the name and 4.9:1 for the line
+    // under it, both past WCAG AA, and still visibly quieter than a server
+    // that answered.
+    final nameColor = isReachable ? colors.textPrimary : colors.textSecondary;
+    final metaColor = isReachable ? colors.textSecondary : colors.textTertiary;
 
     return Semantics(
       selected: isActive,
@@ -150,7 +158,9 @@ class NodeTile extends StatelessWidget {
                           Icon(
                             CommyIcons.offline,
                             size: CommySizes.iconInline,
-                            color: colors.textDisabled,
+                            // Same reason as the name above: this glyph is
+                            // the state, not a dead control.
+                            color: colors.textTertiary,
                             semanticLabel: offlineSemanticLabel,
                           ),
                           SizedBox(width: spacing.s2),

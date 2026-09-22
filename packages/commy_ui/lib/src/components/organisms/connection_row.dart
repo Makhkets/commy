@@ -104,20 +104,31 @@ class ConnectionRow extends StatelessWidget {
                         ),
                       ),
                     ),
+                    // One `Wrap` child, not two. As two they were free to
+                    // land in different runs, and with a short rule that is
+                    // exactly what happened: "geoip:ru => direct · direct
+                    // ↑ 3.0 GB" on one line and a lonely "↓ 12 GB" on the
+                    // next. The two halves of a volume are read as a pair,
+                    // so they travel as one.
                     ConstrainedBox(
                       constraints: limit,
-                      child: _Volume(
-                        icon: CommyIcons.arrowUp,
-                        value: CommyByteFormat.bytes(connection.uploadTotal),
-                      ),
-                    ),
-                    ConstrainedBox(
-                      constraints: limit,
-                      child: _Volume(
-                        icon: CommyIcons.arrowDown,
-                        value: CommyByteFormat.bytes(
-                          connection.downloadTotal,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          _Volume(
+                            icon: CommyIcons.arrowUp,
+                            value: CommyByteFormat.bytes(
+                              connection.uploadTotal,
+                            ),
+                          ),
+                          SizedBox(width: spacing.s2),
+                          _Volume(
+                            icon: CommyIcons.arrowDown,
+                            value: CommyByteFormat.bytes(
+                              connection.downloadTotal,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

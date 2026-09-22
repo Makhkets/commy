@@ -23,8 +23,19 @@ class LogLineView extends StatelessWidget {
   const LogLineView({
     required this.line,
     this.isSelectable = true,
+    this.maxLines = defaultMaxLines,
     super.key,
   });
+
+  /// How many lines one record is allowed to take before it is cut off.
+  ///
+  /// Six, and the number is the point of this parameter. sing-box logs a
+  /// rejected configuration by echoing it, and a 1200-character token wrapped
+  /// to 620pt — three quarters of a phone screen for one record, with two
+  /// rows of four visible in the viewport. A log you have to scroll past is a
+  /// log nobody reads, and the screen already offers the whole text two ways:
+  /// copy, and export to a file, both redacted (rule R3).
+  static const int defaultMaxLines = 6;
 
   /// The record to draw.
   final LogLine line;
@@ -32,6 +43,9 @@ class LogLineView extends StatelessWidget {
   /// Whether the text can be selected and copied. Off is for previews and
   /// golden tests, where a selection handle is noise.
   final bool isSelectable;
+
+  /// Lines to show before cutting the record off. `null` shows all of it.
+  final int? maxLines;
 
   /// Three-letter code shown in place of the level name.
   ///
@@ -73,8 +87,8 @@ class LogLineView extends StatelessWidget {
     final type = context.typography;
     final tag = line.tag;
     final severity = levelColor(colors);
-    final isFailure = line.level == LogLevel.error ||
-        line.level == LogLevel.fatal;
+    final isFailure =
+        line.level == LogLevel.error || line.level == LogLevel.fatal;
 
     final span = TextSpan(
       style: type.mono.copyWith(color: colors.textPrimary),
@@ -107,8 +121,20 @@ class LogLineView extends StatelessWidget {
         vertical: spacing.s1,
       ),
       child: isSelectable
-          ? SelectableText.rich(span)
-          : Text.rich(span),
+          ? SelectableText.rich(
+              span,
+              // `minLines` is not decoration. Without it `SelectableText`
+              // reserves the full `maxLines` height for every record, and a
+              // one-line "sing-box started" drew as 120pt of mostly nothing.
+              minLines: 1,
+              maxLines: maxLines,
+            )
+          : Text.rich(
+              span,
+              maxLines: maxLines,
+              overflow:
+                  maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
+            ),
     );
   }
 }

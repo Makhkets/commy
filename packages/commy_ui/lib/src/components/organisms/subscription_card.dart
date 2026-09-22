@@ -391,21 +391,12 @@ class _Header extends StatelessWidget {
                 ],
               ),
             ),
+          // The gap that used to sit below the notice now sits inside it,
+          // as the lower half of the tap target. Same pixels, 52pt to hit.
           if (note != null)
-            Padding(
-              padding: EdgeInsetsDirectional.only(
-                start: spacing.s4,
-                top: spacing.s2,
-                end: spacing.s4,
-              ),
-              child: Text(
-                note,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: type.monoSmall.copyWith(color: colors.textTertiary),
-              ),
-            ),
-          SizedBox(height: spacing.s3),
+            _Announcement(note)
+          else
+            SizedBox(height: spacing.s3),
           if (links.isNotEmpty) ...<Widget>[
             const CommyDivider(),
             Row(
@@ -471,6 +462,83 @@ class _ProviderLink extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The panel's own message to its users, one line until asked for the rest.
+///
+/// It used to be one line, full stop: a 529-character notice about tonight's
+/// maintenance arrived, was stored, and showed 45 characters of itself with
+/// no way anywhere in the app to read the rest. This is the only channel the
+/// person who runs the panel has, so the text has to be reachable — and it
+/// cannot be reachable by pushing the server list off the screen, which is
+/// why the default is still one line.
+///
+/// The state is local on purpose. Which notice a user has read is not worth a
+/// column in the database, and reopening the screen on the short form is the
+/// right default anyway.
+class _Announcement extends StatefulWidget {
+  const _Announcement(this.note);
+
+  final String note;
+
+  @override
+  State<_Announcement> createState() => _AnnouncementState();
+}
+
+class _AnnouncementState extends State<_Announcement> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final spacing = context.spacing;
+
+    return Semantics(
+      button: true,
+      expanded: _expanded,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: Padding(
+          padding: EdgeInsetsDirectional.only(
+            start: spacing.s4,
+            top: spacing.s2,
+            end: spacing.s4,
+            bottom: spacing.s3,
+          ),
+          // No `minHeight` here, and not for want of the rule: two lines of
+          // `monoSmall` plus this padding clear the 48pt floor on their own,
+          // and a constraint on top of that only padded the card with air.
+          // Measured: 388x52.
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  widget.note,
+                  // Two lines collapsed, not one: it is the difference
+                  // between "Уважаемые пользователи! 24 сент…" and a
+                  // sentence a person can act on, and it costs one line of
+                  // a card that is 250pt tall.
+                  maxLines: _expanded ? null : 2,
+                  overflow:
+                      _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
+                  style: context.typography.monoSmall
+                      .copyWith(color: colors.textTertiary),
+                ),
+              ),
+              SizedBox(width: spacing.s2),
+              Icon(
+                _expanded ? CommyIcons.chevronUp : CommyIcons.chevronDown,
+                size: CommySizes.iconInline,
+                color: colors.textTertiary,
+              ),
+            ],
           ),
         ),
       ),

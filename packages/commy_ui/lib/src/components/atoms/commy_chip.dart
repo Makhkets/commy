@@ -1,5 +1,6 @@
 import 'package:commy_ui/src/components/commy_icons.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
+import 'package:commy_ui/src/tokens/colors.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:flutter/material.dart';
 
@@ -43,69 +44,80 @@ class CommyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final spacing = context.spacing;
-    final foreground =
-        isSelected ? colors.textPrimary : colors.textSecondary;
-    final background =
-        isSelected ? colors.accentWash : colors.bgOverlay;
+    final foreground = isSelected ? colors.textPrimary : colors.textSecondary;
+    final background = isSelected ? colors.accentWash : colors.bgOverlay;
     final border = isSelected ? colors.borderStrong : colors.borderDefault;
+
+    // The visible pill stays the dense 36; the difference up to the minimum
+    // tap target is transparent margin that still takes taps. Same idiom, and
+    // the same arithmetic, as `CheckButton` — a chip is a control a person
+    // pokes repeatedly (the log level filters are four of them in a row), and
+    // a 36pt box is under the 48 this design system sets as its own floor.
+    const tapMargin =
+        (CommySizes.minTapTarget - CommySizes.buttonHeightSmall) / 2;
 
     return Semantics(
       button: onTap != null,
       selected: isSelected,
       child: Material(
-        color: background,
+        color: CommyColors.transparent,
         borderRadius: context.radii.fullAll,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(
-              minHeight: CommySizes.buttonHeightSmall,
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: spacing.s3,
-              vertical: spacing.s1,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: context.radii.fullAll,
-              border: Border.all(color: border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (icon != null) ...<Widget>[
-                  Icon(
-                    icon,
-                    size: CommySizes.iconInline,
-                    color: foreground,
-                  ),
-                  SizedBox(width: spacing.s1),
-                ],
-                Flexible(
-                  child: Text(
-                    label.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        context.typography.label.copyWith(color: foreground),
-                  ),
-                ),
-                if (onRemove != null) ...<Widget>[
-                  SizedBox(width: spacing.s1),
-                  Semantics(
-                    button: true,
-                    label: removeSemanticLabel,
-                    child: GestureDetector(
-                      onTap: onRemove,
-                      child: Icon(
-                        CommyIcons.close,
-                        size: CommySizes.iconInline,
-                        color: foreground,
-                      ),
+          borderRadius: context.radii.fullAll,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: tapMargin),
+            child: Container(
+              constraints: const BoxConstraints(
+                minHeight: CommySizes.buttonHeightSmall,
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: spacing.s3,
+                vertical: spacing.s1,
+              ),
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: context.radii.fullAll,
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (icon != null) ...<Widget>[
+                    Icon(
+                      icon,
+                      size: CommySizes.iconInline,
+                      color: foreground,
+                    ),
+                    SizedBox(width: spacing.s1),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          context.typography.label.copyWith(color: foreground),
                     ),
                   ),
+                  if (onRemove != null) ...<Widget>[
+                    SizedBox(width: spacing.s1),
+                    Semantics(
+                      button: true,
+                      label: removeSemanticLabel,
+                      child: GestureDetector(
+                        onTap: onRemove,
+                        child: Icon(
+                          CommyIcons.close,
+                          size: CommySizes.iconInline,
+                          color: foreground,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

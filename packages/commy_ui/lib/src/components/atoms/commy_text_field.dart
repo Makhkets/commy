@@ -138,6 +138,18 @@ class CommyTextField extends StatelessWidget {
         errorText: errorText,
         errorStyle: type.caption.copyWith(color: colors.statusError),
         isDense: true,
+        // `fieldHeight` exists for this and was referenced nowhere: a plain
+        // field measured 46pt, two short of both it and `minTapTarget`, and
+        // only the search field reached 48 — by accident, because the icon
+        // button in its prefix is 48 tall and pushed the row up. A field is
+        // something a finger has to land in, and the floor this design
+        // system sets for that is 48.
+        //
+        // `minHeight`, so a multi-line field (the paste sheet asks for
+        // three lines and allows eight) keeps growing past it.
+        constraints: const BoxConstraints(
+          minHeight: CommySizes.fieldHeight,
+        ),
         contentPadding: EdgeInsets.symmetric(
           horizontal: spacing.s3,
           vertical: spacing.s3,

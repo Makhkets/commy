@@ -85,7 +85,14 @@ class LatencyBadge extends StatelessWidget {
                 index: index,
                 isLit: index < filledBars,
                 color: foreground,
-                dimColor: colors.borderDefault,
+                // `textTertiary`, not `borderDefault`. The unlit bars are
+                // the scale the lit ones are read against — "one of three"
+                // is the whole message — and at `borderDefault` they
+                // measured 1.2:1 against the surface of a selected row,
+                // where WCAG asks a meaningful graphic for 3:1. The reading
+                // that survived was "one bar, alone", which says nothing
+                // about how bad one is.
+                dimColor: colors.textTertiary,
               ),
             ),
           if (showNumber) ...<Widget>[
