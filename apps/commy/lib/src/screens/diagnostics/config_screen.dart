@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/screens/diagnostics/diagnostics_shell.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -50,8 +52,7 @@ class ConfigScreen extends ConsumerWidget {
           icon: CommyIcons.copy,
           semanticLabel: t.diagnostics.copy,
           tooltip: t.diagnostics.copy,
-          onPressed: () =>
-              unawaited(ref.read(clipboardProvider).write(text)),
+          onPressed: () => unawaited(_copy(context, ref, text)),
         ),
       ],
       child: Column(
@@ -96,6 +97,28 @@ class ConfigScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Copies the redacted document and says whether it landed.
+  ///
+  /// The write used to be fire-and-forget with no message at all, so the one
+  /// button on this screen looked equally broken whether it had worked or
+  /// not. Same toast as the log tab next door, for the same reason.
+  Future<void> _copy(BuildContext context, WidgetRef ref, String text) async {
+    final t = Translations.of(context);
+    final result = await ref.read(clipboardProvider).write(text);
+    if (!context.mounted) {
+      return;
+    }
+    final failure = result.failureOrNull;
+    ToastMessenger.show(
+      context,
+      message: failure == null
+          ? t.diagnostics.copied
+          : FailureText.of(failure, t).message,
+      tone: failure == null ? CommyTone.info : CommyTone.error,
+      icon: failure == null ? CommyIcons.copy : CommyIcons.warning,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
 import 'package:commy/src/screens/import/import_sheet.dart';
+import 'package:commy/src/screens/import/qr_scan_error.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -76,11 +77,8 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
               child: MobileScanner(
                 controller: _controller,
                 onDetect: _onDetect,
-                errorBuilder: (context, error) => EmptyState(
-                  icon: CommyIcons.offline,
-                  title: t.import.qr.permission,
-                  message: t.import.qr.permissionBody,
-                ),
+                errorBuilder: (context, error) =>
+                    QrScanError(code: error.errorCode),
                 placeholderBuilder: (context) => const Center(
                   child: CommySpinner(),
                 ),

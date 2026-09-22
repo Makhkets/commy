@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/i18n/relative_time.dart';
+import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/screens/home/widgets/measure_progress_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/panel_notice_row.dart';
@@ -10,10 +12,12 @@ import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/subscription_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// One subscription and its servers, as a single card.
@@ -65,17 +69,21 @@ class SubscriptionSection extends ConsumerWidget {
       isRefreshing: busy.refreshingId == subscription.id,
       isCollapsed: subscription.isCollapsed,
       links: _links(t),
-      onRefresh: () => unawaited(
-        ref
-            .read(subscriptionControllerProvider.notifier)
-            .refresh(subscription.id),
-      ),
-      onPingAll: () => unawaited(
-        ref.read(measurementProvider.notifier).measureAll(
-              nodes,
-              scopeId: subscription.id,
-            ),
-      ),
+      onRefresh: () => unawaited(_refresh(context, ref, t)),
+      // No servers, no button. A panel that answered with nothing — refused,
+      // or empty — left a card whose "measure all" was enabled and did
+      // nothing at all when pressed: no probe, no progress row, no message.
+      // Disabling it instead of hiding it would have been worse: a disabled
+      // icon is `textDisabled`, which in the light theme is 2:1 against the
+      // card and reads as a smudge rather than as a control.
+      onPingAll: nodes.isEmpty
+          ? null
+          : () => unawaited(
+                ref.read(measurementProvider.notifier).measureAll(
+                      nodes,
+                      scopeId: subscription.id,
+                    ),
+              ),
       onMore: () => unawaited(
         SubscriptionMenuSheet.show(
           context: context,
@@ -86,6 +94,13 @@ class SubscriptionSection extends ConsumerWidget {
         // Above the servers, because when it is there they are usually not:
         // a panel that answers with a notice answers with nothing else.
         if (notices.isNotEmpty) PanelNoticeRow(messages: notices),
+        // And when it answered with neither servers nor a word about it, the
+        // card used to be a name and a blank: no rows, no explanation, and a
+        // person left to wonder whether the app lost their servers. One
+        // quiet line, and deliberately a factual one — a panel may be empty
+        // for an hour of maintenance, so "no servers yet" is all that is
+        // actually known. The way out is the refresh two icons up.
+        if (nodes.isEmpty && notices.isEmpty) const _NoServersRow(),
         if (isMeasuringThis) const MeasureProgressRow(),
         for (final node in nodes)
           NodeRow(node: node, isActive: node.id == activeId),
@@ -94,6 +109,44 @@ class SubscriptionSection extends ConsumerWidget {
   }
 
   /// `2 ч назад · авто 1 ч`, or an honest "never" when it has not run.
+  /// Refreshes the panel, and says something when it does not work.
+  ///
+  /// The call used to be fired and forgotten: the spinner stopped, the card
+  /// kept its old "2 hours ago", and a panel that refused — expired, revoked,
+  /// over its device limit, all of them a 403 — looked exactly like a panel
+  /// that had nothing new. The refresh button is pressed more often than
+  /// anything else on this screen, so it is the worst place to stay quiet.
+  ///
+  /// The sentence comes from [FailureText] here, unlike on the rule sets
+  /// screen: this really is a subscription, so "the subscription server is
+  /// not answering" — or, for a status, "the panel refused: HTTP 403" — is
+  /// the truth rather than a borrowed line.
+  Future<void> _refresh(
+    BuildContext context,
+    WidgetRef ref,
+    Translations t,
+  ) async {
+    final ok = await ref
+        .read(subscriptionControllerProvider.notifier)
+        .refresh(subscription.id);
+    if (!context.mounted || ok) {
+      return;
+    }
+    final failure = ref.read(subscriptionControllerProvider).failure;
+    if (failure == null) {
+      // Declined because another refresh is already running. Nothing broke.
+      return;
+    }
+    ToastMessenger.show(
+      context,
+      message: FailureText.of(failure, t).message,
+      tone: CommyTone.error,
+      icon: CommyIcons.warning,
+      actionLabel: t.error.openLogs,
+      onAction: () => context.go(AppRoutes.diagnosticsLogs),
+    );
+  }
+
   String _subtitle(Translations t, DateTime now) {
     final last = subscription.lastUpdatedAt;
     final parts = <String>[
@@ -206,5 +259,42 @@ class SubscriptionSection extends ConsumerWidget {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
+  }
+}
+
+/// The one line a subscription with nothing in it gets.
+class _NoServersRow extends StatelessWidget {
+  const _NoServersRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final colors = context.colors;
+    final spacing = context.spacing;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: spacing.s4,
+        vertical: spacing.s3,
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            CommyIcons.info,
+            size: CommySizes.iconControl,
+            color: colors.textTertiary,
+          ),
+          SizedBox(width: spacing.s3),
+          Expanded(
+            child: Text(
+              t.subscription.noServers,
+              style: context.typography.body.copyWith(
+                color: colors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

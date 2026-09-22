@@ -181,7 +181,8 @@
       "cancel": "Cancel"
     },
     "linkCopied": "Link copied",
-    "panelSaid": "Your panel sent this instead of servers:"
+    "panelSaid": "Your panel sent this instead of servers:",
+    "noServers": "This subscription has no servers yet"
   },
 
   "node": {
@@ -222,6 +223,7 @@
     "noneNeeded": "Your rules need no lists",
     "noneNeededBody": "Rules naming geosite: or geoip: are the ones that do. Plain domains and addresses work without anything downloaded.",
     "downloaded": "$tag downloaded",
+    "downloadFailed": "Could not download the $tag set",
     "deleteConfirm": {
       "title": "Delete this list?",
       "body": "The rules that name it stay where they are and stop applying until it is downloaded again.",
@@ -248,7 +250,9 @@
     "empty": "This platform does not route by app",
     "emptyBody": "Per-app routing is an Android feature. On the desktops every app uses the tunnel.",
     "nothingFound": "Nothing matches that",
-    "nothingFoundBody": "Try part of the name, or the package."
+    "nothingFoundBody": "Try part of the name, or the package.",
+    "hiddenBySystem": "Only system apps match",
+    "hiddenBySystemBody": "Everything matching this search is a system app, and those are hidden by the switch above."
   },
 
   "dns": {
@@ -351,6 +355,8 @@
       "action": "Switch to Rules"
     },
     "addRule": "Add",
+    "ruleRemoved": "Rule removed",
+    "ruleRestore": "Undo",
     "finalRule": "Everything else",
     "finalRuleHint": "The last rule is always there and cannot be removed: routing must have a final outcome.",
     "dropped": {
@@ -413,6 +419,7 @@
     "statsEmpty": "No statistics yet",
     "statsEmptyBody": "The chart shows the last 60 seconds; the rows below, this session's usage and the last week by day.",
     "statsWindow": "Last 60 seconds",
+    "statsChart": "Traffic over the last 60 seconds, peak $peak",
     "statsUp": "Uploaded",
     "statsDown": "Downloaded",
     "statsTotal": "Session total",
@@ -455,6 +462,10 @@
     "openLogs": "Open the logs",
     "subscriptionUnreachable": {
       "message": "The subscription server is not answering",
+      "action": "Retry"
+    },
+    "subscriptionRefused": {
+      "message": "The panel refused the request: HTTP ${status}. The subscription may be expired, revoked, or over its device limit.",
       "action": "Retry"
     },
     "subscriptionMalformed": {

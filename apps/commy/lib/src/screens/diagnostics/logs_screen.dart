@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/screens/diagnostics/diagnostics_shell.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -124,17 +126,64 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
   }
 
   /// Copies the **redacted** export, never the buffer.
+  ///
+  /// Every way this can end now says so, through the same toast as the rest
+  /// of the app. It used to report "скопировано" after a clipboard write
+  /// whose result it never looked at, stay silent when the export itself
+  /// failed, and claim success over an empty buffer — three different lies
+  /// from one button.
   Future<void> _copy(BuildContext context) async {
     final t = Translations.of(context);
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    final result =
-        await ref.read(logRepositoryProvider).export(redact: true);
-    final text = result.valueOrNull;
-    if (text == null) {
+    final result = await ref.read(logRepositoryProvider).export(redact: true);
+    if (!context.mounted) {
       return;
     }
-    await ref.read(clipboardProvider).write(text);
-    messenger?.showSnackBar(SnackBar(content: Text(t.diagnostics.copied)));
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      _reportFailure(context, failure);
+      return;
+    }
+    final text = result.valueOrNull ?? '';
+    if (text.isEmpty) {
+      // Nothing to copy is not a failure and not a success. The empty state
+      // of the list already has the sentence for it.
+      ToastMessenger.show(
+        context,
+        message: t.diagnostics.logsEmpty,
+        tone: CommyTone.neutral,
+        icon: CommyIcons.empty,
+      );
+      return;
+    }
+    final written = await ref.read(clipboardProvider).write(text);
+    if (!context.mounted) {
+      return;
+    }
+    final writeFailure = written.failureOrNull;
+    if (writeFailure != null) {
+      _reportFailure(context, writeFailure);
+      return;
+    }
+    ToastMessenger.show(
+      context,
+      message: t.diagnostics.copied,
+      tone: CommyTone.info,
+      icon: CommyIcons.copy,
+    );
+  }
+
+  /// Says why an export or a copy did not happen.
+  ///
+  /// No route to the logs on the toast: this *is* the log screen, and a
+  /// button that navigates to where the user already stands is a dead end
+  /// dressed as a way out.
+  void _reportFailure(BuildContext context, CommyFailure failure) {
+    ToastMessenger.show(
+      context,
+      message: FailureText.of(failure, Translations.of(context)).message,
+      tone: CommyTone.error,
+      icon: CommyIcons.warning,
+    );
   }
 
   /// Asks first, and the question says what will be in the file.
@@ -152,10 +201,25 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
     if (!(confirmed ?? false)) {
       return;
     }
-    final result =
-        await ref.read(logRepositoryProvider).export(redact: true);
-    final text = result.valueOrNull;
-    if (text == null || text.isEmpty) {
+    final result = await ref.read(logRepositoryProvider).export(redact: true);
+    if (!context.mounted) {
+      return;
+    }
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      _reportFailure(context, failure);
+      return;
+    }
+    final text = result.valueOrNull ?? '';
+    if (text.isEmpty) {
+      // The user just read a warning and pressed "export". Returning without
+      // a word looks exactly like a button that does nothing.
+      ToastMessenger.show(
+        context,
+        message: t.diagnostics.logsEmpty,
+        tone: CommyTone.neutral,
+        icon: CommyIcons.empty,
+      );
       return;
     }
     await SharePlus.instance.share(

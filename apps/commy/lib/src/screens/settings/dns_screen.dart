@@ -119,10 +119,10 @@ class _Body extends ConsumerWidget {
             for (final strategy in DnsStrategy.values)
               SettingsTile(
                 title: _strategyLabel(t, strategy),
+                selected: dns.strategy == strategy,
                 trailing: CommyRadio<DnsStrategy>(
                   value: strategy,
                   groupValue: dns.strategy,
-                  semanticLabel: _strategyLabel(t, strategy),
                   onChanged: (value) => unawaited(
                     controller.saveDns(dns.copyWith(strategy: value)),
                   ),
@@ -281,8 +281,7 @@ class _ResolverSheetState extends State<_ResolverSheet> {
   /// The schemes the core actually has a transport for, deduplicated: the
   /// builder maps `dot` and `tls` onto the same one, and listing both twice
   /// would suggest they differ.
-  static final String _schemes =
-      DnsSectionBuilder.schemes.keys.join(', ');
+  static final String _schemes = DnsSectionBuilder.schemes.keys.join(', ');
 
   String? _errorText(Translations t) => switch (_problem) {
         ResolverProblem.unsupportedScheme => t.dns.edit.unsupportedScheme,

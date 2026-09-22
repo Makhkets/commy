@@ -54,7 +54,15 @@ class StatsScreen extends ConsumerWidget {
               padding: EdgeInsets.symmetric(horizontal: spacing.s4),
               child: TrafficChart(
                 samples: history.samples,
-                semanticLabel: t.diagnostics.statsWindow,
+                // The section heading was all a screen reader got: "last 60
+                // seconds", and not one number — while the chart's own
+                // documentation says the picture is the only place the peak
+                // exists. Now the sentence carries it.
+                semanticLabel: t.diagnostics.statsChart(
+                  peak: CommyByteFormat.rate(
+                    TrafficChart.peakRate(history.samples),
+                  ),
+                ),
               ),
             ),
             SectionLabel(t.diagnostics.statsWindow),

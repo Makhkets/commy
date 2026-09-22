@@ -114,8 +114,8 @@ class RuleSetsScreen extends ConsumerWidget {
                     stored: onDisk[tag],
                     now: now,
                     isDownloading: action.downloadingTag == tag,
-                    canDownload: settings.isRuleSetSourceEnabled &&
-                        !action.isBusy,
+                    canDownload:
+                        settings.isRuleSetSourceEnabled && !action.isBusy,
                     onDownload: () => unawaited(_download(context, ref, tag)),
                     onDelete: onDisk.containsKey(tag)
                         ? () => unawaited(
@@ -157,7 +157,36 @@ class RuleSetsScreen extends ConsumerWidget {
   ) async {
     final t = Translations.of(context);
     final ok = await ref.read(ruleSetControllerProvider.notifier).download(tag);
-    if (!context.mounted || !ok) {
+    if (!context.mounted) {
+      return;
+    }
+    if (!ok) {
+      // A download that failed used to say nothing at all: the spinner
+      // stopped, the row still read "not downloaded", and the user was left
+      // to guess whether the mirror is blocked, the template is wrong or the
+      // press did not register. This is one of the three requests this app is
+      // allowed to make and it fails often in the weather this product lives
+      // in, so it owes an answer — and, per docs/05-ux-flows.md, a route to
+      // the diagnostics, which the toast now carries.
+      //
+      // The sentence is this screen's own, deliberately. The data layer
+      // reports every network failure as `subscriptionUnreachable`, so
+      // `FailureText` would have said "the subscription server is not
+      // answering" about a geoip mirror — a wrong answer is worse than a
+      // short one. Which mirror and why is in the log the toast points at.
+      final failure = ref.read(ruleSetControllerProvider).failure;
+      if (failure == null) {
+        // Refused before it started: no template, or one already running.
+        return;
+      }
+      ToastMessenger.show(
+        context,
+        message: t.ruleSets.downloadFailed(tag: tag),
+        tone: CommyTone.error,
+        icon: CommyIcons.warning,
+        actionLabel: t.error.openLogs,
+        onAction: () => context.go(AppRoutes.diagnosticsLogs),
+      );
       return;
     }
     ToastMessenger.show(

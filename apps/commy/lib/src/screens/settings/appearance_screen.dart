@@ -64,12 +64,18 @@ class _Body extends ConsumerWidget {
         SettingsSection(
           children: <Widget>[
             for (final mode in AppThemeMode.values)
+              // One row, one announcement. The row carries the name and the
+              // radio carries the state, and unmerged that is two nodes a
+              // screen reader stops on: it read "Тёмная" as prose and then
+              // "Тёмная, radio button, selected" beside it. Merged — and with
+              // the radio no longer repeating a label the row already has —
+              // it is what `RadioListTile` is: a name, a state, one stop.
               SettingsTile(
                 title: _themeLabel(t, mode),
+                selected: settings.themeMode == mode,
                 trailing: CommyRadio<AppThemeMode>(
                   value: mode,
                   groupValue: settings.themeMode,
-                  semanticLabel: _themeLabel(t, mode),
                   onChanged: (value) =>
                       unawaited(controller.setThemeMode(value)),
                 ),
@@ -83,10 +89,10 @@ class _Body extends ConsumerWidget {
             for (final locale in _locales)
               SettingsTile(
                 title: _localeLabel(t, locale),
+                selected: (settings.locale ?? '') == locale,
                 trailing: CommyRadio<String>(
                   value: locale,
                   groupValue: settings.locale ?? '',
-                  semanticLabel: _localeLabel(t, locale),
                   onChanged: (value) => unawaited(controller.setLocale(value)),
                 ),
                 onTap: () => unawaited(controller.setLocale(locale)),

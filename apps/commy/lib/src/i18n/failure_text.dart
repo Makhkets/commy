@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/foundation.dart';
 
@@ -26,6 +29,24 @@ class FailureText {
   factory FailureText.of(CommyFailure failure, Translations t) {
     final errors = t.error;
     return switch (failure) {
+      // A panel that answered with 403 or 404 is not "not answering": it
+      // answered, and it said no. The old single sentence sent the user to
+      // check their connection when the thing to check is the subscription —
+      // expired, revoked, or over its device limit, which is what a Remnawave
+      // panel returns a 403 for. The status is already in the failure; only
+      // the sentence was throwing it away.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindStatus,
+          statusCode: final int status,
+        ),
+      ) =>
+        FailureText(
+          message: errors.subscriptionRefused.message(status: status),
+          actionLabel: errors.subscriptionRefused.action,
+          action: FailureAction.retry,
+          retryable: failure.retryable,
+        ),
       SubscriptionUnreachableFailure() => FailureText(
           message: errors.subscriptionUnreachable.message,
           actionLabel: errors.subscriptionUnreachable.action,
@@ -73,6 +94,19 @@ class FailureText {
           actionLabel: errors.storage.action,
           action: FailureAction.retry,
           retryable: failure.retryable,
+        ),
+      // A file that could not be read is not a mystery, and it is the one
+      // failure the user can fix without leaving the sheet: the pick worked,
+      // the read threw. "Something went wrong" plus a trip to the logs was
+      // hiding a sentence the app already had -- and hiding the obvious next
+      // step, which is to choose another file.
+      UnknownFailure(cause: FileSystemException()) => FailureText(
+          message: t.import.file.unreadable,
+          actionLabel: t.common.retry,
+          action: FailureAction.retry,
+          // Not [failure.retryable]: that answers "can the same call work
+          // again", and the call this offers is a new pick, not the same one.
+          retryable: true,
         ),
       UnknownFailure() => FailureText(
           message: errors.unknown.message,

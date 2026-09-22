@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
@@ -180,6 +181,57 @@ void main() {
         }
       });
     }
+
+    testWidgets('a file that could not be read says so, and offers a re-pick',
+        (tester) async {
+      // The pick worked and the read threw, which the import path wraps in an
+      // `unknown` failure. Rendered as "something went wrong" it sent the one
+      // user who could have fixed it on the spot to the log tab; the sentence
+      // for it had been sitting in both locales, used nowhere.
+      await pumpScreen(
+        tester,
+        const FailureView(
+          failure: CommyFailure.unknown(
+            FileSystemException('no such file'),
+            StackTrace.empty,
+          ),
+        ),
+      );
+
+      final empty = tester.widget<EmptyState>(find.byType(EmptyState));
+      expect(empty.message, t.import.file.unreadable);
+      expect(
+        tester
+            .widgetList<CommyButton>(find.byType(CommyButton))
+            .map((button) => button.label),
+        <String>[t.common.retry, t.error.openLogs],
+      );
+    });
+
+    test('the unreadable-file sentence is a sentence in both languages',
+        () async {
+      // Same guard as the table's own both-languages loop: a key that only
+      // exists in `ru` renders as an empty banner in `en`.
+      const failure = CommyFailure.unknown(
+        FileSystemException('no such file'),
+        StackTrace.empty,
+      );
+      for (final locale in AppLocale.values) {
+        final strings = await locale.build();
+        final text = FailureText.of(failure, strings);
+        expect(
+          text.message.trim(),
+          isNotEmpty,
+          reason: 'unreadable file has no sentence in ${locale.languageCode}',
+        );
+        expect(
+          text.message,
+          isNot(strings.error.unknown.message),
+          reason: 'unreadable file fell back to the generic sentence',
+        );
+        expect(text.actionLabel.trim(), isNotEmpty);
+      }
+    });
 
     testWidgets('the primary action retries in place when it has no route',
         (tester) async {

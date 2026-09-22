@@ -9,6 +9,7 @@ import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
@@ -163,7 +164,7 @@ class _Body extends ConsumerWidget {
             ),
           )
         else
-          _RuleList(rules: rules),
+          _RuleList(policy: policy),
         // The final outcome is drawn outside the reorderable list because it
         // is not reorderable: routing must end somewhere, and a rule you can
         // drag above the last one is a rule that can be made unreachable.
@@ -323,14 +324,17 @@ class _DroppedRules extends StatelessWidget {
 
 /// The draggable part of the rule list.
 class _RuleList extends ConsumerWidget {
-  const _RuleList({required this.rules});
+  const _RuleList({required this.policy});
 
-  final List<RoutingRule> rules;
+  /// The whole policy, not just the rows: a swipe has to be undoable, and
+  /// putting a rule back where it was means writing the policy it came from.
+  final RoutingPolicy policy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final controller = ref.read(settingsControllerProvider.notifier);
+    final rules = policy.rules;
 
     return ReorderableListView.builder(
       shrinkWrap: true,
@@ -346,7 +350,23 @@ class _RuleList extends ConsumerWidget {
         return Dismissible(
           key: ValueKey<String>(rule.id),
           direction: DismissDirection.endToStart,
-          onDismissed: (_) => unawaited(controller.removeRule(rule.id)),
+          // A swipe used to be final. A rule is two fields the user typed
+          // and an order they arranged, and unlike a server it does not come
+          // back with the next subscription refresh — so an accidental swipe
+          // on a list you are reordering by hand cost exactly that, silently.
+          // The way back is the policy as it stood a moment ago, order and
+          // all, and it is offered where the eyes already are.
+          onDismissed: (_) {
+            unawaited(controller.removeRule(rule.id));
+            ToastMessenger.show(
+              context,
+              message: t.routing.ruleRemoved,
+              tone: CommyTone.info,
+              icon: CommyIcons.delete,
+              actionLabel: t.routing.ruleRestore,
+              onAction: () => unawaited(controller.saveRouting(policy)),
+            );
+          },
           background: ColoredBox(color: context.colors.statusErrorWash),
           child: RuleRow(
             matcher: rule.matcher,

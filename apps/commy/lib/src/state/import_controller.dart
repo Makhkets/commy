@@ -197,12 +197,29 @@ class ImportController extends Notifier<ImportState> {
     return ImportState.idle;
   }
 
+  /// Whether a start has to be refused because one is already running.
+  ///
+  /// Every way into this controller is a gesture — the paste button, the
+  /// subscription sheet's "add", the clipboard card, a scanned code, a picked
+  /// file, paste-and-connect on the first-run view — and a second gesture
+  /// inside the same frame is not a second intention. It is one tap counted
+  /// twice: `CommyButton.isLoading` stops taps only from the frame *after*
+  /// [_begin] sets it, so a double tap slipped through the gap and asked the
+  /// user's own panel for the same document twice, on a product whose whole
+  /// promise is that it talks to that panel only when asked. The ticket in
+  /// [_publish] hid it — the first result was discarded and the second drawn,
+  /// so the screen looked right while two requests had gone out.
+  ///
+  /// Refusing the second start rather than the first is deliberate: the first
+  /// is the one the user is already watching a spinner for.
+  bool get _alreadyRunning => state.isBusy;
+
   /// Parses [input] and stores whatever it holds.
   ///
   /// Returns the id of the first imported server so the caller can select it
   /// and connect without a second round trip through the database.
   Future<String?> importText(String input) async {
-    if (input.trim().isEmpty) {
+    if (_alreadyRunning || input.trim().isEmpty) {
       return null;
     }
     return _importText(_begin(), input);
@@ -220,6 +237,9 @@ class ImportController extends Notifier<ImportState> {
     bool autoUpdate = true,
     int? intervalHours,
   }) async {
+    if (_alreadyRunning) {
+      return null;
+    }
     final ticket = _begin();
     final result = await ref.read(addSubscriptionUseCaseProvider)(
       url: url,
@@ -266,6 +286,9 @@ class ImportController extends Notifier<ImportState> {
   /// throwing: a config exported by some panel in cp1251 should produce a
   /// parse failure the user can read, not a crash.
   Future<String?> importFile() async {
+    if (_alreadyRunning) {
+      return null;
+    }
     final ticket = _begin();
     try {
       // One file: `pickFile`, not `pickFiles` — since file_picker 12 the
