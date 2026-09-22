@@ -39,8 +39,24 @@ abstract final class Redact {
   /// which is what makes an import error readable. It is shown the way the
   /// user wrote it, through [_nodeName]. Returns [placeholder] when the input
   /// does not look like a link at all.
+  ///
+  /// One line, and the cut is the whole point. A link cannot hold a newline,
+  /// but `Uri.tryParse` will happily accept a whole subscription document:
+  /// the first line parses, and everything after it lands in the *fragment* —
+  /// the one part this function deliberately keeps. A clipboard holding the
+  /// two links a person just copied therefore came back as
+  /// `vless://[redacted]@nl-03…#Amsterdam 03 trojan://SuperSecretPassword@…`,
+  /// with the second link's password in full, on screen, in the card whose
+  /// own documentation promises the opposite (rules R2 and R3). The pattern
+  /// scrubbing in [_nodeName] caught UUIDs and `key=value` pairs and had no
+  /// way to catch a trojan password, which is arbitrary text.
+  ///
+  /// What a caller loses is the rest of the document, which was never
+  /// something this function could describe anyway: how many links there are
+  /// is `ClipboardPreview.nodeCount`, and it is counted by the parser.
   static String link(String raw) {
-    final parsed = Uri.tryParse(raw.trim());
+    final firstLine = raw.trim().split(RegExp(r'[\r\n]')).first.trim();
+    final parsed = Uri.tryParse(firstLine);
     if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
       return placeholder;
     }
@@ -67,9 +83,8 @@ abstract final class Redact {
   /// puts the query where the name belongs, and the fragment being readable
   /// is not an exemption from rule R3.
   static String _nodeName(String fragment) {
-    final decoded = _decodeOrKeep(fragment)
-        .replaceAll(_controlPattern, ' ')
-        .trim();
+    final decoded =
+        _decodeOrKeep(fragment).replaceAll(_controlPattern, ' ').trim();
     return decoded
         .replaceAllMapped(
           _credentialPattern,

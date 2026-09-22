@@ -100,6 +100,48 @@ void main() {
       );
     });
 
+    test('a clipboard holding several links leaks none of the later ones', () {
+      // What a person copies when they copy "their subscription": the links,
+      // one per line. `Uri.tryParse` takes the whole blob — the first line
+      // parses and the rest lands in the fragment, which is the one part
+      // this redactor keeps on purpose. A trojan password is arbitrary text,
+      // so no pattern inside the name scrubber can catch it, and it used to
+      // be printed in the import sheet in full (rules R2 and R3).
+      const first = 'vless://11111111-2222-3333-4444-555555555555'
+          '@nl-03.example.net:443?security=reality#Amsterdam%2003';
+      const trojan = 'trojan://SuperSecretPassword123@de-01.example.net:443'
+          '#Frankfurt%2001';
+      const shadowsocks =
+          'ss://YWVzLTI1Ni1nY206c2VjcmV0cGFzc3dvcmQ@jp-02.example.net:8388'
+          '#Tokyo%2002';
+
+      final redacted = Redact.link('$first\n$trojan\n$shadowsocks');
+
+      expect(
+        redacted,
+        'vless://${Redact.placeholder}@nl-03.example.net:443'
+        '?${Redact.placeholder}#Amsterdam 03',
+      );
+      expect(redacted, isNot(contains('SuperSecretPassword123')));
+      expect(redacted, isNot(contains('YWVzLTI1Ni1nY206c2VjcmV0cGFzc3dvcmQ')));
+      expect(redacted, isNot(contains('11111111-2222')));
+      // And a `\r\n` clipboard, which is what a desktop panel hands over.
+      expect(Redact.link('$first\r\n$trojan'), redacted);
+    });
+
+    test('a single link of any protocol is untouched by the line cut', () {
+      expect(
+        Redact.link('trojan://SuperSecretPassword123@de-01.example.net:443'
+            '#Frankfurt%2001'),
+        'trojan://${Redact.placeholder}@de-01.example.net:443#Frankfurt 01',
+      );
+      expect(
+        Redact.link('ss://YWVzLTI1Ni1nY206c2VjcmV0cGFzc3dvcmQ'
+            '@jp-02.example.net:8388#Tokyo%2002'),
+        'ss://${Redact.placeholder}@jp-02.example.net:8388#Tokyo 02',
+      );
+    });
+
     test('anything that is not a link at all becomes the placeholder', () {
       expect(
         Redact.link('a shopping list, copied by accident'),
