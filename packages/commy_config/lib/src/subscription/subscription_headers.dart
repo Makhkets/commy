@@ -154,6 +154,7 @@ class SubscriptionHeaders {
         profileWebPageUrl: profileWebPageUrl,
         supportUrl: supportUrl,
         updateIntervalHours: updateIntervalHours,
+        announcement: announcement,
       );
 
   /// Decodes a header value that may be base64, percent-encoded or plain.

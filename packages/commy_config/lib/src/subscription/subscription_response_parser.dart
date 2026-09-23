@@ -61,5 +61,6 @@ class SubscriptionResponseParser {
           groupId: groupId,
           startIndex: startIndex,
         ),
+        announcement: payload.announcement,
       );
 }

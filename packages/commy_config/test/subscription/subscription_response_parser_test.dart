@@ -57,6 +57,45 @@ void main() {
       expect(result.announcement, 'Maintenance on Sunday');
     });
 
+    test('the announcement reaches the subscription it came with', () {
+      // The field existed end to end — column, mapper, card — and was never
+      // written: the payload the fetcher hands the use cases dropped it, so
+      // the card had nothing to show from a real panel.
+      final result = parser.parse(
+        body: _body,
+        headers: <String, Object?>{
+          'announce':
+              'base64:0KDQsNCx0L7RgtGLINCyINCy0L7RgdC60YDQtdGB0LXQvdGM0LU=',
+        },
+      );
+      final updated = result.applyTo(
+        Subscription(
+          id: 'sub-1',
+          name: 'Panel',
+          url: Uri.parse('https://panel.example.com/sub/token'),
+        ),
+      );
+
+      expect(result.payload.announcement, 'Работы в воскресенье');
+      expect(updated.announcement, 'Работы в воскресенье');
+    });
+
+    test('a panel that stops announcing takes the old announcement down', () {
+      final result = parser.parse(body: _body);
+      final updated = result.applyTo(
+        Subscription(
+          id: 'sub-1',
+          name: 'Panel',
+          url: Uri.parse('https://panel.example.com/sub/token'),
+          announcement: 'Maintenance tonight',
+          profileTitle: 'Kept',
+        ),
+      );
+
+      expect(updated.announcement, isNull);
+      expect(updated.profileTitle, 'Kept');
+    });
+
     test('applies the reported metadata onto a subscription', () {
       final result = parser.parse(
         body: _body,
@@ -90,6 +129,14 @@ void main() {
       expect(result.nodes, hasLength(2));
       expect(result.userInfo!.total, 100);
       expect(result.nodes.first.subscriptionId, 'sub-2');
+    });
+
+    test('a payload fetched elsewhere keeps its announcement', () {
+      final result = parser.parsePayload(
+        const SubscriptionPayload(body: _body, announcement: 'Hello'),
+      );
+
+      expect(result.announcement, 'Hello');
     });
 
     test('a body that makes no sense still returns headers', () {
