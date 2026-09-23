@@ -462,6 +462,15 @@ void main() {
     // The row itself reads `geosite:ru`, so the hyphenated tag can only have
     // come from the builder.
     expect(find.textContaining('geosite-ru'), findsOneWidget);
+    // And in the reader's language: the builder's own English used to be
+    // shown here as it was, under a Russian heading.
+    expect(
+      find.text(
+        t.routing.dropped.needsSets(rule: 'geosite:ru', sets: 'geosite-ru'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('left out'), findsNothing);
 
     await harness.ruleSetRepository.download(
       tag: 'geosite-ru',

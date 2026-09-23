@@ -260,7 +260,25 @@ class _Body extends ConsumerWidget {
 class _DroppedRules extends StatelessWidget {
   const _DroppedRules({required this.warnings});
 
-  final List<String> warnings;
+  final List<RoutingWarning> warnings;
+
+  /// One warning in the reader's language. The builder hands over what was
+  /// dropped, not a sentence: its English used to land here as written.
+  static String _line(Translations t, RoutingWarning warning) =>
+      switch (warning.kind) {
+        RoutingWarningKind.adBlockListMissing =>
+          t.routing.dropped.adBlock(tag: warning.subject),
+        RoutingWarningKind.ruleNotApplicable =>
+          t.routing.dropped.notHere(rule: warning.subject),
+        RoutingWarningKind.ruleSetsMissing => t.routing.dropped.needsSets(
+            rule: warning.subject,
+            sets: warning.missing.join(', '),
+          ),
+        RoutingWarningKind.perAppUnavailable =>
+          t.routing.dropped.perAppUnavailable,
+        RoutingWarningKind.perAppIncludeOnly =>
+          t.routing.dropped.perAppIncludeOnly,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +326,7 @@ class _DroppedRules extends StatelessWidget {
             SizedBox(height: spacing.s2),
             for (final warning in warnings) ...<Widget>[
               Text(
-                warning,
+                _line(t, warning),
                 style: context.typography.monoSmall.copyWith(
                   color: colors.textTertiary,
                 ),

@@ -1,4 +1,5 @@
 import 'package:commy_config/src/builder/left_out_node.dart';
+import 'package:commy_config/src/builder/routing_warning.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// A built configuration plus everything the builder had to leave out.
@@ -10,15 +11,15 @@ class ConfigBuildResult {
   /// Creates a result.
   const ConfigBuildResult({
     required this.config,
-    this.warnings = const <String>[],
+    this.warnings = const <RoutingWarning>[],
     this.leftOut = const <LeftOutNode>[],
   });
 
   /// The configuration, ready for the core.
   final CoreConfig config;
 
-  /// Human readable notes about what was dropped and why.
-  final List<String> warnings;
+  /// What was dropped and why. The app words them; the log prints them.
+  final List<RoutingWarning> warnings;
 
   /// Servers that could not be expressed and are not in the document.
   ///

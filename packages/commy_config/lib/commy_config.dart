@@ -19,6 +19,8 @@ export 'src/builder/left_out_node.dart';
 export 'src/builder/outbound_builder.dart';
 export 'src/builder/route_matcher.dart';
 export 'src/builder/route_section_builder.dart';
+export 'src/builder/routing_warning.dart';
+export 'src/builder/routing_warning_kind.dart';
 export 'src/builder/sing_box_build_request.dart';
 export 'src/builder/sing_box_config_builder.dart';
 export 'src/builder/sing_box_keys.dart';

@@ -65,7 +65,7 @@ void main() {
 
   group('config build warnings', () {
     test('a geosite rule with no rule set on disk is reported, not silent', () {
-      final reported = <List<String>>[];
+      final reported = <List<RoutingWarning>>[];
       final node = testNode();
       final generator = SelectorConfigGenerator(
         platform: ConfigPlatform.android,
@@ -91,12 +91,17 @@ void main() {
 
       expect(result.isOk, isTrue, reason: 'the tunnel must still come up');
       expect(reported, hasLength(1));
-      expect(reported.single, isNotEmpty);
-      expect(reported.single.join(' '), contains('geosite:ru'));
+      expect(reported.single, <RoutingWarning>[
+        const RoutingWarning(
+          RoutingWarningKind.ruleSetsMissing,
+          'geosite:ru',
+          missing: <String>['geosite-ru'],
+        ),
+      ]);
     });
 
     test('a clean build reports an empty list, so a stale warning clears', () {
-      final reported = <List<String>>[];
+      final reported = <List<RoutingWarning>>[];
       final node = testNode();
       final generator = SelectorConfigGenerator(
         platform: ConfigPlatform.android,

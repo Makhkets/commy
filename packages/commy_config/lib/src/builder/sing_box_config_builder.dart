@@ -5,6 +5,7 @@ import 'package:commy_config/src/builder/inbound_section_builder.dart';
 import 'package:commy_config/src/builder/left_out_node.dart';
 import 'package:commy_config/src/builder/outbound_builder.dart';
 import 'package:commy_config/src/builder/route_section_builder.dart';
+import 'package:commy_config/src/builder/routing_warning.dart';
 import 'package:commy_config/src/builder/sing_box_build_request.dart';
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/builder/sing_box_tags.dart';
@@ -72,7 +73,7 @@ class SingBoxConfigBuilder {
 
   ConfigBuildResult _build(SingBoxBuildRequest request) {
     final selected = _validate(request);
-    final warnings = <String>[];
+    final warnings = <RoutingWarning>[];
     final leftOut = <LeftOutNode>[];
 
     final outbounds = <Map<String, Object?>>[];
@@ -170,7 +171,7 @@ class SingBoxConfigBuilder {
 
     return ConfigBuildResult(
       config: CoreConfig(document),
-      warnings: List<String>.unmodifiable(warnings),
+      warnings: List<RoutingWarning>.unmodifiable(warnings),
       leftOut: List<LeftOutNode>.unmodifiable(leftOut),
     );
   }

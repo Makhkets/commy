@@ -1,5 +1,7 @@
 import 'package:commy_config/src/builder/config_platform.dart';
 import 'package:commy_config/src/builder/route_matcher.dart';
+import 'package:commy_config/src/builder/routing_warning.dart';
+import 'package:commy_config/src/builder/routing_warning_kind.dart';
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/builder/sing_box_tags.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -76,7 +78,7 @@ abstract final class RouteSectionBuilder {
     required ConfigPlatform platform,
     required Set<String> availableRuleSets,
     required String? ruleSetDirectory,
-    required List<String> warnings,
+    required List<RoutingWarning> warnings,
   }) {
     final usedRuleSets = <String>{};
     final rules = <Map<String, Object?>>[
@@ -108,8 +110,7 @@ abstract final class RouteSectionBuilder {
         });
       } else {
         warnings.add(
-          'Ad blocking is on but the rule set "$tag" is not on disk; the '
-          'rule was left out',
+          RoutingWarning(RoutingWarningKind.adBlockListMissing, tag),
         );
       }
     }
@@ -126,14 +127,19 @@ abstract final class RouteSectionBuilder {
       for (final rule in routing.activeRules) {
         final matcher = RouteMatcher.tryParse(rule.matcher, platform: platform);
         if (matcher == null || matcher.isEmpty) {
-          warnings.add('Rule "${rule.matcher}" does not apply here');
+          warnings.add(
+            RoutingWarning(RoutingWarningKind.ruleNotApplicable, rule.matcher),
+          );
           continue;
         }
         final missing = matcher.ruleSets.difference(availableRuleSets);
         if (missing.isNotEmpty) {
           warnings.add(
-            'Rule "${rule.matcher}" needs ${missing.join(', ')}, which is not '
-            'on disk; the rule was left out',
+            RoutingWarning(
+              RoutingWarningKind.ruleSetsMissing,
+              rule.matcher,
+              missing: missing.toList()..sort(),
+            ),
           );
           continue;
         }
@@ -191,7 +197,7 @@ abstract final class RouteSectionBuilder {
   static List<Map<String, Object?>> _perAppRules({
     required RoutingPolicy routing,
     required ConfigPlatform platform,
-    required List<String> warnings,
+    required List<RoutingWarning> warnings,
   }) {
     if (routing.perAppMode == PerAppMode.disabled ||
         routing.perAppPackages.isEmpty ||
@@ -201,7 +207,9 @@ abstract final class RouteSectionBuilder {
       return const <Map<String, Object?>>[];
     }
     if (!platform.supportsProcessRules) {
-      warnings.add('Per-app routing is not available on ${platform.name}');
+      warnings.add(
+        RoutingWarning(RoutingWarningKind.perAppUnavailable, platform.name),
+      );
       return const <Map<String, Object?>>[];
     }
     final identifiers = <String>[
@@ -212,8 +220,7 @@ abstract final class RouteSectionBuilder {
       // "Only these apps" would mean flipping the final action, which silently
       // rewrites what every other rule means. Refusing is the honest answer.
       warnings.add(
-        'Include-only per-app routing is not expressible on '
-        '${platform.name}; the list was left out',
+        RoutingWarning(RoutingWarningKind.perAppIncludeOnly, platform.name),
       );
       return const <Map<String, Object?>>[];
     }

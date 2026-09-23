@@ -363,7 +363,12 @@
     "finalRuleHint": "The last rule is always there and cannot be removed: routing must have a final outcome.",
     "dropped": {
       "title": "Some rules are not being applied",
-      "body": "They name a rule set that is not on disk. The tunnel still comes up, but these rules do nothing until the sets are downloaded."
+      "body": "They name a rule set that is not on disk. The tunnel still comes up, but these rules do nothing until the sets are downloaded.",
+      "adBlock": "Ad blocking — the $tag list is not downloaded",
+      "notHere": "$rule — does nothing on this device",
+      "needsSets": "$rule — needs $sets",
+      "perAppUnavailable": "Per-app routing is not available on this device",
+      "perAppIncludeOnly": "“Only these apps” is not available on this device — the list is not applied"
     },
     "action": {
       "proxy": "Proxy",

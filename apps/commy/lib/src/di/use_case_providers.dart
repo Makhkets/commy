@@ -34,7 +34,7 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
       ref.read(configWarningsProvider.notifier).report(warnings);
       final logger = ref.read(appLoggerProvider);
       for (final warning in warnings) {
-        logger.warn(warning, tag: 'config');
+        logger.warn('$warning', tag: 'config');
       }
     },
     // Logged, so that "why is this server not in the running core" has an
@@ -55,22 +55,22 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
 /// dropped so the tunnel still comes up — which is the right call, and a
 /// silent one until somebody shows this list.
 final configWarningsProvider =
-    NotifierProvider<ConfigWarnings, List<String>>(ConfigWarnings.new);
+    NotifierProvider<ConfigWarnings, List<RoutingWarning>>(ConfigWarnings.new);
 
 /// Holds the notes from the most recent build.
-class ConfigWarnings extends Notifier<List<String>> {
+class ConfigWarnings extends Notifier<List<RoutingWarning>> {
   @override
-  List<String> build() => const <String>[];
+  List<RoutingWarning> build() => const <RoutingWarning>[];
 
   /// Replaces the list with what the latest build produced.
   ///
   /// Compared before assigning: a build happens on every connect, and handing
   /// Riverpod a new-but-equal list would rebuild the routing screen each time.
-  void report(List<String> warnings) {
+  void report(List<RoutingWarning> warnings) {
     if (Structural.listEquals(state, warnings)) {
       return;
     }
-    state = List<String>.unmodifiable(warnings);
+    state = List<RoutingWarning>.unmodifiable(warnings);
   }
 }
 

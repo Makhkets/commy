@@ -712,6 +712,15 @@ void main() {
       final route = built.config.document['route']! as Map<String, Object?>;
 
       expect(built.hasWarnings, isTrue);
+      // A fact the app can word in the reader's language, not an English
+      // sentence: the routing screen used to show this one verbatim.
+      expect(built.warnings, <RoutingWarning>[
+        const RoutingWarning(
+          RoutingWarningKind.ruleSetsMissing,
+          'geosite:ru',
+          missing: <String>['geosite-ru'],
+        ),
+      ]);
       expect(route.containsKey('rule_set'), isFalse);
     });
 
@@ -801,8 +810,12 @@ void main() {
       final route = document['route']! as Map<String, Object?>;
 
       expect(
-        built.warnings.where((line) => line.contains(adsTag)),
-        hasLength(1),
+        built.warnings.where(
+          (warning) => warning.kind == RoutingWarningKind.adBlockListMissing,
+        ),
+        <RoutingWarning>[
+          const RoutingWarning(RoutingWarningKind.adBlockListMissing, adsTag),
+        ],
       );
       expect(
         (document['dns']! as Map<String, Object?>).containsKey('rules'),

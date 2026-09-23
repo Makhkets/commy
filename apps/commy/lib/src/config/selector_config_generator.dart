@@ -59,7 +59,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
   /// `geosite:` rule they typed was silently removed because no rule set is on
   /// disk. Reported on every build, including one that dropped nothing, so a
   /// listener can clear a stale warning instead of showing it forever.
-  final void Function(List<String> warnings)? onWarnings;
+  final void Function(List<RoutingWarning> warnings)? onWarnings;
 
   /// Receives the servers the builder could not express and built without.
   ///
