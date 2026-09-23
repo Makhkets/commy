@@ -221,6 +221,34 @@ Server(("127.0.0.1", port), Handler).serve_forever()
 PY
 }
 
+decoy_py() {
+  cat <<'PY'
+import socket, socketserver, ssl, sys
+
+port, cert, key = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.minimum_version = ssl.TLSVersion.TLSv1_3
+context.load_cert_chain(cert, key)
+BODY = b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok"
+
+class Handler(socketserver.BaseRequestHandler):
+    def handle(self):
+        self.request.settimeout(15)
+        try:
+            with context.wrap_socket(self.request, server_side=True) as tls:
+                tls.recv(4096)
+                tls.sendall(BODY)
+        except (OSError, ssl.SSLError):
+            pass
+
+class Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+Server(("127.0.0.1", port), Handler).serve_forever()
+PY
+}
+
 blob_py() {
   cat <<'PY'
 import hashlib, http.server, socketserver, sys, urllib.parse
@@ -374,11 +402,16 @@ start() {
   core_config > "${STAND_DIR}/core.json"
   panel_py > "${STAND_DIR}/panel.py"
   blob_py > "${STAND_DIR}/blob.py"
+  decoy_py > "${STAND_DIR}/decoy.py"
 
   local pids=()
-  # What REALITY borrows its handshake from: any TLS 1.3 server will do.
-  setsid openssl s_server -accept "127.0.0.1:${DECOY_PORT}" -cert "${STAND_DIR}/cert.pem" \
-    -key "${STAND_DIR}/key.pem" -tls1_3 -www -quiet >/dev/null 2>&1 < /dev/null & pids+=($!)
+  # What REALITY borrows its handshake from: any TLS 1.3 server will do — as
+  # long as it serves more than one connection at a time. `openssl s_server`
+  # does not: a session cut off mid-handshake (a phone losing Wi-Fi) held it
+  # until Xray timed out, and every REALITY handshake behind it waited ~75 s.
+  # That looked exactly like a tunnel that does not survive a network change.
+  setsid python3 "${STAND_DIR}/decoy.py" "${DECOY_PORT}" "${STAND_DIR}/cert.pem" \
+    "${STAND_DIR}/key.pem" > "${STAND_DIR}/decoy.out" 2>&1 < /dev/null & pids+=($!)
   setsid "${XRAY_BIN}" run -c "${STAND_DIR}/xray.json" > "${STAND_DIR}/xray.out" 2>&1 < /dev/null & pids+=($!)
   setsid "${STAND_DIR}/devbox" "${STAND_DIR}/core.json" > "${STAND_DIR}/core.out" 2>&1 < /dev/null & pids+=($!)
   setsid python3 "${STAND_DIR}/panel.py" "${PANEL_PORT}" "${STAND_DIR}/links.txt" \
