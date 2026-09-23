@@ -208,6 +208,26 @@ void main() {
       expect(container.read(selectedNodeIdProvider).value, 'node-1');
     });
 
+    // Found on the emulator: the notification that says the tunnel is down
+    // opens the app with a connect request, and that request lands before the
+    // database has answered. It used to find no selection and no servers, and
+    // do nothing.
+    test('a connect that arrives with the process waits for the list',
+        () async {
+      final harness = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
+      addTearDown(harness.dispose);
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+      container.listen(coreStatusProvider, (_, __) {});
+
+      final acted =
+          await container.read(tunnelControllerProvider.notifier).connect();
+
+      expect(acted, isTrue);
+      expect(harness.core.isRunning, isTrue);
+      expect(container.read(selectedNodeIdProvider).value, 'node-1');
+    });
+
     test('with no server at all it still answers false, for the import sheet',
         () async {
       final harness = CommyTestHarness();

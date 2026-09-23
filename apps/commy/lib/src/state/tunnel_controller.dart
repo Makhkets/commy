@@ -544,8 +544,7 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// send the user to the import sheet instead of showing an error about a
   /// choice they never made.
   Future<bool> connect({String? nodeId}) async {
-    final target =
-        nodeId ?? ref.read(selectedNodeIdProvider).value ?? _leadNodeId();
+    final target = nodeId ?? await _connectTarget();
     if (target == null) {
       return false;
     }
@@ -961,9 +960,41 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// servers, the user asked to connect, and the first one in the list is the
   /// one they are looking at. The core reorders by latency on Auto the moment
   /// it has measured them; off Auto the user can switch without reconnecting.
-  String? _leadNodeId() {
-    final all = ref.read(nodesProvider).value ?? const <ProxyNode>[];
-    return all.isEmpty ? null : all.first.id;
+  /// The server a connect with no explicit choice lands on: the selection,
+  /// or the first server there is.
+  ///
+  /// Awaited rather than read. A connect that arrives with the process — the
+  /// notification that says the tunnel is down, the Quick Settings tile on a
+  /// cold app — gets here before the database has answered, and a
+  /// synchronous read then finds neither a selection nor a single server and
+  /// returns as if there were nothing to connect to. On a device that was the
+  /// tap on "open the app to bring the tunnel up" opening the app and leaving
+  /// the tunnel down, with nothing in the log but the intent itself.
+  ///
+  /// Both are listened to for the length of the wait: a provider nobody
+  /// listens to is paused, and a paused stream never delivers the first value
+  /// its `future` is waiting for.
+  Future<String?> _connectTarget() async {
+    final selection = ref.listen(selectedNodeIdProvider, (_, __) {});
+    final servers = ref.listen(nodesProvider, (_, __) {});
+    try {
+      try {
+        final selected = await ref.read(selectedNodeIdProvider.future);
+        if (selected != null) {
+          return selected;
+        }
+      } on Object {
+        // A selection that cannot be read is no selection: fall through to
+        // the first server, as a user who never picked one gets.
+      }
+      final all = await ref.read(nodesProvider.future);
+      return all.isEmpty ? null : all.first.id;
+    } on Object {
+      return null;
+    } finally {
+      selection.close();
+      servers.close();
+    }
   }
 
   /// Rebuilds the configuration that was just sent, for the diagnostics tab.
