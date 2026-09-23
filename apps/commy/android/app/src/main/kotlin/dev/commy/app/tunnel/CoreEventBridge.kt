@@ -79,10 +79,26 @@ internal class CoreEventBridge(
 
     suspend fun start() {
         statusClient = open(Libbox.CommandStatus, StatusHandler())
-        open(Libbox.CommandLog, LogHandler())
         groupClient = open(Libbox.CommandGroup, GroupHandler())
         open(Libbox.CommandConnections, ConnectionHandler())
         startConnectionTicker()
+    }
+
+    /**
+     * Subscribes to the core's log. Only once the service has started.
+     *
+     * The log stream opens with `GetDefaultLogLevel`, which libbox answers
+     * with `os.ErrInvalid` unless the service is starting or started
+     * (`daemon/started_service.go`, v1.13.16) — and on that error the client
+     * reports `disconnected` and the stream is over, for good and without a
+     * word. Opened alongside the others, before `startOrReloadService`, it
+     * never delivered a line: in a release build the log screen carried the
+     * app's own lines and not one of the core's. Nothing is lost by waiting —
+     * the subscription starts with the lines the core has kept (512, see
+     * `CoreSetup`), start-up included.
+     */
+    suspend fun startLogs() {
+        open(Libbox.CommandLog, LogHandler())
     }
 
     fun close() {
