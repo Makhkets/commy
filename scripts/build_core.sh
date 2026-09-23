@@ -26,6 +26,13 @@ readonly BUILD_DIR="${CORE_DIR}/build"
 # Pinned deliberately. Bumping it is its own PR with its own matrix run (rule R8).
 readonly SINGBOX_VERSION="v1.13.16"
 readonly LIBBOX_PKG="github.com/sagernet/sing-box/experimental/libbox"
+# Ours, bound into the same library: what Commy adds to the libbox API (today,
+# measuring servers with no tunnel up). A package of its own rather than an
+# overlay edit to libbox, because gomobile writes the Java and Objective-C
+# bindings from the source files on disk — an overlaid function compiles into
+# the library and never gets a binding. With -javapkg it is
+# io.nekohasekai.mobile.Mobile.
+readonly MOBILE_PKG="github.com/Makhkets/commy/core/mobile"
 
 # Shorter than upstream's list on purpose.
 #
@@ -236,7 +243,7 @@ build_android() {
   mkdir -p "${BUILD_DIR}"
   prepare_overlay
 
-  say "gomobile bind ${LIBBOX_PKG} for ${ANDROID_ABIS}"
+  say "gomobile bind ${LIBBOX_PKG} ${MOBILE_PKG} for ${ANDROID_ABIS}"
   say "this compiles the whole core once per ABI and is slow on a weak machine;"
   say "set COMMY_ANDROID_ABIS=android/arm64 to build only what a phone needs."
   ( cd "${CORE_DIR}" && gomobile bind -v \
@@ -248,7 +255,7 @@ build_android() {
       -ldflags "${LDFLAGS}" \
       -trimpath \
       -o "${BUILD_DIR}/libbox.aar" \
-      "${LIBBOX_PKG}" )
+      "${LIBBOX_PKG}" "${MOBILE_PKG}" )
 
   local lib
   for lib in $(unzip -Z1 "${BUILD_DIR}/libbox.aar" 'jni/*/libbox.so'); do
@@ -271,14 +278,14 @@ build_apple() {
   [[ "$(uname -s)" == "Darwin" ]] || die "the Apple target needs macOS with Xcode."
   prepare_overlay
   install_go_shim
-  say "gomobile bind ${LIBBOX_PKG} for Apple"
+  say "gomobile bind ${LIBBOX_PKG} ${MOBILE_PKG} for Apple"
   ( cd "${CORE_DIR}" && gomobile bind -v \
       -target=ios,iossimulator,macos \
       -tags "${TAGS},with_low_memory" \
       -ldflags "${LDFLAGS}" \
       -trimpath \
       -o "${BUILD_DIR}/Libbox.xcframework" \
-      "${LIBBOX_PKG}" )
+      "${LIBBOX_PKG}" "${MOBILE_PKG}" )
   local binary
   while IFS= read -r binary; do
     verify_xhttp_in "${binary#"${BUILD_DIR}/"}" cat "${binary}"

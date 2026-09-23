@@ -4,6 +4,7 @@ go 1.24.7
 
 require (
 	github.com/metacubex/utls v1.8.4
+	github.com/miekg/dns v1.1.72
 	github.com/sagernet/gomobile v0.1.13
 	github.com/sagernet/quic-go v0.59.0-sing-box-mod.4
 	github.com/sagernet/sing v0.8.12-0.20260726145744-ef2df370afca
@@ -61,7 +62,6 @@ require (
 	github.com/mdlayher/netlink v1.9.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/mholt/acmez/v3 v3.1.6 // indirect
-	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/openai/openai-go/v3 v3.26.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
