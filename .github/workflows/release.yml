@@ -193,8 +193,12 @@ jobs:
           v="${GITHUB_REF_NAME#v}"
           {
             if [ -f CHANGELOG.md ] && grep -q "## \[$v\]" CHANGELOG.md; then
-              awk -v ver="## \\[$v\\]" '
-                $0 ~ ver {found=1; next}
+              # A literal match, not a regex: awk turns "\\[" into "[", and
+              # "[0.1.0-alpha.6]" is then a character class whose range 0-a
+              # takes in "[" — every "## [" heading matched it, the exit rule
+              # never ran, and each release carried the whole changelog.
+              awk -v ver="## [$v]" '
+                index($0, ver) == 1 {found=1; next}
                 found && /^## \[/ {exit}
                 found {print}
               ' CHANGELOG.md
