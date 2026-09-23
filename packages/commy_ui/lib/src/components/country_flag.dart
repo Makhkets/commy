@@ -57,6 +57,10 @@ class CountryFlag extends StatelessWidget {
   /// out as a second, redundant fact.
   final String? semanticLabel;
 
+  /// The code for the flag of the European Union — not a country, which is
+  /// exactly why the auto-select group wears it: the group is no one place.
+  static const String europeanUnion = 'EU';
+
   /// Whether a flag is drawn for [code], as opposed to the neutral chip.
   ///
   /// Screens use it to decide whether a flag is worth the horizontal space at
@@ -140,7 +144,7 @@ class CountryFlag extends StatelessWidget {
       'LV' => _FlagDesign.lv,
       'FI' => _FlagDesign.fi,
       'JP' => _FlagDesign.jp,
-      'EU' => _FlagDesign.eu,
+      europeanUnion => _FlagDesign.eu,
       'US' => _FlagDesign.us,
       // Panels write both; `UK` is not an ISO code but it is what people type.
       'GB' || 'UK' => _FlagDesign.gb,

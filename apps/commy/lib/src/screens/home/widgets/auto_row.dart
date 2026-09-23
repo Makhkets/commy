@@ -17,10 +17,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// subscription cards because it belongs to none of them: the group measures
 /// every stored server, whichever panel it came from.
 ///
-/// The second line and the flag follow whatever the core is currently using,
-/// so this row answers "so where am I, then?" without the user opening
-/// diagnostics. Until the core has said — tunnel down, or freshly up — it says
-/// what the group does instead of naming a server it has not picked yet.
+/// The second line follows whatever the core is currently using, so this row
+/// answers "so where am I, then?" without the user opening diagnostics. Until
+/// the core has said — tunnel down, or freshly up — it says what the group
+/// does instead of naming a server it has not picked yet.
+///
+/// The flag is the European Union's, always. It used to be the picked
+/// server's, which left the row with the empty globe chip whenever the tunnel
+/// was down — the one time the user reads this row to decide. The group is no
+/// one country, and panels ship their own auto-select under the same flag.
 class AutoRow extends ConsumerWidget {
   /// Creates the row.
   const AutoRow({this.onChosen, super.key});
@@ -40,7 +45,7 @@ class AutoRow extends ConsumerWidget {
       name: t.home.auto,
       descriptors: <String>[label?.text ?? t.home.autoSubtitle],
       latency: picked?.latency,
-      countryCode: label?.countryCode,
+      countryCode: CountryFlag.europeanUnion,
       isActive: isActive,
       onTap: () {
         unawaited(ref.read(tunnelControllerProvider.notifier).selectAuto());

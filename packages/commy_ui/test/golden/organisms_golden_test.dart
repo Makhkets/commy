@@ -93,7 +93,7 @@ void main() {
 
   goldenTest(
     'node_tile',
-    size: const Size(390, 300),
+    size: const Size(390, 370),
     builder: (context) => card(
       Column(
         mainAxisSize: MainAxisSize.min,
@@ -126,6 +126,17 @@ void main() {
           NodeTile(
             name: 'Node without a country',
             descriptors: const <String>['Hysteria2', 'QUIC'],
+            isReachable: false,
+            offlineSemanticLabel: 'Недоступен',
+            onTap: () {},
+          ),
+          const CommyDivider(),
+          // A server with a flag that failed its ping: the flag goes grey
+          // with the name, so the row reads as down before it is read.
+          NodeTile(
+            name: 'Frankfurt 02',
+            countryCode: 'DE',
+            descriptors: const <String>['VLESS', 'Reality', 'TCP'],
             isReachable: false,
             offlineSemanticLabel: 'Недоступен',
             onTap: () {},

@@ -447,6 +447,46 @@ void main() {
         isTrue,
       );
     });
+
+    testWidgets('wears the European flag, in the list and in the chip',
+        (tester) async {
+      final t = Translations();
+      await pumpTwo(tester);
+      await tester.tap(find.text(t.home.auto));
+      await settle(tester);
+
+      // Before the group has picked anything: the tunnel is down. The chip
+      // used to go without a flag until it had, and the row showed the empty
+      // globe — the owner read that as the row being broken.
+      final row = tester
+          .widgetList<NodeTile>(find.byType(NodeTile))
+          .firstWhere((tile) => tile.name == t.home.auto);
+      expect(row.countryCode, CountryFlag.europeanUnion);
+      final chipFlag = tester.widget<CountryFlag>(
+        find.descendant(
+          of: find.byType(SelectedNode),
+          matching: find.byType(CountryFlag),
+        ),
+      );
+      expect(chipFlag.countryCode, CountryFlag.europeanUnion);
+    });
+
+    testWidgets('the blocks of the list keep off the edges of the screen',
+        (tester) async {
+      await pumpTwo(tester);
+      const width = 400.0;
+
+      // The owner: "the list is stretched to 100%". Every row — Auto and
+      // the servers under it — sits inside a card that keeps a margin on
+      // both sides now.
+      final rows = find.byType(NodeTile);
+      expect(rows, findsNWidgets(3));
+      for (var index = 0; index < 3; index++) {
+        final box = tester.getRect(rows.at(index));
+        expect(box.left, greaterThan(0), reason: 'row $index touches the left');
+        expect(box.right, lessThan(width), reason: 'row $index, the right');
+      }
+    });
   });
 
   /// The chip under the disc, and the list its chevron opens.

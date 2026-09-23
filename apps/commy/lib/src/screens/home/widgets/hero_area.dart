@@ -82,14 +82,19 @@ class HeroArea extends ConsumerWidget {
         SelectedNode(
           name: _nodeLabel(t, isAuto: isAuto, name: label?.text),
           semanticLabel: t.home.selectNode,
-          flag: label == null
-              ? null
-              : CountryFlag(
-                  countryCode: label.countryCode,
-                  semanticLabel: label.countryCode == null
-                      ? null
-                      : t.a11y.flag(country: label.countryCode!),
-                ),
+          // Auto wears the flag it wears in the list below, whether or not
+          // the group has picked a server yet; the chip used to go without
+          // one until it had.
+          flag: isAuto
+              ? const CountryFlag(countryCode: CountryFlag.europeanUnion)
+              : label == null
+                  ? null
+                  : CountryFlag(
+                      countryCode: label.countryCode,
+                      semanticLabel: label.countryCode == null
+                          ? null
+                          : t.a11y.flag(country: label.countryCode!),
+                    ),
           onTap:
               hasChoice ? () => unawaited(NodePickerSheet.show(context)) : null,
         ),

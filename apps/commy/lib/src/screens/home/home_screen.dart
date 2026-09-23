@@ -6,6 +6,7 @@ import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/first_run_view.dart';
 import 'package:commy/src/screens/home/widgets/hero_area.dart';
+import 'package:commy/src/screens/home/widgets/list_card.dart';
 import 'package:commy/src/screens/home/widgets/list_toolbar.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_section.dart';
@@ -398,7 +399,11 @@ class _HomeContent extends ConsumerWidget {
         continue;
       }
       cards
-        ..add(SubscriptionSection(subscription: subscription, nodes: own))
+        ..add(
+          ListCard.inset(
+            child: SubscriptionSection(subscription: subscription, nodes: own),
+          ),
+        )
         ..add(SizedBox(height: spacing.s4));
     }
 
@@ -410,7 +415,7 @@ class _HomeContent extends ConsumerWidget {
         // Auto row, failure banner, toolbar, cards.
         if (!hasConnectionPane) const HeroArea(),
         if (hasChoice) ...<Widget>[
-          const AutoRow(),
+          const ListCard(children: <Widget>[AutoRow()]),
           SizedBox(height: spacing.s4),
         ],
         if (!hasConnectionPane) const _TunnelFailureBanner(),
@@ -419,14 +424,17 @@ class _HomeContent extends ConsumerWidget {
           SizedBox(height: spacing.s4),
         ],
         ...cards,
-        if (manual.isNotEmpty) ...<Widget>[
-          GroupHeader(
-            title: t.home.manualGroup,
-            subtitle: t.home.manualGroupSubtitle,
+        if (manual.isNotEmpty)
+          ListCard(
+            children: <Widget>[
+              GroupHeader(
+                title: t.home.manualGroup,
+                subtitle: t.home.manualGroupSubtitle,
+              ),
+              for (final node in manual)
+                NodeRow(node: node, isActive: node.id == activeId),
+            ],
           ),
-          for (final node in manual)
-            NodeRow(node: node, isActive: node.id == activeId),
-        ],
         // A search that matched nothing is the one empty state this screen
         // did not have, and it gets the action every other one has.
         if (filter.isSearching && shown == 0)

@@ -13,11 +13,11 @@ import 'package:flutter/material.dart';
 /// caught by peripheral vision while scrolling, which is the whole job of
 /// this row in a list the user flicks through looking for one name.
 ///
-/// An unreachable node is dimmed and given the offline glyph, but never
-/// hidden — a server that timed out once may be fine a minute later. Hiding
-/// dead nodes is a separate, explicit switch (docs/05-ux-flows.md, scenario
-/// 4). The glyph matters: dimming alone is a colour signal, and colour is
-/// never allowed to carry a meaning on its own.
+/// An unreachable node is greyed — flag and text — and given the offline
+/// glyph, but never hidden: a server that timed out once may be fine a minute
+/// later. Hiding dead nodes is a separate, explicit switch
+/// (docs/05-ux-flows.md, scenario 4). The glyph matters: grey alone is a
+/// colour signal, and colour is never allowed to carry a meaning on its own.
 ///
 /// Latency comes from [LatencyBadge], which shows bars *and* a number *and* a
 /// colour for the same reason.
@@ -38,6 +38,16 @@ class NodeTile extends StatelessWidget {
 
   /// What sits between two descriptors: `VLESS · Reality · TCP`.
   static const String descriptorSeparator = ' · ';
+
+  /// Takes the colour out of a flag and keeps its light and dark, so it
+  /// stays a flag — only a grey one. Rec. 709 luma weights; not a design
+  /// token, the same way the geometry inside a flag is not.
+  static const ColorFilter _greyscale = ColorFilter.matrix(<double>[
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0, 0, 0, 1, 0, //
+  ]);
 
   /// Display name, as the panel wrote it.
   final String name;
@@ -90,16 +100,16 @@ class NodeTile extends StatelessWidget {
     final type = context.typography;
     final motion = context.motion;
 
-    // A server that did not answer is dimmed by one step down the text ramp,
-    // not painted in `textDisabled`. `textDisabled` is for a control a tap
-    // cannot reach; this row is still tappable, and its name is the single
-    // thing the user came to read — which of my servers is down. In the light
-    // theme that colour is 2.0:1 against the surface, so the answer arrived
-    // as a ghost. One step down is 7.7:1 for the name and 4.9:1 for the line
-    // under it, both past WCAG AA, and still visibly quieter than a server
-    // that answered.
-    final nameColor = isReachable ? colors.textPrimary : colors.textSecondary;
+    // A server that did not answer is grey: its flag loses its colour and its
+    // name drops to the tertiary step. One step down used to be all it got,
+    // and on a phone that read as "the same row, slightly lighter" — the
+    // owner could not tell at a glance which servers had failed their ping.
+    // Still not `textDisabled`: that is for a control a tap cannot reach, it
+    // is 2.0:1 against the surface in the light theme, and this row is still
+    // tappable. Tertiary is 4.9:1, past WCAG AA for a title.
+    final nameColor = isReachable ? colors.textPrimary : colors.textTertiary;
     final metaColor = isReachable ? colors.textSecondary : colors.textTertiary;
+    final flag = CountryFlag(countryCode: countryCode);
 
     return Semantics(
       selected: isActive,
@@ -128,7 +138,10 @@ class NodeTile extends StatelessWidget {
                     ),
                     child: Row(
                       children: <Widget>[
-                        CountryFlag(countryCode: countryCode),
+                        if (isReachable)
+                          flag
+                        else
+                          ColorFiltered(colorFilter: _greyscale, child: flag),
                         SizedBox(width: spacing.s3),
                         Expanded(
                           child: Column(
