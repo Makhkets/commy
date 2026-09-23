@@ -118,8 +118,7 @@ class SubscriptionSection extends ConsumerWidget {
     );
   }
 
-  /// `2 ч назад · авто 1 ч`, or an honest "never" when it has not run.
-  /// Refreshes the panel, and says something when it does not work.
+  /// Refreshes the panel, and says how it went — either way.
   ///
   /// The call used to be fired and forgotten: the spinner stopped, the card
   /// kept its old "2 hours ago", and a panel that refused — expired, revoked,
@@ -139,7 +138,21 @@ class SubscriptionSection extends ConsumerWidget {
     final ok = await ref
         .read(subscriptionControllerProvider.notifier)
         .refresh(subscription.id);
-    if (!context.mounted || ok) {
+    if (!context.mounted) {
+      return;
+    }
+    if (ok) {
+      // Success says so too. The card's "just now" was the only sign, and
+      // it is the line nobody reads — the owner kept pressing refresh to see
+      // whether anything had happened.
+      ToastMessenger.show(
+        context,
+        message: t.subscription.refreshed(
+          count: ref.read(subscriptionControllerProvider).importedCount ?? 0,
+        ),
+        tone: CommyTone.connected,
+        icon: CommyIcons.success,
+      );
       return;
     }
     final failure = ref.read(subscriptionControllerProvider).failure;
@@ -173,6 +186,7 @@ class SubscriptionSection extends ConsumerWidget {
     await _refresh(context, ref, t);
   }
 
+  /// `2 ч назад · авто 1 ч`, or an honest "never" when it has not run.
   String _subtitle(Translations t, DateTime now) {
     final last = subscription.lastUpdatedAt;
     final parts = <String>[
