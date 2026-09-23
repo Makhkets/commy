@@ -58,7 +58,31 @@ void main() {
         used: CommyByteFormat.bytes(4 << 30, locale: t.flutterLocale),
       ),
     );
-    expect(card.quotaRatio, isNull, reason: 'No ceiling, so no bar.');
+    expect(card.quotaRatio, isNull, reason: 'No ceiling, so no share of it.');
+    // The owner: a full bar, as if it were all spent — except it is not,
+    // because there is no end. Drawn full and calm, never red.
+    expect(card.isUnlimited, isTrue);
+    final bar = tester.widget<QuotaBar>(find.byType(QuotaBar));
+    expect(bar.isUnlimited, isTrue);
+    expect(bar.clampedRatio, 1);
+  });
+
+  testWidgets('a panel that sent no traffic figures draws no bar at all',
+      (tester) async {
+    final harness = CommyTestHarness(
+      subscriptions: <Subscription>[testSubscription()],
+      nodes: <ProxyNode>[testNode(subscriptionId: 'sub-1')],
+    );
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(
+      harness.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+    );
+    await settle(tester);
+
+    // Silence is not "unlimited": a bar here would invent a plan.
+    final card = tester.widget<SubscriptionCard>(find.byType(SubscriptionCard));
+    expect(card.isUnlimited, isFalse);
+    expect(find.byType(QuotaBar), findsNothing);
   });
 
   testWidgets('with nothing used yet it is just the word', (tester) async {
@@ -87,5 +111,7 @@ void main() {
         total: CommyByteFormat.bytes(10 << 30, locale: t.flutterLocale),
       ),
     );
+    expect(card.isUnlimited, isFalse);
+    expect(tester.widget<QuotaBar>(find.byType(QuotaBar)).clampedRatio, 0.2);
   });
 }

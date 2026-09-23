@@ -63,8 +63,14 @@ void main() {
 
   goldenTest(
     'quota_bar',
-    size: const Size(360, 220),
+    size: const Size(360, 280),
     builder: (context) => column(const <Widget>[
+      // Unlimited: the whole track, in the calm colour — never red.
+      QuotaBar(
+        ratio: 0,
+        isUnlimited: true,
+        leadingLabel: '41 ГБ · без лимита',
+      ),
       QuotaBar(
         ratio: 0.32,
         leadingLabel: '0,64 ТБ из 2 ТБ',

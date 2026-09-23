@@ -66,6 +66,8 @@ class SubscriptionSection extends ConsumerWidget {
       health: _healthOf(info, now),
       healthSemanticLabel: t.a11y.subscriptionHealth,
       quotaRatio: info?.ratio,
+      // Only when the panel spoke: no userinfo at all is not "unlimited".
+      isUnlimited: info != null && !info.hasQuota,
       quotaLabel: _quotaLabel(t, info),
       expiryLabel: _expiryLabel(t, info, now),
       quotaSemanticLabel: _quotaSemantics(t, info),

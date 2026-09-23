@@ -86,6 +86,7 @@ class SubscriptionCard extends StatelessWidget {
     this.health = SubscriptionHealth.ok,
     this.healthSemanticLabel,
     this.quotaRatio,
+    this.isUnlimited = false,
     this.quotaLabel,
     this.expiryLabel,
     this.quotaSemanticLabel,
@@ -125,8 +126,13 @@ class SubscriptionCard extends StatelessWidget {
 
   /// Share of the quota already spent, in `0..1`, or `null` when the panel
   /// reported no quota at all. No bar is drawn in that case: inventing one is
-  /// worse than showing nothing.
+  /// worse than showing nothing — unless the panel said the plan has no
+  /// ceiling, see [isUnlimited].
   final double? quotaRatio;
+
+  /// Whether the panel reported an unlimited plan. The bar is drawn full and
+  /// calm (see `QuotaBar.isUnlimited`).
+  final bool isUnlimited;
 
   /// Volume line under the bar, for example `1,12 ТБ из 2 ТБ`.
   final String? quotaLabel;
@@ -189,6 +195,7 @@ class SubscriptionCard extends StatelessWidget {
             health: health,
             healthSemanticLabel: healthSemanticLabel,
             quotaRatio: quotaRatio,
+            isUnlimited: isUnlimited,
             quotaLabel: quotaLabel,
             expiryLabel: expiryLabel,
             quotaSemanticLabel: quotaSemanticLabel,
@@ -222,6 +229,7 @@ class _Header extends StatelessWidget {
     required this.health,
     required this.healthSemanticLabel,
     required this.quotaRatio,
+    required this.isUnlimited,
     required this.quotaLabel,
     required this.expiryLabel,
     required this.quotaSemanticLabel,
@@ -241,6 +249,7 @@ class _Header extends StatelessWidget {
   final SubscriptionHealth health;
   final String? healthSemanticLabel;
   final double? quotaRatio;
+  final bool isUnlimited;
   final String? quotaLabel;
   final String? expiryLabel;
   final String? quotaSemanticLabel;
@@ -347,11 +356,12 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          if (ratio != null)
+          if (ratio != null || isUnlimited)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: spacing.s4),
               child: QuotaBar(
-                ratio: ratio,
+                ratio: ratio ?? 1,
+                isUnlimited: isUnlimited,
                 semanticLabel: quotaSemanticLabel,
               ),
             ),

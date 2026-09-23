@@ -8,6 +8,12 @@ import 'package:flutter/material.dart';
 /// Thresholds come from tokens, and the critical one is the same number the
 /// domain uses for `SubscriptionUserInfo.isNearQuota` — a bar that turns red
 /// at a different point from the warning text would be worse than no bar.
+///
+/// An unlimited plan ([isUnlimited]) draws the track full, in the calm
+/// colour. The owner asked for it: a card without a bar read as a card the
+/// panel had said nothing about, and a full bar in the colour of plenty says
+/// "there is no end to this" at a glance. Never in red — a full red bar is
+/// the one thing that must mean "spent".
 class QuotaBar extends StatelessWidget {
   /// Creates a quota bar.
   const QuotaBar({
@@ -15,11 +21,16 @@ class QuotaBar extends StatelessWidget {
     this.leadingLabel,
     this.trailingLabel,
     this.semanticLabel,
+    this.isUnlimited = false,
     super.key,
   });
 
-  /// Share of the quota already spent, clamped to `0..1`.
+  /// Share of the quota already spent, clamped to `0..1`. Ignored when
+  /// [isUnlimited].
   final double ratio;
+
+  /// Whether the plan has no ceiling. The track is drawn full and calm.
+  final bool isUnlimited;
 
   /// Text above the track on the leading side. Already translated.
   final String? leadingLabel;
@@ -30,8 +41,8 @@ class QuotaBar extends StatelessWidget {
   /// Announced to assistive technology in place of the two labels.
   final String? semanticLabel;
 
-  /// [ratio] brought into range.
-  double get clampedRatio => ratio.clamp(0, 1).toDouble();
+  /// [ratio] brought into range; the whole track for an unlimited plan.
+  double get clampedRatio => isUnlimited ? 1 : ratio.clamp(0, 1).toDouble();
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +52,9 @@ class QuotaBar extends StatelessWidget {
     final motion = context.motion;
 
     final Color fill;
-    if (clampedRatio >= CommyThresholds.quotaCritical) {
+    if (isUnlimited) {
+      fill = colors.accentSolid;
+    } else if (clampedRatio >= CommyThresholds.quotaCritical) {
       fill = colors.statusError;
     } else if (clampedRatio >= CommyThresholds.quotaWarn) {
       fill = colors.statusConnecting;
@@ -64,8 +77,7 @@ class QuotaBar extends StatelessWidget {
                     leadingLabel ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        type.caption.copyWith(color: colors.textSecondary),
+                    style: type.caption.copyWith(color: colors.textSecondary),
                   ),
                 ),
                 if (trailingLabel != null)
