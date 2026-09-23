@@ -33,6 +33,12 @@ internal data class GroupItemSnapshot(
     val type: String?,
     /** Milliseconds. `0` means "never measured", not "instant". */
     val urlTestDelay: Int,
+    /**
+     * When [urlTestDelay] was measured, in Unix seconds — all the core keeps.
+     * Native only: it is how a url test tells its own answer from the one
+     * before it, and the wire protocol has no use for it.
+     */
+    val urlTestTime: Long = 0,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put(Wire.Keys.TAG, tag)

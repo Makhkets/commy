@@ -58,6 +58,9 @@ internal class CoreEventBridge(
     @Volatile
     private var lastGroups: List<GroupSnapshot> = emptyList()
 
+    /** When the url test round of each group began, in milliseconds. */
+    private val rounds = mutableMapOf<String, Long>()
+
     /**
      * Group refreshes, for `urlTest` to wait on.
      *
@@ -113,36 +116,88 @@ internal class CoreEventBridge(
     /**
      * Measures one outbound, on a libbox API that measures a whole group.
      *
-     * `CommandClient.urlTest(groupTag)` takes a group and answers nothing — the
-     * numbers arrive later through `writeGroups`. The domain port asks for the
+     * `CommandClient.urlTest(groupTag)` takes a group and answers nothing. The
+     * core then tests *every* member of the group at once, ten at a time, and
+     * pushes a group refresh each time one of them finishes
+     * (`daemon/started_service.go`, v1.13.16). The domain port asks for the
      * delay of a single outbound as a return value, so the asynchrony is hidden
-     * here: subscribe, trigger, wait for the next refresh, read one item out.
+     * here.
+     *
+     * It used to take the first refresh after the request and read the tag out
+     * of it. The first refresh is whichever server answered first, and the one
+     * asked about was usually still in flight — zero, or the number from last
+     * time. On the emulator that was "Check" reporting a working tunnel as
+     * unreachable, every time, with nine servers answering in the core log.
+     * Now a refresh only counts once it carries a delay for [tag] measured at
+     * or after this round began.
+     *
+     * One round per group at a time. "Measure all" asks for every server in
+     * turn, and each ask used to start its own round: nine servers, nine
+     * rounds, eighty-one probes. An ask that finds a round of the same group
+     * already running waits on that one instead.
      *
      * Null means "the probe did not come back", and null is a legitimate answer
-     * — a timeout, a missing tag and a delay of zero all mean the same thing to
-     * the screen, which draws a dash. Throwing instead would make an
-     * unreachable node indistinguishable from a broken app.
+     * — a timeout, a missing tag and a failed test (the core deletes the old
+     * number rather than keep it) all mean the same thing to the screen, which
+     * draws a dash. Throwing instead would make an unreachable node
+     * indistinguishable from a broken app.
      */
     suspend fun urlTest(group: String, tag: String, timeoutMs: Long): Long? {
         val client = groupClient ?: throw notRunning()
+        val now = System.currentTimeMillis()
+        val (round, starts) = synchronized(rounds) {
+            val running = rounds[group]?.takeIf { now - it < timeoutMs }
+            if (running != null) {
+                running to false
+            } else {
+                rounds[group] = now
+                now to true
+            }
+        }
+        // The core stamps a result with Unix seconds, nothing finer.
+        val since = round / MILLIS_PER_SECOND
         // UNDISPATCHED so the collector is registered before the request goes
         // out. Started lazily, a fast core could answer into an empty room.
-        val update = scope.async(start = CoroutineStart.UNDISPATCHED) { groupUpdates.first() }
-        try {
-            withContext(Dispatchers.IO) { client.urlTest(group) }
-        } catch (error: Exception) {
+        val update = scope.async(start = CoroutineStart.UNDISPATCHED) {
+            groupUpdates.first { freshDelay(it, group, tag, since) != null }
+        }
+        // A round that was already running may have measured this one before
+        // we subscribed.
+        freshDelay(lastGroups, group, tag, since)?.let {
             update.cancel()
-            throw WireException.from(Wire.Errors.CONFIG_INVALID, error)
+            return it
+        }
+        if (starts) {
+            try {
+                withContext(Dispatchers.IO) { client.urlTest(group) }
+            } catch (error: Exception) {
+                update.cancel()
+                synchronized(rounds) { rounds.remove(group, round) }
+                throw WireException.from(Wire.Errors.CONFIG_INVALID, error)
+            }
         }
         val groups = withTimeoutOrNull(timeoutMs) { update.await() }
         if (groups == null) {
             update.cancel()
             return null
         }
+        return freshDelay(groups, group, tag, since)
+    }
+
+    /** [tag]'s delay in [groups], if it was measured at or after [since]. */
+    private fun freshDelay(
+        groups: List<GroupSnapshot>,
+        group: String,
+        tag: String,
+        since: Long,
+    ): Long? {
         val item = groups.firstOrNull { it.tag == group }?.items?.firstOrNull { it.tag == tag }
             ?: groups.flatMap(GroupSnapshot::items).firstOrNull { it.tag == tag }
-        val delay = item?.urlTestDelay ?: 0
-        return if (delay > 0) delay.toLong() else null
+            ?: return null
+        if (item.urlTestDelay <= 0 || item.urlTestTime < since) {
+            return null
+        }
+        return item.urlTestDelay.toLong()
     }
 
     // ── plumbing ──────────────────────────────────────────────────────────
@@ -274,6 +329,7 @@ internal class CoreEventBridge(
                         // together, so the synthetic property is `URLTestDelay`
                         // and the obvious spelling does not resolve.
                         urlTestDelay = item.getURLTestDelay(),
+                        urlTestTime = item.getURLTestTime(),
                     )
                 }
                 groups += GroupSnapshot(
@@ -344,6 +400,7 @@ internal class CoreEventBridge(
         const val STATUS_INTERVAL_NANOS = 1_000_000_000L
 
         const val CONNECTIONS_INTERVAL_MS = 1_000L
+        const val MILLIS_PER_SECOND = 1_000L
         const val CONNECT_ATTEMPTS = 20
         const val CONNECT_RETRY_MS = 100L
         const val DEFAULT_NETWORK = "tcp"
