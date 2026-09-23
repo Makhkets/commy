@@ -62,6 +62,58 @@ void main() {
       });
     });
 
+    // Measured against Xray 26.9.9 with the pinned core: every uTLS hello
+    // but Chrome's lacks the X25519MLKEM768 share the server now requires,
+    // and Reality does not check the fingerprint anyway.
+    test('reality always goes out with the chrome fingerprint', () {
+      for (final named in <String>[
+        'firefox',
+        'safari',
+        'ios',
+        'edge',
+        'android',
+        '360',
+        'qq',
+        'random',
+        'randomized',
+        'chrome',
+      ]) {
+        final outbound = _build(
+          _node(Protocol.vless, <String, Object?>{
+            'uuid': 'u',
+            'security': 'reality',
+            'sni': 's.example',
+            'pbk': 'KEY',
+            'fp': named,
+          }),
+        );
+        final tls = outbound['tls']! as Map<String, Object?>;
+
+        expect(
+          (tls['utls']! as Map<String, Object?>)['fingerprint'],
+          'chrome',
+          reason: 'fp=$named',
+        );
+      }
+    });
+
+    test('plain TLS keeps the fingerprint the link named', () {
+      final outbound = _build(
+        _node(Protocol.vless, <String, Object?>{
+          'uuid': 'u',
+          'security': 'tls',
+          'sni': 's.example',
+          'fp': 'firefox',
+        }),
+      );
+      final tls = outbound['tls']! as Map<String, Object?>;
+
+      expect(
+        (tls['utls']! as Map<String, Object?>)['fingerprint'],
+        'firefox',
+      );
+    });
+
     test('omits packet_encoding so the core picks its own default', () {
       final outbound = _build(
         _node(Protocol.vless, <String, Object?>{'uuid': 'u'}),

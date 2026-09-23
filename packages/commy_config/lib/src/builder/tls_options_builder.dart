@@ -14,12 +14,36 @@ import 'package:commy_domain/commy_domain.dart';
 ///   configuration and is dropped (docs/13-libbox-reference.md).
 /// * Reality **requires** uTLS: `reality_client.go` refuses to start with
 ///   "uTLS is required by reality client", so the fingerprint block is written
-///   whether or not the link named one.
+///   whether or not the link named one — and it is always Chrome's, see
+///   [realityFingerprint].
 /// * `server_name` is filled from the host when the link gave no SNI, but only
 ///   when the host is a name. Sending an IP literal as SNI is invalid.
 abstract final class TlsOptionsBuilder {
   /// Fingerprint used when Reality is on and the link named none.
-  static const String defaultFingerprint = 'chrome';
+  static const String defaultFingerprint = realityFingerprint;
+
+  /// The fingerprint every Reality connection is made with, whatever the link
+  /// named.
+  ///
+  /// Xray 26.9.8 and later refuse a Reality ClientHello without an
+  /// `X25519MLKEM768` key share, and in the uTLS the pinned core is built with
+  /// (metacubex/utls v1.8.4) only the Chrome hellos carry one. Measured with
+  /// the pinned core and the stand (docs/18) against Xray 26.9.9: `chrome`
+  /// connects; `firefox`, `safari`, `ios`, `edge`, `qq` and `random` are
+  /// answered with the decoy's certificate; `randomized` carries the share
+  /// only when its coin lands that way; `android` and `360` offer no X25519
+  /// at all and fail against every Xray, old ones included. Against Xray
+  /// 26.3.27 all of them but those two connect — which is why a link that
+  /// names `firefox` worked yesterday and does not after the server updated.
+  ///
+  /// A Reality server does not check the fingerprint; it is there to blend
+  /// in, and Chrome is the most common hello there is. So the builder uses it
+  /// for Reality always, and older servers are reached with it too — the
+  /// overlay's second attempt strips the share they cannot take
+  /// (docs/adr/0011-reality-client-hello.md). The link itself keeps what the
+  /// panel wrote: export and QR hand on the original `fp`. Narrow this again
+  /// when a core bump brings a uTLS with the share in the other hellos.
+  static const String realityFingerprint = 'chrome';
 
   /// Longest a Reality short id may be: eight bytes, written as hex.
   static const int maxShortIdLength = 16;
@@ -77,9 +101,7 @@ abstract final class TlsOptionsBuilder {
     if (isReality) {
       options[SingBoxKeys.utls] = <String, Object?>{
         SingBoxKeys.enabled: true,
-        SingBoxKeys.fingerprint: fingerprint == null || fingerprint.isEmpty
-            ? defaultFingerprint
-            : fingerprint,
+        SingBoxKeys.fingerprint: realityFingerprint,
       };
       options[SingBoxKeys.reality] = _reality(node);
     } else if (!overQuic && fingerprint != null && fingerprint.isNotEmpty) {
