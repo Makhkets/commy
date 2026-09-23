@@ -379,6 +379,40 @@ void main() {
         <String>['auto', 'node-reality-1', 'node-reality-2'],
       );
     });
+
+    test('the chosen server leads the selector, the rest keep their order', () {
+      ProxyNode node(String id) => ProxyNode(
+            id: id,
+            name: id,
+            protocol: Protocol.vless,
+            host: '$id.example.net',
+            port: 443,
+            params: const <String, Object?>{'uuid': 'u', 'security': 'none'},
+          );
+      final result = const SingBoxConfigBuilder().build(
+        SingBoxBuildRequest(
+          nodes: <ProxyNode>[node('a'), node('b'), node('c'), node('d')],
+          selectedNodeId: 'c',
+          routing: RoutingPolicy.defaults,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+      final selector = (result.valueOrNull!.config.document['outbounds']!
+              as List<Object?>)
+          .cast<Map<String, Object?>>()
+          .firstWhere((outbound) => outbound['tag'] == SingBoxTags.proxyGroup);
+
+      // The core measures a group in this order, ten at a time, and "Check"
+      // waits on the chosen server: last in a long list, its answer came
+      // after the wait, and a working tunnel read as one with no way out.
+      expect(
+        selector['outbounds'],
+        <String>['node-c', 'node-a', 'node-b', 'node-d'],
+      );
+      expect(selector['default'], 'node-c');
+    });
   });
 
   group('the Auto group', () {

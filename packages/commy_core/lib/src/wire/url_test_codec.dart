@@ -14,7 +14,13 @@ import 'package:commy_domain/commy_domain.dart';
 /// (`docs/wire-protocol.md`, "urlTest").
 abstract final class UrlTestCodec {
   /// How long the native side waits for the group refresh, by default.
-  static const Duration defaultTimeout = Duration(seconds: 5);
+  ///
+  /// Ten seconds, not five. The core measures every server of the group at
+  /// once, ten at a time, and all of them shake hands over the same link: on
+  /// a slow one, five seconds after the start only six to eight of nineteen
+  /// healthy servers had answered, each in under 300 ms of its own. The rest
+  /// were reported as down — and are now drawn grey — while they were fine.
+  static const Duration defaultTimeout = Duration(seconds: 10);
 
   /// Group measured when the caller did not name one.
   static const String defaultGroup = SwitchNodeUseCase.defaultGroupTag;

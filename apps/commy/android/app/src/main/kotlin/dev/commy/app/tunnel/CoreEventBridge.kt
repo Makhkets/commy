@@ -23,7 +23,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Everything coming back out of the core.
@@ -49,7 +51,24 @@ internal class CoreEventBridge(
     private val clients = mutableListOf<CommandClient>()
 
     private var statusClient: CommandClient? = null
+
+    @Volatile
     private var groupClient: CommandClient? = null
+
+    @Volatile
+    private var connectionsClient: CommandClient? = null
+
+    /** Streams with a resubscribe in flight, so a burst of ends asks once. */
+    private val resubscribing: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * Which subscription of each stream is the current one. A client let go
+     * of may still report its own end afterwards; only the current one's end
+     * is a reason to subscribe again, or the fresh stream would be replaced
+     * every time the old one said goodbye.
+     */
+    private val groupGeneration = AtomicInteger()
+    private val connectionsGeneration = AtomicInteger()
 
     private val connections = linkedMapOf<String, ConnectionRow>()
     private var connectionsDirty = false
@@ -77,40 +96,55 @@ internal class CoreEventBridge(
     val selectedNode: String?
         get() = lastGroups.firstOrNull { it.selected != null }?.selected
 
+    /**
+     * Subscribes to the status stream, which is the one to open before the
+     * core starts: libbox serves it in any state, and its end is how a core
+     * that died is noticed at all.
+     */
     suspend fun start() {
         statusClient = open(Libbox.CommandStatus, StatusHandler())
-        groupClient = open(Libbox.CommandGroup, GroupHandler())
-        open(Libbox.CommandConnections, ConnectionHandler())
-        startConnectionTicker()
     }
 
     /**
-     * Subscribes to the core's log. Only once the service has started.
+     * Subscribes to logs, groups and connections. Only once the service has
+     * started.
      *
-     * The log stream opens with `GetDefaultLogLevel`, which libbox answers
-     * with `os.ErrInvalid` unless the service is starting or started
-     * (`daemon/started_service.go`, v1.13.16) — and on that error the client
-     * reports `disconnected` and the stream is over, for good and without a
-     * word. Opened alongside the others, before `startOrReloadService`, it
-     * never delivered a line: in a release build the log screen carried the
-     * app's own lines and not one of the core's. Nothing is lost by waiting —
-     * the subscription starts with the lines the core has kept (512, see
-     * `CoreSetup`), start-up included.
+     * libbox refuses all three while the service is idle, each in its own way
+     * (`daemon/started_service.go`, v1.13.16): the log stream opens with
+     * `GetDefaultLogLevel`, and groups and connections with `waitForStarted`,
+     * and both answer `os.ErrInvalid` unless the service is starting or
+     * started. On that error the stream is over, for good and without a word.
+     *
+     * The log stream was the first to be caught — not one line of the core's
+     * reached the screen in a release build. Groups lost the same race on a
+     * fast device, and that one cost more: "Check" and "measure all" wait for
+     * the group refresh a url test produces, the refresh never came, and every
+     * server was reported down — and drawn grey — while traffic flowed through
+     * it. Nothing is lost by waiting: the log starts with the lines the core
+     * has kept (512, see `CoreSetup`), groups and connections with a full
+     * snapshot.
      */
-    suspend fun startLogs() {
+    suspend fun startStreams() {
         open(Libbox.CommandLog, LogHandler())
+        groupClient = open(Libbox.CommandGroup, GroupHandler(groupGeneration.incrementAndGet()))
+        connectionsClient = open(
+            Libbox.CommandConnections,
+            ConnectionHandler(connectionsGeneration.incrementAndGet()),
+        )
+        startConnectionTicker()
     }
 
     fun close() {
         closing.set(true)
         connectionsJob?.cancel()
         connectionsJob = null
-        for (client in clients) {
+        val all = synchronized(clients) { clients.toList().also { clients.clear() } }
+        for (client in all) {
             runCatching { client.disconnect() }
         }
-        clients.clear()
         statusClient = null
         groupClient = null
+        connectionsClient = null
         synchronized(connections) { connections.clear() }
     }
 
@@ -227,7 +261,7 @@ internal class CoreEventBridge(
         }
         val client = Libbox.newCommandClient(handler, options)
         connect(client)
-        clients += client
+        synchronized(clients) { clients += client }
         return client
     }
 
@@ -276,6 +310,52 @@ internal class CoreEventBridge(
                 }
             }
         }
+    }
+
+    /**
+     * Opens a group or connections subscription again after it ended.
+     *
+     * libbox ends either stream the moment an update finds the service in
+     * any state but started — and a reload puts it in another state for the
+     * length of the restart. Left alone, the next "Check" after a routing edit
+     * would wait on a stream that is gone. So the stream is reopened after a
+     * short pause, until it holds or the bridge is closed; while the core is
+     * still coming back, the new subscription fails the same way and asks
+     * again. One attempt at a time per stream.
+     */
+    private fun resubscribe(command: Int) {
+        if (closing.get() || !resubscribing.add(command)) {
+            return
+        }
+        scope.launch {
+            try {
+                delay(RESUBSCRIBE_FIRST_MS)
+                if (closing.get()) {
+                    return@launch
+                }
+                if (command == Libbox.CommandGroup) {
+                    val next = groupGeneration.incrementAndGet()
+                    release(groupClient)
+                    groupClient = open(Libbox.CommandGroup, GroupHandler(next))
+                } else {
+                    val next = connectionsGeneration.incrementAndGet()
+                    release(connectionsClient)
+                    connectionsClient = open(Libbox.CommandConnections, ConnectionHandler(next))
+                }
+            } catch (error: Exception) {
+                // The command server itself is gone; the status stream says
+                // so on its own, and there is nothing left to subscribe to.
+            } finally {
+                resubscribing.remove(command)
+            }
+        }
+    }
+
+    /** Lets go of a client whose stream has ended. */
+    private fun release(client: CommandClient?) {
+        client ?: return
+        runCatching { client.disconnect() }
+        synchronized(clients) { clients.remove(client) }
     }
 
     private fun reportLoss(message: String) {
@@ -328,7 +408,7 @@ internal class CoreEventBridge(
         }
     }
 
-    private inner class GroupHandler : CommandClientAdapter() {
+    private inner class GroupHandler(private val generation: Int) : CommandClientAdapter() {
         override fun writeGroups(message: OutboundGroupIterator) {
             val groups = mutableListOf<GroupSnapshot>()
             while (message.hasNext()) {
@@ -359,9 +439,15 @@ internal class CoreEventBridge(
             lastGroups = groups
             groupUpdates.tryEmit(groups)
         }
+
+        override fun disconnected(message: String?) {
+            if (generation == groupGeneration.get()) {
+                resubscribe(Libbox.CommandGroup)
+            }
+        }
     }
 
-    private inner class ConnectionHandler : CommandClientAdapter() {
+    private inner class ConnectionHandler(private val generation: Int) : CommandClientAdapter() {
         override fun writeConnectionEvents(events: ConnectionEvents) {
             synchronized(connections) {
                 if (events.reset) {
@@ -378,6 +464,12 @@ internal class CoreEventBridge(
                     }
                 }
                 connectionsDirty = true
+            }
+        }
+
+        override fun disconnected(message: String?) {
+            if (generation == connectionsGeneration.get()) {
+                resubscribe(Libbox.CommandConnections)
             }
         }
 
@@ -419,6 +511,7 @@ internal class CoreEventBridge(
         const val MILLIS_PER_SECOND = 1_000L
         const val CONNECT_ATTEMPTS = 20
         const val CONNECT_RETRY_MS = 100L
+        const val RESUBSCRIBE_FIRST_MS = 500L
         const val DEFAULT_NETWORK = "tcp"
     }
 }

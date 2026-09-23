@@ -261,8 +261,8 @@ class CommyVpnService : VpnService(), CommandServerHandler {
                 runCatching { server.startOrReloadService(config, noOverrides()) }
                     .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
             }
-            // After the start, not with the other streams: see startLogs.
-            events.startLogs()
+            // After the start, not before it: see startStreams.
+            events.startStreams()
 
             isCoreUp = true
             // getStartedAt comes from the core and is the honest answer; the

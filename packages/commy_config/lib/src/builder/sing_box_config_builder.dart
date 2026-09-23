@@ -128,9 +128,16 @@ class SingBoxConfigBuilder {
       ..add(<String, Object?>{
         SingBoxKeys.type: SingBoxKeys.typeSelector,
         SingBoxKeys.tag: SingBoxTags.proxyGroup,
+        // The chosen server first. The core measures a group in the order of
+        // this list, ten at a time, and "Check" waits on the chosen server's
+        // result: at the back of a long subscription it arrived after the
+        // wait was over, and a tunnel carrying traffic was reported as having
+        // no way out. Nothing else reads this order.
         SingBoxKeys.groupOutbounds: <String>[
           if (useAuto) SingBoxTags.autoGroup,
-          ...memberTags,
+          selectedTag,
+          for (final tag in memberTags)
+            if (tag != selectedTag) tag,
         ],
         SingBoxKeys.groupDefault: useAuto ? SingBoxTags.autoGroup : selectedTag,
       })

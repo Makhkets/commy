@@ -312,7 +312,7 @@ void main() {
 
       expect(json['tag'], 'node-7f3c1a');
       expect(json['url'], 'http://cp.cloudflare.com/generate_204');
-      expect(json['timeoutMs'], 5000);
+      expect(json['timeoutMs'], 10000);
       expect(json['group'], 'proxy');
     });
 
