@@ -304,12 +304,18 @@ import (
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "usage: probe get <url> | probe loop <url> <every-ms> <seconds>")
+		fmt.Fprintln(os.Stderr, "usage: probe get <url> | probe body <url> [host] | probe loop <url> <every-ms> <seconds>")
 		os.Exit(2)
 	}
 	switch os.Args[1] {
 	case "get":
 		os.Exit(get(os.Args[2]))
+	case "body":
+		host := ""
+		if len(os.Args) > 3 {
+			host = os.Args[3]
+		}
+		os.Exit(body(os.Args[2], host))
 	case "loop":
 		every, _ := strconv.Atoi(os.Args[3])
 		seconds, _ := strconv.Atoi(os.Args[4])
@@ -338,6 +344,33 @@ func get(url string) int {
 	}
 	fmt.Printf("OK %d bytes in %s, %.2f MB/s, sha256 %s\n", n, took.Round(time.Millisecond),
 		float64(n)/took.Seconds()/1e6, hex.EncodeToString(hash.Sum(nil)))
+	return 0
+}
+
+// body prints what one GET answers, with the Host header set by hand and no
+// redirect followed — how a probe that resolves no names asks an address
+// echo which server the traffic left through:
+//
+//	probe body 'http://208.95.112.1/line/?fields=query,country' ip-api.com
+func body(url, host string) int {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		fmt.Println("FAIL", err)
+		return 1
+	}
+	if host != "" {
+		req.Host = host
+	}
+	c := client(15 * time.Second)
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := c.Do(req)
+	if err != nil {
+		fmt.Println("FAIL", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 600))
+	fmt.Printf("HTTP %d\n%s\n", resp.StatusCode, data)
 	return 0
 }
 
