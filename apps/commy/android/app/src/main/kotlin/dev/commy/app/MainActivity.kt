@@ -1,6 +1,7 @@
 package dev.commy.app
 
 import android.content.Intent
+import android.os.Bundle
 import dev.commy.app.tunnel.TunnelController
 import dev.commy.app.wire.CommyChannels
 import io.flutter.embedding.android.FlutterActivity
@@ -22,6 +23,20 @@ class MainActivity : FlutterActivity() {
 
     private var channels: CommyChannels? = null
 
+    /**
+     * Whether this activity is being restored rather than launched.
+     *
+     * A restored activity is handed the intent it was first launched with, and
+     * publishing that again would repeat whatever it asked for — a "connect"
+     * the user has since undone, an import already done.
+     */
+    private var restored = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        restored = savedInstanceState != null
+        super.onCreate(savedInstanceState)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // Before the channels exist, so the first status Dart reads already
@@ -33,9 +48,11 @@ class MainActivity : FlutterActivity() {
         ).also {
             it.attach(this)
             // The intent that started us: a tapped vless:// link, a config
-            // file, or "connect" from the tile. Published now and replayed to
-            // Dart whenever it gets round to subscribing.
-            it.onIntent(intent)
+            // file, or "connect" from the tile. Published now and delivered
+            // once, whenever Dart gets round to subscribing.
+            if (!restored) {
+                it.onIntent(intent)
+            }
         }
     }
 
