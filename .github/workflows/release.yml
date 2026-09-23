@@ -201,21 +201,14 @@ jobs:
             else
               echo "See CHANGELOG.md for details."
             fi
+            # Short on purpose: the owner asked for release notes a person
+            # reads to the end. One line each for the two things a download
+            # needs to know.
             echo
             if [ "${{ needs.android.outputs.signed }}" != "true" ]; then
-              echo "> ⚠️ **This build is unsigned.** Android will refuse to install it over a"
-              echo "> signed build, and it is not suitable for distribution. It is here so the"
-              echo "> release pipeline stays honest, not because you should use it."
-              echo
+              echo '> Not signed with a release key: remove the previous version first.'
             fi
-            echo '## Verify your download'
-            echo
-            echo '```bash'
-            echo 'sha256sum -c SHA256SUMS.txt --ignore-missing'
-            echo '```'
-            echo
-            echo 'Commy is not a VPN service: it hosts no servers and ships no configurations.'
-            echo 'You bring your own.'
+            echo '> Checksum: `sha256sum -c SHA256SUMS.txt --ignore-missing`'
           } > release-notes.md
           cat release-notes.md
 
