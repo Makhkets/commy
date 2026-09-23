@@ -11,6 +11,19 @@ LogLine line(String message, {int second = 0}) => LogLine(
       tag: 'core',
     );
 
+/// Counts the lines put through the live view's redaction.
+class _CountingRedactor extends LogRedactor {
+  int viewCalls = 0;
+
+  @override
+  LogLine redactLine(LogLine line, {required bool forExport}) {
+    if (!forExport) {
+      viewCalls++;
+    }
+    return super.redactLine(line, forExport: forExport);
+  }
+}
+
 void main() {
   group('RingBufferLogRepository', () {
     test('read returns lines with credentials already removed', () async {
@@ -22,6 +35,41 @@ void main() {
 
       expect(lines, hasLength(1));
       expect(lines.single.message, isNot(contains(Fixtures.uuid)));
+      await repository.dispose();
+    });
+
+    test('redacts each line once, however often the view is sent', () async {
+      // The owner's report: "Check" on a connected tunnel froze the whole
+      // interface. Every appended line used to redact the full buffer again,
+      // so a burst of core lines into a full buffer cost millions of regular
+      // expression runs on the UI isolate.
+      final redactor = _CountingRedactor();
+      final repository = RingBufferLogRepository(redactor: redactor);
+      final subscription = repository.watch().listen((_) {});
+      await Future<void>.delayed(Duration.zero);
+
+      for (var i = 0; i < 300; i++) {
+        await repository.append(line('outbound connection $i'));
+      }
+      await Future<void>.delayed(Duration.zero);
+      await repository.read();
+
+      expect(redactor.viewCalls, 300);
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
+    test('the view keeps pace with the buffer as it drops lines', () async {
+      final repository = RingBufferLogRepository(capacity: 2);
+      await repository.appendAll(
+        <LogLine>[line('uuid=${Fixtures.uuid}'), line('b'), line('c')],
+      );
+
+      final messages =
+          (await repository.read()).valueOrNull!.map((entry) => entry.message);
+      expect(messages, <String>['b', 'c']);
+      final raw = (await repository.export(redact: false)).valueOrNull!;
+      expect(raw, isNot(contains(Fixtures.uuid)));
       await repository.dispose();
     });
 

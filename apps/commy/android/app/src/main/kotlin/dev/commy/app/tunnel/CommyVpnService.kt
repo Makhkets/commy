@@ -199,6 +199,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             "reload needs a running core",
         )
         withContext(Dispatchers.IO) {
+            bridge?.useConfig(config)
             runCatching { server.startOrReloadService(config, noOverrides()) }
                 .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
         }
@@ -254,6 +255,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             doze.attach(server)
 
             val events = CoreEventBridge(scope, ::onCoreLost, ::onTraffic)
+            withContext(Dispatchers.IO) { events.useConfig(config) }
             events.start()
             bridge = events
 

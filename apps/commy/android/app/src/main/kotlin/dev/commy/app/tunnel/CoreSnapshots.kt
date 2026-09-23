@@ -144,4 +144,42 @@ internal object CoreSnapshots {
         6 -> "trace"
         else -> null
     }
+
+    /** A threshold no line passes: the config switched the log off. */
+    const val LOG_NONE = -1
+
+    /** The app's default level, `info`, for before a config is known. */
+    const val LOG_INFO = 4
+
+    /**
+     * The most verbose level [config] asks for, numbered like [logLevelName].
+     *
+     * The core does not apply it to us. libbox hands its platform writer every
+     * line at every level (`log/observable.go`, v1.13.16) and leaves the choice
+     * to the client — sing-box's own app filters in its log screen. Ours did
+     * not filter at all, so an app set to `info` received every trace line the
+     * core wrote: per-packet Vision padding while traffic flowed, and a burst
+     * of several hundred lines whenever "Check" measured the servers. The
+     * config is the one place the user's choice is written down, so it is read
+     * from there: the same rules as `log.New` — off when disabled, the named
+     * level when there is one, trace when there is none.
+     */
+    fun logThreshold(config: String): Int {
+        val log = runCatching { JSONObject(config).optJSONObject("log") }.getOrNull()
+            ?: return LEVEL_TRACE
+        if (log.optBoolean("disabled")) {
+            return LOG_NONE
+        }
+        return when (log.optString("level")) {
+            "panic" -> 0
+            "fatal" -> 1
+            "error" -> 2
+            "warn", "warning" -> 3
+            "info" -> LOG_INFO
+            "debug" -> 5
+            else -> LEVEL_TRACE
+        }
+    }
+
+    private const val LEVEL_TRACE = 6
 }

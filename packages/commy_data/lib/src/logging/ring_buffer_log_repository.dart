@@ -15,7 +15,9 @@ import 'package:commy_domain/commy_domain.dart';
 /// Lines go in raw and come out redacted:
 ///
 /// * [watch] and [read] apply `LogRedactor.redact` — credentials gone, server
-///   addresses kept, because that is what makes the live view usable;
+///   addresses kept, because that is what makes the live view usable. That
+///   form is worked out once per line, on the way in, and kept beside the raw
+///   one;
 /// * [export] with `redact: true` additionally replaces the user's own server
 ///   addresses with `[server]`;
 /// * [export] with `redact: false` returns the raw buffer and is only ever
@@ -39,6 +41,17 @@ class RingBufferLogRepository implements LogRepository {
   final LogRedactor _redactor;
   final int _capacity;
   final Queue<LogLine> _buffer = Queue<LogLine>();
+
+  /// [_buffer] as the live view shows it, line for line.
+  ///
+  /// The view used to be redacted afresh on every append: the whole buffer,
+  /// two thousand lines through five regular expressions, on the UI isolate,
+  /// for each line the core wrote. A connected core writes steadily, and
+  /// "Check" measures every server at once — a burst of lines — so the
+  /// interface froze for seconds each time it was pressed, whether or not the
+  /// log screen was even open. Redacting once per line on the way in costs the
+  /// same line the same work exactly once.
+  final Queue<LogLine> _view = Queue<LogLine>();
   final StreamController<List<LogLine>> _changes =
       StreamController<List<LogLine>>.broadcast();
 
@@ -54,7 +67,7 @@ class RingBufferLogRepository implements LogRepository {
     // whatever is added while nobody is listening. A line written in that gap
     // would silently never appear in the log view.
     return Stream<List<LogLine>>.multi((controller) {
-      controller.add(_snapshot(forExport: false));
+      controller.add(_viewSnapshot());
       final subscription = _changes.stream.listen(
         controller.add,
         onError: controller.addError,
@@ -67,7 +80,7 @@ class RingBufferLogRepository implements LogRepository {
   @override
   Future<Result<List<LogLine>, CommyFailure>> read({int? limit}) async {
     return StorageGuard.runSync(() {
-      final all = _snapshot(forExport: false);
+      final all = _viewSnapshot();
       if (limit == null || limit >= all.length) {
         return all;
       }
@@ -78,7 +91,7 @@ class RingBufferLogRepository implements LogRepository {
   @override
   Future<Result<void, CommyFailure>> append(LogLine line) async {
     return StorageGuard.runVoidSync(() {
-      _buffer.addLast(line);
+      _add(line);
       _trim();
       _publish();
     });
@@ -92,7 +105,7 @@ class RingBufferLogRepository implements LogRepository {
   @override
   Future<Result<void, CommyFailure>> appendAll(Iterable<LogLine> lines) async {
     return StorageGuard.runVoidSync(() {
-      _buffer.addAll(lines);
+      lines.forEach(_add);
       _trim();
       _publish();
     });
@@ -102,6 +115,7 @@ class RingBufferLogRepository implements LogRepository {
   Future<Result<void, CommyFailure>> clear() async {
     return StorageGuard.runVoidSync(() {
       _buffer.clear();
+      _view.clear();
       _publish();
     });
   }
@@ -109,7 +123,12 @@ class RingBufferLogRepository implements LogRepository {
   @override
   Future<Result<String, CommyFailure>> export({required bool redact}) async {
     return StorageGuard.runSync(() {
-      final lines = redact ? _snapshot(forExport: true) : _buffer.toList();
+      final lines = redact
+          ? <LogLine>[
+              for (final line in _buffer)
+                _redactor.redactLine(line, forExport: true),
+            ]
+          : _buffer.toList();
       return lines.map(formatLine).join('\n');
     });
   }
@@ -134,22 +153,26 @@ class RingBufferLogRepository implements LogRepository {
     await _changes.close();
   }
 
+  void _add(LogLine line) {
+    _buffer.addLast(line);
+    _view.addLast(_redactor.redactLine(line, forExport: false));
+  }
+
   void _trim() {
     while (_buffer.length > _capacity) {
       _buffer.removeFirst();
+      _view.removeFirst();
     }
   }
 
-  List<LogLine> _snapshot({required bool forExport}) {
-    return List<LogLine>.unmodifiable(
-      _buffer.map((line) => _redactor.redactLine(line, forExport: forExport)),
-    );
-  }
+  List<LogLine> _viewSnapshot() => List<LogLine>.unmodifiable(_view);
 
   void _publish() {
-    if (_closed || _changes.isClosed) {
+    // Nobody watching is the usual case — the log screen is closed — and a
+    // snapshot nobody receives is two thousand references copied for nothing.
+    if (_closed || _changes.isClosed || !_changes.hasListener) {
       return;
     }
-    _changes.add(_snapshot(forExport: false));
+    _changes.add(_viewSnapshot());
   }
 }

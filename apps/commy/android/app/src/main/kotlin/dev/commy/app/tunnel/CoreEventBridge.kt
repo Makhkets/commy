@@ -77,6 +77,10 @@ internal class CoreEventBridge(
     @Volatile
     private var lastGroups: List<GroupSnapshot> = emptyList()
 
+    /** The most verbose log level passed on, see [CoreSnapshots.logThreshold]. */
+    @Volatile
+    private var logThreshold = CoreSnapshots.LOG_INFO
+
     /** When the url test round of each group began, in milliseconds. */
     private val rounds = mutableMapOf<String, Long>()
 
@@ -132,6 +136,11 @@ internal class CoreEventBridge(
             ConnectionHandler(connectionsGeneration.incrementAndGet()),
         )
         startConnectionTicker()
+    }
+
+    /** Reads the log level out of the config the core is about to run. */
+    fun useConfig(config: String) {
+        logThreshold = CoreSnapshots.logThreshold(config)
     }
 
     fun close() {
@@ -397,9 +406,13 @@ internal class CoreEventBridge(
 
     private inner class LogHandler : CommandClientAdapter() {
         override fun writeLogs(messageList: LogIterator) {
+            val threshold = logThreshold
             val lines = mutableListOf<Pair<String?, String>>()
             while (messageList.hasNext()) {
                 val entry = messageList.next()
+                if (entry.level > threshold) {
+                    continue
+                }
                 lines += CoreSnapshots.logLevelName(entry.level) to entry.message
             }
             if (lines.isNotEmpty()) {
