@@ -33,16 +33,21 @@ abstract final class AppRoutes {
   static const String about = '/settings/about';
 
   /// Core log, monospace, coloured by level.
-  static const String diagnosticsLogs = '/diagnostics/logs';
+  ///
+  /// Under `/settings` like every other section, so that the system Back from
+  /// a diagnostics tab lands on the settings it was opened from rather than
+  /// closing the app.
+  static const String diagnosticsLogs = '/settings/diagnostics/logs';
 
   /// Which rule matched which host.
-  static const String diagnosticsConnections = '/diagnostics/connections';
+  static const String diagnosticsConnections =
+      '/settings/diagnostics/connections';
 
   /// The generated configuration, read only, redacted.
-  static const String diagnosticsConfig = '/diagnostics/config';
+  static const String diagnosticsConfig = '/settings/diagnostics/config';
 
   /// Throughput over the last minute and the session totals.
-  static const String diagnosticsStats = '/diagnostics/stats';
+  static const String diagnosticsStats = '/settings/diagnostics/stats';
 
   /// The four diagnostics tabs, in the order the segmented control shows them.
   static const List<String> diagnosticsTabs = <String>[

@@ -399,14 +399,20 @@ void main() {
       await tapRail(tester, AppSection.settings);
 
       // `go`, not `push`. Two taps that pushed would leave Home under
-      // Routing under Settings, and the back arrow — which every section
-      // wires to its own parent — would be undoing a history of clicks.
+      // Routing under Settings, and Back — the system one as much as the
+      // arrow every section wires to its parent — would be undoing a history
+      // of clicks. What is under Settings is the place it belongs to, Home,
+      // and nothing the rail was tapped on before.
       expect(find.byType(SettingsScreen), findsOneWidget);
+      router.pop();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
       expect(
-        router.canPop(),
-        isFalse,
+        find.byType(HomeScreen),
+        findsOneWidget,
         reason: 'The rail is a place switcher, not a history.',
       );
+      expect(router.canPop(), isFalse);
     });
 
     testWidgets('below the breakpoint there is no rail to tap', (tester) async {
