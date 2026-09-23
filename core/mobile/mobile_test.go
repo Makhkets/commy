@@ -1,47 +1,78 @@
 package mobile_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Makhkets/commy/core/mobile"
 )
 
-// The app's end of the probe: the configuration goes in as a string, the
-// answer comes back as a JSON object the Kotlin side can read, and a server
-// named by host name is resolved by the system resolver — "localhost" here,
-// where on Android it is every server a panel hands out.
+// The app's end of the probe: the configuration goes in as a string, and
+// the answer comes back as a JSON object the Kotlin side can read.
 func TestURLTestOutboundsAnswersJSON(t *testing.T) {
-	seen := make(chan string, 4)
-	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen <- r.Method
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer page.Close()
-
+	page, seen := probePage(t)
 	proxy := socksServer(t)
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	refused := closedPort(t)
+
+	document := fmt.Sprintf(`{
+		"log": {"disabled": true},
+		"outbounds": [
+			{"type": "socks", "tag": "node-up", "server": "127.0.0.1", "server_port": %d},
+			{"type": "socks", "tag": "node-down", "server": "127.0.0.1", "server_port": %d}
+		]
+	}`, proxy, refused)
+
+	delays := urlTest(t, document, page+"/generate_204")
+	if delays["node-up"] <= 0 {
+		t.Errorf("the reachable server was not measured: %v", delays)
 	}
-	refused := listener.Addr().(*net.TCPAddr).Port
-	_ = listener.Close()
+	if delays["node-down"] != 0 {
+		t.Errorf("a refused server has a delay: %v", delays)
+	}
+	expectGet(t, seen)
+}
+
+// A server named by host name is resolved by the system resolver: "localhost"
+// here, where on Android it is every server a panel hands out — and where
+// sing-box's own "local" would read an /etc/resolv.conf that is not there.
+func TestURLTestOutboundsResolvesServerNames(t *testing.T) {
+	addresses, err := net.DefaultResolver.LookupNetIP(context.Background(), "ip", "localhost")
+	if err != nil || len(addresses) == 0 {
+		t.Skip("this machine does not resolve localhost")
+	}
+	page, seen := probePage(t)
+	// Both loopbacks, so whichever address the name comes back as, it
+	// reaches the server.
+	proxy := socksServer(t)
 
 	document := fmt.Sprintf(`{
 		"log": {"disabled": true},
 		"dns": {"servers": [{"type": "local", "tag": "dns-direct"}]},
 		"outbounds": [
-			{"type": "socks", "tag": "node-up", "server": "localhost", "server_port": %d},
-			{"type": "socks", "tag": "node-down", "server": "127.0.0.1", "server_port": %d}
+			{"type": "socks", "tag": "node-named", "server": "localhost", "server_port": %d}
 		],
 		"route": {"default_domain_resolver": {"server": "dns-direct"}}
-	}`, proxy, refused)
+	}`, proxy)
 
-	answer, err := mobile.URLTestOutbounds(document, page.URL+"/generate_204", 3000)
+	delays := urlTest(t, document, page+"/generate_204")
+	if delays["node-named"] <= 0 {
+		t.Errorf("the server behind a host name was not measured: %v "+
+			"(localhost is %v here)", delays, addresses)
+	}
+	expectGet(t, seen)
+}
+
+// urlTest runs the exported function and reads its answer. Ten seconds a
+// server: a race-detector build on a shared CI runner is slow.
+func urlTest(t *testing.T, document string, link string) map[string]int {
+	t.Helper()
+	answer, err := mobile.URLTestOutbounds(document, link, 10000)
 	if err != nil {
 		t.Fatalf("URLTestOutbounds: %v", err)
 	}
@@ -49,35 +80,77 @@ func TestURLTestOutboundsAnswersJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(answer), &delays); err != nil {
 		t.Fatalf("not a JSON object of delays: %q", answer)
 	}
-	if delays["node-up"] <= 0 {
-		t.Errorf("the server behind a host name was not measured: %s", answer)
-	}
-	if delays["node-down"] != 0 {
-		t.Errorf("a refused server has a delay: %s", answer)
-	}
-	if method := <-seen; method != http.MethodGet {
-		t.Errorf("the probe page was asked with %s", method)
+	return delays
+}
+
+// probePage answers 204 and reports the method of every request it gets.
+func probePage(t *testing.T) (string, <-chan string) {
+	t.Helper()
+	seen := make(chan string, 8)
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case seen <- r.Method:
+		default:
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(page.Close)
+	return page.URL, seen
+}
+
+// expectGet fails unless the probe page was asked, and asked with GET. It
+// never waits long: a request that did not arrive is a failure to report,
+// not a reason to hang the whole run.
+func expectGet(t *testing.T, seen <-chan string) {
+	t.Helper()
+	select {
+	case method := <-seen:
+		if method != http.MethodGet {
+			t.Errorf("the probe page was asked with %s", method)
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("the probe page was never asked")
 	}
 }
 
-// socksServer is a minimal SOCKS5 proxy: no authentication, CONNECT only.
+func closedPort(t *testing.T) int {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	_ = listener.Close()
+	return port
+}
+
+// socksServer is a minimal SOCKS5 proxy: no authentication, CONNECT only. It
+// listens on 127.0.0.1 and, where the machine has it, on [::1] at the same
+// port.
 func socksServer(t *testing.T) int {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = listener.Close() })
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				return
+	port := listener.Addr().(*net.TCPAddr).Port
+	listeners := []net.Listener{listener}
+	if v6, err := net.Listen("tcp", fmt.Sprintf("[::1]:%d", port)); err == nil {
+		listeners = append(listeners, v6)
+	}
+	for _, each := range listeners {
+		t.Cleanup(func() { _ = each.Close() })
+		go func() {
+			for {
+				conn, err := each.Accept()
+				if err != nil {
+					return
+				}
+				go serveSocks(conn)
 			}
-			go serveSocks(conn)
-		}
-	}()
-	return listener.Addr().(*net.TCPAddr).Port
+		}()
+	}
+	return port
 }
 
 func serveSocks(conn net.Conn) {
