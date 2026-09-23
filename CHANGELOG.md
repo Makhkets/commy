@@ -96,6 +96,20 @@ matching the tag out of this file and uses it as the release notes.
   yet", which on a second add is never, so the switch beside it worked and the
   interval silently did not.
 
+### Security
+
+- **Known, measured, not ours to fix: under Android's own kill switch, names
+  are still looked up in the clear while the tunnel is down.** With "Always-on
+  VPN" and "Block connections without VPN" set and the tunnel down — after
+  Disconnect, or in the seconds after the core crashed — connections are
+  blocked as they should be, but a DNS query an app makes still reaches the
+  network's resolver unencrypted: Android sends it from netd as uid 0, which
+  its lockdown exempts. Every VPN client on Android shares this; it was
+  reported publicly in 2024. Google Play services also keeps its own
+  connection outside the lockdown by platform privilege. Measurements and the
+  one mitigation an app could try — keeping a blocking TUN up while
+  disconnected, an owner's decision — are in docs/09-security-privacy.md.
+
 ### Fixed
 
 Found by running the app on an Android emulator against live servers of every
@@ -170,6 +184,24 @@ and most of them to anyone who does not unplug things on purpose.
   at boot or by an always-on start stayed in the shade under "Connected" until
   it was tapped. It is taken down when a tunnel comes up, and it is posted
   where it can be seen — no longer in the silent section of the shade.
+- **Sizes and speeds read in the reader's language.** A Russian screen said
+  `6.0 GB из 100 GB` and `37.1 KB/s`: Latin symbols and a decimal point, the
+  one line nobody had translated. It is `6,0 ГБ из 100 ГБ` and `37,1 КБ/с` now,
+  in the app and in the notification alike; English keeps `GB` and `KB/s`.
+- **Reconnecting no longer leaves a TUN interface behind.** Every stop or
+  reload of the core left the old interface in the system and a thread asleep
+  on its descriptor — five reconnects, five more interfaces. The fault is in
+  sing-tun: closing the gVisor stack wrapped the "detach" signal so that the
+  reader never saw it, and that reader kept the descriptor *number*, which the
+  next core reuses — a woken one could read a live socket or the new tunnel.
+  The same one-line fix upstream sing-tun carries is applied through the build
+  overlay, since v1.13.16 pins a sing-tun without it; a test against the
+  library fails without it. docs/adr/0012-gvisor-reader-stop.md.
+- **The routing screen explains a dropped rule in the reader's language.** The
+  banner above the rules had a Russian heading and, under it, the builder's own
+  English — "Rule "geosite:ru" needs geosite-ru, which is not on disk; the
+  rule was left out". The builder hands over what it dropped, not a sentence,
+  and the screen words it: `geosite:ru — нужно загрузить: geosite-ru`.
 
 - **REALITY keeps working against Xray 26.9.8 and later.** Found while testing
   XHTTP, and nothing to do with it: plain VLESS + REALITY stopped connecting to
@@ -181,9 +213,12 @@ and most of them to anyone who does not unplug things on purpose.
   stripped one only after a server has answered with somebody else's
   certificate; a timeout switches nothing. Tested against eight Xray
   generations from 1.8.4 to 26.9.9: all connect, the old ones on the second
-  attempt. Fingerprints other than `chrome` still fail on new servers — their
-  hellos have no such share in this uTLS — and that needs a core bump.
-  docs/adr/0011-reality-client-hello.md; **awaiting the owner's confirmation**.
+  attempt. In this uTLS only Chrome's hellos carry that share, and a REALITY
+  server does not check the fingerprint, so a REALITY server is now always
+  reached with `chrome`, whatever the link's `fp=` says; `firefox`, `safari`
+  and the rest failed on 26.9.x with a stranger's certificate. The link itself
+  — export, QR, copy — keeps what it had. docs/adr/0011-reality-client-hello.md,
+  confirmed by the owner.
 - **One malformed server no longer stops every other server connecting.** The
   document holds every stored server, so that switching does not mean
   reconnecting — and one entry the builder could not express (Reality with no
