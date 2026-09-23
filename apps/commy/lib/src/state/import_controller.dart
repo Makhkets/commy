@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -222,8 +223,41 @@ class ImportController extends Notifier<ImportState> {
     if (_alreadyRunning || input.trim().isEmpty) {
       return null;
     }
+    final subscription = subscriptionAddress(input);
+    if (subscription != null) {
+      return addSubscription(url: subscription);
+    }
     return _importText(_begin(), input);
   }
+
+  /// The address of a subscription, when [input] is one and nothing else.
+  ///
+  /// Every text-shaped way in arrives at [importText] — a link shared from a
+  /// panel's bot, the clipboard offer, a pasted line, a scanned QR code — and
+  /// a panel hands its subscription out as exactly such a line:
+  /// `https://panel.example/sub/<token>`. The link parser refuses it, rightly,
+  /// since it is not a proxy, and the import used to end on "the subscription
+  /// response could not be read" without asking the panel anything. Found on
+  /// the emulator by sharing the stand's subscription to the app.
+  ///
+  /// [HttpLinkParser.looksLikeProxy] draws the line the parser already draws:
+  /// a proxy names its port and has no path; a subscription has a path, or
+  /// leans on the default port.
+  static Uri? subscriptionAddress(String input) {
+    final text = input.trim();
+    if (text.isEmpty || text.contains(_whitespace)) {
+      return null;
+    }
+    final url = Uri.tryParse(text);
+    if (url == null ||
+        url.host.isEmpty ||
+        (url.scheme != 'http' && url.scheme != 'https')) {
+      return null;
+    }
+    return HttpLinkParser.looksLikeProxy(text) ? null : url;
+  }
+
+  static final RegExp _whitespace = RegExp(r'\s');
 
   /// Downloads [url] and stores it as a subscription.
   ///

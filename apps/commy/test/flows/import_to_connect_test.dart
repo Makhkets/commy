@@ -175,6 +175,49 @@ void main() {
     expect(harness.nodeRepository.nodes, isEmpty);
   });
 
+  // Found on the emulator: a subscription link shared from a panel's bot
+  // opened the paste sheet, and the import said the response could not be
+  // read — without having asked the panel anything.
+  test('a subscription address pasted as text is fetched as a subscription',
+      () async {
+    start();
+    harness.subscriptionFetcher.body = link;
+
+    final nodeId = await container
+        .read(importControllerProvider.notifier)
+        .importText('  https://panel.example.com/sub/token123\n');
+
+    expect(harness.subscriptionFetcher.requests, <Uri>[
+      Uri.parse('https://panel.example.com/sub/token123'),
+    ]);
+    expect(nodeId, isNotNull);
+    expect(harness.subscriptionRepository.items, hasLength(1));
+    expect(container.read(importControllerProvider).failure, isNull);
+  });
+
+  test('an http proxy link is still a proxy, not a subscription', () {
+    expect(
+      ImportController.subscriptionAddress('http://user:pw@1.2.3.4:8080'),
+      isNull,
+    );
+    expect(
+      ImportController.subscriptionAddress('https://panel.example/sub/t'),
+      Uri.parse('https://panel.example/sub/t'),
+    );
+    expect(
+      ImportController.subscriptionAddress('http://10.0.2.2:18080/sub/stand'),
+      Uri.parse('http://10.0.2.2:18080/sub/stand'),
+    );
+    expect(ImportController.subscriptionAddress(link), isNull);
+    expect(
+      ImportController.subscriptionAddress(
+        'https://a.example/sub/1\nhttps://b.example/sub/2',
+      ),
+      isNull,
+      reason: 'Two lines are a list for the parser, not one subscription.',
+    );
+  });
+
   test('connect with nothing selected asks the caller to import instead',
       () async {
     start();
