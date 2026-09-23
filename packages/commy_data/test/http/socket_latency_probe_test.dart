@@ -45,6 +45,50 @@ void main() {
       expect(elapsed, isNull);
     });
 
+    test('the clock starts after the name is resolved', () async {
+      // A cold lookup used to be timed with the handshake, and a batch that
+      // happened to resolve first looked four times further away than the
+      // same servers measured a moment later.
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((client) => client.destroy());
+      var lookedUp = false;
+      final probe = SocketLatencyProbe(
+        lookup: (host) async {
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+          lookedUp = true;
+          return <InternetAddress>[InternetAddress.loopbackIPv4];
+        },
+      );
+
+      final elapsed = await probe.connectTime(
+        InternetAddress.loopbackIPv4.address,
+        server.port,
+        timeout: const Duration(seconds: 2),
+      );
+
+      expect(lookedUp, isTrue);
+      expect(elapsed, isNotNull);
+      expect(elapsed, lessThan(const Duration(milliseconds: 400)));
+    });
+
+    test('a lookup that eats the whole budget is "did not answer"', () async {
+      final probe = SocketLatencyProbe(
+        lookup: (host) async {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          return <InternetAddress>[InternetAddress.loopbackIPv4];
+        },
+      );
+
+      final elapsed = await probe.connectTime(
+        'slow.example',
+        443,
+        timeout: const Duration(milliseconds: 200),
+      );
+
+      expect(elapsed, isNull);
+    });
+
     test('a name that does not resolve is "did not answer" too', () async {
       final elapsed = await probe.connectTime(
         'no-such-host.invalid',
