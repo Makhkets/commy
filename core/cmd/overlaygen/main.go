@@ -4,7 +4,7 @@
 //
 //	go run ./cmd/overlaygen -out build/_overlay
 //
-// There are three of them, and each is here because the alternative was worse.
+// There are five of them, and each is here because the alternative was worse.
 //
 // # XHTTP
 //
@@ -25,6 +25,30 @@
 // the client send the modern hello first and fall back to the stripped one
 // when, and only when, the server has answered with somebody else's
 // certificate. See docs/adr/0011-reality-client-hello.md.
+//
+// # The REALITY client version
+//
+// A REALITY client writes its version into the encrypted session ID, and the
+// server may refuse versions outside a range. sing-box writes 1.8.1 — and
+// Xray 26.7.28, when its owner sets no range, refuses everything below
+// 26.3.27: "other clients may be refused to connect". Every node of a panel
+// that updated to it answered this client with the cover site's certificate,
+// while clients on current Xray connected. The edit writes 26.9.9, the Xray
+// release whose REALITY client this one now matches — the hello above is
+// that release's. The server uses the number for nothing but the range. See
+// docs/adr/0013-reality-client-version.md.
+//
+// # The server the user picked
+//
+// With the cache file on, a selector starts on the outbound it last saw
+// selected — stored whenever a server is switched inside a running core —
+// and consults its configured default only when the cache holds nothing.
+// Commy writes the user's choice into that default on every start, from its
+// own settings. So a server picked while disconnected lost to the one last
+// switched to inside the previous session: the chip named one server and the
+// traffic went through another, or through one that was down. The edit
+// consults the cache only for a selector with no default. See
+// docs/adr/0014-selector-default.md.
 //
 // # The gVisor reader that outlives its stack
 //
@@ -187,6 +211,13 @@ var targets = []target{
 				anchor:      "\topts := x509.VerifyOptions{\n\t\tDNSName:       c.serverName,\n",
 				replacement: "\tc.refused = true // [commy]\n\topts := x509.VerifyOptions{\n\t\tDNSName:       c.serverName,\n",
 			},
+			{
+				anchor: "\thello.SessionId[0] = 1\n\thello.SessionId[1] = 8\n\thello.SessionId[2] = 1\n",
+				replacement: "\t// [commy] The client version a REALITY server reads. Upstream says\n" +
+					"\t// 1.8.1, and Xray 26.7.28 refuses anything below 26.3.27 unless its\n" +
+					"\t// owner opted out. See core/cmd/overlaygen.\n" +
+					"\thello.SessionId[0] = 26\n\thello.SessionId[1] = 9\n\thello.SessionId[2] = 9\n",
+			},
 		},
 	},
 	{
@@ -211,6 +242,23 @@ var targets = []target{
 				replacement: "\t\treturn v2rayhttpupgrade.NewClient(ctx, dialer, serverAddr, options.HTTPUpgradeOptions, tlsConfig)\n" +
 					"\tcase xhttpconfig.TransportType:\n" +
 					"\t\treturn xhttp.NewClient(ctx, dialer, serverAddr, options.XHTTPOptions, tlsConfig)\n",
+			},
+		},
+	},
+	{
+		module: singBox,
+		path:   "protocol/group/selector.go",
+		sha256: "12ba424ed8a9ee3f560f008e5f2c0c116ae6b9538ea6b688240dd8d96a0eda52",
+		edits: []edit{
+			{
+				anchor: "\tif s.Tag() != \"\" {\n\t\tcacheFile := service.FromContext[adapter.CacheFile](s.ctx)\n" +
+					"\t\tif cacheFile != nil {\n\t\t\tselected := cacheFile.LoadSelected(s.Tag())\n",
+				replacement: "\t// [commy] The configuration's default is the user's choice, made in\n" +
+					"\t// the app while no core ran; the cache holds the last one made inside\n" +
+					"\t// a running core. See core/cmd/overlaygen.\n" +
+					"\tif s.Tag() != \"\" && s.defaultTag == \"\" {\n" +
+					"\t\tcacheFile := service.FromContext[adapter.CacheFile](s.ctx)\n" +
+					"\t\tif cacheFile != nil {\n\t\t\tselected := cacheFile.LoadSelected(s.Tag())\n",
 			},
 		},
 	},

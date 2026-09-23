@@ -91,10 +91,11 @@ sync_modules() {
 }
 
 # Teaches the pinned sing-box the XHTTP transport without forking it — and
-# carries the two fixes that ride the same mechanism: the REALITY ClientHello
-# (ADR-0011) and the gVisor reader that outlived its stack (ADR-0012).
+# carries the fixes that ride the same mechanism: the REALITY ClientHello
+# (ADR-0011) and client version (ADR-0013), the selector that started on its
+# cache (ADR-0014), and the gVisor reader that outlived its stack (ADR-0012).
 #
-# core/cmd/overlaygen patches four upstream files, three in sing-box and one
+# core/cmd/overlaygen patches five upstream files, four in sing-box and one
 # in sing-tun, and writes a `go build -overlay` map. The modules in go.mod stay
 # the published versions; the transport itself is ordinary code in core/xhttp.
 #
@@ -115,7 +116,7 @@ readonly XHTTP_MARKER='commy/core/xhttp.NewClient'
 OVERLAY=""
 
 prepare_overlay() {
-  say "generating the build overlay (XHTTP, REALITY hello, gVisor reader stop)"
+  say "generating the build overlay (XHTTP, REALITY, selector default, gVisor reader)"
   # `_overlay`, not `overlay`: Go skips directories that start with an
   # underscore, and these files must not be mistaken for packages of core/.
   OVERLAY="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen -out "${BUILD_DIR}/_overlay")" \

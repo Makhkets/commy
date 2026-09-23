@@ -76,8 +76,10 @@ jobs:
       # notices a sing-box bump that moved them: overlaygen refuses a file
       # whose hash it does not know. The tagged tests then go through the
       # libraries themselves — a real sing-box instance, a VLESS outbound over
-      # XHTTP, traffic in every mode; and a gVisor stack that must stop
-      # reading its device once closed.
+      # XHTTP, traffic in every mode; a gVisor stack that must stop reading
+      # its device once closed; a REALITY client that Xray's default
+      # version floor lets through; and a selector that starts on the
+      # server the configuration names.
       - name: Build overlay applies, and the edits hold in the libraries
         working-directory: core
         run: |
@@ -85,7 +87,7 @@ jobs:
           OVERLAY=$(go run ./cmd/overlaygen -out build/_overlay)
           GODEBUG=goindex=0 go test -overlay="$OVERLAY" \
             -tags "$TAGS,commy_overlay" -ldflags "-checklinkname=0" \
-            ./xhttp/ ./internal/singtun/
+            ./xhttp/ ./internal/singtun/ ./internal/singbox/
 
       - name: Typecheck for android/arm64
         working-directory: core

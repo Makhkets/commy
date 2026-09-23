@@ -46,3 +46,5 @@
 | [0010](0010-xhttp-transport.md) | Транспорт XHTTP: свой клиент в `core/xhttp`, в sing-box — оверлеем сборки | Accepted |
 | [0011](0011-reality-client-hello.md) | ClientHello REALITY: сначала современный, обрезанный — после отказа сервера; для REALITY всегда отпечаток `chrome` | Accepted (владелец, 2026-09-23) |
 | [0012](0012-gvisor-reader-stop.md) | Читатель gVisor, переживший стек: правка sing-tun оверлеем | Accepted (2026-09-23) |
+| [0013](0013-reality-client-version.md) | Версия клиента в REALITY: 26.9.9 вместо 1.8.1 (порог Xray 26.7.28) | Accepted (2026-09-23) |
+| [0014](0014-selector-default.md) | Селектор стартует на выборе пользователя, а не на кэше ядра | Accepted (2026-09-23) |
