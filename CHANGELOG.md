@@ -98,6 +98,79 @@ matching the tag out of this file and uses it as the release notes.
 
 ### Fixed
 
+Found by running the app on an Android emulator against live servers of every
+protocol on the list (session 15). Each one was invisible to the unit tests,
+and most of them to anyone who does not unplug things on purpose.
+
+- **After a crash the notification no longer says "Connected".** The core
+  lives in the app's process, so when that process dies — a Go panic, the
+  low-memory killer — the tunnel dies with it and every app goes back to the
+  open network. Android kept the last notification up regardless: "Connected",
+  a speed and a Disconnect button, over a device that was not protected, for as
+  long as nothing started the app again. The service is sticky now, so the
+  system restarts it to report the loss ("The tunnel stopped — apps are using
+  the network without the proxy", or, under the system kill switch, "nothing
+  reaches the network until it is back"); and where Android 16 skips that
+  restart — its VPN code unbinds from the service at the instant the process
+  dies, which leaves the service record behind — the next start of the app
+  clears the stale notification and opens on "The core stopped unexpectedly"
+  instead of a quiet "Disconnected".
+- **The core's log reaches the log screen.** Not one line of it ever arrived
+  in a release build: the log stream was opened before the core started,
+  libbox refuses that request until the service is up, and the stream ended
+  there without a word — so the screen showed the app's own lines and none of
+  the core's. It opens after the start now, and begins with everything the
+  core kept from start-up.
+- **A subscription link shared to the app, pasted or scanned is imported as a
+  subscription.** Sharing the link from a panel's bot opened the paste sheet,
+  and the import answered "the subscription response could not be read"
+  without asking the panel anything: the text went to the proxy-link parser,
+  which rightly refused it. A single http(s) line that is not a proxy is now
+  fetched as the subscription it is.
+- **"Check" reports a working tunnel as working.** The core measures a whole
+  group at once and reports each server as it finishes; the app read the first
+  report and looked for the server it had asked about, which was usually still
+  in flight — so the check failed on every press, while traffic flowed. It now
+  waits for that server's own fresh result. "Measure all" with the tunnel up
+  asked for one full round per server — nine servers, eighty-one probes — and
+  now shares one round.
+- **The system Back button no longer closes the app.** Every screen was a
+  sibling route, so Back — the gesture people use far more than the arrow on
+  screen — had nothing to return to from Settings, Routing, DNS or Diagnostics
+  and left the app. The routes are nested the way the paths always read.
+- **A tap on "open the app to connect" connects.** The notification after a
+  reboot, the one after a crash and the Quick Settings tile all open the app
+  with a connect request, and that request arrived before the database had
+  answered: no selection, no servers, nothing done. It waits for them now.
+- **A connect is not repeated behind the user's back.** The last system intent
+  was replayed to every new Flutter engine for the life of the process — and
+  the process outlives the screen whenever a tunnel is up. Open the app from
+  the notification, disconnect, press Back, open it again: the tunnel came back
+  up on its own. A tapped `vless://` link reopened its import sheet the same
+  way. Each intent is delivered once now.
+- **The panel's announcement is shown.** The subscription card has had a place
+  for the `announce` header since the card existed, and nothing ever filled
+  it: the header was parsed and then dropped on the way to the database. It
+  arrives now, and goes away when the panel stops sending it.
+- **Ping without a tunnel measures the server, not the resolver.** The name
+  was resolved inside the timed window, so the first batch of "measure all"
+  paid for every cold lookup — 196 ms against 44 for identical servers on one
+  host — and sorting by latency sorted by who went first.
+- **Hysteria2 and TUIC are not labelled TCP.** Every server whose link names
+  no transport was described as TCP, including the two that have no TCP port;
+  they read QUIC now, and WireGuard UDP.
+- **"App not supported" says why when the device identifier is off.** That is
+  word for word what a panel with a device limit sends a client without
+  `x-hwid`; with the switch off, the card and the import sheet now say so, and
+  the card turns it back on and refreshes in one tap.
+- **The IP check names its host.** docs/09 asks that the user see where an
+  exception's request goes before it goes; the row in the silence panel said
+  when and never where. It reads `ipinfo.io · only when you tap` now.
+- **"Commy is not connected" does not outlive a connection.** The prompt posted
+  at boot or by an always-on start stayed in the shade under "Connected" until
+  it was tapped. It is taken down when a tunnel comes up, and it is posted
+  where it can be seen — no longer in the silent section of the shade.
+
 - **REALITY keeps working against Xray 26.9.8 and later.** Found while testing
   XHTTP, and nothing to do with it: plain VLESS + REALITY stopped connecting to
   a current Xray. sing-box strips the `X25519MLKEM768` key share from its
