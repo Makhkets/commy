@@ -2,6 +2,7 @@ import 'package:commy_domain/src/core/json_map.dart';
 import 'package:commy_domain/src/core/json_read.dart';
 import 'package:commy_domain/src/entities/log_line.dart';
 import 'package:commy_domain/src/entities/node_sort.dart';
+import 'package:commy_domain/src/entities/ping_method.dart';
 
 /// Theme preference. Deliberately not Flutter's `ThemeMode`: rule R5.
 enum AppThemeMode {
@@ -44,6 +45,7 @@ class AppSettings {
     this.hideUnavailable = false,
     this.sendDeviceId = true,
     this.nodeSort = NodeSort.panel,
+    this.pingMethod = PingMethod.get,
     this.latencyProbeUrl = defaultLatencyProbeUrl,
     this.ipCheckUrl = '',
     this.ruleSetSource = defaultRuleSetSource,
@@ -70,6 +72,9 @@ class AppSettings {
         sendDeviceId: JsonRead.boolean(json, 'sendDeviceId', orElse: true),
         nodeSort: NodeSort.values.byName(
           JsonRead.stringOr(json, 'nodeSort', orElse: 'panel'),
+        ),
+        pingMethod: PingMethod.fromName(
+          JsonRead.stringOrNull(json, 'pingMethod'),
         ),
         latencyProbeUrl: JsonRead.stringOr(
           json,
@@ -180,10 +185,16 @@ class AppSettings {
   /// How the servers inside each list are ordered.
   final NodeSort nodeSort;
 
+  /// How servers are timed. See [PingMethod].
+  final PingMethod pingMethod;
+
   /// URL the latency test requests through the proxy.
   ///
-  /// Empty disables the test. The request never leaves the tunnel, so it is
-  /// not a rule R1 exception — it is the user's own server being measured.
+  /// Empty disables the test. The request only ever goes through the user's
+  /// server — through the tunnel, or through a probe instance of the core
+  /// when [pingMethod] is [PingMethod.get] and no tunnel is up — so it is not
+  /// a rule R1 exception: the device talks to the host the user entered, and
+  /// that host fetches the page.
   final String latencyProbeUrl;
 
   /// URL the external IP check requests. Empty by default, and it stays empty
@@ -246,6 +257,7 @@ class AppSettings {
     bool? hideUnavailable,
     bool? sendDeviceId,
     NodeSort? nodeSort,
+    PingMethod? pingMethod,
     String? latencyProbeUrl,
     String? ipCheckUrl,
     String? ruleSetSource,
@@ -264,6 +276,7 @@ class AppSettings {
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
       sendDeviceId: sendDeviceId ?? this.sendDeviceId,
       nodeSort: nodeSort ?? this.nodeSort,
+      pingMethod: pingMethod ?? this.pingMethod,
       latencyProbeUrl: latencyProbeUrl ?? this.latencyProbeUrl,
       ipCheckUrl: ipCheckUrl ?? this.ipCheckUrl,
       ruleSetSource: ruleSetSource ?? this.ruleSetSource,
@@ -284,6 +297,7 @@ class AppSettings {
         'hideUnavailable': hideUnavailable,
         'sendDeviceId': sendDeviceId,
         'nodeSort': nodeSort.name,
+        'pingMethod': pingMethod.name,
         'latencyProbeUrl': latencyProbeUrl,
         'ipCheckUrl': ipCheckUrl,
         'ruleSetSource': ruleSetSource,
@@ -305,6 +319,7 @@ class AppSettings {
           other.hideUnavailable == hideUnavailable &&
           other.sendDeviceId == sendDeviceId &&
           other.nodeSort == nodeSort &&
+          other.pingMethod == pingMethod &&
           other.latencyProbeUrl == latencyProbeUrl &&
           other.ipCheckUrl == ipCheckUrl &&
           other.ruleSetSource == ruleSetSource &&
@@ -323,6 +338,7 @@ class AppSettings {
         hideUnavailable,
         sendDeviceId,
         nodeSort,
+        pingMethod,
         latencyProbeUrl,
         ipCheckUrl,
         ruleSetSource,

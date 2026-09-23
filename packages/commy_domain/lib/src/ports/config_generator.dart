@@ -27,4 +27,16 @@ abstract interface class ConfigGenerator {
     required AppSettings settings,
     required bool includeClashApi,
   });
+
+  /// Builds a configuration that carries [nodes]' outbounds and nothing else,
+  /// for `CoreClient.probeOutbounds`.
+  ///
+  /// Each outbound exactly as a tunnel would carry it — same transport, same
+  /// TLS, same fingerprint — so a server measured here is the server a
+  /// connect would reach. Server names are resolved the way the tunnel
+  /// resolves them outside itself, by [dns]'s direct resolver.
+  Result<CoreConfig, CommyFailure> buildProbe({
+    required List<ProxyNode> nodes,
+    required DnsSettings dns,
+  });
 }

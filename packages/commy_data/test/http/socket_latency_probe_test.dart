@@ -99,4 +99,44 @@ void main() {
       expect(elapsed, isNull);
     });
   });
+
+  group('SocketLatencyProbe.echoTime', () {
+    test('hands the echo to the platform, with the deadline', () async {
+      final asked = <String>[];
+      final probe = SocketLatencyProbe(
+        echo: (host, {required timeout}) async {
+          asked.add('$host ${timeout.inMilliseconds}');
+          return const Duration(milliseconds: 23);
+        },
+      );
+
+      final elapsed = await probe.echoTime(
+        '45.151.180.167',
+        timeout: const Duration(seconds: 5),
+      );
+
+      expect(elapsed, const Duration(milliseconds: 23));
+      expect(asked, <String>['45.151.180.167 5000']);
+    });
+
+    test('without a platform to send it, no echo is "did not answer"',
+        () async {
+      expect(
+        await const SocketLatencyProbe()
+            .echoTime('a.example', timeout: const Duration(seconds: 1)),
+        isNull,
+      );
+    });
+
+    test('a platform that throws is "did not answer" as well', () async {
+      final probe = SocketLatencyProbe(
+        echo: (host, {required timeout}) async => throw StateError('no'),
+      );
+
+      expect(
+        await probe.echoTime('a.example', timeout: const Duration(seconds: 1)),
+        isNull,
+      );
+    });
+  });
 }

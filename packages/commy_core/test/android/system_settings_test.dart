@@ -61,6 +61,48 @@ void main() {
     });
   });
 
+  group('ping', () {
+    test('sends the host and the deadline, and reads the echo back',
+        () async {
+      messenger.setMockMethodCallHandler(method, (call) async {
+        calls.add(call);
+        return '{"delayMs":38}';
+      });
+
+      final delay = await const SystemSettings().ping(
+        '45.151.180.167',
+        timeout: const Duration(seconds: 5),
+      );
+
+      expect(delay, const Duration(milliseconds: 38));
+      expect(calls.single.method, WireMethods.ping);
+      expect(
+        calls.single.arguments,
+        '{"host":"45.151.180.167","timeoutMs":5000}',
+      );
+    });
+
+    test('no echo is null, and so is a platform without the method',
+        () async {
+      messenger.setMockMethodCallHandler(
+        method,
+        (call) async => '{"delayMs":null}',
+      );
+      expect(
+        await const SystemSettings()
+            .ping('a.example', timeout: const Duration(seconds: 1)),
+        isNull,
+      );
+
+      messenger.setMockMethodCallHandler(method, null);
+      expect(
+        await const SystemSettings()
+            .ping('a.example', timeout: const Duration(seconds: 1)),
+        isNull,
+      );
+    });
+  });
+
   group('installedApps', () {
     void answer(String payload) {
       messenger.setMockMethodCallHandler(method, (call) async {

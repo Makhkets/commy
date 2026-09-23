@@ -301,6 +301,27 @@ void main() {
     });
   });
 
+  group('ProbeCodec', () {
+    test('a delay of zero is no answer, and so is anything not a number', () {
+      expect(
+        ProbeCodec.decodeOutbounds('{"a":140,"b":0,"c":null,"d":"x"}'),
+        <String, Duration?>{
+          'a': const Duration(milliseconds: 140),
+          'b': null,
+          'c': null,
+          'd': null,
+        },
+      );
+    });
+
+    test('an answer that is not an object is a format error', () {
+      expect(
+        () => ProbeCodec.decodeOutbounds('[1,2]'),
+        throwsA(isA<WireFormatException>()),
+      );
+    });
+  });
+
   group('UrlTestCodec', () {
     test('builds the argument the protocol document specifies', () {
       final json = jsonDecode(

@@ -69,9 +69,9 @@
     "switched": "Switched to $name",
     "switchedToAuto": "The server is now chosen automatically",
     "measuring": "Measured $done of $total",
-    "measureNeedsTunnel(plural, param=count)": {
-      "one": "$count server can only be measured while connected",
-      "other": "$count servers can only be measured while connected"
+    "measureSkippedUdp(plural, param=count)": {
+      "one": "$count UDP server cannot be timed over TCP — pick GET or ICMP under Ping",
+      "other": "$count UDP servers cannot be timed over TCP — pick GET or ICMP under Ping"
     },
     "settingsApplied": "Settings applied to the tunnel"
   },
@@ -340,6 +340,15 @@
       "hideUnavailableHint": "Servers that did not answer a probe",
       "allowLan": "Allow LAN access",
       "allowLanHint": "The proxy listens beyond localhost"
+    },
+    "ping": {
+      "title": "Ping",
+      "get": "GET through the server",
+      "getHint": "A request through the server itself: shows whether it really works. Works without connecting too",
+      "tcp": "TCP",
+      "tcpHint": "How fast the server accepts a connection, measured directly. Quick, but does not check that it carries traffic",
+      "icmp": "ICMP",
+      "icmpHint": "A plain ping to the server's address. Many servers do not answer it"
     },
     "reset": {
       "title": "Reset",

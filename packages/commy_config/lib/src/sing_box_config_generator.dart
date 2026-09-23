@@ -58,4 +58,11 @@ class SingBoxConfigGenerator implements ConfigGenerator {
     );
     return result.map((built) => built.config);
   }
+
+  @override
+  Result<CoreConfig, CommyFailure> buildProbe({
+    required List<ProxyNode> nodes,
+    required DnsSettings dns,
+  }) =>
+      builder.buildProbe(nodes: nodes, dns: dns);
 }

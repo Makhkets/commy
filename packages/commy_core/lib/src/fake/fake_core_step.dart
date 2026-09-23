@@ -23,4 +23,8 @@ enum FakeCoreStep {
 
   /// `proxies`.
   proxies,
+
+  /// `probeOutbounds`. A server that did not answer is `null` in the answer,
+  /// set through `FakeCoreClient.setLatency`, and not a failure.
+  probeOutbounds,
 }

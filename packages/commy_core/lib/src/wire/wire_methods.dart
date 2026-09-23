@@ -4,9 +4,9 @@
 /// one means editing the Kotlin side, this list and `docs/wire-protocol.md` in
 /// the same pull request.
 ///
-/// [openVpnSettings], [setStartOnBoot] and [installedApps] are not tunnel
-/// commands, and they are counted separately for that reason — see their own
-/// notes below.
+/// [openVpnSettings], [setStartOnBoot], [installedApps], [deviceInfo],
+/// [probeOutbounds] and [ping] are not tunnel commands, and they are counted
+/// separately for that reason — see their own notes below.
 abstract final class WireMethods {
   /// Brings the tunnel up. Argument: the configuration JSON, as a string.
   static const String start = 'start';
@@ -67,4 +67,21 @@ abstract final class WireMethods {
   /// boot for nothing, and one disabled while the switch is on is a promise
   /// the settings screen makes and nobody keeps.
   static const String setStartOnBoot = 'setStartOnBoot';
+
+  /// Measures every outbound of a configuration by a GET through it, in a
+  /// core instance of its own. Argument: `{config, url, timeoutMs}`, where
+  /// `config` is the configuration JSON as a string. Result: `{tag: ms}`,
+  /// 0 for a server that did not answer.
+  ///
+  /// Not a tunnel command: it runs with or without a tunnel and never touches
+  /// one. It is how the "Ping" setting's GET has an answer before the user
+  /// connects — see `CoreClient.probeOutbounds`.
+  static const String probeOutbounds = 'probeOutbounds';
+
+  /// One ICMP echo. Argument: `{host, timeoutMs}`. Result: `{delayMs}`, `null`
+  /// for no echo.
+  ///
+  /// Not a tunnel command either: the "Ping" setting's ICMP method.
+  /// `dart:io` has no ICMP socket.
+  static const String ping = 'ping';
 }

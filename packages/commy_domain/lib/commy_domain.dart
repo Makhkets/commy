@@ -26,6 +26,7 @@ export 'src/entities/node_label.dart';
 export 'src/entities/node_sort.dart';
 export 'src/entities/panel_notice.dart';
 export 'src/entities/parse_outcome.dart';
+export 'src/entities/ping_method.dart';
 export 'src/entities/protocol.dart';
 export 'src/entities/proxy_group.dart';
 export 'src/entities/proxy_node.dart';

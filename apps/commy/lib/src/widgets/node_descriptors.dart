@@ -46,7 +46,7 @@ abstract final class NodeDescriptors {
   ///
   /// Every row used to fall back to "TCP", which put `HYSTERIA2 · TCP` under
   /// a server that has no TCP port at all. Exhaustive on purpose, like
-  /// `MeasureLatencyUseCase.isDirectlyMeasurable`: a protocol added later has
+  /// `MeasureLatencyUseCase.acceptsTcp`: a protocol added later has
   /// to be placed by whoever adds it.
   static String _carriedOver(Protocol protocol) => switch (protocol) {
         Protocol.hysteria2 || Protocol.tuic => 'QUIC',

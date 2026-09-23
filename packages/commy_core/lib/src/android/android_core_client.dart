@@ -4,6 +4,7 @@ import 'package:commy_core/src/core_client_exception.dart';
 import 'package:commy_core/src/logging/app_logger.dart';
 import 'package:commy_core/src/wire/connection_info_codec.dart';
 import 'package:commy_core/src/wire/log_line_codec.dart';
+import 'package:commy_core/src/wire/probe_codec.dart';
 import 'package:commy_core/src/wire/proxy_group_codec.dart';
 import 'package:commy_core/src/wire/select_codec.dart';
 import 'package:commy_core/src/wire/traffic_sample_codec.dart';
@@ -152,6 +153,22 @@ class AndroidCoreClient implements CoreClient {
       ),
     );
     return _read(WireMethods.urlTest, () => UrlTestCodec.decodeDelay(raw));
+  }
+
+  @override
+  Future<Map<String, Duration?>> probeOutbounds(
+    CoreConfig config, {
+    required Uri probe,
+    required Duration timeout,
+  }) async {
+    final raw = await _invoke(
+      WireMethods.probeOutbounds,
+      ProbeCodec.encodeOutbounds(config, probe: probe, timeout: timeout),
+    );
+    return _read(
+      WireMethods.probeOutbounds,
+      () => ProbeCodec.decodeOutbounds(raw),
+    );
   }
 
   @override

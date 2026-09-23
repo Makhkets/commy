@@ -155,13 +155,15 @@ final switchNodeUseCaseProvider = Provider<SwitchNodeUseCase>((ref) {
   );
 });
 
-/// Measures one node and stores the result.
+/// Measures one node, the way the "Ping" setting says, and stores the result.
 final measureLatencyUseCaseProvider = Provider<MeasureLatencyUseCase>((ref) {
   return MeasureLatencyUseCase(
     core: ref.watch(coreClientProvider),
     probe: ref.watch(latencyProbeProvider),
     nodes: ref.watch(nodeRepositoryProvider),
     settings: ref.watch(settingsRepositoryProvider),
+    routing: ref.watch(routingRepositoryProvider),
+    generator: ref.watch(configGeneratorProvider),
   );
 });
 
@@ -174,13 +176,15 @@ final checkReachabilityUseCaseProvider =
   );
 });
 
-/// Times a server's TCP handshake while there is no core to measure through.
+/// Times a server directly: its TCP handshake, or an ICMP echo, which the
+/// platform sends (`SystemSettings.ping`).
 ///
 /// A provider of its own so a test can put a scripted probe in its place: the
 /// real one opens a socket, and a widget test that dials out is rule R1 with a
 /// different blast radius.
 final latencyProbeProvider = Provider<LatencyProbe>((ref) {
-  return const SocketLatencyProbe();
+  final system = ref.watch(systemSettingsProvider);
+  return SocketLatencyProbe(echo: system.ping);
 });
 
 /// Exception E-1, the external IP check — the data half.

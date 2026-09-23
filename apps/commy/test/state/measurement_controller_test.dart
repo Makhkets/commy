@@ -8,11 +8,13 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/commy_test_app.dart';
 
 /// Queue item #7: «Замерить все» ran one probe at a time, reported nothing
-/// and could not be stopped.
+/// and could not be stopped. And the owner's "Ping" setting (2026-09-23): a
+/// GET through the server by default, TCP or ICMP by choice — whether or not
+/// the tunnel is up.
 ///
-/// The batching is not a detail that can be taken on trust — it is the whole
-/// point of the change — so the test watches the progress counter and asserts
-/// the steps it moves in.
+/// The progress is not a detail that can be taken on trust — it is what the
+/// user watches — so the test follows the counter and asserts the steps it
+/// moves in.
 void main() {
   late CommyTestHarness harness;
   late ProviderContainer container;
@@ -22,8 +24,23 @@ void main() {
           testNode(id: 'node-$index', name: 'Server $index', latency: null),
       ];
 
-  Future<void> start(List<ProxyNode> nodes) async {
-    harness = CommyTestHarness(nodes: nodes);
+  ProxyNode udpNode() => const ProxyNode(
+        id: 'node-udp',
+        name: 'Hysteria',
+        protocol: Protocol.hysteria2,
+        host: 'hy.example.net',
+        port: 8443,
+      );
+
+  Future<void> start(
+    List<ProxyNode> nodes, {
+    bool connect = false,
+    PingMethod method = PingMethod.get,
+  }) async {
+    harness = CommyTestHarness(
+      nodes: nodes,
+      settings: AppSettings(pingMethod: method),
+    );
     container = ProviderContainer(overrides: harness.overrides());
     addTearDown(() async {
       container.dispose();
@@ -32,20 +49,23 @@ void main() {
     final handles = <ProviderSubscription<Object?>>[
       container.listen(nodesProvider, (_, __) {}),
       container.listen(coreStatusProvider, (_, __) {}),
+      container.listen(settingsProvider, (_, __) {}),
     ];
     addTearDown(() {
       for (final handle in handles) {
         handle.close();
       }
     });
-    // The core only answers a url test while it is running, which is also
-    // true of the real one.
-    await container.read(tunnelControllerProvider.notifier).connect(
-          nodeId: nodes.first.id,
-        );
-    await harness.core.status
-        .firstWhere((status) => status is TunnelConnected)
-        .timeout(const Duration(seconds: 5));
+    await container.read(nodesProvider.future);
+    await container.read(settingsProvider.future);
+    if (connect) {
+      await container.read(tunnelControllerProvider.notifier).connect(
+            nodeId: nodes.first.id,
+          );
+      await harness.core.status
+          .firstWhere((status) => status is TunnelConnected)
+          .timeout(const Duration(seconds: 5));
+    }
   }
 
   MeasurementController controller() =>
@@ -66,17 +86,17 @@ void main() {
     return steps;
   }
 
-  test('probes run in batches, not one at a time', () async {
+  test('the counter moves one server at a time, several in flight', () async {
     final nodes = manyNodes(10);
     await start(nodes);
     final steps = watchProgress();
 
     await controller().measureAll(nodes, scopeId: 'sub-1');
 
-    // 0 when the run is announced, then one step per batch of four, with the
-    // last batch short.
-    expect(steps, <int>[0, 4, 8, 10]);
-    expect(MeasurementController.batchSize, 4);
+    // 0 when the run is announced, then every server as it comes back: a
+    // slow one holds its own slot, not a whole batch.
+    expect(steps, <int>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(MeasurementController.inFlight, 6);
   });
 
   test('every node ends up with a measurement, and the run ends idle',
@@ -93,7 +113,8 @@ void main() {
     );
   });
 
-  test('cancelling stops the run and leaves the rest unmeasured', () async {
+  test('cancelling starts nothing more and leaves the rest unmeasured',
+      () async {
     final nodes = manyNodes(12);
     await start(nodes);
     final handle = container.listen<MeasurementState>(
@@ -110,12 +131,16 @@ void main() {
 
     final state = container.read(measurementProvider);
     expect(state.isRunning, isFalse);
+    // What was already in flight is kept — a measurement that came back is
+    // still true — but nothing after the cancel was started.
+    expect(
+      harness.core.probeCalls,
+      lessThanOrEqualTo(4 + MeasurementController.inFlight),
+    );
     final measured = harness.nodeRepository.nodes
         .where((node) => node.latency != null)
         .length;
-    // The batch that was already in flight is kept — a measurement that came
-    // back is still true — but nothing after it was started.
-    expect(measured, 4);
+    expect(measured, lessThan(nodes.length));
   });
 
   test('a second run while one is going is ignored', () async {
@@ -150,59 +175,58 @@ void main() {
     expect(container.read(measurementProvider), MeasurementState.idle);
   });
 
-  /// The header's ping button failed on every press while the tunnel was
-  /// down: the only way to measure was to ask a core that was not running.
-  /// That is the moment the numbers are wanted — before choosing a server.
-  group('with the tunnel down', () {
-    Future<void> startIdle(List<ProxyNode> nodes) async {
-      harness = CommyTestHarness(nodes: nodes);
-      container = ProviderContainer(overrides: harness.overrides());
-      addTearDown(() async {
-        container.dispose();
-        await harness.dispose();
-      });
-      final handles = <ProviderSubscription<Object?>>[
-        container.listen(nodesProvider, (_, __) {}),
-        container.listen(coreStatusProvider, (_, __) {}),
-      ];
-      addTearDown(() {
-        for (final handle in handles) {
-          handle.close();
-        }
-      });
-      await container.read(nodesProvider.future);
-    }
-
-    ProxyNode udpNode() => const ProxyNode(
-          id: 'node-udp',
-          name: 'Hysteria',
-          protocol: Protocol.hysteria2,
-          host: 'hy.example.net',
-          port: 8443,
-        );
-
-    test('a run times the servers directly and asks the core nothing',
-        () async {
+  /// The header's ping button once failed on every press while the tunnel
+  /// was down, and then measured only TCP handshakes until the user
+  /// connected. A GET through the server is the number that says whether it
+  /// works, and it is wanted before choosing one.
+  group('GET, the default', () {
+    test('goes through a probe core with the tunnel down', () async {
       final nodes = manyNodes(5);
-      await startIdle(nodes);
+      await start(nodes);
 
       await controller().measureAll(nodes, scopeId: 'sub-1');
 
-      expect(harness.latencyProbe.asked, hasLength(5));
+      expect(harness.core.probeCalls, 5);
+      expect(harness.latencyProbe.asked, isEmpty);
       expect(
         harness.nodeRepository.nodes.map((node) => node.latency),
-        everyElement(const Duration(milliseconds: 37)),
+        everyElement(const Duration(milliseconds: 137)),
       );
       final state = container.read(measurementProvider);
       expect(state.isRunning, isFalse);
-      expect(state.failure, isNull, reason: 'Not running is not a failure.');
+      expect(state.failure, isNull);
     });
 
-    test('a server that did not answer is recorded as that, not as a failure',
+    test('and the same way with the tunnel up', () async {
+      final nodes = manyNodes(3);
+      await start(nodes, connect: true);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(harness.core.probeCalls, 3);
+      expect(harness.latencyProbe.asked, isEmpty);
+    });
+
+    test('times a UDP server as well', () async {
+      await start(<ProxyNode>[udpNode()]);
+
+      await controller().measureOne(udpNode());
+
+      expect(harness.core.probeCalls, 1);
+      expect(container.read(measurementProvider).skipped, 0);
+      expect(
+        harness.nodeRepository.nodes.single.latency,
+        const Duration(milliseconds: 137),
+      );
+    });
+
+    test('a server that did not answer is recorded as that, not a failure',
         () async {
       final nodes = manyNodes(2);
-      await startIdle(nodes);
-      harness.latencyProbe.answer = null;
+      await start(nodes);
+      for (final node in nodes) {
+        harness.core.setLatency('node-${node.id}', null);
+      }
 
       await controller().measureAll(nodes, scopeId: 'sub-1');
 
@@ -215,15 +239,43 @@ void main() {
       );
     });
 
-    test('a UDP server is left alone and counted, not marked offline',
+    test('measuring one server never touches the tunnel state', () async {
+      final nodes = manyNodes(1);
+      await start(nodes);
+
+      await controller().measureOne(nodes.single);
+
+      // The regression this pins: a ping used to write its failure into the
+      // tunnel controller, which painted the connect button red.
+      expect(container.read(tunnelControllerProvider).failure, isNull);
+      expect(container.read(tunnelStatusProvider), isA<TunnelIdle>());
+    });
+  });
+
+  group('TCP', () {
+    test('times the handshakes directly and asks no core', () async {
+      final nodes = manyNodes(5);
+      await start(nodes, method: PingMethod.tcp);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(harness.latencyProbe.asked, hasLength(5));
+      expect(harness.core.probeCalls, 0);
+      expect(
+        harness.nodeRepository.nodes.map((node) => node.latency),
+        everyElement(const Duration(milliseconds: 37)),
+      );
+    });
+
+    test('leaves a UDP server alone and counts it, not marked offline',
         () async {
       final nodes = <ProxyNode>[...manyNodes(2), udpNode()];
-      await startIdle(nodes);
+      await start(nodes, method: PingMethod.tcp);
 
       await controller().measureAll(nodes, scopeId: 'sub-1');
 
       expect(harness.latencyProbe.asked, hasLength(2));
-      expect(container.read(measurementProvider).needTunnel, 1);
+      expect(container.read(measurementProvider).skipped, 1);
       final udp = harness.nodeRepository.nodes.firstWhere(
         (node) => node.id == 'node-udp',
       );
@@ -234,39 +286,25 @@ void main() {
       );
     });
 
-    test('measuring one UDP server says it needs the tunnel', () async {
-      await startIdle(<ProxyNode>[udpNode()]);
+    test('measuring one UDP server says it was skipped', () async {
+      await start(<ProxyNode>[udpNode()], method: PingMethod.tcp);
 
       await controller().measureOne(udpNode());
 
       expect(harness.latencyProbe.asked, isEmpty);
-      expect(container.read(measurementProvider).needTunnel, 1);
-    });
-
-    test('measuring one server never touches the tunnel state', () async {
-      final nodes = manyNodes(1);
-      await startIdle(nodes);
-
-      await controller().measureOne(nodes.single);
-
-      // The regression this pins: a ping used to write its failure into the
-      // tunnel controller, which painted the connect button red.
-      expect(container.read(tunnelControllerProvider).failure, isNull);
-      expect(container.read(tunnelStatusProvider), isA<TunnelIdle>());
-      expect(
-        harness.nodeRepository.nodes.single.latency,
-        const Duration(milliseconds: 37),
-      );
+      expect(container.read(measurementProvider).skipped, 1);
     });
   });
 
-  test('with the tunnel up the core measures, and the direct probe is unused',
-      () async {
-    final nodes = manyNodes(3);
-    await start(nodes);
+  test('ICMP sends an echo to every host, UDP servers included', () async {
+    final nodes = <ProxyNode>[...manyNodes(2), udpNode()];
+    await start(nodes, method: PingMethod.icmp);
 
     await controller().measureAll(nodes, scopeId: 'sub-1');
 
+    expect(harness.latencyProbe.echoed, hasLength(3));
     expect(harness.latencyProbe.asked, isEmpty);
+    expect(harness.core.probeCalls, 0);
+    expect(container.read(measurementProvider).skipped, 0);
   });
 }

@@ -1,16 +1,20 @@
 import 'dart:async';
 
 import 'package:commy_core/src/android/installed_app.dart';
+import 'package:commy_core/src/wire/probe_codec.dart';
+import 'package:commy_core/src/wire/url_test_codec.dart';
 import 'package:commy_core/src/wire/wire_channels.dart';
+import 'package:commy_core/src/wire/wire_format_exception.dart';
 import 'package:commy_core/src/wire/wire_json.dart';
 import 'package:commy_core/src/wire/wire_methods.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/services.dart';
 
-/// The system-side switches Commy can flip but cannot replace.
+/// The system-side switches Commy can flip but cannot replace, and the one
+/// measurement `dart:io` cannot make.
 ///
-/// Four so far. [openVpnSettings] exists for a reason worth stating: an
-/// application-level kill switch is a promise an application cannot keep. If
+/// Four switches so far. [openVpnSettings] exists for a reason worth stating:
+/// an application-level kill switch is a promise an application cannot keep. If
 /// the process is killed — by the user, by the system, by an out-of-memory
 /// reaper — there is nothing left running to block traffic with. Android's own
 /// "Always-on VPN" plus "Block connections without VPN" is enforced by the
@@ -100,6 +104,33 @@ class SystemSettings {
         WireJson.object(raw, WireMethods.deviceInfo),
       );
     } on Object {
+      return null;
+    }
+  }
+
+  /// One ICMP echo to [host]: the round trip, or `null`.
+  ///
+  /// The "Ping" setting's ICMP method. `dart:io` has no ICMP socket, and
+  /// Android lets every app open an unprivileged one, so the platform sends
+  /// it. Null when nothing came back within [timeout], and on every platform
+  /// without the method — never an exception, because a server that does not
+  /// answer an echo is a measurement, and many do not.
+  Future<Duration?> ping(String host, {required Duration timeout}) async {
+    try {
+      final raw = await _channel
+          .invokeMethod<String>(
+            WireMethods.ping,
+            ProbeCodec.encodePing(host, timeout: timeout),
+          )
+          // The platform has its own deadline; this one is for a platform
+          // that never answers at all.
+          .timeout(timeout + answerWithin, onTimeout: () => null);
+      return UrlTestCodec.decodeDelay(raw);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    } on WireFormatException {
       return null;
     }
   }

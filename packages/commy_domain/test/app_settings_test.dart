@@ -32,4 +32,33 @@ void main() {
       expect(changed.copyWith(nodeSort: NodeSort.panel), settings);
     });
   });
+
+  group('AppSettings.pingMethod', () {
+    test('defaults to GET, also for settings stored before it existed', () {
+      expect(AppSettings.defaults.pingMethod, PingMethod.get);
+      expect(
+        AppSettings.fromJson(<String, Object?>{'themeMode': 'dark'})
+            .pingMethod,
+        PingMethod.get,
+      );
+    });
+
+    test('a method this build does not know reads as GET', () {
+      expect(
+        AppSettings.fromJson(<String, Object?>{'pingMethod': 'udp'})
+            .pingMethod,
+        PingMethod.get,
+      );
+    });
+
+    test('round-trips through JSON', () {
+      const settings = AppSettings(pingMethod: PingMethod.icmp);
+
+      final restored = AppSettings.fromJson(settings.toJson());
+
+      expect(restored.pingMethod, PingMethod.icmp);
+      expect(restored, settings);
+      expect(settings.copyWith(pingMethod: PingMethod.tcp), isNot(settings));
+    });
+  });
 }

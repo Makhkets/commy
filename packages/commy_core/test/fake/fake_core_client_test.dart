@@ -177,6 +177,11 @@ void main() {
               FakeCoreStep.urlTest =>
                 client.urlTest('node-alpha', Uri.parse('http://x/')),
               FakeCoreStep.proxies => client.proxies(),
+              FakeCoreStep.probeOutbounds => client.probeOutbounds(
+                  config,
+                  probe: Uri.parse('http://x/'),
+                  timeout: const Duration(seconds: 1),
+                ),
             };
 
         await expectLater(

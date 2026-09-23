@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import dev.commy.app.tunnel.BootReceiver
+import dev.commy.app.tunnel.ServerProbes
 import dev.commy.app.tunnel.TunnelController
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -18,7 +19,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The methods of `dev.commy.app/core`: seven for the tunnel, three for the system.
+ * The methods of `dev.commy.app/core`: seven for the tunnel, four for the
+ * system, two for timing servers.
  *
  * Every branch answers exactly once, with `success` or with `error`. A silent
  * path here is a button that does nothing and a future waiting forever, which
@@ -135,6 +137,30 @@ internal class CoreMethodHandler(
         Wire.Methods.INSTALLED_APPS -> installedApps()
 
         Wire.Methods.DEVICE_INFO -> deviceInfo()
+
+        Wire.Methods.PROBE_OUTBOUNDS -> {
+            val request = jsonArgument(call)
+            // The core's own answer, passed through: `{tag: milliseconds}`,
+            // 0 for a server that did not answer.
+            runCatching {
+                ServerProbes.outbounds(
+                    context = context,
+                    config = request.getString(Wire.Keys.CONFIG),
+                    url = request.getString(Wire.Keys.URL),
+                    timeoutMs = request.optLong(Wire.Keys.TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
+                )
+            }.getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
+        }
+
+        Wire.Methods.PING -> {
+            val request = jsonArgument(call)
+            val delay = ServerProbes.echo(
+                host = request.getString(Wire.Keys.HOST),
+                timeoutMs = request.optLong(Wire.Keys.TIMEOUT_MS, DEFAULT_TIMEOUT_MS),
+            )
+            // An explicit null, as for urlTest: "no echo" is an answer.
+            JSONObject().put(Wire.Keys.DELAY_MS, delay ?: JSONObject.NULL).toString()
+        }
 
         else -> null
     }
@@ -259,6 +285,8 @@ internal class CoreMethodHandler(
             Wire.Methods.SET_START_ON_BOOT,
             Wire.Methods.INSTALLED_APPS,
             Wire.Methods.DEVICE_INFO,
+            Wire.Methods.PROBE_OUTBOUNDS,
+            Wire.Methods.PING,
         )
     }
 }

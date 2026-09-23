@@ -27,6 +27,7 @@ export 'src/logging/app_logger.dart';
 export 'src/logging/log_redaction.dart';
 export 'src/wire/connection_info_codec.dart';
 export 'src/wire/log_line_codec.dart';
+export 'src/wire/probe_codec.dart';
 export 'src/wire/proxy_group_codec.dart';
 export 'src/wire/select_codec.dart';
 export 'src/wire/system_intent.dart';

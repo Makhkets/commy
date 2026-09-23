@@ -183,6 +183,78 @@ class SingBoxConfigBuilder {
     );
   }
 
+  /// A document with [nodes]' outbounds and nothing else, for timing them
+  /// (`CoreClient.probeOutbounds`).
+  ///
+  /// Each outbound exactly as [build] writes it into a tunnel — the same
+  /// transport, TLS, REALITY and fingerprint — or the number would be about a
+  /// different connection than the one a connect makes. Server names are
+  /// resolved by the tunnel's resolver for what bypasses it, [dns]'s direct
+  /// one, because that is what resolves them when a tunnel dials.
+  ///
+  /// No inbound, no routing, no log: the core that reads this measures and
+  /// goes away, and a log of it would only be noise in the user's. A server
+  /// that cannot be expressed is left out and has no number, as in [build];
+  /// a document with none left is an error.
+  Result<CoreConfig, CommyFailure> buildProbe({
+    required List<ProxyNode> nodes,
+    required DnsSettings dns,
+  }) {
+    try {
+      final outbounds = <Map<String, Object?>>[];
+      final endpoints = <Map<String, Object?>>[];
+      final tags = <String>{};
+      for (final node in nodes) {
+        final tag = SingBoxTags.forNode(node);
+        if (tags.contains(tag)) {
+          continue;
+        }
+        final Map<String, Object?> built;
+        try {
+          _checkAddress(node);
+          built = OutboundBuilder.build(node: node, tag: tag);
+        } on ConfigBuildException {
+          continue;
+        }
+        tags.add(tag);
+        if (OutboundBuilder.isEndpoint(node.protocol)) {
+          endpoints.add(built);
+        } else {
+          outbounds.add(built);
+        }
+      }
+      if (tags.isEmpty) {
+        throw const ConfigBuildException('No server to measure');
+      }
+      return Ok<CoreConfig, CommyFailure>(
+        CoreConfig(<String, Object?>{
+          SingBoxKeys.log: <String, Object?>{SingBoxKeys.disabled: true},
+          SingBoxKeys.dns: <String, Object?>{
+            SingBoxKeys.servers: <Map<String, Object?>>[
+              DnsSectionBuilder.parseResolver(
+                dns.direct,
+                tag: SingBoxTags.dnsDirect,
+              ),
+            ],
+            SingBoxKeys.finalTag: SingBoxTags.dnsDirect,
+            SingBoxKeys.strategy: dns.strategy.wireName,
+          },
+          if (endpoints.isNotEmpty) SingBoxKeys.endpoints: endpoints,
+          SingBoxKeys.outbounds: outbounds,
+          SingBoxKeys.route: <String, Object?>{
+            SingBoxKeys.defaultDomainResolver: <String, Object?>{
+              SingBoxKeys.dnsServer: SingBoxTags.dnsDirect,
+            },
+          },
+        }),
+      );
+    } on ConfigBuildException catch (error) {
+      return Err<CoreConfig, CommyFailure>(ConfigInvalidFailure(error.reason));
+    } on Object catch (error, stackTrace) {
+      return Err<CoreConfig, CommyFailure>(UnknownFailure(error, stackTrace));
+    }
+  }
+
   Map<String, Object?> _autoGroup(
     SingBoxBuildRequest request,
     List<String> memberTags,

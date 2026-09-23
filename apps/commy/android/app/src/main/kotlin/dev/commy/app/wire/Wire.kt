@@ -43,7 +43,7 @@ internal object Wire {
     }
 
     /**
-     * Method names on [Channels.METHOD]. Seven for the tunnel, plus two.
+     * Method names on [Channels.METHOD]. Seven for the tunnel, and six that are not.
      *
      * [OPEN_VPN_SETTINGS] is not a tunnel command and does not belong to the
      * seven. It is here because the only honest kill switch on Android is the
@@ -63,6 +63,10 @@ internal object Wire {
      * not. `dart:io` reports a kernel build string where a panel wants
      * "16" and has no word at all for the model; `device_info_plus` would
      * bring native code along for three strings (CLAUDE.md §7.2).
+     *
+     * [PROBE_OUTBOUNDS] and [PING] time the user's servers for the "Ping"
+     * setting, with or without a tunnel: a GET through each server by a core
+     * instance of its own, and an ICMP echo. Neither touches the tunnel.
      */
     object Methods {
         const val START = "start"
@@ -76,6 +80,8 @@ internal object Wire {
         const val SET_START_ON_BOOT = "setStartOnBoot"
         const val INSTALLED_APPS = "installedApps"
         const val DEVICE_INFO = "deviceInfo"
+        const val PROBE_OUTBOUNDS = "probeOutbounds"
+        const val PING = "ping"
     }
 
     /** JSON field names. Matches `WireKeys`. */
@@ -86,6 +92,7 @@ internal object Wire {
         const val URL = "url"
         const val TIMEOUT_MS = "timeoutMs"
         const val DELAY_MS = "delayMs"
+        const val CONFIG = "config"
 
         // proxies()
         const val TYPE = "type"

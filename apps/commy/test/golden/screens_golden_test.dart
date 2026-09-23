@@ -165,12 +165,13 @@ void main() {
     },
   );
 
-  // Taller than a phone on purpose: the silence panel is the bottom half of
-  // this screen and the whole point of photographing it. The row that says ad
-  // blocking is switched on with no list on disk is in the picture.
+  // Taller than a phone on purpose: the silence panel is the middle of this
+  // screen and the whole point of photographing it. The row that says ad
+  // blocking is switched on with no list on disk is in the picture, and so
+  // are the three ways of timing a server under "Ping".
   screenGolden(
     'settings',
-    size: const Size(390, 1800),
+    size: const Size(390, 2150),
     screen: const SettingsScreen(),
     seed: (harness) => harness.routingRepository.write(
       RoutingPolicy.defaults.copyWith(blockAds: true),

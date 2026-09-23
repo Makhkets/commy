@@ -64,6 +64,9 @@ abstract final class SingBoxKeys {
   /// Whether lines carry a timestamp.
   static const String timestamp = 'timestamp';
 
+  /// Whether the core writes a log at all.
+  static const String disabled = 'disabled';
+
   // ── dns (option/dns.go) ───────────────────────────────────────────────
 
   /// Resolver list.

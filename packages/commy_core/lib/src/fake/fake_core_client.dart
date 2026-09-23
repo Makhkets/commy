@@ -284,6 +284,37 @@ class FakeCoreClient implements CoreClient {
     return measured;
   }
 
+  /// Answers every outbound and endpoint of [config] the way [urlTest]
+  /// answers for its tag — [setLatency], or the default latency — and needs
+  /// no running tunnel, as the real one does not.
+  @override
+  Future<Map<String, Duration?>> probeOutbounds(
+    CoreConfig config, {
+    required Uri probe,
+    required Duration timeout,
+  }) async {
+    _guard(FakeCoreStep.probeOutbounds);
+    probeCalls++;
+    final delays = <String, Duration?>{};
+    for (final section in <String>['outbounds', 'endpoints']) {
+      final entries = config.document[section];
+      if (entries is! List) {
+        continue;
+      }
+      for (final entry in entries) {
+        if (entry is Map && entry['tag'] is String) {
+          final tag = entry['tag']! as String;
+          delays[tag] =
+              _latencies.containsKey(tag) ? _latencies[tag] : _latency;
+        }
+      }
+    }
+    return delays;
+  }
+
+  /// How many times [probeOutbounds] was asked.
+  int probeCalls = 0;
+
   @override
   Future<List<ProxyGroup>> proxies() async {
     _guard(FakeCoreStep.proxies);

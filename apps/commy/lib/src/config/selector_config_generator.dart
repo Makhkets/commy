@@ -103,6 +103,13 @@ class SelectorConfigGenerator implements ConfigGenerator {
     });
   }
 
+  @override
+  Result<CoreConfig, CommyFailure> buildProbe({
+    required List<ProxyNode> nodes,
+    required DnsSettings dns,
+  }) =>
+      builder.buildProbe(nodes: nodes, dns: dns);
+
   /// The selected node first, then everything else, with no duplicates.
   ///
   /// The chosen node leads so that a build with a stale snapshot — a server

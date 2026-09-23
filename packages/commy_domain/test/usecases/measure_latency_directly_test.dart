@@ -13,11 +13,11 @@ ProxyNode _node(Protocol protocol, Map<String, Object?> params) => ProxyNode(
 /// With the tunnel down a server is measured by a TCP handshake to its port.
 /// That is only an answer for a server that listens on TCP.
 void main() {
-  group('MeasureLatencyUseCase.isDirectlyMeasurable', () {
+  group('MeasureLatencyUseCase.acceptsTcp', () {
     test('a TCP protocol over a TCP transport is', () {
       for (final transport in <String?>[null, 'tcp', 'ws', 'grpc', 'xhttp']) {
         expect(
-          MeasureLatencyUseCase.isDirectlyMeasurable(
+          MeasureLatencyUseCase.acceptsTcp(
             _node(Protocol.vless, <String, Object?>{'type': transport}),
           ),
           isTrue,
@@ -33,7 +33,7 @@ void main() {
         Protocol.wireguard,
       ]) {
         expect(
-          MeasureLatencyUseCase.isDirectlyMeasurable(
+          MeasureLatencyUseCase.acceptsTcp(
             _node(protocol, const <String, Object?>{}),
           ),
           isFalse,
@@ -44,7 +44,7 @@ void main() {
 
     test('a UDP transport under a TCP protocol is not', () {
       expect(
-        MeasureLatencyUseCase.isDirectlyMeasurable(
+        MeasureLatencyUseCase.acceptsTcp(
           _node(Protocol.vmess, <String, Object?>{'type': 'quic'}),
         ),
         isFalse,
@@ -76,10 +76,10 @@ void main() {
         'alpn': 'h3',
       });
 
-      expect(MeasureLatencyUseCase.isDirectlyMeasurable(http3), isFalse);
-      expect(MeasureLatencyUseCase.isDirectlyMeasurable(http2), isTrue);
-      expect(MeasureLatencyUseCase.isDirectlyMeasurable(both), isTrue);
-      expect(MeasureLatencyUseCase.isDirectlyMeasurable(reality), isTrue);
+      expect(MeasureLatencyUseCase.acceptsTcp(http3), isFalse);
+      expect(MeasureLatencyUseCase.acceptsTcp(http2), isTrue);
+      expect(MeasureLatencyUseCase.acceptsTcp(both), isTrue);
+      expect(MeasureLatencyUseCase.acceptsTcp(reality), isTrue);
     });
   });
 

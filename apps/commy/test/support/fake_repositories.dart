@@ -568,7 +568,8 @@ Stream<T> _replay<T>(StreamController<T> controller, T Function() current) {
 /// A [LatencyProbe] that answers from a script and remembers who it was asked
 /// about.
 ///
-/// The real one opens a TCP connection. Nothing in a test may.
+/// The real one opens a TCP connection or sends an echo. Nothing in a test
+/// may.
 class FakeLatencyProbe implements LatencyProbe {
   /// What every server answers with. `null` is "did not answer".
   Duration? answer = const Duration(milliseconds: 37);
@@ -583,6 +584,15 @@ class FakeLatencyProbe implements LatencyProbe {
     required Duration timeout,
   }) async {
     asked.add('$host:$port');
+    return answer;
+  }
+
+  /// Every host an echo was sent to, in order.
+  final List<String> echoed = <String>[];
+
+  @override
+  Future<Duration?> echoTime(String host, {required Duration timeout}) async {
+    echoed.add(host);
     return answer;
   }
 }

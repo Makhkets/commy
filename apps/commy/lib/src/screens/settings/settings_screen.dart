@@ -191,6 +191,27 @@ class _Body extends ConsumerWidget {
             ),
           ],
         ),
+        // How the servers in the list are timed. Three rows and a radio, as
+        // on the appearance screen: a choice of one, with the reason for each
+        // written under it, because the three answer different questions.
+        SectionLabel(t.settings.ping.title),
+        SettingsSection(
+          children: <Widget>[
+            for (final method in PingMethod.values)
+              SettingsTile(
+                title: _pingLabel(t, method),
+                subtitle: _pingHint(t, method),
+                selected: settings.pingMethod == method,
+                trailing: CommyRadio<PingMethod>(
+                  value: method,
+                  groupValue: settings.pingMethod,
+                  onChanged: (value) =>
+                      unawaited(controller.setPingMethod(value)),
+                ),
+                onTap: () => unawaited(controller.setPingMethod(method)),
+              ),
+          ],
+        ),
         // Last, and each behind a question: the two rows on this screen
         // that undo more than they do.
         SectionLabel(t.settings.reset.title),
@@ -241,6 +262,18 @@ class _Body extends ConsumerWidget {
         ),
       );
   }
+
+  String _pingLabel(Translations t, PingMethod method) => switch (method) {
+        PingMethod.get => t.settings.ping.get,
+        PingMethod.tcp => t.settings.ping.tcp,
+        PingMethod.icmp => t.settings.ping.icmp,
+      };
+
+  String _pingHint(Translations t, PingMethod method) => switch (method) {
+        PingMethod.get => t.settings.ping.getHint,
+        PingMethod.tcp => t.settings.ping.tcpHint,
+        PingMethod.icmp => t.settings.ping.icmpHint,
+      };
 
   String _routingSubtitle(Translations t) {
     final policy = routing;

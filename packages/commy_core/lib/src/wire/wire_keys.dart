@@ -18,8 +18,11 @@ abstract final class WireKeys {
   /// `urlTest`: how long the native side waits for the group refresh.
   static const String timeoutMs = 'timeoutMs';
 
-  /// `urlTest` result: measured round trip, or `null` on timeout.
+  /// `urlTest`, `ping` result: measured round trip, or `null` on timeout.
   static const String delayMs = 'delayMs';
+
+  /// `probeOutbounds`: the configuration to measure, as a JSON string.
+  static const String config = 'config';
 
   // ── proxies() ─────────────────────────────────────────────────────────
 

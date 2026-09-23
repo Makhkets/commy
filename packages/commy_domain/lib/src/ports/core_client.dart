@@ -53,6 +53,21 @@ abstract interface class CoreClient {
   /// Returns `null` when the probe did not come back.
   Future<Duration?> urlTest(String tag, Uri probe);
 
+  /// Measures every outbound of [config] by a GET to [probe] through it, in a
+  /// core instance of its own, whether or not the tunnel is up.
+  ///
+  /// [config] carries nothing but the outbounds to measure (see
+  /// `ConfigGenerator.buildProbe`); the instance has no inbound and no TUN,
+  /// and goes away once the numbers are in. Each server gets [timeout].
+  ///
+  /// The answer maps each outbound tag to its delay, `null` for a server that
+  /// did not answer. Throws only when the core refuses [config] as a whole.
+  Future<Map<String, Duration?>> probeOutbounds(
+    CoreConfig config, {
+    required Uri probe,
+    required Duration timeout,
+  });
+
   /// Releases what the client holds: subscriptions, timers, sockets.
   ///
   /// It does **not** take the tunnel down, and must never be mistaken for

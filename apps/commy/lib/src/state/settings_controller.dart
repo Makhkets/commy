@@ -127,6 +127,12 @@ class SettingsController extends Notifier<CommyFailure?> {
     await save((await _settings()).copyWith(logLevel: level));
   }
 
+  /// Chooses how servers are timed. Takes effect on the next measurement; a
+  /// running tunnel has nothing to reload for it.
+  Future<void> setPingMethod(PingMethod method) async {
+    await save((await _settings()).copyWith(pingMethod: method));
+  }
+
   /// Stores a whole routing policy.
   Future<void> saveRouting(RoutingPolicy policy) async {
     final result = await ref.read(routingRepositoryProvider).write(policy);

@@ -6,6 +6,12 @@ import 'package:commy_domain/commy_domain.dart';
 /// Resolves a host name; [InternetAddress.lookup] outside tests.
 typedef AddressLookup = Future<List<InternetAddress>> Function(String host);
 
+/// Sends one ICMP echo, or answers `null` where it cannot.
+typedef EchoSender = Future<Duration?> Function(
+  String host, {
+  required Duration timeout,
+});
+
 /// [LatencyProbe] over a plain `dart:io` socket.
 ///
 /// Opens a TCP connection to the server, notes how long the handshake took,
@@ -21,15 +27,36 @@ typedef AddressLookup = Future<List<InternetAddress>> Function(String host);
 /// connect itself resolves the name again, from the cache, which keeps
 /// `Socket.connect`'s way of trying each address in turn.
 ///
-/// The connection leaves outside the tunnel by construction — the use case
-/// only comes here while the tunnel is down — and goes to the host the user
-/// entered and nowhere else (rule R1).
+/// The connection leaves outside the tunnel by construction — the app's own
+/// traffic is always excluded from it — and goes to the host the user entered
+/// and nowhere else (rule R1).
+///
+/// An echo is not something `dart:io` can send, so [echoTime] hands it to
+/// the platform through the `echo` it was built with; without one it answers
+/// `null`.
 class SocketLatencyProbe implements LatencyProbe {
   /// Creates the probe.
-  const SocketLatencyProbe({AddressLookup lookup = InternetAddress.lookup})
-      : _lookup = lookup;
+  const SocketLatencyProbe({
+    AddressLookup lookup = InternetAddress.lookup,
+    EchoSender? echo,
+  })  : _lookup = lookup,
+        _echo = echo;
 
   final AddressLookup _lookup;
+  final EchoSender? _echo;
+
+  @override
+  Future<Duration?> echoTime(String host, {required Duration timeout}) async {
+    final echo = _echo;
+    if (echo == null) {
+      return null;
+    }
+    try {
+      return await echo(host, timeout: timeout);
+    } on Object {
+      return null;
+    }
+  }
 
   @override
   Future<Duration?> connectTime(

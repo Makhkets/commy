@@ -52,12 +52,12 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
           _showFailure(failure);
           return;
         }
-        // Servers the run left alone — UDP protocols, with the tunnel down.
+        // Servers the run left alone — UDP servers, with the TCP method.
         // Said once, at the end, rather than per row: it is one fact about
         // the run, and it tells the user what would measure them.
-        final needTunnel = next.needTunnel;
-        if (needTunnel > 0 && needTunnel != previous?.needTunnel) {
-          _showNeedsTunnel(needTunnel);
+        final skipped = next.skipped;
+        if (skipped > 0 && skipped != previous?.skipped) {
+          _showSkipped(skipped);
         }
       });
     return widget.child;
@@ -74,10 +74,10 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
     ref.read(measurementProvider.notifier).clearFailure();
   }
 
-  void _showNeedsTunnel(int count) {
+  void _showSkipped(int count) {
     ToastMessenger.show(
       context,
-      message: Translations.of(context).home.measureNeedsTunnel(count: count),
+      message: Translations.of(context).home.measureSkippedUdp(count: count),
       tone: CommyTone.info,
       icon: CommyIcons.diagnostics,
     );

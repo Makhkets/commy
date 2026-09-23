@@ -101,6 +101,49 @@ void main() {
       );
     });
 
+    test('probeOutbounds hands over the configuration and reads the delays',
+        () async {
+      answers[WireMethods.probeOutbounds] = '{"node-cz":212,"node-fi":0}';
+      const config = CoreConfig(<String, Object?>{
+        'outbounds': <Object?>[
+          <String, Object?>{'type': 'vless', 'tag': 'node-cz'},
+        ],
+      });
+
+      final delays = await AndroidCoreClient().probeOutbounds(
+        config,
+        probe: Uri.parse('http://cp.cloudflare.com/generate_204'),
+        timeout: const Duration(seconds: 8),
+      );
+
+      expect(delays, <String, Duration?>{
+        'node-cz': const Duration(milliseconds: 212),
+        'node-fi': null,
+      });
+      expect(calls.single.method, WireMethods.probeOutbounds);
+      final argument =
+          jsonDecode(calls.single.arguments as String) as Map<String, Object?>;
+      expect(argument['config'], config.encode(), reason: 'a string, as is');
+      expect(argument['url'], 'http://cp.cloudflare.com/generate_204');
+      expect(argument['timeoutMs'], 8000);
+    });
+
+    test('a probe the core refused as a whole is a thrown failure', () async {
+      errors[WireMethods.probeOutbounds] = PlatformException(
+        code: WireErrorCodes.configInvalid,
+        message: 'decode config',
+      );
+
+      await expectLater(
+        AndroidCoreClient().probeOutbounds(
+          const CoreConfig(<String, Object?>{}),
+          probe: Uri.parse('http://x/'),
+          timeout: const Duration(seconds: 1),
+        ),
+        throwsA(isA<CoreClientException>()),
+      );
+    });
+
     test('proxies normalises the libbox payload down to the domain shape',
         () async {
       answers[WireMethods.proxies] =

@@ -53,11 +53,11 @@ void main() {
     bool animationsEnd = true,
     List<Override> extra = const <Override>[],
   }) async {
-    // Taller than the 800x600 default: four sections, a panel and a footer,
-    // and a surface that cut the connection rows off would be testing the
-    // window rather than the screen.
+    // Taller than the 800x600 default: six sections, a panel and a footer,
+    // and a surface that cut the last rows off would be testing the window
+    // rather than the screen.
     tester.view
-      ..physicalSize = const Size(420, 2400)
+      ..physicalSize = const Size(420, 3000)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -601,6 +601,54 @@ void main() {
     // to pass one renders exactly these three widgets and answers a tap with
     // nothing — an error state that cannot be left, and a green test.
     expect(reads, greaterThan(before));
+  });
+
+  /// The owner's "Ping" section: GET through the server by default, TCP or
+  /// ICMP by choice, each row saying what it measures.
+  group('ping', () {
+    PingMethod? chosen(WidgetTester tester) => tester
+        .widget<CommyRadio<PingMethod>>(
+          find.byType(CommyRadio<PingMethod>).first,
+        )
+        .groupValue;
+
+    testWidgets('GET is chosen until the user picks another', (tester) async {
+      await pumpScreen(tester);
+
+      expect(find.byType(CommyRadio<PingMethod>), findsNWidgets(3));
+      expect(chosen(tester), PingMethod.get);
+    });
+
+    testWidgets('each method says what it measures', (tester) async {
+      await pumpScreen(tester);
+
+      for (final hint in <String>[
+        t.settings.ping.getHint,
+        t.settings.ping.tcpHint,
+        t.settings.ping.icmpHint,
+      ]) {
+        expect(find.text(hint), findsOneWidget);
+      }
+    });
+
+    testWidgets('a tapped method is stored and shown', (tester) async {
+      await pumpScreen(tester);
+
+      await tester.tap(find.text(t.settings.ping.icmp));
+      await tester.pumpAndSettle();
+
+      expect((await stored()).pingMethod, PingMethod.icmp);
+      expect(chosen(tester), PingMethod.icmp);
+    });
+
+    testWidgets('the stored method is the one shown', (tester) async {
+      await pumpScreen(
+        tester,
+        settings: const AppSettings(pingMethod: PingMethod.tcp),
+      );
+
+      expect(chosen(tester), PingMethod.tcp);
+    });
   });
 
   /// "Reset network" and "reset app settings": each asks first, each puts
