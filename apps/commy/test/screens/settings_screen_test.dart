@@ -397,6 +397,28 @@ void main() {
     expect((await stored()).isIpCheckEnabled, isFalse);
   });
 
+  // docs/09: the user sees where an exception's request goes before it goes.
+  // The row used to say when ("only when you tap") and never where.
+  testWidgets('the IP check names its host before and after it is on',
+      (tester) async {
+    await pumpScreen(tester);
+    expect(find.textContaining('ipinfo.io'), findsOneWidget);
+
+    await tester.tap(switchFor(t.settings.silence.ipCheck));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('ipinfo.io'), findsOneWidget);
+  });
+
+  testWidgets('a custom IP check host is the one shown', (tester) async {
+    await pumpScreen(
+      tester,
+      settings: const AppSettings(ipCheckUrl: 'https://ip.example/json'),
+    );
+
+    expect(find.textContaining('ip.example'), findsOneWidget);
+    expect(find.textContaining('ipinfo.io'), findsNothing);
+  });
+
   testWidgets('the rule-set switch is the routing mode itself', (tester) async {
     await pumpScreen(tester);
     expect(switchValue(tester, t.settings.silence.ruleSets), isTrue);

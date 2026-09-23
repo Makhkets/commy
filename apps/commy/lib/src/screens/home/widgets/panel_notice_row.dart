@@ -19,12 +19,26 @@ import 'package:flutter/material.dart';
 /// language their users read, and a translation of it would be this app
 /// inventing an explanation on someone else's behalf. The line above it is
 /// ours and says whose words these are.
+///
+/// One case gets a line of ours below it as well: the device identifier
+/// switched off. "App not supported" is word for word what a panel that
+/// limits devices sends a client without `x-hwid`, and the person who turned
+/// the switch off in settings is not going to connect the two on their own —
+/// so the row says it, and puts the switch in reach.
 class PanelNoticeRow extends StatelessWidget {
   /// Creates the row.
-  const PanelNoticeRow({required this.messages, super.key});
+  const PanelNoticeRow({
+    required this.messages,
+    this.onSendDeviceId,
+    super.key,
+  });
 
   /// What the panel sent in place of servers, in its own order.
   final List<String> messages;
+
+  /// Turns the device identifier on and asks the panel again. Set only while
+  /// it is off.
+  final VoidCallback? onSendDeviceId;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +79,22 @@ class PanelNoticeRow extends StatelessWidget {
                       color: colors.textPrimary,
                     ),
                   ),
+                if (onSendDeviceId != null) ...<Widget>[
+                  SizedBox(height: spacing.s2),
+                  Text(
+                    t.subscription.deviceIdOff,
+                    style: context.typography.caption.copyWith(
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                  SizedBox(height: spacing.s2),
+                  CommyButton(
+                    label: t.subscription.sendDeviceId,
+                    variant: CommyButtonVariant.secondary,
+                    isCompact: true,
+                    onPressed: onSendDeviceId,
+                  ),
+                ],
               ],
             ),
           ),

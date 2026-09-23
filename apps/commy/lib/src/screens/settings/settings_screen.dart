@@ -4,6 +4,7 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
+import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
@@ -305,7 +306,11 @@ class _SilencePanel extends ConsumerWidget {
             SettingsTile(
               icon: CommyIcons.globe,
               title: t.settings.silence.ipCheck,
-              subtitle: t.settings.silence.ipCheckHint,
+              // The host, before anything is sent to it: docs/09 asks that
+              // the user see where an exception's request goes before it
+              // goes, and this row said when but not where.
+              subtitle: '${_ipCheckHost(settings)}${NodeRow.separator}'
+                  '${t.settings.silence.ipCheckHint}',
               isMonospaceSubtitle: true,
               trailing: CommySwitch(
                 value: settings.isIpCheckEnabled,
@@ -387,4 +392,14 @@ Future<void> _resetDeviceId(
     tone: done ? CommyTone.info : CommyTone.error,
     icon: done ? CommyIcons.refresh : CommyIcons.warning,
   );
+}
+
+/// The host exception E-1 asks: the configured one, or the one switching it
+/// on would configure.
+String _ipCheckHost(AppSettings settings) {
+  final url = settings.isIpCheckEnabled
+      ? settings.ipCheckUrl
+      : SettingsController.defaultIpCheckUrl;
+  final host = Uri.tryParse(url)?.host ?? '';
+  return host.isEmpty ? url : host;
 }

@@ -182,6 +182,8 @@
     },
     "linkCopied": "Link copied",
     "panelSaid": "Your panel sent this instead of servers:",
+    "deviceIdOff": "Sending the device identifier (HWID) is off, and a panel that limits devices answers like this without it.",
+    "sendDeviceId": "Turn it on and refresh",
     "noServers": "This subscription has no servers yet"
   },
 

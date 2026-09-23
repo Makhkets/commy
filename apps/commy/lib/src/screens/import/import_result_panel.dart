@@ -1,6 +1,7 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/state/import_controller.dart';
+import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +38,11 @@ class ImportResultPanel extends ConsumerWidget {
       // the link. "Check that the text holds a vless:// link" is the wrong
       // advice for a link that was fine and an answer that was "no".
       final refused = state.panelNotices.isNotEmpty;
+      // The words a panel that limits devices sends a client without
+      // `x-hwid`. With the identifier switched off that is the likeliest
+      // reason by far, and the card this sheet leaves behind has the switch.
+      final deviceIdOff = refused &&
+          ref.watch(settingsProvider).value?.sendDeviceId == false;
       return Padding(
         padding: EdgeInsets.all(spacing.s4),
         child: Column(
@@ -52,6 +58,16 @@ class ImportResultPanel extends ConsumerWidget {
                   ? state.panelNotices.join('\n')
                   : t.import.result.nothingBody,
             ),
+            if (deviceIdOff) ...<Widget>[
+              SizedBox(height: spacing.s2),
+              Text(
+                t.subscription.deviceIdOff,
+                textAlign: TextAlign.center,
+                style: context.typography.caption.copyWith(
+                  color: context.colors.textSecondary,
+                ),
+              ),
+            ],
             SizedBox(height: spacing.s4),
             CommyButton(
               label: t.common.close,

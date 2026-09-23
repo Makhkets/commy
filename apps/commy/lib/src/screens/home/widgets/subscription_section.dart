@@ -10,6 +10,7 @@ import 'package:commy/src/screens/home/widgets/panel_notice_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/measurement_controller.dart';
+import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/subscription_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
@@ -51,6 +52,8 @@ class SubscriptionSection extends ConsumerWidget {
     final info = subscription.userInfo;
     final notices =
         ref.watch(panelNoticesProvider)[subscription.id] ?? const <String>[];
+    final deviceIdOff =
+        ref.watch(settingsProvider).value?.sendDeviceId == false;
     final now = ref.watch(clockProvider).value ?? DateTime.now();
 
     return SubscriptionCard(
@@ -93,7 +96,13 @@ class SubscriptionSection extends ConsumerWidget {
       nodes: <Widget>[
         // Above the servers, because when it is there they are usually not:
         // a panel that answers with a notice answers with nothing else.
-        if (notices.isNotEmpty) PanelNoticeRow(messages: notices),
+        if (notices.isNotEmpty)
+          PanelNoticeRow(
+            messages: notices,
+            onSendDeviceId: deviceIdOff
+                ? () => unawaited(_sendDeviceIdAndRefresh(context, ref, t))
+                : null,
+          ),
         // And when it answered with neither servers nor a word about it, the
         // card used to be a name and a blank: no rows, no explanation, and a
         // person left to wonder whether the app lost their servers. One
@@ -145,6 +154,22 @@ class SubscriptionSection extends ConsumerWidget {
       actionLabel: t.error.openLogs,
       onAction: () => context.go(AppRoutes.diagnosticsLogs),
     );
+  }
+
+  /// Turns the device identifier back on and asks the panel again, which is
+  /// the whole fix for "App not supported" from a panel that limits devices.
+  Future<void> _sendDeviceIdAndRefresh(
+    BuildContext context,
+    WidgetRef ref,
+    Translations t,
+  ) async {
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .setSendDeviceId(enabled: true);
+    if (!context.mounted) {
+      return;
+    }
+    await _refresh(context, ref, t);
   }
 
   String _subtitle(Translations t, DateTime now) {
