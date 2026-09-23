@@ -7,6 +7,7 @@ require (
 	github.com/sagernet/quic-go v0.59.0-sing-box-mod.4
 	github.com/sagernet/sing v0.8.12-0.20260726145744-ef2df370afca
 	github.com/sagernet/sing-box v1.13.16
+	github.com/sagernet/sing-tun v0.8.12-0.20260727151122-3a09076491df
 	golang.org/x/net v0.50.0
 )
 
@@ -110,7 +111,6 @@ require (
 	github.com/sagernet/sing-shadowsocks v0.2.8 // indirect
 	github.com/sagernet/sing-shadowsocks2 v0.2.1 // indirect
 	github.com/sagernet/sing-shadowtls v0.2.1 // indirect
-	github.com/sagernet/sing-tun v0.8.12-0.20260727151122-3a09076491df // indirect
 	github.com/sagernet/sing-vmess v0.2.8-0.20250909125414-3aed155119a1 // indirect
 	github.com/sagernet/smux v1.5.50-sing-box-mod.1 // indirect
 	github.com/sagernet/tailscale v1.92.4-sing-box-1.13-mod.8 // indirect

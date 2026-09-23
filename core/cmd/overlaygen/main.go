@@ -1,9 +1,10 @@
 // Command overlaygen writes the build overlay: the handful of edits Commy
-// makes to the pinned sing-box, applied at build time and nowhere else.
+// makes to the pinned sing-box and its TUN library, applied at build time and
+// nowhere else.
 //
 //	go run ./cmd/overlaygen -out build/_overlay
 //
-// There are two of them, and each is here because the alternative was worse.
+// There are three of them, and each is here because the alternative was worse.
 //
 // # XHTTP
 //
@@ -25,6 +26,19 @@
 // when, and only when, the server has answered with somebody else's
 // certificate. See docs/adr/0011-reality-client-hello.md.
 //
+// # The gVisor reader that outlives its stack
+//
+// sing-tun puts a filter in front of the gVisor link endpoint, and the
+// filter's Attach wraps whatever it is handed — nil included. Closing the
+// stack detaches the endpoint with Attach(nil); the wrapper turns that into a
+// non-nil dispatcher, and fdbased, which stops its reader only on nil, stops
+// nothing. Every stop or reload of the core then leaves a thread asleep in
+// ppoll on the old descriptor number: the TUN interface outlives the tunnel,
+// one more per reconnect, and a reader that wakes up reads whatever file now
+// owns that number — a socket of the new core, or the new TUN. Seen on the
+// emulator; upstream sing-tun has the same one-line fix, the one sing-box
+// v1.13.16 pins does not. See docs/adr/0012-gvisor-reader-stop.md.
+//
 // # Why an overlay
 //
 // Reaching upstream code means changing upstream files, and there are three
@@ -39,11 +53,12 @@
 //     the whole delta is the list of edits below.
 //
 // This is the third. The edits are exact-string replacements: each anchor must
-// appear exactly once in a file whose SHA-256 is the one recorded here. A
-// sing-box bump that touches any of these files stops the build with a message
-// saying so, instead of compiling a stale copy of upstream's code into the core
-// (rule R8: a bump is its own change, and re-basing this overlay — or dropping
-// an edit upstream no longer needs — is part of it).
+// appear exactly once in a file whose SHA-256 is the one recorded here, in a
+// module whose version is the one recorded here. A sing-box bump that touches
+// any of these files, or brings a different sing-tun, stops the build with a
+// message saying so, instead of compiling a stale copy of upstream's code into
+// the core (rule R8: a bump is its own change, and re-basing this overlay — or
+// dropping an edit upstream no longer needs — is part of it).
 //
 // One sharp edge, handled by scripts/build_core.sh: the go command reads the
 // import list of a module-cache package from its module index and does not
@@ -63,11 +78,20 @@ import (
 	"strings"
 )
 
-const singBoxModule = "github.com/sagernet/sing-box"
+// module is an upstream module the overlay edits, at the version the hashes
+// below were taken from. The version is checked against go.mod by the module
+// query, not assumed.
+type module struct {
+	path    string
+	version string
+}
 
-// singBoxVersion is the release the hashes below were taken from. It is
-// checked against go.mod by the module query, not assumed.
-const singBoxVersion = "v1.13.16"
+var (
+	singBox = module{"github.com/sagernet/sing-box", "v1.13.16"}
+	// singTun is whatever sing-box v1.13.16 requires. It moves only when
+	// sing-box does, so a bump meets this check as well as the hashes.
+	singTun = module{"github.com/sagernet/sing-tun", "v0.8.12-0.20260727151122-3a09076491df"}
+)
 
 type edit struct {
 	// anchor is upstream text that must occur exactly once.
@@ -77,7 +101,8 @@ type edit struct {
 }
 
 type target struct {
-	// path is relative to the sing-box module root.
+	module module
+	// path is relative to the module root.
 	path   string
 	sha256 string
 	edits  []edit
@@ -85,6 +110,7 @@ type target struct {
 
 var targets = []target{
 	{
+		module: singBox,
 		path:   "option/v2ray_transport.go",
 		sha256: "b21a197c27195d7b35ce746751905d2e054fdfc668ec66052f7efd4714538d0e",
 		edits: []edit{
@@ -111,6 +137,7 @@ var targets = []target{
 		},
 	},
 	{
+		module: singBox,
 		path:   "common/tls/reality_client.go",
 		sha256: "c4ac64433d5fce2c4f40ad0e49ed73f90259861c2553307fb394559c923f6b68",
 		edits: []edit{
@@ -163,6 +190,7 @@ var targets = []target{
 		},
 	},
 	{
+		module: singBox,
 		path:   "transport/v2ray/transport.go",
 		sha256: "3ff90cfde30a7b25db84174f61715c54b1a6f1242ac823469e877c655a971189",
 		edits: []edit{
@@ -183,6 +211,21 @@ var targets = []target{
 				replacement: "\t\treturn v2rayhttpupgrade.NewClient(ctx, dialer, serverAddr, options.HTTPUpgradeOptions, tlsConfig)\n" +
 					"\tcase xhttpconfig.TransportType:\n" +
 					"\t\treturn xhttp.NewClient(ctx, dialer, serverAddr, options.XHTTPOptions, tlsConfig)\n",
+			},
+		},
+	},
+	{
+		module: singTun,
+		path:   "stack_gvisor_filter.go",
+		sha256: "9fc5164671a89a8aec5c2d9929af360e774a2a74f38364ac512d268ad23ede4b",
+		edits: []edit{
+			{
+				anchor: "func (w *LinkEndpointFilter) Attach(dispatcher stack.NetworkDispatcher) {\n",
+				replacement: "func (w *LinkEndpointFilter) Attach(dispatcher stack.NetworkDispatcher) {\n" +
+					"\t// [commy] nil is how the stack detaches, and fdbased stops its\n" +
+					"\t// reader only on nil. Wrapped, it stopped nothing. See\n" +
+					"\t// core/cmd/overlaygen.\n" +
+					"\tif dispatcher == nil {\n\t\tw.LinkEndpoint.Attach(nil)\n\t\treturn\n\t}\n",
 			},
 		},
 	},
@@ -278,22 +321,28 @@ func main() {
 // generate writes the patched files and overlay.json, and returns the
 // absolute path of the latter.
 func generate(out string) (string, error) {
-	root, err := moduleRoot()
-	if err != nil {
-		return "", err
-	}
 	outAbs, err := filepath.Abs(out)
 	if err != nil {
 		return "", err
 	}
+	roots := make(map[module]string)
 	replace := make(map[string]string, len(targets))
 	for _, t := range targets {
+		root, known := roots[t.module]
+		if !known {
+			if root, err = moduleRoot(t.module); err != nil {
+				return "", err
+			}
+			roots[t.module] = root
+		}
 		upstream := filepath.Join(root, filepath.FromSlash(t.path))
 		patched, err := patch(upstream, t)
 		if err != nil {
 			return "", err
 		}
-		destination := filepath.Join(outAbs, filepath.FromSlash(t.path))
+		// Under the module path, so that two modules' files of the same name
+		// cannot land on each other.
+		destination := filepath.Join(outAbs, filepath.FromSlash(t.module.path), filepath.FromSlash(t.path))
 		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 			return "", err
 		}
@@ -323,11 +372,11 @@ func patch(upstream string, t target) ([]byte, error) {
 	if got := hex.EncodeToString(sum[:]); got != t.sha256 {
 		return nil, fmt.Errorf(
 			"%s is not the file this overlay was written against "+
-				"(sha256 %s, expected %s from sing-box %s).\n"+
+				"(sha256 %s, expected %s from %s %s).\n"+
 				"sing-box was bumped or the module cache is damaged. Re-base the edits in "+
 				"core/cmd/overlaygen/main.go onto the new file, check the result by hand, "+
 				"and record its hash",
-			t.path, got, t.sha256, singBoxVersion)
+			t.path, got, t.sha256, t.module.path, t.module.version)
 	}
 	text := string(content)
 	for _, e := range t.edits {
@@ -340,38 +389,38 @@ func patch(upstream string, t target) ([]byte, error) {
 	return []byte(text), nil
 }
 
-// moduleRoot asks the go command where the pinned sing-box lives, and refuses
-// to go on if go.mod pins something else or replaces the module.
-func moduleRoot() (string, error) {
-	command := exec.Command("go", "list", "-m", "-json", singBoxModule)
+// moduleRoot asks the go command where the pinned module lives, and refuses to
+// go on if the build selects another version or replaces the module.
+func moduleRoot(m module) (string, error) {
+	command := exec.Command("go", "list", "-m", "-json", m.path)
 	// An inherited GOFLAGS may already name the overlay — a file this program
 	// has not written yet — so the query runs with none. Emptied, not set to
 	// -mod=mod: a program that only reads must not be able to rewrite go.mod.
 	command.Env = append(os.Environ(), "GOFLAGS=")
 	output, err := command.Output()
 	if err != nil {
-		return "", fmt.Errorf("go list -m %s: %w (run it from core/)", singBoxModule, err)
+		return "", fmt.Errorf("go list -m %s: %w (run it from core/)", m.path, err)
 	}
-	var module struct {
+	var listed struct {
 		Version string
 		Dir     string
 		Replace *struct{ Path string }
 	}
-	if err := json.Unmarshal(output, &module); err != nil {
+	if err := json.Unmarshal(output, &listed); err != nil {
 		return "", err
 	}
-	if module.Replace != nil {
+	if listed.Replace != nil {
 		return "", fmt.Errorf("%s is replaced by %s: the overlay is written against the published module",
-			singBoxModule, module.Replace.Path)
+			m.path, listed.Replace.Path)
 	}
-	if module.Version != singBoxVersion {
-		return "", fmt.Errorf("go.mod pins %s %s, the overlay is written against %s",
-			singBoxModule, module.Version, singBoxVersion)
+	if listed.Version != m.version {
+		return "", fmt.Errorf("the build selects %s %s, the overlay is written against %s",
+			m.path, listed.Version, m.version)
 	}
-	if module.Dir == "" {
-		return "", fmt.Errorf("%s is not in the module cache; run `go mod download`", singBoxModule)
+	if listed.Dir == "" {
+		return "", fmt.Errorf("%s is not in the module cache; run `go mod download`", m.path)
 	}
-	return module.Dir, nil
+	return listed.Dir, nil
 }
 
 func firstLine(text string) string {

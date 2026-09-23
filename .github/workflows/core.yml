@@ -72,17 +72,20 @@ jobs:
         run: go test -race ./...
 
       # The XHTTP transport reaches sing-box through a build overlay that
-      # patches two upstream files. This step is what notices a sing-box bump
-      # that moved them: overlaygen refuses a file whose hash it does not know.
-      # The tagged test then goes through sing-box itself — a real instance, a
-      # VLESS outbound over XHTTP, traffic in every mode.
-      - name: Build overlay applies, and sing-box carries XHTTP through it
+      # patches upstream files, sing-tun's among them. This step is what
+      # notices a sing-box bump that moved them: overlaygen refuses a file
+      # whose hash it does not know. The tagged tests then go through the
+      # libraries themselves — a real sing-box instance, a VLESS outbound over
+      # XHTTP, traffic in every mode; and a gVisor stack that must stop
+      # reading its device once closed.
+      - name: Build overlay applies, and the edits hold in the libraries
         working-directory: core
         run: |
           TAGS=$(grep -oP '(?<=^readonly TAGS=")[^"]+' ../scripts/build_core.sh)
           OVERLAY=$(go run ./cmd/overlaygen -out build/_overlay)
           GODEBUG=goindex=0 go test -overlay="$OVERLAY" \
-            -tags "$TAGS,commy_overlay" -ldflags "-checklinkname=0" ./xhttp/
+            -tags "$TAGS,commy_overlay" -ldflags "-checklinkname=0" \
+            ./xhttp/ ./internal/singtun/
 
       - name: Typecheck for android/arm64
         working-directory: core
