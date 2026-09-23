@@ -1,6 +1,7 @@
 package dev.commy.app
 
 import android.content.Intent
+import dev.commy.app.tunnel.TunnelController
 import dev.commy.app.wire.CommyChannels
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -23,6 +24,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Before the channels exist, so the first status Dart reads already
+        // says that a tunnel died while the app was away.
+        TunnelController.clearOrphan(applicationContext)
         channels = CommyChannels(
             context = applicationContext,
             messenger = flutterEngine.dartExecutor.binaryMessenger,

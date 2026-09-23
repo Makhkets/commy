@@ -13,6 +13,8 @@
     <string name="notification_channel_tunnel">Tunnel</string>
     <string name="notification_channel_tunnel_description">Shows the tunnel state while it is running. Turning this off stops the tunnel from staying up in the background.</string>
     <string name="notification_channel_core">Core messages</string>
+    <string name="notification_channel_alerts">Tunnel alerts</string>
+    <string name="notification_channel_alerts_description">When the tunnel is not up and should be: after a restart, or when it stopped on its own.</string>
 
     <string name="notification_idle">Disconnected</string>
     <string name="notification_starting">Connecting…</string>
@@ -26,4 +28,8 @@
 
     <string name="notification_open_title">Commy is not connected</string>
     <string name="notification_open_text">Open the app to bring the tunnel up.</string>
+
+    <string name="notification_lost_title">The tunnel stopped</string>
+    <string name="notification_lost_text">Apps are using the network without the proxy. Tap to connect again.</string>
+    <string name="notification_lost_blocked_text">Nothing reaches the network until it is back: the system blocks connections without a VPN. Tap to connect again.</string>
 </resources>

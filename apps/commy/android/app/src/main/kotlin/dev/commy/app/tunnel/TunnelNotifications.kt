@@ -122,6 +122,17 @@ internal class TunnelNotifications(private val context: Context) {
     }
 
     /**
+     * Takes down [promptToOpenApp] and [tunnelLost] once a tunnel is up.
+     *
+     * Both are auto-cancel, which only covers a tap on them. A user who opened
+     * the app some other way and connected was left with "Commy is not
+     * connected" sitting under "Connected" for as long as the tunnel ran.
+     */
+    fun clearPrompt() {
+        manager?.cancel(ID_PROMPT)
+    }
+
+    /**
      * "Open Commy to connect."
      *
      * Shown when something outside the app asked for a tunnel — a boot, an
@@ -131,8 +142,12 @@ internal class TunnelNotifications(private val context: Context) {
      * the encrypted store, can produce one.
      */
     fun promptToOpenApp() {
-        ensureChannel()
-        val notification = NotificationCompat.Builder(context, CHANNEL_TUNNEL)
+        // The alerts channel, silenced: a user who turned on "start on boot"
+        // expects to be protected, and in the silent section of the shade,
+        // with no icon in the status bar, the one message saying they are not
+        // was easy to miss.
+        ensureAlertsChannel()
+        val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notification_open_title))
             .setContentText(context.getString(R.string.notification_open_text))
@@ -142,6 +157,52 @@ internal class TunnelNotifications(private val context: Context) {
             .setContentIntent(openApp(connect = true))
             .build()
         manager?.notify(ID_PROMPT, notification)
+    }
+
+    /**
+     * "The tunnel stopped." Posted when the process died with the tunnel up.
+     *
+     * Louder than the ongoing notification on purpose — its own channel at
+     * default importance, so it reaches the status bar: until the user acts,
+     * every app is on the open network. [blocked] is the one exception, the
+     * system kill switch ("Block connections without VPN"), and there the
+     * truth is the opposite — nothing gets out at all — so the text says
+     * that instead. Same id as [promptToOpenApp], because an always-on VPN
+     * restarts us at the same moment and two cards saying one thing is noise.
+     */
+    fun tunnelLost(blocked: Boolean) {
+        ensureAlertsChannel()
+        val text = context.getString(
+            if (blocked) R.string.notification_lost_blocked_text else R.string.notification_lost_text,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_lost_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_ERROR)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setContentIntent(openApp(connect = true))
+            .build()
+        manager?.notify(ID_PROMPT, notification)
+    }
+
+    /** Default importance: these reach the status bar. */
+    private fun ensureAlertsChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+        manager?.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ALERTS,
+                context.getString(R.string.notification_channel_alerts),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                description = context.getString(R.string.notification_channel_alerts_description)
+                setShowBadge(false)
+            },
+        )
     }
 
     /**
@@ -230,6 +291,7 @@ internal class TunnelNotifications(private val context: Context) {
 
         private const val CHANNEL_TUNNEL = "commy.tunnel"
         private const val CHANNEL_CORE = "commy.core"
+        private const val CHANNEL_ALERTS = "commy.alerts"
 
         // FLAG_IMMUTABLE is mandatory from API 31 and harmless before it. A
         // mutable PendingIntent handed to the notification shade is a way for

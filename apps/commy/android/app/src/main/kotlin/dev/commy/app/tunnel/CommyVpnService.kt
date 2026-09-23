@@ -91,27 +91,76 @@ class CommyVpnService : VpnService(), CommandServerHandler {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Foreground first, always. Android gives a service started with
-        // startForegroundService five seconds to get here, and misses are a
-        // crash rather than a warning.
-        goForeground(if (intent?.action == ACTION_START) Wire.States.STARTING else Wire.States.IDLE)
-        when (intent?.action) {
-            ACTION_START -> scope.launch { bringUp() }
+        if (intent == null) {
+            reportTunnelLost(startId)
+            return START_NOT_STICKY
+        }
+        when (intent.action) {
+            ACTION_START -> {
+                // Foreground first. Android gives a service started with
+                // startForegroundService five seconds to get here, and misses
+                // are a crash rather than a warning.
+                goForeground(Wire.States.STARTING)
+                scope.launch { bringUp() }
+            }
+            // No foreground for the two ways down: both arrive through
+            // startService, which promises nothing, and one of them lands in a
+            // process that has just started — where the platform may refuse a
+            // foreground start outright. shutdown() takes the notification
+            // away either way.
             ACTION_STOP -> scope.launch { shutdown() }
+            ACTION_CLEAR -> scope.launch { shutdown(report = false) }
             else -> {
-                // Always-on VPN, or the system restarting us. Neither hands
-                // over a configuration, and we have none to fall back on: the
-                // generated config is a secret and rule R2 keeps it in the
-                // encrypted store on the Dart side. Say so and stand down.
+                goForeground(Wire.States.IDLE)
+                // Always-on VPN. It hands over no configuration, and we have
+                // none to fall back on: the generated config is a secret and
+                // rule R2 keeps it in the encrypted store on the Dart side.
+                // Say so and stand down.
                 Log.i(TAG, "started without a configuration; asking the user to open the app")
                 notifications.promptToOpenApp()
                 scope.launch { shutdown() }
             }
         }
-        // NOT_STICKY: a restart the system performs on its own arrives with no
-        // configuration and no Flutter engine, so it could only recreate the
-        // useless case above.
-        return START_NOT_STICKY
+        // STICKY only while a tunnel is coming up, and for one reason: to be
+        // told when it dies. See [reportTunnelLost].
+        return if (intent.action == ACTION_START) START_STICKY else START_NOT_STICKY
+    }
+
+    /**
+     * The system restarting us after our process died with the tunnel up.
+     *
+     * The core lives in this process, so a Go panic, the low-memory killer or
+     * anything else that ends the process ends the tunnel too — and Android
+     * does not take down the notification with it. The service record outlives
+     * the process, and so does the last thing it posted: "Connected", with a
+     * speed, above a Disconnect button, while every app is back on the open
+     * network. That is the one thing a proxy client must never tell its user,
+     * and it stayed there until something started the process again.
+     *
+     * START_STICKY is how we find out. Android restarts a sticky service whose
+     * process died, with no intent, and stopping the service here is what
+     * finally takes the stale notification away. The restart carries no
+     * configuration, so the tunnel cannot come back on its own; what we can do
+     * is say that it is gone, which is what the leak checklist asks for when
+     * the kill switch is off (docs/09-security-privacy.md).
+     *
+     * It does not always come. On Android 16 the platform's VPN code unbinds
+     * from us the moment the TUN interface disappears, which is the same
+     * moment the process dies, and that unbind leaves the service record
+     * behind with no restart scheduled — "Exception when unbinding service"
+     * in the system log, and the stale notification with it. That case is
+     * cleared from the other end, the next time the process starts: see
+     * [TunnelController.clearOrphan].
+     *
+     * No foreground here: nothing called startForegroundService, and a
+     * background restart may not be allowed one.
+     */
+    private fun reportTunnelLost(startId: Int) {
+        Log.w(TAG, "restarted after the process died with the tunnel up")
+        val blocked = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            runCatching { isLockdownEnabled }.getOrDefault(false)
+        notifications.tunnelLost(blocked)
+        stopSelf(startId)
     }
 
     override fun onRevoke() {
@@ -220,6 +269,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             val since = events.startedAtMillis() ?: System.currentTimeMillis()
             TunnelController.onStarted(since)
             notifications.update(Wire.States.CONNECTED, events.selectedNode, 0, 0)
+            notifications.clearPrompt()
         } catch (error: Throwable) {
             val failure = error as? WireException
                 ?: WireException.from(Wire.Errors.CORE_CRASHED, error)
@@ -567,6 +617,9 @@ class CommyVpnService : VpnService(), CommandServerHandler {
 
         const val ACTION_START = "dev.commy.app.action.START"
         const val ACTION_STOP = "dev.commy.app.action.STOP"
+
+        /** [ACTION_STOP] for a service whose process already died. */
+        const val ACTION_CLEAR = "dev.commy.app.action.CLEAR"
 
         private const val DEFAULT_V4 = "0.0.0.0"
         private const val DEFAULT_V6 = "::"

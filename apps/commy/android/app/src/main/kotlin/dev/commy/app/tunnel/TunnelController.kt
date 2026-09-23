@@ -1,7 +1,11 @@
 package dev.commy.app.tunnel
 
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import dev.commy.app.wire.Wire
@@ -166,6 +170,65 @@ internal object TunnelController {
 
     /** The last groups the core reported, or an empty array when it is not up. */
     fun proxies(): String = service?.proxies() ?: CoreSnapshots.NO_GROUPS
+
+    /**
+     * Clears a tunnel notification that has no tunnel behind it.
+     *
+     * The core lives in this process, so when the process dies the tunnel dies
+     * with it — and on Android 16 the service record, and with it the last
+     * "Connected" the service posted, can outlive both (see
+     * `CommyVpnService.reportTunnelLost` for why the restart that should
+     * clean up never comes). Every app is on the open network by then, and
+     * the shade says the opposite.
+     *
+     * Called when the activity starts, which is the next moment this process
+     * is allowed to start a service: it asks the orphaned service to go away
+     * and reports the loss as `core_crashed`, so the app opens on the error
+     * rather than on a quiet "Disconnected" that hides what happened. Does
+     * nothing in the ordinary case — a fresh process with no notification, or
+     * a live tunnel in this one.
+     */
+    fun clearOrphan(context: Context) {
+        if (service != null || statusState.value.state != Wire.States.IDLE) {
+            return
+        }
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val orphaned = runCatching {
+            manager.activeNotifications.any { it.id == TunnelNotifications.ID_TUNNEL }
+        }.getOrDefault(false)
+        if (!orphaned) {
+            return
+        }
+        val how = lastExit(context)
+        Log.w(TAG, "the tunnel notification outlived its process ($how); clearing it")
+        fail(Wire.Errors.CORE_CRASHED, "the tunnel stopped while the app was not running: $how")
+        runCatching {
+            context.startService(
+                Intent(context, CommyVpnService::class.java)
+                    .setAction(CommyVpnService.ACTION_CLEAR),
+            )
+        }.onFailure { Log.w(TAG, "could not clear the orphaned tunnel: ${it.message}") }
+    }
+
+    /** How the last process of this app ended, in words, for the log. */
+    private fun lastExit(context: Context): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return "the system does not say how"
+        }
+        val info = runCatching {
+            context.getSystemService(ActivityManager::class.java)
+                ?.getHistoricalProcessExitReasons(context.packageName, 0, 1)
+                ?.firstOrNull()
+        }.getOrNull() ?: return "the system does not say how"
+        val what = when (info.reason) {
+            ApplicationExitInfo.REASON_CRASH, ApplicationExitInfo.REASON_CRASH_NATIVE -> "crashed"
+            ApplicationExitInfo.REASON_SIGNALED -> "killed by signal ${info.status}"
+            ApplicationExitInfo.REASON_LOW_MEMORY -> "killed to free memory"
+            ApplicationExitInfo.REASON_EXIT_SELF -> "exited with status ${info.status}"
+            else -> "ended, reason ${info.reason}"
+        }
+        return info.description?.takeIf { it.isNotBlank() }?.let { "$what: $it" } ?: what
+    }
 
     // ── called from the service ───────────────────────────────────────────
 

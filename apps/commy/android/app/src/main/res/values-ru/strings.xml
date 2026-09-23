@@ -3,6 +3,8 @@
     <string name="notification_channel_tunnel">Туннель</string>
     <string name="notification_channel_tunnel_description">Показывает состояние туннеля, пока он поднят. Если отключить, туннель не сможет работать в фоне.</string>
     <string name="notification_channel_core">Сообщения ядра</string>
+    <string name="notification_channel_alerts">Предупреждения туннеля</string>
+    <string name="notification_channel_alerts_description">Когда туннель не поднят, хотя должен: после перезагрузки или если он остановился сам.</string>
 
     <string name="notification_idle">Отключено</string>
     <string name="notification_starting">Подключение…</string>
@@ -15,4 +17,8 @@
 
     <string name="notification_open_title">Commy не подключён</string>
     <string name="notification_open_text">Откройте приложение, чтобы поднять туннель.</string>
+
+    <string name="notification_lost_title">Туннель остановился</string>
+    <string name="notification_lost_text">Приложения выходят в сеть без прокси. Нажмите, чтобы подключиться снова.</string>
+    <string name="notification_lost_blocked_text">Пока он не поднимется, сеть недоступна: система блокирует соединения без VPN. Нажмите, чтобы подключиться снова.</string>
 </resources>
