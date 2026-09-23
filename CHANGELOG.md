@@ -10,6 +10,17 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5]
+
+The release that met a live stand: servers of every protocol on the list, a
+panel with a device limit, and an emulator that loses its Wi-Fi on purpose.
+Three things matter more than the rest of this list: a tunnel that dies now
+says so instead of showing "Connected"; the core's log reaches the log screen
+at all; and REALITY keeps working against Xray 26.9.8 and later.
+
+**If alpha.4 is installed, uninstall it first.** Neither build is signed with
+a release key, so Android will not install one over the other.
+
 ### Added
 
 - **Ad blocking works, and it works in DNS.** The switch had been in settings
@@ -601,7 +612,8 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.4...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.5...main
+[0.1.0-alpha.5]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.5
 [0.1.0-alpha.4]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.4
 [0.1.0-alpha.3]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.3
 [0.1.0-alpha.2]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.2
