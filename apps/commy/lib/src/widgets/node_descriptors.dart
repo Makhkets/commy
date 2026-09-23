@@ -4,8 +4,9 @@ import 'package:commy_domain/commy_domain.dart';
 ///
 /// It answers the one question a list of near-identical names cannot: what is
 /// this connection actually made of. The parts are read from the node's own
-/// parameters, so a server that carries no transport information gets a
-/// shorter line rather than an invented one.
+/// parameters. A link that names no transport gets the one its protocol runs
+/// over — TCP for the V2Ray family, QUIC for Hysteria2 and TUIC, UDP for
+/// WireGuard — and never a default that belongs to some other protocol.
 ///
 /// Nothing secret is ever read here. The keys touched — `security`, `type`,
 /// `flow` — are transport shape, not credentials, and none of them appear in
@@ -30,7 +31,9 @@ abstract final class NodeDescriptors {
     }
 
     final transport = node.param(transportKey)?.trim() ?? '';
-    parts.add(transport.isEmpty ? 'TCP' : transport.toUpperCase());
+    parts.add(
+      transport.isEmpty ? _carriedOver(node.protocol) : transport.toUpperCase(),
+    );
 
     final flow = node.param(flowKey)?.trim() ?? '';
     if (flow.isNotEmpty) {
@@ -38,6 +41,25 @@ abstract final class NodeDescriptors {
     }
     return parts;
   }
+
+  /// What [protocol] carries traffic over when the link says nothing.
+  ///
+  /// Every row used to fall back to "TCP", which put `HYSTERIA2 · TCP` under
+  /// a server that has no TCP port at all. Exhaustive on purpose, like
+  /// `MeasureLatencyUseCase.isDirectlyMeasurable`: a protocol added later has
+  /// to be placed by whoever adds it.
+  static String _carriedOver(Protocol protocol) => switch (protocol) {
+        Protocol.hysteria2 || Protocol.tuic => 'QUIC',
+        Protocol.wireguard => 'UDP',
+        Protocol.vless ||
+        Protocol.vmess ||
+        Protocol.trojan ||
+        Protocol.shadowsocks ||
+        Protocol.shadowtls ||
+        Protocol.socks ||
+        Protocol.http =>
+          'TCP',
+      };
 
   static String _titleCase(String value) {
     if (value.isEmpty) {
