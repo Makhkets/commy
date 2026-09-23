@@ -10,6 +10,14 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8]
+
+- **Settings → Ping.** Servers are timed by a GET through the server itself —
+  also with the tunnel down, so the list shows which servers really work
+  before you connect. TCP and ICMP are there to choose instead.
+- **No more lag after "Check".** The log view re-read its whole buffer for
+  every line, and the core's trace lines reached it at any log level.
+
 ## [0.1.0-alpha.7]
 
 - An unlimited plan draws a full traffic bar, in the calm colour — not red.
@@ -634,6 +642,7 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.7...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.8...main
+[0.1.0-alpha.8]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.8
 [0.1.0-alpha.7]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.7
 [0.1.0-alpha.6]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.6
