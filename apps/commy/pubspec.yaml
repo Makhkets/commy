@@ -2,7 +2,7 @@ name: commy
 description: >-
   Commy — a cross-platform proxy client for servers you own. Composition root,
   routing and screens. Application id and namespace: dev.commy.app.
-version: 0.1.0-alpha.6+6
+version: 0.1.0-alpha.7+7
 publish_to: none
 
 environment:

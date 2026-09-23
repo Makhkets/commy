@@ -10,6 +10,12 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7]
+
+- An unlimited plan draws a full traffic bar, in the calm colour — not red.
+- Release notes carry only the release they describe; each earlier one
+  carried the whole changelog.
+
 ## [0.1.0-alpha.6]
 
 The earlier alphas are withdrawn: none of them connected to REALITY servers on
@@ -628,5 +634,6 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.6...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.7...main
+[0.1.0-alpha.7]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.7
 [0.1.0-alpha.6]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.6
