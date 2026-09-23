@@ -10,6 +10,22 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6]
+
+The earlier alphas are withdrawn: none of them connected to REALITY servers on
+Xray 26.7.
+
+- **Connects to REALITY servers on Xray 26.7.** They refuse clients that call
+  themselves older than 26.3.27, and sing-box calls itself 1.8.1.
+- **The server you pick is the one traffic goes through.** A choice made while
+  disconnected used to lose to the server used last time.
+- **"Check" and "Measure all" work with the tunnel up.** They used to report
+  every server down.
+- Servers that did not answer are grey; Auto wears the EU flag; the list keeps
+  a margin from the screen edges.
+- A toast after a subscription refresh, whether it worked or not.
+- Settings → Reset: network settings and app settings.
+
 ## [0.1.0-alpha.5]
 
 The release that met a live stand: servers of every protocol on the list, a
@@ -612,9 +628,5 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.5...main
-[0.1.0-alpha.5]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.5
-[0.1.0-alpha.4]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.4
-[0.1.0-alpha.3]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.3
-[0.1.0-alpha.2]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.2
-[0.1.0-alpha.1]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.1
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.6...main
+[0.1.0-alpha.6]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.6
