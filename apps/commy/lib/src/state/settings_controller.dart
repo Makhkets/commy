@@ -230,6 +230,45 @@ class SettingsController extends Notifier<CommyFailure?> {
     state = result.failureOrNull;
   }
 
+  /// Puts routing and DNS back as they were after install: "reset network".
+  ///
+  /// The mode, the user's rules, per-app routing, ad blocking, the LAN switch
+  /// and every DNS setting return to their defaults. Servers and
+  /// subscriptions are not network settings and stay where they are. A
+  /// running tunnel takes the change the way it takes any routing edit —
+  /// `liveReloadProvider` reloads it, once for both writes.
+  ///
+  /// Returns whether both writes went through.
+  Future<bool> resetNetwork() async {
+    await saveRouting(RoutingPolicy.defaults);
+    if (state != null) {
+      return false;
+    }
+    await saveDns(DnsSettings.defaults);
+    return state == null;
+  }
+
+  /// Puts the app's own settings back as they were after install.
+  ///
+  /// Theme, language, connecting on launch and on boot, the silence panel's
+  /// exceptions, the log level and the rest of [AppSettings]. Servers,
+  /// subscriptions, routing and DNS stay — they have a reset of their own —
+  /// and so does the device identifier, which has its own row. The boot
+  /// receiver is brought in line with the restored setting, the way
+  /// [setStartOnBoot] does it.
+  ///
+  /// Returns whether the write went through.
+  Future<bool> resetAppSettings() async {
+    await save(AppSettings.defaults);
+    if (state != null) {
+      return false;
+    }
+    await ref
+        .read(systemSettingsProvider)
+        .setStartOnBoot(enabled: AppSettings.defaults.startOnBoot);
+    return true;
+  }
+
   /// Clears the last failure once it has been shown.
   void clear() => state = null;
 

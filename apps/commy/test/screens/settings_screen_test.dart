@@ -602,6 +602,89 @@ void main() {
     // nothing — an error state that cannot be left, and a green test.
     expect(reads, greaterThan(before));
   });
+
+  /// "Reset network" and "reset app settings": each asks first, each puts
+  /// back only what it names, and each says it is done.
+  group('reset', () {
+    final policy = RoutingPolicy.defaults.copyWith(
+      mode: RoutingMode.direct,
+      blockAds: true,
+      rules: const <RoutingRule>[
+        RoutingRule(
+          id: 'r1',
+          matcher: 'domain:example.com',
+          action: RuleAction.direct,
+        ),
+      ],
+    );
+    final settings = AppSettings.defaults.copyWith(
+      hideUnavailable: true,
+      startOnBoot: true,
+      allowLan: true,
+    );
+
+    Future<void> ask(WidgetTester tester, String row) async {
+      await tester.tap(find.text(row));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('network puts routing and DNS back, and only them',
+        (tester) async {
+      await pumpScreen(tester, settings: settings, policy: policy);
+      await harness.routingRepository
+          .writeDns(DnsSettings.defaults.copyWith(fakeIp: true));
+
+      await ask(tester, t.settings.reset.network);
+      expect(find.text(t.settings.reset.networkConfirm.body), findsOneWidget);
+      await tester.tap(find.text(t.settings.reset.confirm));
+      await tester.pumpAndSettle();
+
+      expect(
+        (await harness.routingRepository.read()).valueOrNull,
+        RoutingPolicy.defaults,
+      );
+      expect(
+        (await harness.routingRepository.readDns()).valueOrNull,
+        DnsSettings.defaults,
+      );
+      // The app's own settings are not network settings.
+      expect(await stored(), settings);
+      expect(find.text(t.settings.reset.networkDone), findsOneWidget);
+    });
+
+    testWidgets('cancelling the question changes nothing', (tester) async {
+      await pumpScreen(tester, settings: settings, policy: policy);
+
+      await ask(tester, t.settings.reset.network);
+      await tester.tap(find.text(t.settings.reset.cancel));
+      await tester.pumpAndSettle();
+      await ask(tester, t.settings.reset.app);
+      await tester.tap(find.text(t.settings.reset.cancel));
+      await tester.pumpAndSettle();
+
+      expect((await harness.routingRepository.read()).valueOrNull, policy);
+      expect(await stored(), settings);
+      expect(system.startOnBootCalls, isEmpty);
+    });
+
+    testWidgets('app settings go back, and the boot receiver with them',
+        (tester) async {
+      await pumpScreen(tester, settings: settings, policy: policy);
+
+      await ask(tester, t.settings.reset.app);
+      expect(find.text(t.settings.reset.appConfirm.body), findsOneWidget);
+      await tester.tap(find.text(t.settings.reset.confirm));
+      await tester.pumpAndSettle();
+
+      expect(await stored(), AppSettings.defaults);
+      // A receiver left armed behind a setting that now reads off is the
+      // defect `setStartOnBoot` exists to prevent; the reset keeps the pair.
+      expect(system.startOnBootCalls, <bool>[AppSettings.defaults.startOnBoot]);
+      // Routing has its own reset.
+      expect((await harness.routingRepository.read()).valueOrNull, policy);
+      expect(find.text(t.settings.reset.appDone), findsOneWidget);
+    });
+  });
 }
 
 /// A [SystemSettings] that records instead of calling a platform channel.

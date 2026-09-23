@@ -8,6 +8,7 @@ import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
+import 'package:commy/src/widgets/confirm_sheet.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_config/commy_config.dart';
@@ -187,6 +188,25 @@ class _Body extends ConsumerWidget {
                   controller.save(settings.copyWith(allowLan: value)),
                 ),
               ),
+            ),
+          ],
+        ),
+        // Last, and each behind a question: the two rows on this screen
+        // that undo more than they do.
+        SectionLabel(t.settings.reset.title),
+        SettingsSection(
+          children: <Widget>[
+            SettingsTile(
+              icon: CommyIcons.routing,
+              title: t.settings.reset.network,
+              subtitle: t.settings.reset.networkHint,
+              onTap: () => unawaited(_resetNetwork(context, controller)),
+            ),
+            SettingsTile(
+              icon: CommyIcons.refresh,
+              title: t.settings.reset.app,
+              subtitle: t.settings.reset.appHint,
+              onTap: () => unawaited(_resetApp(context, controller)),
             ),
           ],
         ),
@@ -391,6 +411,78 @@ Future<void> _resetDeviceId(
         done ? t.settings.identity.resetDone : t.settings.identity.resetFailed,
     tone: done ? CommyTone.info : CommyTone.error,
     icon: done ? CommyIcons.refresh : CommyIcons.warning,
+  );
+}
+
+/// Asks, then puts routing and DNS back as they were after install.
+Future<void> _resetNetwork(
+  BuildContext context,
+  SettingsController controller,
+) async {
+  final t = Translations.of(context);
+  final confirmed = await ConfirmSheet.show(
+    context,
+    title: t.settings.reset.networkConfirm.title,
+    body: t.settings.reset.networkConfirm.body,
+    confirmLabel: t.settings.reset.confirm,
+    cancelLabel: t.settings.reset.cancel,
+    icon: CommyIcons.routing,
+  );
+  if (!confirmed) {
+    return;
+  }
+  final done = await controller.resetNetwork();
+  if (!context.mounted) {
+    return;
+  }
+  _saySo(
+    context,
+    done: done,
+    message: done ? t.settings.reset.networkDone : t.settings.reset.failed,
+  );
+}
+
+/// Asks, then puts the app's own settings back as they were after install.
+Future<void> _resetApp(
+  BuildContext context,
+  SettingsController controller,
+) async {
+  final t = Translations.of(context);
+  final confirmed = await ConfirmSheet.show(
+    context,
+    title: t.settings.reset.appConfirm.title,
+    body: t.settings.reset.appConfirm.body,
+    confirmLabel: t.settings.reset.confirm,
+    cancelLabel: t.settings.reset.cancel,
+    icon: CommyIcons.refresh,
+  );
+  if (!confirmed) {
+    return;
+  }
+  final done = await controller.resetAppSettings();
+  if (!context.mounted) {
+    return;
+  }
+  // Read again: the language may just have changed back, and the toast is
+  // the first thing said in it.
+  final after = Translations.of(context);
+  _saySo(
+    context,
+    done: done,
+    message: done ? after.settings.reset.appDone : after.settings.reset.failed,
+  );
+}
+
+void _saySo(
+  BuildContext context, {
+  required bool done,
+  required String message,
+}) {
+  ToastMessenger.show(
+    context,
+    message: message,
+    tone: done ? CommyTone.connected : CommyTone.error,
+    icon: done ? CommyIcons.success : CommyIcons.warning,
   );
 }
 

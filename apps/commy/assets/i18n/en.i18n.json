@@ -340,6 +340,26 @@
       "hideUnavailableHint": "Servers that did not answer a probe",
       "allowLan": "Allow LAN access",
       "allowLanHint": "The proxy listens beyond localhost"
+    },
+    "reset": {
+      "title": "Reset",
+      "network": "Reset network",
+      "networkHint": "Routing, rules and DNS, as after install",
+      "networkConfirm": {
+        "title": "Reset network?",
+        "body": "The routing mode, your rules, the app list, ad blocking and DNS settings go back to their defaults. Servers and subscriptions stay. A running tunnel picks up the new settings at once."
+      },
+      "networkDone": "Network settings reset",
+      "app": "Reset app settings",
+      "appHint": "Theme, language, connection and checks, as after install",
+      "appConfirm": {
+        "title": "Reset app settings?",
+        "body": "Theme, language, auto connect, start on boot, checks and the other settings go back to their defaults. Servers, subscriptions, routing and DNS stay."
+      },
+      "appDone": "App settings reset",
+      "confirm": "Reset",
+      "cancel": "Cancel",
+      "failed": "Could not reset: the store refused the write"
     }
   },
 
