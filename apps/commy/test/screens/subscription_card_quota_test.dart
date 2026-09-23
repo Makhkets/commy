@@ -1,4 +1,5 @@
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
@@ -53,7 +54,9 @@ void main() {
 
     expect(
       card.quotaLabel,
-      t.subscription.usedUnlimited(used: CommyByteFormat.bytes(4 << 30)),
+      t.subscription.usedUnlimited(
+        used: CommyByteFormat.bytes(4 << 30, locale: t.flutterLocale),
+      ),
     );
     expect(card.quotaRatio, isNull, reason: 'No ceiling, so no bar.');
   });
@@ -80,8 +83,8 @@ void main() {
     expect(
       card.quotaLabel,
       t.subscription.quota(
-        used: CommyByteFormat.bytes(2 << 30),
-        total: CommyByteFormat.bytes(10 << 30),
+        used: CommyByteFormat.bytes(2 << 30, locale: t.flutterLocale),
+        total: CommyByteFormat.bytes(10 << 30, locale: t.flutterLocale),
       ),
     );
   });

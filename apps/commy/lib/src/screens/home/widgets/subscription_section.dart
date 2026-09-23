@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/i18n/relative_time.dart';
+import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/screens/home/widgets/measure_progress_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
@@ -203,12 +204,14 @@ class SubscriptionSection extends ConsumerWidget {
       // went through, and that is the one number an unlimited plan has. The
       // bare word alone read as a stray caption under the card's header.
       return used > 0
-          ? t.subscription.usedUnlimited(used: CommyByteFormat.bytes(used))
+          ? t.subscription.usedUnlimited(
+              used: CommyByteFormat.bytes(used, locale: t.flutterLocale),
+            )
           : t.subscription.unlimited;
     }
     return t.subscription.quota(
-      used: CommyByteFormat.bytes(used),
-      total: CommyByteFormat.bytes(total),
+      used: CommyByteFormat.bytes(used, locale: t.flutterLocale),
+      total: CommyByteFormat.bytes(total, locale: t.flutterLocale),
     );
   }
 
@@ -222,8 +225,8 @@ class SubscriptionSection extends ConsumerWidget {
       return null;
     }
     return t.a11y.quota(
-      used: CommyByteFormat.bytes(used),
-      total: CommyByteFormat.bytes(total),
+      used: CommyByteFormat.bytes(used, locale: t.flutterLocale),
+      total: CommyByteFormat.bytes(total, locale: t.flutterLocale),
     );
   }
 

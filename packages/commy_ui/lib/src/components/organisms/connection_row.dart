@@ -119,6 +119,7 @@ class ConnectionRow extends StatelessWidget {
                             icon: CommyIcons.arrowUp,
                             value: CommyByteFormat.bytes(
                               connection.uploadTotal,
+                              locale: Localizations.maybeLocaleOf(context),
                             ),
                           ),
                           SizedBox(width: spacing.s2),
@@ -126,6 +127,7 @@ class ConnectionRow extends StatelessWidget {
                             icon: CommyIcons.arrowDown,
                             value: CommyByteFormat.bytes(
                               connection.downloadTotal,
+                              locale: Localizations.maybeLocaleOf(context),
                             ),
                           ),
                         ],

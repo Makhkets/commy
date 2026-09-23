@@ -26,6 +26,15 @@
     <!-- Upload and download speed. %1$s and %2$s are already formatted sizes. -->
     <string name="notification_speed">↑ %1$s/s   ↓ %2$s/s</string>
 
+    <!-- Byte units, smallest first, for the speed line of the notification. -->
+    <string-array name="byte_units">
+        <item>B</item>
+        <item>KB</item>
+        <item>MB</item>
+        <item>GB</item>
+        <item>TB</item>
+    </string-array>
+
     <string name="notification_open_title">Commy is not connected</string>
     <string name="notification_open_text">Open the app to bring the tunnel up.</string>
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/i18n/relative_time.dart';
+import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/state/library_providers.dart';
@@ -302,7 +303,7 @@ class _RuleSetTile extends StatelessWidget {
       return t.ruleSets.missing;
     }
     final line = t.ruleSets.size(
-      size: CommyByteFormat.bytes(file.sizeBytes),
+      size: CommyByteFormat.bytes(file.sizeBytes, locale: t.flutterLocale),
       age: RelativeTime.coarse(file.ageAt(now), t),
     );
     return isUnused ? '$line · ${t.ruleSets.unused}' : line;

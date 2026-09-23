@@ -13,7 +13,6 @@ import dev.commy.app.MainActivity
 import dev.commy.app.R
 import dev.commy.app.wire.IntentBus
 import dev.commy.app.wire.Wire
-import io.nekohasekai.libbox.Libbox
 
 /**
  * The persistent notification, and the only piece of UI this module owns.
@@ -244,9 +243,34 @@ internal class TunnelNotifications(private val context: Context) {
         }
         return context.getString(
             R.string.notification_speed,
-            Libbox.formatBytes(up),
-            Libbox.formatBytes(down),
+            formatBytes(up),
+            formatBytes(down),
         )
+    }
+
+    /**
+     * A byte count the way the app's own screens write it, in the device's
+     * language: `1.2 MB` in English, `1,2 МБ` in Russian.
+     *
+     * `Libbox.formatBytes` did this before and only speaks English, so the
+     * Russian notification read `↑ 1.2 MB/с` — a translated suffix on an
+     * untranslated number. Mirrors `CommyByteFormat` in commy_ui: binary
+     * steps, one decimal below ten.
+     */
+    private fun formatBytes(value: Long): String {
+        val units = context.resources.getStringArray(R.array.byte_units)
+        if (value < BYTE_STEP) {
+            return "$value ${units.first()}"
+        }
+        var amount = value.toDouble()
+        var unit = 0
+        while (amount >= BYTE_STEP && unit < units.lastIndex) {
+            amount /= BYTE_STEP
+            unit++
+        }
+        val locale = context.resources.configuration.locales[0]
+        val number = String.format(locale, if (amount < 10) "%.1f" else "%.0f", amount)
+        return "$number ${units[unit]}"
     }
 
     private fun stateText(state: String): String = context.getString(
@@ -292,6 +316,8 @@ internal class TunnelNotifications(private val context: Context) {
         private const val CHANNEL_TUNNEL = "commy.tunnel"
         private const val CHANNEL_CORE = "commy.core"
         private const val CHANNEL_ALERTS = "commy.alerts"
+
+        private const val BYTE_STEP = 1024.0
 
         // FLAG_IMMUTABLE is mandatory from API 31 and harmless before it. A
         // mutable PendingIntent handed to the notification shade is a way for

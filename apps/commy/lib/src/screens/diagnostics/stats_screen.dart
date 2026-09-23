@@ -1,4 +1,5 @@
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/screens/diagnostics/diagnostics_shell.dart';
 import 'package:commy/src/state/traffic_history.dart';
@@ -61,6 +62,7 @@ class StatsScreen extends ConsumerWidget {
                 semanticLabel: t.diagnostics.statsChart(
                   peak: CommyByteFormat.rate(
                     TrafficChart.peakRate(history.samples),
+                    locale: t.flutterLocale,
                   ),
                 ),
               ),
@@ -71,12 +73,18 @@ class StatsScreen extends ConsumerWidget {
                 SettingsTile(
                   icon: CommyIcons.arrowUp,
                   title: t.metrics.up,
-                  value: CommyByteFormat.rate(latest.uplink),
+                  value: CommyByteFormat.rate(
+                    latest.uplink,
+                    locale: t.flutterLocale,
+                  ),
                 ),
                 SettingsTile(
                   icon: CommyIcons.arrowDown,
                   title: t.metrics.down,
-                  value: CommyByteFormat.rate(latest.downlink),
+                  value: CommyByteFormat.rate(
+                    latest.downlink,
+                    locale: t.flutterLocale,
+                  ),
                 ),
               ],
             ),
@@ -86,12 +94,18 @@ class StatsScreen extends ConsumerWidget {
                 SettingsTile(
                   icon: CommyIcons.arrowUp,
                   title: t.diagnostics.statsUp,
-                  value: CommyByteFormat.bytes(latest.uplinkTotal),
+                  value: CommyByteFormat.bytes(
+                    latest.uplinkTotal,
+                    locale: t.flutterLocale,
+                  ),
                 ),
                 SettingsTile(
                   icon: CommyIcons.arrowDown,
                   title: t.diagnostics.statsDown,
-                  value: CommyByteFormat.bytes(latest.downlinkTotal),
+                  value: CommyByteFormat.bytes(
+                    latest.downlinkTotal,
+                    locale: t.flutterLocale,
+                  ),
                 ),
               ],
             ),
@@ -124,10 +138,10 @@ class _DayTile extends StatelessWidget {
     return SettingsTile(
       title: MaterialLocalizations.of(context).formatMediumDate(day.day),
       subtitle: t.diagnostics.statsDayDetail(
-        up: CommyByteFormat.bytes(day.upBytes),
-        down: CommyByteFormat.bytes(day.downBytes),
+        up: CommyByteFormat.bytes(day.upBytes, locale: t.flutterLocale),
+        down: CommyByteFormat.bytes(day.downBytes, locale: t.flutterLocale),
       ),
-      value: CommyByteFormat.bytes(day.totalBytes),
+      value: CommyByteFormat.bytes(day.totalBytes, locale: t.flutterLocale),
     );
   }
 }

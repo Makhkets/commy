@@ -39,12 +39,18 @@ class TrafficMeter extends StatelessWidget {
 
     final up = _Readout(
       icon: CommyIcons.arrowUp,
-      value: CommyByteFormat.rate(isActive ? uplink : 0),
+      value: CommyByteFormat.rate(
+        isActive ? uplink : 0,
+        locale: Localizations.maybeLocaleOf(context),
+      ),
       color: color,
     );
     final down = _Readout(
       icon: CommyIcons.arrowDown,
-      value: CommyByteFormat.rate(isActive ? downlink : 0),
+      value: CommyByteFormat.rate(
+        isActive ? downlink : 0,
+        locale: Localizations.maybeLocaleOf(context),
+      ),
       color: color,
     );
 

@@ -68,7 +68,10 @@ class MetricsStrip extends StatelessWidget {
 
     final up = _Metric(
       icon: CommyIcons.arrowUp,
-      value: CommyByteFormat.rate(isActive ? uplink : 0),
+      value: CommyByteFormat.rate(
+        isActive ? uplink : 0,
+        locale: Localizations.maybeLocaleOf(context),
+      ),
       color: color,
       label: uplinkLabel,
     );
@@ -80,7 +83,10 @@ class MetricsStrip extends StatelessWidget {
     );
     final down = _Metric(
       icon: CommyIcons.arrowDown,
-      value: CommyByteFormat.rate(isActive ? downlink : 0),
+      value: CommyByteFormat.rate(
+        isActive ? downlink : 0,
+        locale: Localizations.maybeLocaleOf(context),
+      ),
       color: color,
       label: downlinkLabel,
     );

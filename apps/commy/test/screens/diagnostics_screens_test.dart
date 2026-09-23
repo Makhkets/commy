@@ -1,5 +1,6 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/screens/diagnostics/config_screen.dart';
 import 'package:commy/src/screens/diagnostics/connections_screen.dart';
 import 'package:commy/src/screens/diagnostics/logs_screen.dart';
@@ -322,7 +323,10 @@ void main() {
     expect(find.byType(EmptyState), findsNothing);
     // Section labels are drawn in capitals.
     expect(find.text(t.diagnostics.statsDays.toUpperCase()), findsOneWidget);
-    expect(find.text(CommyByteFormat.bytes(5120)), findsOneWidget);
+    expect(
+      find.text(CommyByteFormat.bytes(5120, locale: t.flutterLocale)),
+      findsOneWidget,
+    );
     // The live sections have nothing to say with the tunnel down.
     expect(find.text(t.diagnostics.statsWindow), findsNothing);
   });

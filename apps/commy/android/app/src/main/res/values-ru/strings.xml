@@ -15,6 +15,15 @@
 
     <string name="notification_speed">↑ %1$s/с   ↓ %2$s/с</string>
 
+    <!-- Byte units, smallest first, for the speed line of the notification. -->
+    <string-array name="byte_units">
+        <item>Б</item>
+        <item>КБ</item>
+        <item>МБ</item>
+        <item>ГБ</item>
+        <item>ТБ</item>
+    </string-array>
+
     <string name="notification_open_title">Commy не подключён</string>
     <string name="notification_open_text">Откройте приложение, чтобы поднять туннель.</string>
 
