@@ -67,15 +67,19 @@ Device identifier turns it off or resets it.
 
 **Alpha.** Pre-release APKs are cut from tags and published on
 [Releases](https://github.com/Makhkets/commy/releases); there is no store listing yet.
+From `v0.1.0-alpha.9` on, releases are signed with the project's key, so updates
+install over each other. To check a download:
+`apksigner verify --print-certs commy-<version>.apk` must print the certificate
+SHA-256 `49f1018be3c298a94cdba9a4a92737300680562b7be095ddd4fe3e2e42d3882e`.
 
 | Platform | State |
 |---|---|
-| **Android** | App and tunnel written, APK builds with the core inside. Not yet verified against a live server |
+| **Android** | Milestone M1 done: nine protocols carry traffic against live servers, on emulators and on a real phone |
 | **iOS** | Not started — [milestone M4](docs/07-roadmap.md), the project's main risk |
 | **Windows** | Not started — planned for 1.1 |
 | **macOS**, **Linux** | Not started — planned for 1.2 |
 
-What exists today: six Dart packages behind 699 tests, the sing-box core built for
+What exists today: six Dart packages behind 1,544 tests, the sing-box core built for
 three Android ABIs, the Android tunnel (`VpnService`, all 15 `PlatformInterface`
 methods, boot receiver, quick-settings tile, Doze handling), every application
 screen, deep links for six URL schemes, and Russian/English localization.
