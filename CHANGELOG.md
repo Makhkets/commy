@@ -10,6 +10,26 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9]
+
+**The first release signed with Commy's own key.** Remove the previous version
+once; from here on, updates install over each other.
+
+- **Messages appear at the top of the screen**, under the status bar, instead
+  of over the connect button. Swipe one up to put it away.
+- **"Measure all" says what it found**: how many servers answer and the
+  quickest one. Measuring a single server says its time, or that it did not
+  answer.
+- **An automatic subscription refresh says so**, and says once — not every
+  retry — when the panel stops answering.
+- **With Android's "Block connections without VPN" on, disconnecting no longer
+  leaks DNS.** Android lets the names apps look up go out in the clear while no
+  VPN is up; Commy now keeps a closed tunnel in place until you connect again
+  or turn the setting off. Without that setting, Disconnect gives the network
+  back at once, as before.
+- Latency reads "мс" in Russian.
+- Kotlin 2.4.20, Android Gradle Plugin 9.4.1, file_picker 13.1.
+
 ## [0.1.0-alpha.8]
 
 - **Settings → Ping.** Servers are timed by a GET through the server itself —
