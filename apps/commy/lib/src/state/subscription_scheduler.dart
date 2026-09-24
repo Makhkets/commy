@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/state/auto_refresh_notice.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/subscription_controller.dart';
+import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -76,6 +79,27 @@ class SubscriptionScheduler {
 
   final Ref _ref;
   final Map<String, DateTime> _notBefore = <String, DateTime>{};
+
+  /// Subscriptions whose automatic refresh is failing, each with the
+  /// `lastUpdatedAt` it had when the failures began.
+  ///
+  /// A failure is announced once per streak — the first one after a refresh
+  /// that worked, or after the app started — and not on every retry: a
+  /// panel that is down for an afternoon would otherwise say so every
+  /// fifteen minutes, over whatever the user was doing. The card shows no
+  /// failure of its own, so without the first one nothing would.
+  final Map<String, DateTime?> _failingSince = <String, DateTime?>{};
+
+  /// Whether the current sweep has already said that a refresh failed.
+  ///
+  /// Toasts replace each other rather than queue, so the next subscription's
+  /// "refreshed" took a failure down as soon as its own download came back —
+  /// and the streak rule then kept that failure quiet on every retry, so it
+  /// was never seen at all. At a cold start after a long pause every
+  /// subscription is due at once, which makes that the usual case. Within one
+  /// sweep a failure outranks a success, and a second failure waits for its
+  /// own retry rather than covering the first.
+  bool _failureSaid = false;
   bool _sweeping = false;
 
   /// Refreshes every subscription that is due, sequentially.
@@ -88,6 +112,7 @@ class SubscriptionScheduler {
       return;
     }
     _sweeping = true;
+    _failureSaid = false;
     try {
       final items =
           _ref.read(subscriptionsProvider).value ?? const <Subscription>[];
@@ -107,6 +132,12 @@ class SubscriptionScheduler {
     final controller = _ref.read(subscriptionControllerProvider.notifier);
     if (await controller.refresh(item.id)) {
       _notBefore.remove(item.id);
+      _failingSince.remove(item.id);
+      final count =
+          _ref.read(subscriptionControllerProvider).importedCount ?? 0;
+      if (!_failureSaid) {
+        _notices.refreshed(name: await _nameOf(item), count: count);
+      }
       return;
     }
     final failure = _ref.read(subscriptionControllerProvider).failure;
@@ -116,13 +147,56 @@ class SubscriptionScheduler {
       return;
     }
     _notBefore[item.id] = now.add(retryAfterFailure);
+    // Not recorded as said unless it was: a failure held back behind
+    // another one of this sweep is news on its next retry.
+    if (!_failureSaid && _startsStreak(item)) {
+      _failingSince[item.id] = item.lastUpdatedAt;
+      _failureSaid = true;
+      _notices.failed(name: item.name, failure: failure);
+    }
     // The id, not the URL: the URL carries the access token (rule R3).
     _ref.read(appLoggerProvider).warn(
-          'automatic refresh of ${item.id} failed: ${failure.code}; '
+          'automatic refresh of ${item.id} failed: ${_describe(failure)}; '
           'not retrying for ${retryAfterFailure.inMinutes} min',
           tag: logTag,
         );
   }
+
+  /// The failure's code, and what the panel's HTTP exchange said when that
+  /// is what went wrong — `subscription_unreachable (status 403)`.
+  ///
+  /// The toast is a headline that sends the user here, so this line is where
+  /// the reason has to be. A status and a kind carry no token (rule R3).
+  static String _describe(CommyFailure failure) {
+    if (failure
+        case SubscriptionUnreachableFailure(
+          cause: HttpTransportError(:final kind, :final statusCode),
+        )) {
+      final status = statusCode == null ? '' : ' $statusCode';
+      return '${failure.code} ($kind$status)';
+    }
+    return failure.code;
+  }
+
+  /// Whether a failure of [item] is the first since it last refreshed.
+  ///
+  /// A `lastUpdatedAt` that moved since the streak began means a refresh
+  /// worked in between — the user's own, from the card, which this
+  /// scheduler never sees — and a new failure after it is news again.
+  bool _startsStreak(Subscription item) =>
+      !_failingSince.containsKey(item.id) ||
+      _failingSince[item.id] != item.lastUpdatedAt;
+
+  /// The name as the card shows it once the refresh landed: a panel may
+  /// send a new title with its servers.
+  Future<String> _nameOf(Subscription item) async {
+    final stored =
+        await _ref.read(subscriptionRepositoryProvider).findById(item.id);
+    return stored.valueOrNull?.name ?? item.name;
+  }
+
+  AutoRefreshNotices get _notices =>
+      _ref.read(autoRefreshNoticeProvider.notifier);
 
   bool _isCoolingDown(String id, DateTime now) {
     final until = _notBefore[id];

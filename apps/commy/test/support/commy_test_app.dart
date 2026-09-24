@@ -3,6 +3,7 @@ import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/toast_host.dart';
 import 'package:commy_core/commy_core.dart';
 import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -169,6 +170,11 @@ class CommyTestHarness {
             locale: TranslationProvider.of(context).flutterLocale,
             supportedLocales: AppLocaleUtils.supportedLocales,
             localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            // Where the app puts it, so a screen that raises a toast raises
+            // it here too. `NoticeHost` is left out: a test that wants the
+            // notices pumps its own.
+            builder: (context, navigator) =>
+                ToastHost(child: navigator ?? const SizedBox.shrink()),
             home: child,
           ),
         ),

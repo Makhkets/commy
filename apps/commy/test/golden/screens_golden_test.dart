@@ -4,10 +4,15 @@ import 'package:commy/src/screens/diagnostics/logs_screen.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy/src/screens/settings/routing_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
+import 'package:commy/src/state/measurement_controller.dart';
+import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/notice_host.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -111,6 +116,52 @@ void main() {
     extra: <Override>[liveTraffic],
   );
 
+  // The owner, 2026-09-24: results at the top, and a ping that answers. The
+  // longest sentence a run produces — who answered, the best, the skipped —
+  // over the list it measured: the toast has to clear the status area, stay
+  // inside the gutters and leave the list readable around it. The list says
+  // the same as the toast: Warsaw timed out, Helsinki is on UDP and was
+  // left alone.
+  final pinged = <ProxyNode>[
+    nodes[0],
+    nodes[1],
+    nodes[2].copyWith(latency: null, lastCheckedAt: CommyTestHarness.now),
+    const ProxyNode(
+      id: 'sub-1-4',
+      name: 'Helsinki 02',
+      protocol: Protocol.hysteria2,
+      host: 'fi-02.example.net',
+      port: 443,
+      countryCode: 'FI',
+      subscriptionId: 'sub-1',
+    ),
+  ];
+  screenGolden(
+    'home_ping_toast',
+    screen: const HomeScreen(),
+    harness: () => CommyTestHarness(
+      nodes: pinged,
+      subscriptions: <Subscription>[subscription],
+    ),
+    seed: (harness) =>
+        harness.settingsRepository.writeSelectedNodeId('sub-1-1'),
+    status: const TunnelStatus.idle(),
+    extra: <Override>[measurementProvider.overrideWith(_Reporting.new)],
+    toast: (tester) async {
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+      );
+      (container.read(measurementProvider.notifier) as _Reporting).finish(
+        MeasurementReport.of(
+          <(ProxyNode, Duration?)>[
+            for (final node in pinged.take(3)) (node, node.latency),
+          ],
+          skipped: 1,
+        ),
+      );
+    },
+  );
+
   screenGolden(
     'routing',
     screen: const RoutingScreen(),
@@ -182,6 +233,9 @@ void main() {
 /// A phone, in logical pixels. The design is drawn at this size.
 const Size _phone = Size(390, 844);
 
+/// How far down the system draws its status bar, for the toast golden.
+const double _statusBar = 24;
+
 /// The frame each golden photographs.
 const ValueKey<String> _frame = ValueKey<String>('commy-golden-frame');
 
@@ -195,6 +249,13 @@ enum _Theme {
 }
 
 /// Registers one golden per theme for [screen].
+///
+/// [toast], when given, raises a toast once the screen has settled. The
+/// frame then takes in the whole window instead of the route: toasts are
+/// drawn above the navigator, where the app's `ToastHost` sits, and a frame
+/// around the route would photograph the screen without them. `NoticeHost`
+/// goes around the screen, as the app puts it around the navigator, so the
+/// toast is worded by the code that words it in the app.
 void screenGolden(
   String name, {
   required Widget screen,
@@ -203,6 +264,7 @@ void screenGolden(
   Future<void> Function(CommyTestHarness harness)? seed,
   TunnelStatus? status,
   List<Override> extra = const <Override>[],
+  Future<void> Function(WidgetTester tester)? toast,
 }) {
   for (final theme in _Theme.values) {
     testWidgets(
@@ -215,31 +277,60 @@ void screenGolden(
         tester.view
           ..physicalSize = size
           ..devicePixelRatio = 1;
+        // A status bar for the toast to clear. Only the toast sees it: the
+        // screen gets its own `MediaQuery` below, padding and all zero, so
+        // every other picture is as it was.
+        if (toast != null) {
+          tester.view.padding = const FakeViewPadding(top: _statusBar);
+        }
         addTearDown(tester.view.reset);
 
+        // Inside the app, not around it: `MaterialApp` installs its own
+        // `MediaQuery` from the view, so one wrapped outside would be
+        // shadowed and the animations it turns off would keep running.
+        final still = MediaQuery(
+          data: MediaQueryData(size: size, disableAnimations: true),
+          child: screen,
+        );
         await tester.pumpWidget(
-          host.wrap(
-            // Inside the app, not around it: `MaterialApp` installs its own
-            // `MediaQuery` from the view, so one wrapped outside would be
-            // shadowed and the animations it turns off would keep running.
-            RepaintBoundary(
-              key: _frame,
-              child: MediaQuery(
-                data: MediaQueryData(size: size, disableAnimations: true),
-                child: screen,
-              ),
-            ),
-            status: status,
-            extra: extra,
-            theme: theme.data,
-          ),
+          toast == null
+              ? host.wrap(
+                  RepaintBoundary(key: _frame, child: still),
+                  status: status,
+                  extra: extra,
+                  theme: theme.data,
+                )
+              : RepaintBoundary(
+                  key: _frame,
+                  child: host.wrap(
+                    NoticeHost(child: still),
+                    status: status,
+                    extra: extra,
+                    theme: theme.data,
+                  ),
+                ),
         );
         await settle(tester);
+
+        if (toast != null) {
+          await toast(tester);
+          // Through the entrance — the toast layer runs its own motion, off
+          // the window's `MediaQuery` — and well short of the three seconds
+          // it stays up.
+          await tester.pump();
+          await tester.pump(const Duration(seconds: 1));
+        }
 
         await expectLater(
           find.byKey(_frame),
           matchesGoldenFile('goldens/$name.${theme.name}.png'),
         );
+
+        if (toast != null) {
+          // Out the other side, so its timer does not outlive the test.
+          await tester.pump(ToastMessenger.duration);
+          await tester.pump(const Duration(seconds: 1));
+        }
       },
       tags: 'golden',
       // Golden images are Skia output, and Skia rasterises text differently on
@@ -251,4 +342,15 @@ void screenGolden(
       skip: !Platform.isLinux,
     );
   }
+}
+
+/// A measurement controller the toast golden can finish a run on.
+///
+/// The real one needs probes that answer differently per server to produce
+/// a "best", and the fake probe answers every server alike; what the golden
+/// photographs is what `NoticeHost` makes of a finished run.
+class _Reporting extends MeasurementController {
+  /// Writes the end of a run the way `measureAll` does.
+  void finish(MeasurementReport report) =>
+      state = MeasurementState(skipped: report.skipped, report: report);
 }

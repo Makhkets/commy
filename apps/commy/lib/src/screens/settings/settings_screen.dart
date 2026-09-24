@@ -242,25 +242,16 @@ class _Body extends ConsumerWidget {
   /// is better than a row that swallows the tap.
   Future<void> _openVpnSettings(BuildContext context, WidgetRef ref) async {
     final t = Translations.of(context);
-    final messenger = ScaffoldMessenger.maybeOf(context);
     final opened = await ref.read(systemSettingsProvider).openVpnSettings();
-    if (opened || messenger == null) {
+    if (opened || !context.mounted) {
       return;
     }
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          behavior: SnackBarBehavior.floating,
-          content: Toast(
-            message: t.settings.connection.killSwitchUnavailable,
-            tone: CommyTone.info,
-            icon: CommyIcons.info,
-          ),
-        ),
-      );
+    ToastMessenger.show(
+      context,
+      message: t.settings.connection.killSwitchUnavailable,
+      tone: CommyTone.info,
+      icon: CommyIcons.info,
+    );
   }
 
   String _pingLabel(Translations t, PingMethod method) => switch (method) {

@@ -3,8 +3,11 @@ import 'dart:io';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
+import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/state/auto_refresh_notice.dart';
 import 'package:commy/src/state/measurement_controller.dart';
+import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/failure_view.dart';
@@ -18,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../support/commy_test_app.dart';
 
@@ -734,8 +738,12 @@ void main() {
   group('NoticeHost', () {
     late _NoticeStub tunnel;
     late _MeasurementStub measurement;
+    late AutoRefreshNotices autoRefresh;
 
-    Future<void> pumpHost(WidgetTester tester) async {
+    Future<void> pumpHost(
+      WidgetTester tester, {
+      List<Override> extra = const <Override>[],
+    }) async {
       await tester.pumpWidget(
         harness.wrap(
           NoticeHost(
@@ -746,6 +754,7 @@ void main() {
                       as _NoticeStub;
                   measurement = ref.read(measurementProvider.notifier)
                       as _MeasurementStub;
+                  autoRefresh = ref.read(autoRefreshNoticeProvider.notifier);
                   return const SizedBox.shrink();
                 },
               ),
@@ -754,10 +763,40 @@ void main() {
           extra: <Override>[
             tunnelControllerProvider.overrideWith(_NoticeStub.new),
             measurementProvider.overrideWith(_MeasurementStub.new),
+            ...extra,
           ],
         ),
       );
       await settle(tester);
+    }
+
+    /// The one toast on screen: what it says, and that it says it at the top.
+    ///
+    /// Measured on the toast's own surface — the decorated box, not the
+    /// full-width `Align` around it — against the height of the window, so a
+    /// toast that slid back to the bottom fails here even with the right
+    /// words in it. Its top edge is what is pinned: the test font draws every
+    /// glyph a full em wide, so a long sentence wraps to more lines here than
+    /// it does on a phone, and only the bottom edge moves with that.
+    Toast expectToastAtTop(WidgetTester tester, String message) {
+      expect(find.byType(Toast), findsOneWidget);
+      expect(
+        find.descendant(of: find.byType(Toast), matching: find.text(message)),
+        findsOneWidget,
+      );
+      final surface = tester.getRect(
+        find
+            .descendant(
+              of: find.byType(Toast),
+              matching: find.byType(Container),
+            )
+            .first,
+      );
+      final window = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(surface.top, greaterThanOrEqualTo(0));
+      expect(surface.top, lessThan(window.height / 8));
+      expect(surface.bottom, lessThan(window.height / 2));
+      return tester.widget<Toast>(find.byType(Toast));
     }
 
     final notices = <({
@@ -884,6 +923,286 @@ void main() {
 
       await expireToast(tester);
     });
+
+    // The owner, 2026-09-24: a ping the user asked for has to answer. The run
+    // used to end with its progress row simply disappearing.
+    group('a finished measurement', () {
+      final finland = testNode(id: 'fi-1', name: 'Finland', countryCode: 'FI');
+
+      testWidgets('a run says who answered, the best and the skipped at once',
+          (tester) async {
+        await pumpHost(tester);
+
+        measurement.finish(
+          MeasurementReport(
+            measured: 17,
+            reachable: 15,
+            node: finland,
+            latency: const Duration(milliseconds: 90),
+            skipped: 2,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final toast = expectToastAtTop(
+          tester,
+          'Отвечают 15 из 17 · лучший — Finland, 90 мс · 2 UDP пропущены',
+        );
+        expect(toast.tone, CommyTone.connected);
+        expect(toast.icon, CommyIcons.success);
+        // The skipped servers ride along in the same sentence; the long form
+        // that explains what would measure them is for a run that measured
+        // nothing, and a second toast would have overwritten the first.
+        expect(find.textContaining('выберите GET'), findsNothing);
+
+        await expireToast(tester);
+        measurement.progress(1, 17);
+        await tester.pumpAndSettle();
+        expect(find.byType(Toast), findsNothing);
+      });
+
+      final silentRuns = <int, String>{
+        17: 'Ни один из 17 серверов не ответил',
+        21: 'Ни один из 21 сервера не ответил',
+      };
+      for (final MapEntry(key: count, value: message) in silentRuns.entries) {
+        testWidgets('a run of $count nobody answered says so, as an error',
+            (tester) async {
+          await pumpHost(tester);
+
+          measurement.finish(MeasurementReport(measured: count, reachable: 0));
+          await tester.pumpAndSettle();
+
+          final toast = expectToastAtTop(tester, message);
+          expect(toast.tone, CommyTone.error);
+          expect(toast.icon, CommyIcons.offline);
+
+          await expireToast(tester);
+        });
+      }
+
+      testWidgets('one server that answered is named, with its time',
+          (tester) async {
+        await pumpHost(tester);
+
+        measurement.finish(
+          MeasurementReport.of(<(ProxyNode, Duration?)>[
+            (finland, const Duration(milliseconds: 124)),
+          ]),
+        );
+        await tester.pumpAndSettle();
+
+        final toast = expectToastAtTop(tester, 'Finland — 124 мс');
+        expect(toast.tone, CommyTone.connected);
+
+        await expireToast(tester);
+      });
+
+      testWidgets('one server that did not answer is named as silent',
+          (tester) async {
+        await pumpHost(tester);
+
+        measurement.finish(
+          MeasurementReport.of(<(ProxyNode, Duration?)>[(finland, null)]),
+        );
+        await tester.pumpAndSettle();
+
+        final toast = expectToastAtTop(tester, 'Finland не отвечает');
+        expect(toast.tone, CommyTone.error);
+        expect(toast.icon, CommyIcons.offline);
+
+        await expireToast(tester);
+      });
+
+      testWidgets('a failure is said when nothing answered', (tester) async {
+        // Every server failed the same way — the probe URL is missing — and
+        // "nobody answered" would send the user to check the servers.
+        await pumpHost(tester);
+
+        measurement.finish(
+          const MeasurementReport(measured: 17, reachable: 0),
+          failure: const CommyFailure.configInvalid('no probe url'),
+        );
+        await tester.pumpAndSettle();
+
+        final toast = expectToastAtTop(tester, t.error.configInvalid.message);
+        expect(toast.tone, CommyTone.error);
+        expect(find.textContaining('Ни один'), findsNothing);
+
+        // And the numbers do not come back once the failure is gone.
+        await expireToast(tester);
+        measurement.progress(1, 17);
+        await tester.pumpAndSettle();
+        expect(find.byType(Toast), findsNothing);
+      });
+
+      testWidgets(
+          'one server that could not be measured does not hide the '
+          'rest of the run', (tester) async {
+        // A panel's mKCP node: no probe can be built for it, and it failed
+        // every run of that subscription. It is counted with the servers
+        // that did not answer, and what the others found is still said.
+        await pumpHost(tester);
+
+        measurement.finish(
+          MeasurementReport(
+            measured: 17,
+            reachable: 15,
+            node: finland,
+            latency: const Duration(milliseconds: 90),
+          ),
+          failure: const CommyFailure.configInvalid('transport kcp'),
+        );
+        await tester.pumpAndSettle();
+
+        final toast = expectToastAtTop(
+          tester,
+          'Отвечают 15 из 17 · лучший — Finland, 90 мс',
+        );
+        expect(toast.tone, CommyTone.connected);
+        expect(find.text(t.error.configInvalid.message), findsNothing);
+
+        // Said once: the failure does not follow when the report is gone.
+        await expireToast(tester);
+        measurement.progress(1, 17);
+        await tester.pumpAndSettle();
+        expect(find.byType(Toast), findsNothing);
+      });
+
+      testWidgets('a report is said once, and the next run is said again',
+          (tester) async {
+        await pumpHost(tester);
+        final report = MeasurementReport.of(<(ProxyNode, Duration?)>[
+          (finland, const Duration(milliseconds: 124)),
+        ]);
+
+        measurement.finish(report);
+        await tester.pumpAndSettle();
+        expectToastAtTop(tester, 'Finland — 124 мс');
+        await expireToast(tester);
+
+        // The same server pinged again with the same result, straight after:
+        // a second answer, not nothing — which it only is because the first
+        // report was taken down once shown. Left in place, the second would
+        // be no change of state at all.
+        measurement.finish(report);
+        await tester.pumpAndSettle();
+        expectToastAtTop(tester, 'Finland — 124 мс');
+        await expireToast(tester);
+
+        // An unrelated change of state does not put it back on screen.
+        measurement.progress(1, 3);
+        await tester.pumpAndSettle();
+        expect(find.byType(Toast), findsNothing);
+      });
+    });
+
+    // A refresh nobody pressed for: the only way the user learns the list
+    // under them changed, or that the panel stopped answering.
+    group('an automatic subscription refresh', () {
+      final counted = <int, String>{
+        1: '1 узел',
+        3: '3 узла',
+        17: '17 узлов',
+        21: '21 узел',
+      };
+      for (final MapEntry(key: count, value: nodes) in counted.entries) {
+        testWidgets('that worked names the subscription and $nodes',
+            (tester) async {
+          await pumpHost(tester);
+
+          autoRefresh.refreshed(name: 'Мой сервер', count: count);
+          await tester.pumpAndSettle();
+
+          final toast = expectToastAtTop(
+            tester,
+            'Подписка «Мой сервер» обновлена · $nodes',
+          );
+          expect(toast.tone, CommyTone.connected);
+          expect(toast.icon, CommyIcons.refresh);
+          expect(toast.actionLabel, isNull);
+
+          await expireToast(tester);
+        });
+      }
+
+      testWidgets(
+          'that failed names the subscription, and the action opens '
+          'the logs', (tester) async {
+        final router = GoRouter(
+          routes: <RouteBase>[
+            GoRoute(
+              path: AppRoutes.home,
+              builder: (context, state) => const SizedBox.shrink(),
+            ),
+            GoRoute(
+              path: AppRoutes.diagnosticsLogs,
+              builder: (context, state) => const SizedBox.shrink(),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await pumpHost(
+          tester,
+          extra: <Override>[routerProvider.overrideWithValue(router)],
+        );
+        final failure = SubscriptionUnreachableFailure(
+          url: Uri.parse('https://panel.example.net/sub/secret-token'),
+          cause: 'the panel did not answer',
+        );
+
+        autoRefresh.failed(name: 'Мой сервер', failure: failure);
+        await tester.pumpAndSettle();
+
+        // A headline, not the reason: the reason of a panel's 403 ran to
+        // eleven lines over the app bar on a 360 dp phone.
+        final toast = expectToastAtTop(
+          tester,
+          'Подписка «Мой сервер» не обновилась',
+        );
+        expect(
+          find.textContaining(FailureText.of(failure, t).message),
+          findsNothing,
+        );
+        expect(toast.tone, CommyTone.error);
+        expect(toast.icon, CommyIcons.warning);
+        // The URL carries the access token (rule R3): the subscription is
+        // named, never addressed.
+        expect(find.textContaining('secret-token'), findsNothing);
+        expect(find.textContaining('panel.example.net'), findsNothing);
+
+        await tester.tap(find.text(t.diagnostics.logs));
+        await tester.pumpAndSettle();
+
+        expect(
+          router.routeInformationProvider.value.uri.path,
+          AppRoutes.diagnosticsLogs,
+        );
+        expect(find.byType(Toast), findsNothing);
+      });
+
+      testWidgets('is said once, and the next refresh is said again',
+          (tester) async {
+        await pumpHost(tester);
+
+        autoRefresh.refreshed(name: 'Мой сервер', count: 3);
+        await tester.pumpAndSettle();
+        expectToastAtTop(tester, 'Подписка «Мой сервер» обновлена · 3 узла');
+        await expireToast(tester);
+
+        // Something else changes; the refresh is not announced a second time.
+        tunnel.state = tunnel.state.copyWith(isBusy: true);
+        await tester.pumpAndSettle();
+        expect(find.byType(Toast), findsNothing);
+
+        // The next sweep with the same outcome is news of its own.
+        autoRefresh.refreshed(name: 'Мой сервер', count: 3);
+        await tester.pumpAndSettle();
+        expectToastAtTop(tester, 'Подписка «Мой сервер» обновлена · 3 узла');
+
+        await expireToast(tester);
+      });
+    });
   });
 }
 
@@ -915,8 +1234,22 @@ class _NoticeStub extends TunnelController {
   void post(TunnelNotice notice) => state = state.copyWith(notice: notice);
 }
 
-/// A measurement controller a test can fail on demand.
+/// A measurement controller a test can fail, finish or advance on demand.
 class _MeasurementStub extends MeasurementController {
   /// Writes [failure] the way a finished run would.
   void post(CommyFailure failure) => state = MeasurementState(failure: failure);
+
+  /// Writes the end of a run the way `measureAll` does: its [report], the
+  /// servers it skipped, and the [failure] it hit, if any.
+  void finish(MeasurementReport report, {CommyFailure? failure}) =>
+      state = MeasurementState(
+        failure: failure,
+        skipped: report.skipped,
+        report: report,
+      );
+
+  /// Writes a step of a run in progress — a change of state with nothing in
+  /// it to announce.
+  void progress(int done, int total) =>
+      state = MeasurementState(scopeId: 'sub-1', done: done, total: total);
 }

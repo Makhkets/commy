@@ -73,7 +73,24 @@
       "one": "$count UDP server cannot be timed over TCP — pick GET or ICMP under Ping",
       "other": "$count UDP servers cannot be timed over TCP — pick GET or ICMP under Ping"
     },
-    "settingsApplied": "Settings applied to the tunnel"
+    "settingsApplied": "Settings applied to the tunnel",
+    "ping": {
+      "summary(plural, param=count)": {
+        "one": "$count of $total answered",
+        "other": "$count of $total answered"
+      },
+      "best": "best: $name, $ms ms",
+      "noneAnswered(plural, param=count)": {
+        "one": "$count server did not answer",
+        "other": "None of the $count servers answered"
+      },
+      "skipped(plural, param=count)": {
+        "one": "$count UDP server skipped",
+        "other": "$count UDP servers skipped"
+      },
+      "single": "$name — $ms ms",
+      "singleSilent": "$name did not answer"
+    }
   },
 
   "import": {
@@ -184,7 +201,9 @@
     "panelSaid": "Your panel sent this instead of servers:",
     "deviceIdOff": "Sending the device identifier (HWID) is off, and a panel that limits devices answers like this without it.",
     "sendDeviceId": "Turn it on and refresh",
-    "noServers": "This subscription has no servers yet"
+    "noServers": "This subscription has no servers yet",
+    "autoRefreshed": "Subscription “$name” refreshed · $nodes",
+    "autoRefreshFailed": "Subscription “$name” was not refreshed"
   },
 
   "node": {

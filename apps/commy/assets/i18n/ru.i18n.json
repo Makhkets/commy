@@ -75,7 +75,30 @@
       "many": "$count серверов на UDP не замерить по TCP — выберите GET или ICMP в разделе «Пинг»",
       "other": "$count сервера на UDP не замерить по TCP — выберите GET или ICMP в разделе «Пинг»"
     },
-    "settingsApplied": "Настройки применены к туннелю"
+    "settingsApplied": "Настройки применены к туннелю",
+    "ping": {
+      "summary(plural, param=count)": {
+        "one": "Отвечает $count из $total",
+        "few": "Отвечают $count из $total",
+        "many": "Отвечают $count из $total",
+        "other": "Отвечают $count из $total"
+      },
+      "best": "лучший — $name, $ms мс",
+      "noneAnswered(plural, param=count)": {
+        "one": "Ни один из $count сервера не ответил",
+        "few": "Ни один из $count серверов не ответил",
+        "many": "Ни один из $count серверов не ответил",
+        "other": "Ни один из $count серверов не ответил"
+      },
+      "skipped(plural, param=count)": {
+        "one": "$count UDP пропущен",
+        "few": "$count UDP пропущены",
+        "many": "$count UDP пропущено",
+        "other": "$count UDP пропущено"
+      },
+      "single": "$name — $ms мс",
+      "singleSilent": "$name не отвечает"
+    }
   },
 
   "import": {
@@ -194,7 +217,9 @@
     "panelSaid": "Панель прислала это вместо серверов:",
     "deviceIdOff": "Отправка идентификатора устройства (HWID) выключена, а панель с лимитом устройств без него отвечает именно так.",
     "sendDeviceId": "Включить и обновить",
-    "noServers": "В этой подписке пока нет серверов"
+    "noServers": "В этой подписке пока нет серверов",
+    "autoRefreshed": "Подписка «$name» обновлена · $nodes",
+    "autoRefreshFailed": "Подписка «$name» не обновилась"
   },
 
   "node": {

@@ -1,5 +1,6 @@
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/measurement_controller.dart';
+import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,10 +37,11 @@ void main() {
     List<ProxyNode> nodes, {
     bool connect = false,
     PingMethod method = PingMethod.get,
+    String probeUrl = AppSettings.defaultLatencyProbeUrl,
   }) async {
     harness = CommyTestHarness(
       nodes: nodes,
-      settings: AppSettings(pingMethod: method),
+      settings: AppSettings(pingMethod: method, latencyProbeUrl: probeUrl),
     );
     container = ProviderContainer(overrides: harness.overrides());
     addTearDown(() async {
@@ -70,6 +72,25 @@ void main() {
 
   MeasurementController controller() =>
       container.read(measurementProvider.notifier);
+
+  MeasurementState current() => container.read(measurementProvider);
+
+  /// Every state the run passed through, in order.
+  List<MeasurementState> watchStates() {
+    final states = <MeasurementState>[];
+    final handle = container.listen<MeasurementState>(
+      measurementProvider,
+      (previous, next) => states.add(next),
+    );
+    addTearDown(handle.close);
+    return states;
+  }
+
+  /// What the fake probe core answers for [node].
+  void answer(ProxyNode node, int? milliseconds) => harness.core.setLatency(
+        'node-${node.id}',
+        milliseconds == null ? null : Duration(milliseconds: milliseconds),
+      );
 
   /// Every `done` the counter passed through, in order.
   List<int> watchProgress() {
@@ -306,5 +327,208 @@ void main() {
     expect(harness.latencyProbe.asked, isEmpty);
     expect(harness.core.probeCalls, 0);
     expect(container.read(measurementProvider).skipped, 0);
+  });
+
+  /// The owner (2026-09-24): a measurement the user asked for says what it
+  /// found. The toast is `NoticeHost`'s; the numbers in it are this
+  /// controller's, published once, when the run is over.
+  group('the report', () {
+    test('counts who answered and names the quickest of them', () async {
+      final nodes = manyNodes(4);
+      await start(nodes);
+      answer(nodes[0], null);
+      answer(nodes[1], 90);
+      answer(nodes[2], 40);
+      answer(nodes[3], null);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      final report = current().report!;
+      expect(report.measured, 4);
+      expect(report.reachable, 2);
+      expect(report.node?.id, 'node-2');
+      expect(report.latency, const Duration(milliseconds: 40));
+      expect(report.skipped, 0);
+      expect(report.isSingle, isFalse);
+    });
+
+    test('a tie goes to the server listed first, not the first to return',
+        () async {
+      final nodes = manyNodes(8);
+      await start(nodes);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      // Every server answers in the same 137 ms here, and six of them are
+      // in flight at once: whichever came back first is an accident.
+      expect(current().report?.node?.id, 'node-0');
+    });
+
+    test('a run in which nobody answered names nobody', () async {
+      final nodes = manyNodes(3);
+      await start(nodes);
+      for (final node in nodes) {
+        answer(node, null);
+      }
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(
+        current().report,
+        const MeasurementReport(measured: 3, reachable: 0),
+      );
+    });
+
+    test('the servers the method left alone are in the same report', () async {
+      final nodes = <ProxyNode>[...manyNodes(2), udpNode()];
+      await start(nodes, method: PingMethod.tcp);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      final report = current().report!;
+      expect(report.measured, 2);
+      expect(report.reachable, 2);
+      expect(report.skipped, 1);
+    });
+
+    test('is published once, at the end — the progress carries none', () async {
+      final nodes = manyNodes(7);
+      await start(nodes);
+      final states = watchStates();
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      final running = states.where((state) => state.isRunning);
+      expect(running, isNotEmpty);
+      expect(running.every((state) => state.report == null), isTrue);
+      expect(states.where((state) => state.report != null), hasLength(1));
+      expect(states.last.report?.measured, 7);
+      expect(states.last.isRunning, isFalse);
+    });
+
+    test('a cancelled run reports nothing', () async {
+      final nodes = manyNodes(12);
+      await start(nodes);
+      final handle = container.listen<MeasurementState>(
+        measurementProvider,
+        (previous, next) {
+          if (next.done == 4) {
+            container.read(measurementProvider.notifier).cancel();
+          }
+        },
+      );
+      addTearDown(handle.close);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(current().report, isNull);
+      expect(current().failure, isNull);
+    });
+
+    test('a failure waits for the end of the run and is said once', () async {
+      // No probe page: every GET fails the same way before it starts.
+      final nodes = manyNodes(5);
+      await start(nodes, probeUrl: '');
+      final states = watchStates();
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+
+      expect(
+        states.where((state) => state.isRunning).map((state) => state.failure),
+        everyElement(isNull),
+        reason: 'A failure in the progress was announced mid-run, then again.',
+      );
+      expect(current().failure, isA<ConfigInvalidFailure>());
+    });
+
+    test('one server from its menu is named, with its number', () async {
+      final nodes = manyNodes(1);
+      await start(nodes);
+      answer(nodes.single, 90);
+
+      await controller().measureOne(nodes.single);
+
+      final report = current().report!;
+      expect(report.isSingle, isTrue);
+      expect(report.node?.id, nodes.single.id);
+      expect(report.latency, const Duration(milliseconds: 90));
+      expect(report.reachable, 1);
+    });
+
+    test('one server that did not answer is named too', () async {
+      final nodes = manyNodes(1);
+      await start(nodes);
+      answer(nodes.single, null);
+
+      await controller().measureOne(nodes.single);
+
+      final report = current().report!;
+      expect(report.isSingle, isTrue);
+      expect(report.node?.id, nodes.single.id);
+      expect(report.latency, isNull);
+      expect(report.reachable, 0);
+    });
+
+    test('one server whose probe failed reports the failure instead', () async {
+      final nodes = manyNodes(1);
+      await start(nodes, probeUrl: '');
+
+      await controller().measureOne(nodes.single);
+
+      expect(current().failure, isA<ConfigInvalidFailure>());
+      expect(current().report, isNull);
+    });
+
+    test('once shown, it is cleared with the rest of the outcome', () async {
+      final nodes = manyNodes(2);
+      await start(nodes, method: PingMethod.tcp);
+
+      await controller().measureAll(nodes, scopeId: 'sub-1');
+      controller().clearOutcome();
+
+      expect(current(), MeasurementState.idle);
+    });
+  });
+
+  group('MeasurementReport.of', () {
+    final a = testNode(id: 'a', latency: null);
+    final b = testNode(id: 'b', latency: null);
+
+    test('nothing measured is an empty report', () {
+      expect(
+        MeasurementReport.of(const <(ProxyNode, Duration?)>[], skipped: 3),
+        const MeasurementReport(measured: 0, reachable: 0, skipped: 3),
+      );
+    });
+
+    test('the quickest answer wins', () {
+      final report = MeasurementReport.of(<(ProxyNode, Duration?)>[
+        (a, const Duration(milliseconds: 90)),
+        (b, const Duration(milliseconds: 40)),
+      ]);
+
+      expect(report.node, b);
+      expect(report.latency, const Duration(milliseconds: 40));
+      expect(report.reachable, 2);
+    });
+
+    test('a single silent server is still the one named', () {
+      final report = MeasurementReport.of(<(ProxyNode, Duration?)>[(a, null)]);
+
+      expect(report.isSingle, isTrue);
+      expect(report.node, a);
+      expect(report.latency, isNull);
+      expect(report.reachable, 0);
+    });
+
+    test('several silent servers name none of them', () {
+      final report = MeasurementReport.of(<(ProxyNode, Duration?)>[
+        (a, null),
+        (b, null),
+      ]);
+
+      expect(report.node, isNull);
+      expect(report.latency, isNull);
+    });
   });
 }

@@ -9,6 +9,7 @@ import 'package:commy/src/state/system_intent_listener.dart';
 import 'package:commy/src/state/traffic_history.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/notice_host.dart';
+import 'package:commy/src/widgets/toast_host.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -89,8 +90,11 @@ class _CommyAppState extends ConsumerState<CommyApp> {
           locale: TranslationProvider.of(context).flutterLocale,
           supportedLocales: AppLocaleUtils.supportedLocales,
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          builder: (context, child) =>
-              NoticeHost(child: child ?? const SizedBox.shrink()),
+          // Toasts over the notices' host, so a notice raised anywhere —
+          // and any toast a screen puts up — lands at the top of the window.
+          builder: (context, child) => ToastHost(
+            child: NoticeHost(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

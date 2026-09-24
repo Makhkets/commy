@@ -1,5 +1,6 @@
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/foundation.dart';
@@ -32,6 +33,7 @@ class MeasurementState {
     this.total = 0,
     this.failure,
     this.skipped = 0,
+    this.report,
   });
 
   /// Nothing is being measured.
@@ -49,6 +51,9 @@ class MeasurementState {
 
   /// What the last probe failed with. A timeout is not a failure — the use
   /// case reports that as a measurement of `null`.
+  ///
+  /// Published next to [report] at the end of a run; which of the two is
+  /// said is `NoticeHost`'s call — the failure only when nothing answered.
   final CommyFailure? failure;
 
   /// How many servers the last run left alone because the chosen method
@@ -57,6 +62,15 @@ class MeasurementState {
   /// Reported rather than dropped: a run that silently skips three rows looks
   /// exactly like a run that broke on them.
   final int skipped;
+
+  /// What the last finished measurement found — a whole run that was not
+  /// cancelled, or one server from its menu.
+  ///
+  /// The measurement is the user's own request, and the numbers landing on
+  /// the rows were its only answer: a run of seventeen servers ended with the
+  /// progress row simply disappearing, and a single probe changed one figure
+  /// somewhere down the list. The owner asked for the result to be said.
+  final MeasurementReport? report;
 
   /// Whether a run is in progress.
   bool get isRunning => scopeId != null;
@@ -72,13 +86,16 @@ class MeasurementState {
           other.done == done &&
           other.total == total &&
           other.failure == failure &&
-          other.skipped == skipped;
+          other.skipped == skipped &&
+          other.report == report;
 
   @override
-  int get hashCode => Object.hash(scopeId, done, total, failure, skipped);
+  int get hashCode =>
+      Object.hash(scopeId, done, total, failure, skipped, report);
 
   @override
-  String toString() => 'MeasurementState($scopeId, $done/$total, $failure)';
+  String toString() =>
+      'MeasurementState($scopeId, $done/$total, $failure, $report)';
 }
 
 /// Runs a batch of latency probes and reports on it.
@@ -100,11 +117,18 @@ class MeasurementController extends Notifier<MeasurementState> {
   /// its run was called off writes no progress and starts nothing further.
   int _generation = 0;
 
+  /// The last thing that went wrong in the current run.
+  ///
+  /// Kept here rather than in the progress state: a failure written into
+  /// every step was announced in the middle of the run, then again by
+  /// whatever came next, and the end of the run had no single thing to say.
+  CommyFailure? _runFailure;
+
   /// Probes one server, for the "measure" row of its menu.
   ///
-  /// No progress to show — the number landing on the row is the report — but
-  /// the same rules as a run: a failure is this controller's to announce, and
-  /// a server the method cannot time says so instead of failing.
+  /// No progress to show, but the same rules as a run: the result is said
+  /// out loud, a failure is this controller's to announce, and a server the
+  /// method cannot time says so instead of failing.
   Future<void> measureOne(ProxyNode node) async {
     if (!MeasureLatencyUseCase.canMeasure(node, _method)) {
       state = MeasurementState(
@@ -115,15 +139,16 @@ class MeasurementController extends Notifier<MeasurementState> {
       );
       return;
     }
-    final failure = await _measure(node);
-    if (failure != null) {
-      state = MeasurementState(
-        scopeId: state.scopeId,
-        done: state.done,
-        total: state.total,
-        failure: failure,
-      );
-    }
+    final (latency, failure) = await _measure(node);
+    state = MeasurementState(
+      scopeId: state.scopeId,
+      done: state.done,
+      total: state.total,
+      failure: failure,
+      report: failure == null
+          ? MeasurementReport.of(<(ProxyNode, Duration?)>[(node, latency)])
+          : null,
+    );
   }
 
   /// Probes every node in [nodes], [inFlight] at a time.
@@ -153,25 +178,35 @@ class MeasurementController extends Notifier<MeasurementState> {
     }
 
     final generation = ++_generation;
+    _runFailure = null;
     state = MeasurementState(scopeId: scopeId, total: measurable.length);
 
+    // By position, so the report names the first of two equally quick
+    // servers in the order the list shows them, not in the order they
+    // happened to come back.
+    final results = List<(ProxyNode, Duration?)?>.filled(
+      measurable.length,
+      null,
+    );
     var next = 0;
     var done = 0;
     Future<void> worker() async {
       while (generation == _generation && next < measurable.length) {
-        final node = measurable[next++];
-        final failure = await _measure(node);
+        final index = next++;
+        final node = measurable[index];
+        final (latency, failure) = await _measure(node);
         if (generation != _generation) {
           return;
         }
+        results[index] = (node, latency);
+        // The last thing that went wrong, not the first: the freshest
+        // failure is the one worth putting in front of the user.
+        _runFailure = failure ?? _runFailure;
         done++;
         state = MeasurementState(
           scopeId: scopeId,
           done: done,
           total: measurable.length,
-          // The last thing that went wrong, not the first: the freshest
-          // failure is the one worth putting in front of the user.
-          failure: failure ?? state.failure,
         );
       }
     }
@@ -182,21 +217,35 @@ class MeasurementController extends Notifier<MeasurementState> {
     if (generation != _generation) {
       return;
     }
-    state = MeasurementState(failure: state.failure, skipped: skipped);
+    state = MeasurementState(
+      failure: _runFailure,
+      skipped: skipped,
+      report: MeasurementReport.of(
+        <(ProxyNode, Duration?)>[
+          for (final result in results)
+            if (result != null) result,
+        ],
+        skipped: skipped,
+      ),
+    );
   }
 
   /// Stops the run. Probes already in flight finish and their numbers are
   /// kept — a measurement that came back is still true.
+  ///
+  /// A stopped run reports nothing: the user called it off, and "3 of 17
+  /// answer" about a run they abandoned would be a number about nothing.
+  /// A failure it already hit is still said — that is not about the run.
   void cancel() {
     if (!state.isRunning) {
       return;
     }
     _generation++;
-    state = MeasurementState(failure: state.failure);
+    state = MeasurementState(failure: _runFailure);
   }
 
-  /// Drops the last failure, and the "skipped" count, once shown.
-  void clearFailure() => state = MeasurementState(
+  /// Drops the last failure, report and "skipped" count, once shown.
+  void clearOutcome() => state = MeasurementState(
         scopeId: state.scopeId,
         done: state.done,
         total: state.total,
@@ -206,11 +255,13 @@ class MeasurementController extends Notifier<MeasurementState> {
   PingMethod get _method =>
       (ref.read(settingsProvider).value ?? AppSettings.defaults).pingMethod;
 
-  Future<CommyFailure?> _measure(ProxyNode node) async {
+  /// The round trip — `null` when the server did not answer — or what
+  /// stopped it from being taken.
+  Future<(Duration?, CommyFailure?)> _measure(ProxyNode node) async {
     final result = await ref.read(measureLatencyUseCaseProvider)(
       node: node,
       outboundTag: SingBoxTags.forNode(node),
     );
-    return result.failureOrNull;
+    return (result.valueOrNull, result.failureOrNull);
   }
 }
