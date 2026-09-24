@@ -30,6 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       signed: ${{ steps.signing.outputs.signed }}
+      certificate: ${{ steps.certificate.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -149,6 +150,20 @@ jobs:
           cp "$out/flutter-apk/app-release.apk" "dist/commy-${v}${suffix}.apk"
           cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
 
+      # The fingerprint a user compares with `apksigner verify --print-certs`
+      # (docs/08). Read from the APK itself, so the notes can never name a
+      # key the file was not signed with. Not fatal: a missing line in the
+      # notes is not worth a failed release.
+      - name: Read the signing certificate
+        id: certificate
+        if: steps.signing.outputs.signed == 'true'
+        run: |
+          tools="$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -1)"
+          sha="$("$tools/apksigner" verify --print-certs dist/*.apk 2>/dev/null \
+            | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)" || true
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "certificate SHA-256: ${sha:-unknown}"
+
       # Not release assets. An .aab does not install on a phone and an .aar is
       # a library; on the releases page both were two more files to pick the
       # wrong one from. They stay available here, on the workflow run.
@@ -211,6 +226,8 @@ jobs:
             echo
             if [ "${{ needs.android.outputs.signed }}" != "true" ]; then
               echo '> Not signed with a release key: remove the previous version first.'
+            elif [ -n "${{ needs.android.outputs.certificate }}" ]; then
+              echo '> Signing certificate SHA-256: `${{ needs.android.outputs.certificate }}`'
             fi
             echo '> Checksum: `sha256sum -c SHA256SUMS.txt --ignore-missing`'
           } > release-notes.md
