@@ -65,7 +65,10 @@ class LatencyBadge extends StatelessWidget {
         value == null ? colors.textDisabled : tone.foreground(colors);
     final text = value == null
         ? CommyDurationFormat.unknown
-        : CommyDurationFormat.milliseconds(value);
+        : CommyDurationFormat.milliseconds(
+            value,
+            locale: Localizations.maybeLocaleOf(context),
+          );
 
     return Semantics(
       label: text,
