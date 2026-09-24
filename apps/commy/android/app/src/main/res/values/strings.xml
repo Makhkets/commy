@@ -41,4 +41,10 @@
     <string name="notification_lost_title">The tunnel stopped</string>
     <string name="notification_lost_text">Apps are using the network without the proxy. Tap to connect again.</string>
     <string name="notification_lost_blocked_text">Nothing reaches the network until it is back: the system blocks connections without a VPN. Tap to connect again.</string>
+
+    <!-- Held while the system kill switch is on and no tunnel is up (ADR-0016). -->
+    <string name="notification_blocked_title">Not connected · network closed</string>
+    <string name="notification_blocked_text">The system blocks connections without a VPN, so Commy keeps DNS lookups in too until you connect.</string>
+    <string name="notification_connect">Connect</string>
+    <string name="notification_vpn_settings">VPN settings</string>
 </resources>

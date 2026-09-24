@@ -183,25 +183,39 @@ internal object TunnelController {
      *
      * Called when the activity starts, which is the next moment this process
      * is allowed to start a service: it asks the orphaned service to go away
-     * and reports the loss as `core_crashed`, so the app opens on the error
-     * rather than on a quiet "Disconnected" that hides what happened. Does
-     * nothing in the ordinary case — a fresh process with no notification, or
-     * a live tunnel in this one.
+     * and, if a tunnel was up ([TunnelMarks.tunnelUp]), reports the loss as
+     * `core_crashed`, so the app opens on the error rather than on a quiet
+     * "Disconnected" that hides what happened. A stale card of the blocking
+     * interface is not a crash: the user had disconnected.
+     *
+     * The same start puts the blocking interface back when the kill switch was
+     * on the last time anyone could ask (ADR-0016) — with no service alive,
+     * nothing else would, and names would leak until the user connects. The
+     * service confirms with the interface up and stands down if the answer
+     * changed.
+     *
+     * Does nothing in the ordinary case — a fresh process with no card and no
+     * kill switch, or a live service in this one.
      */
     fun clearOrphan(context: Context) {
         if (service != null || statusState.value.state != Wire.States.IDLE) {
             return
         }
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val marks = TunnelMarks(context)
         val orphaned = runCatching {
             manager.activeNotifications.any { it.id == TunnelNotifications.ID_TUNNEL }
         }.getOrDefault(false)
-        if (!orphaned) {
+        if (!orphaned && !marks.lockdown) {
             return
         }
-        val how = lastExit(context)
-        Log.w(TAG, "the tunnel notification outlived its process ($how); clearing it")
-        fail(Wire.Errors.CORE_CRASHED, "the tunnel stopped while the app was not running: $how")
+        if (orphaned && marks.tunnelUp) {
+            val how = lastExit(context)
+            Log.w(TAG, "the tunnel notification outlived its process ($how); clearing it")
+            fail(Wire.Errors.CORE_CRASHED, "the tunnel stopped while the app was not running: $how")
+        } else {
+            Log.i(TAG, "no service after the last process; restoring what the kill switch needs")
+        }
         runCatching {
             context.startService(
                 Intent(context, CommyVpnService::class.java)
@@ -262,6 +276,23 @@ internal object TunnelController {
     fun onStarted(since: Long) {
         statusState.value = StatusEvent.connected(since)
         synchronized(lock) {
+            startGate?.complete(Unit)
+            startGate = null
+        }
+    }
+
+    /**
+     * A start that a later stop called off.
+     *
+     * Not a failure: the user tapped Disconnect on "Connecting…", and the stop
+     * that won reports the state. Answering the waiting `start` now is what
+     * keeps the app from sitting busy for the whole start timeout and then
+     * showing an error for something the user did on purpose. The
+     * configuration, a secret, goes with it.
+     */
+    fun onStartAborted() {
+        synchronized(lock) {
+            pendingConfig = null
             startGate?.complete(Unit)
             startGate = null
         }

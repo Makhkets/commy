@@ -30,4 +30,9 @@
     <string name="notification_lost_title">Туннель остановился</string>
     <string name="notification_lost_text">Приложения выходят в сеть без прокси. Нажмите, чтобы подключиться снова.</string>
     <string name="notification_lost_blocked_text">Пока он не поднимется, сеть недоступна: система блокирует соединения без VPN. Нажмите, чтобы подключиться снова.</string>
+
+    <string name="notification_blocked_title">Не подключено · сеть закрыта</string>
+    <string name="notification_blocked_text">Система блокирует соединения без VPN, поэтому Commy не выпускает и DNS-запросы, пока вы не подключитесь.</string>
+    <string name="notification_connect">Подключить</string>
+    <string name="notification_vpn_settings">Настройки VPN</string>
 </resources>

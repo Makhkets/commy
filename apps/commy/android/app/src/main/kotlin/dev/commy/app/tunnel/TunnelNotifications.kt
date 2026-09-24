@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import dev.commy.app.MainActivity
@@ -118,6 +119,51 @@ internal class TunnelNotifications(private val context: Context) {
     fun cancel() {
         posted = null
         manager?.cancel(ID_TUNNEL)
+    }
+
+    /**
+     * The ongoing notification while the blocking interface is held.
+     *
+     * Says the two things the user needs when the network is gone and Commy
+     * is "Disconnected": that the block is the system setting they chose, and
+     * that Commy is keeping DNS inside it too — with the two ways out, connect
+     * or change the setting.
+     */
+    fun blocked(): Notification {
+        posted = KEY_BLOCKED
+        val text = context.getString(R.string.notification_blocked_text)
+        return NotificationCompat.Builder(context, CHANNEL_TUNNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_blocked_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setOngoing(true)
+            .setShowWhen(false)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(openAppIntent)
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_notification,
+                    context.getString(R.string.notification_connect),
+                    openApp(connect = true),
+                ).build(),
+            )
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_notification,
+                    context.getString(R.string.notification_vpn_settings),
+                    vpnSettings(),
+                ).build(),
+            )
+            .build()
+    }
+
+    /** [blocked] without a foreground service, for when the platform refuses one. */
+    fun showBlocked() {
+        manager?.notify(ID_TUNNEL, blocked())
     }
 
     /**
@@ -308,10 +354,19 @@ internal class TunnelNotifications(private val context: Context) {
         FLAGS,
     )
 
+    private fun vpnSettings(): PendingIntent = PendingIntent.getActivity(
+        context,
+        3,
+        Intent(Settings.ACTION_VPN_SETTINGS).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        FLAGS,
+    )
+
     companion object {
         const val ID_TUNNEL = 1001
         private const val ID_PROMPT = 1002
         private const val ID_CORE = 1003
+
+        private const val KEY_BLOCKED = "blocked"
 
         private const val CHANNEL_TUNNEL = "commy.tunnel"
         private const val CHANNEL_CORE = "commy.core"
