@@ -228,7 +228,7 @@
 
   "ruleSets": {
     "title": "Rule sets",
-    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask — with the button or the schedule below — and the address below is the one that will be asked.",
+    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask — with the button or a schedule. The address below is the one that will be asked.",
     "source": "Source",
     "sourceLabel": "Address template",
     "sourceHelp": "$token is replaced with the tag being fetched. Clear the field to make downloading unavailable.",
@@ -492,6 +492,7 @@
     "appsOff": "All",
     "ruleSets": "Rule sets",
     "ruleSetsHint": "Downloaded only when you tap",
+    "ruleSetsHintAuto": "Downloaded when you tap, and $interval",
     "ruleSetsValue": "$have of $need",
     "dns": "DNS",
     "dnsValue": "$remote · $strategy",
