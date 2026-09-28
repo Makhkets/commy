@@ -52,8 +52,9 @@ import 'package:cryptography/dart.dart';
 /// anything, so a crafted file cannot ask for a gigabyte of memory.
 ///
 /// Key derivation and encryption run in a separate isolate: at the recommended
-/// parameters the derivation takes about a second on a phone, and on the UI
-/// isolate that second would be a frozen screen.
+/// parameters the derivation takes seconds on a phone, and on the UI isolate
+/// those seconds would be a frozen screen. Inside it, Argon2's lanes run one
+/// after another (see `_derive` for why not in parallel isolates).
 class PasswordBackupCipher implements BackupCipher {
   /// Creates the cipher. The defaults are RFC 9106's second recommended
   /// option; tests pass tiny ones.
@@ -290,6 +291,14 @@ class PasswordBackupCipher implements BackupCipher {
       iterations: view.getUint32(16),
       parallelism: header[20],
       hashLength: _keyLength,
+      // One thread, pure Dart. With isolates the library shares a malloc'd
+      // buffer between them, gives each segment ten seconds, and on a timeout
+      // frees the buffer while the workers may still be writing into it — a
+      // native crash on exactly the slow phone that timed out. This already
+      // runs on a worker isolate of its own, so the screen does not wait on
+      // it either way; the lanes are computed one after another, and the
+      // result is the same Argon2id.
+      maxIsolates: 0,
     );
     // UTF-8 as typed: no trimming, no normalisation. A password is whatever
     // bytes the user's keyboard produced, and changing them here would lock

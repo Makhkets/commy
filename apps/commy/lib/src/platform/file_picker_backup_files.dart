@@ -40,22 +40,28 @@ class FilePickerBackupFiles implements BackupFiles {
       // extension — a filter would hide the very file the user saved. What
       // the file is, the cipher decides from its first bytes.
       final picked = await FilePicker.pickFile();
-      final path = picked?.path;
-      if (picked == null || path == null) {
-        return const Ok(null);
-      }
       try {
+        final path = picked?.path;
+        if (picked == null || path == null) {
+          return const Ok(null);
+        }
         final file = File(path);
-        // Measured before it is read: a video picked by mistake is not a
-        // backup, and reading it whole to find out would be the slow way.
+        // Measured before it is read into memory. The picker has already
+        // copied it by now — that is how it hands a file over — so this
+        // saves the read, not the copy.
         if (await file.length() > maxBytes) {
           return const Err(BackupFailure(BackupProblem.notABackup));
         }
         return Ok(await file.readAsBytes());
       } finally {
-        // On Android the picker hands over a copy in our cache directory.
-        // It is ciphertext, but a copy nobody needs is a copy to delete.
-        await FilePicker.clearTemporaryFiles();
+        // On Android that copy sits in our cache directory. It is
+        // ciphertext, but a copy nobody needs is a copy to delete — on every
+        // way out, the refused file's included.
+        try {
+          await FilePicker.clearTemporaryFiles();
+        } on Object {
+          // Nothing to clear is not a failed pick.
+        }
       }
     } on Object catch (error, stackTrace) {
       return Err(UnknownFailure(error, stackTrace));

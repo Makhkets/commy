@@ -336,7 +336,15 @@ class ImportController extends Notifier<ImportState> {
         _publish(ticket, ImportState.idle);
         return null;
       }
-      final bytes = await File(path).readAsBytes();
+      final Uint8List bytes;
+      try {
+        bytes = await File(path).readAsBytes();
+      } finally {
+        // On Android the picker reads through a copy in our cache directory,
+        // and a config file is every credential in it, in the clear (R2).
+        // Read once, then gone — not left for the next pick to overwrite.
+        await _clearPickerCopies();
+      }
       // The ticket the pick started on, not a fresh one: the sheet this has to
       // report to is the one that opened the picker, and going through
       // [importText] would hand the import a ticket no dismissal had burnt.
@@ -347,6 +355,15 @@ class ImportController extends Notifier<ImportState> {
     } on Object catch (error, stackTrace) {
       _publish(ticket, ImportState(failure: UnknownFailure(error, stackTrace)));
       return null;
+    }
+  }
+
+  static Future<void> _clearPickerCopies() async {
+    try {
+      await FilePicker.clearTemporaryFiles();
+    } on Object {
+      // Not every platform keeps copies, and not every one implements the
+      // call; nothing to clear is not a failed import.
     }
   }
 
