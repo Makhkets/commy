@@ -228,7 +228,7 @@
 
   "ruleSets": {
     "title": "Rule sets",
-    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask, and the address below is the one that will be asked.",
+    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask — with the button or a schedule. The address below is the one that will be asked.",
     "source": "Source",
     "sourceLabel": "Address template",
     "sourceHelp": "$token is replaced with the tag being fetched. Clear the field to make downloading unavailable.",
@@ -245,6 +245,14 @@
     "noneNeededBody": "Rules naming geosite: or geoip: are the ones that do. Plain domains and addresses work without anything downloaded.",
     "downloaded": "$tag downloaded",
     "downloadFailed": "Could not download the $tag set",
+    "autoUpdate": "Update automatically",
+    "autoUpdateHint": "Only sets already downloaded and used by your rules, from the same source",
+    "autoUpdateOff": "off",
+    "everyDay": "daily",
+    "everyWeek": "weekly",
+    "everyMonth": "monthly",
+    "autoUpdateTitle": "Updating rule sets",
+    "autoUpdateBody": "Commy fetches them again on this schedule — only the ones already on the phone and used by your rules, from the same address as the button. Off — only when you tap Update.",
     "deleteConfirm": {
       "title": "Delete this list?",
       "body": "The rules that name it stay where they are and stop applying until it is downloaded again.",
@@ -332,6 +340,7 @@
       "ipCheckHint": "only when you tap",
       "ruleSets": "geoip and geosite rule sets",
       "ruleSetsHint": "when you tap Refresh",
+      "ruleSetsHintAuto": "on a tap and $interval",
       "blockLists": "Ad block lists",
       "blockListsHint": "source is configurable",
       "blockListsMissing": "on, but the list is not downloaded — open Rule sets",
@@ -368,6 +377,60 @@
       "tcpHint": "How fast the server accepts a connection, measured directly. Quick, but does not check that it carries traffic",
       "icmp": "ICMP",
       "icmpHint": "A plain ping to the server's address. Many servers do not answer it"
+    },
+    "backup": {
+      "title": "Backup",
+      "export": "Save a backup",
+      "exportHint": "Subscriptions, servers, rules and settings, in one file under a password",
+      "restore": "Restore from a backup",
+      "restoreHint": "Replaces everything here now",
+      "password": {
+        "exportTitle": "Backup password",
+        "exportBody": "The backup holds your subscriptions and the keys to your servers. Without the password nobody can open it: not whoever gets the file, and not you. A lost password cannot be recovered.",
+        "restoreTitle": "Password of the backup",
+        "label": "Password",
+        "repeat": "Password again",
+        "tooShort": "At least $min characters",
+        "mismatch": "The passwords do not match",
+        "empty": "Enter the password",
+        "show": "Show password",
+        "hide": "Hide password",
+        "save": "Encrypt and save",
+        "open": "Open"
+      },
+      "fileTitle": "Save a Commy backup",
+      "saved": "Backup saved · $contents",
+      "notSaved": "Backup not saved",
+      "subscriptions(plural, param=count)": {
+        "zero": "no subscriptions",
+        "one": "$count subscription",
+        "other": "$count subscriptions"
+      },
+      "servers(plural, param=count)": {
+        "zero": "no servers",
+        "one": "$count server",
+        "other": "$count servers"
+      },
+      "rules(plural, param=count)": {
+        "zero": "no rules of your own",
+        "one": "$count rule",
+        "other": "$count rules"
+      },
+      "restoreConfirm": {
+        "title": "Replace everything with the backup?",
+        "body": "Backup of $date: $contents. Subscriptions, servers, rules and settings on this phone will be replaced, and the tunnel disconnects. The device ID (HWID) is not carried over: the panel sees this phone, not the one the backup came from.",
+        "confirm": "Replace",
+        "cancel": "Cancel"
+      },
+      "restored": "Restored · $contents",
+      "ruleSetsMissing": "Rule sets are not part of a backup — download them again",
+      "ruleSetsAction": "Open",
+      "perAppDropped": "The app list was made on another system — it is turned off",
+      "skipped(plural, param=count)": {
+        "one": "$count entry of the backup was not read: a newer version made it",
+        "other": "$count entries of the backup were not read: a newer version made them"
+      },
+      "failed": "Could not restore the backup"
     },
     "reset": {
       "title": "Reset",
@@ -429,6 +492,7 @@
     "appsOff": "All",
     "ruleSets": "Rule sets",
     "ruleSetsHint": "Downloaded only when you tap",
+    "ruleSetsHintAuto": "Downloaded when you tap, and $interval",
     "ruleSetsValue": "$have of $need",
     "dns": "DNS",
     "dnsValue": "$remote · $strategy",
@@ -550,6 +614,14 @@
     "storage": {
       "message": "Could not save",
       "action": "Retry"
+    },
+    "backup": {
+      "notABackup": "This is not a Commy backup",
+      "newerVersion": "A newer Commy made this backup — update the app",
+      "wrongPassword": "The password does not fit — or the file was changed after it was saved",
+      "unreadable": "The backup is damaged and cannot be read",
+      "pickAnother": "Choose another file",
+      "retry": "Try again"
     },
     "unknown": {
       "message": "Something went wrong",

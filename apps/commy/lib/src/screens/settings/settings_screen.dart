@@ -5,6 +5,8 @@ import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
+import 'package:commy/src/screens/settings/backup_section.dart';
+import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
@@ -212,6 +214,9 @@ class _Body extends ConsumerWidget {
               ),
           ],
         ),
+        // Next to Reset on purpose: restoring replaces as much as a reset
+        // does, and saving is what makes either of them safe to try.
+        const BackupSection(),
         // Last, and each behind a question: the two rows on this screen
         // that undo more than they do.
         SectionLabel(t.settings.reset.title),
@@ -367,7 +372,14 @@ class _SilencePanel extends ConsumerWidget {
             SettingsTile(
               icon: CommyIcons.routing,
               title: t.settings.silence.ruleSets,
-              subtitle: t.settings.silence.ruleSetsHint,
+              subtitle: settings.isRuleSetAutoUpdateEnabled
+                  ? t.settings.silence.ruleSetsHintAuto(
+                      interval: RuleSetsScreen.intervalPhrase(
+                        t,
+                        settings.ruleSetUpdateDays,
+                      ),
+                    )
+                  : t.settings.silence.ruleSetsHint,
               isMonospaceSubtitle: true,
               trailing: CommySwitch(
                 value: routing?.mode == RoutingMode.rules,

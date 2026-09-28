@@ -30,6 +30,14 @@ final subscriptionRepositoryProvider = Provider<SubscriptionRepository>((ref) {
   );
 });
 
+/// Subscriptions, groups and servers replaced as one, for a restore.
+final libraryStoreProvider = Provider<LibraryStore>((ref) {
+  return DriftLibraryStore(
+    database: ref.watch(databaseProvider),
+    secrets: ref.watch(secretVaultProvider),
+  );
+});
+
 /// Application settings, including the selected node id.
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return DriftSettingsRepository(database: ref.watch(databaseProvider));

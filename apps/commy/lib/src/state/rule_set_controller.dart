@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Downloading and deleting the geoip and geosite files. Exception E-2.
 ///
-/// The whole of the exception is one method with one caller: `download`, from
-/// a button. Nothing in this file runs on a timer, on a schedule, or on the
-/// app coming up — a rule set that refreshed itself would turn a sanctioned
-/// exception into traffic the user never asked for, which is rule R1.
+/// The whole of the exception is one method: `download`. It has two callers —
+/// the button, and `RuleSetScheduler` once the user has chosen an interval
+/// for it (E-2 and E-3 allow exactly that; off by default). Nothing here runs
+/// on its own: a rule set that refreshed itself without that choice would
+/// turn a sanctioned exception into traffic the user never asked for, which
+/// is rule R1.
 final ruleSetControllerProvider =
     NotifierProvider<RuleSetController, RuleSetActionState>(
   RuleSetController.new,

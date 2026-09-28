@@ -97,6 +97,8 @@ abstract final class TunnelStatusCodec {
         return detail;
       case StorageFailure(:final cause):
         return '$cause';
+      case BackupFailure(:final problem):
+        return problem.name;
       case UnknownFailure(:final cause):
         return '$cause';
       case SubscriptionMalformedFailure(:final detail):

@@ -30,6 +30,7 @@ class CommyTextField extends StatelessWidget {
     this.onChanged,
     this.onSubmitted,
     this.isMonospace = false,
+    this.isSecret = false,
     super.key,
   });
 
@@ -91,6 +92,11 @@ class CommyTextField extends StatelessWidget {
   /// anything else where character shape matters more than reading comfort.
   final bool isMonospace;
 
+  /// A secret the keyboard must not learn or suggest from — a password, even
+  /// while it is shown in the clear. `obscureText` alone does not say this:
+  /// once the user taps "show", the field is ordinary text to the keyboard.
+  final bool isSecret;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -117,6 +123,8 @@ class CommyTextField extends StatelessWidget {
       enabled: enabled,
       autofocus: autofocus,
       obscureText: obscureText,
+      autocorrect: !isSecret,
+      enableSuggestions: !isSecret,
       maxLines: obscureText ? 1 : maxLines,
       minLines: minLines,
       keyboardType: keyboardType,

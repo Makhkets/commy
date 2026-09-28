@@ -95,6 +95,22 @@ class FailureText {
           action: FailureAction.retry,
           retryable: failure.retryable,
         ),
+      // Never a trip to the logs: nothing about a backup is logged (R3), and
+      // every answer here is something the user does in the sheet itself —
+      // type the password again, or pick another file.
+      BackupFailure(:final problem) => FailureText(
+          message: switch (problem) {
+            BackupProblem.notABackup => errors.backup.notABackup,
+            BackupProblem.newerVersion => errors.backup.newerVersion,
+            BackupProblem.wrongPassword => errors.backup.wrongPassword,
+            BackupProblem.unreadable => errors.backup.unreadable,
+          },
+          actionLabel: problem == BackupProblem.wrongPassword
+              ? errors.backup.retry
+              : errors.backup.pickAnother,
+          action: FailureAction.retry,
+          retryable: true,
+        ),
       // A file that could not be read is not a mystery, and it is the one
       // failure the user can fix without leaving the sheet: the pick worked,
       // the read threw. "Something went wrong" plus a trip to the logs was

@@ -38,7 +38,9 @@ class CommyTestHarness {
     AppSettings settings = AppSettings.defaults,
     List<ProxyGroup>? coreGroups,
     List<TrafficDay> trafficDays = const <TrafficDay>[],
+    List<RuleSet> ruleSets = const <RuleSet>[],
   })  : _coreGroups = coreGroups,
+        ruleSetRepository = FakeRuleSetRepository(ruleSets),
         trafficHistory = FakeTrafficHistoryRepository(trafficDays),
         nodeRepository = FakeNodeRepository(nodes),
         subscriptionRepository = FakeSubscriptionRepository(subscriptions),
@@ -74,10 +76,16 @@ class CommyTestHarness {
   final FakeSubscriptionFetcher subscriptionFetcher = FakeSubscriptionFetcher();
 
   /// The geoip and geosite files. Exception E-2, without a socket.
-  final FakeRuleSetRepository ruleSetRepository = FakeRuleSetRepository();
+  final FakeRuleSetRepository ruleSetRepository;
 
   /// Daily traffic totals.
   final FakeTrafficHistoryRepository trafficHistory;
+
+  /// The save and open dialogs a backup goes through.
+  final FakeBackupFiles backupFiles = FakeBackupFiles();
+
+  /// Seals backups without the real cipher's seconds of key derivation.
+  final FakeBackupCipher backupCipher = FakeBackupCipher();
 
   final List<ProxyGroup>? _coreGroups;
 
@@ -137,6 +145,11 @@ class CommyTestHarness {
       // a screen test can reach — builds instead of throwing "must override".
       secureStoreProvider.overrideWithValue(secureStore),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
+      backupFilesProvider.overrideWithValue(backupFiles),
+      backupCipherProvider.overrideWithValue(backupCipher),
+      libraryStoreProvider.overrideWithValue(
+        FakeLibraryStore(nodeRepository, subscriptionRepository),
+      ),
       if (status != null)
         coreStatusProvider.overrideWith(
           (ref) => Stream<TunnelStatus>.value(status),

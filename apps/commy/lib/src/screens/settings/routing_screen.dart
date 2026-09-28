@@ -5,6 +5,7 @@ import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
+import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
@@ -63,6 +64,7 @@ class _Body extends ConsumerWidget {
     final spacing = context.spacing;
     final controller = ref.read(settingsControllerProvider.notifier);
     final dns = ref.watch(dnsSettingsProvider).value ?? DnsSettings.defaults;
+    final settings = ref.watch(settingsProvider).value ?? AppSettings.defaults;
     final rules = policy.rules;
     final needed = RouteSectionBuilder.requiredRuleSets(
       routing: policy,
@@ -197,7 +199,14 @@ class _Body extends ConsumerWidget {
             SettingsTile(
               icon: CommyIcons.globe,
               title: t.routing.ruleSets,
-              subtitle: t.routing.ruleSetsHint,
+              subtitle: settings.isRuleSetAutoUpdateEnabled
+                  ? t.routing.ruleSetsHintAuto(
+                      interval: RuleSetsScreen.intervalPhrase(
+                        t,
+                        settings.ruleSetUpdateDays,
+                      ),
+                    )
+                  : t.routing.ruleSetsHint,
               // How many of the sets the rules ask for are actually here.
               // The old value showed the routing mode, which this row has
               // nothing to do with.

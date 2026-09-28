@@ -54,6 +54,9 @@ sealed class CommyFailure {
   /// The database or the secure storage refused to cooperate.
   const factory CommyFailure.storage(Object cause) = StorageFailure;
 
+  /// A backup file could not be read, opened or restored; see [BackupProblem].
+  const factory CommyFailure.backup(BackupProblem problem) = BackupFailure;
+
   /// Anything we failed to classify. Always a bug worth reading.
   const factory CommyFailure.unknown(Object cause, StackTrace stackTrace) =
       UnknownFailure;
@@ -297,6 +300,55 @@ final class StorageFailure extends CommyFailure {
 
   @override
   String toString() => 'StorageFailure($cause)';
+}
+
+/// Why a backup file did not become the user's data.
+///
+/// Four answers and no fifth, because each asks the user for something
+/// different: another file, a newer Commy, another try at the password, or
+/// giving up on this copy. A wrong password and a damaged file are one answer
+/// on purpose — authenticated encryption cannot tell them apart, and guessing
+/// would send the user to retype a password that was right.
+enum BackupProblem {
+  /// The file is not a Commy backup at all.
+  notABackup,
+
+  /// A Commy backup this version cannot read: made by a newer Commy.
+  newerVersion,
+
+  /// The password does not open it, or the file was changed since it was made.
+  wrongPassword,
+
+  /// Damaged: a header that makes no sense, or contents that opened and are
+  /// not something this version can restore.
+  unreadable,
+}
+
+/// A backup file could not be read, opened or restored.
+final class BackupFailure extends CommyFailure {
+  /// Creates the failure for [problem].
+  const BackupFailure(this.problem);
+
+  /// What went wrong, in terms of what the user can do about it.
+  final BackupProblem problem;
+
+  @override
+  String get code => 'backup';
+
+  /// Only a password can be tried again; a file does not change by retrying.
+  @override
+  bool get retryable => problem == BackupProblem.wrongPassword;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BackupFailure && other.problem == problem;
+
+  @override
+  int get hashCode => Object.hash(runtimeType, problem);
+
+  @override
+  String toString() => 'BackupFailure(${problem.name})';
 }
 
 /// Something we did not classify. Every occurrence is worth investigating.

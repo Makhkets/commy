@@ -13,6 +13,8 @@ library;
 
 import 'dart:async';
 
+import 'package:commy/src/platform/backup_files.dart';
+import 'package:commy/src/platform/file_picker_backup_files.dart';
 import 'package:commy/src/platform/flutter_clipboard.dart';
 import 'package:commy_config/commy_config.dart'
     show CommyLinkParser, ConfigPlatform;
@@ -129,6 +131,17 @@ final idGeneratorProvider = Provider<IdGenerator>((ref) => RandomIdGenerator());
 /// Reading and writing the system clipboard.
 final clipboardProvider = Provider<ClipboardPort>(
   (ref) => const FlutterClipboard(),
+);
+
+/// The system's own dialogs, for backup files: save where the user says,
+/// pick what the user picks. Never a share sheet (docs/06, "Экспорт").
+final backupFilesProvider = Provider<BackupFiles>(
+  (ref) => const FilePickerBackupFiles(),
+);
+
+/// Seals and opens backups under the user's password (ADR-0017).
+final backupCipherProvider = Provider<BackupCipher>(
+  (ref) => PasswordBackupCipher(),
 );
 
 /// Parses every link scheme and every subscription body shape we support.

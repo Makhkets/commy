@@ -145,6 +145,30 @@ internal object CoreSnapshots {
         else -> null
     }
 
+    /**
+     * [tag]'s delay in [groups], if it was measured at or after [since] (Unix
+     * seconds, as the core keeps it). Looked up in [group] first and then in
+     * any group: the same outbound sits in the selector and in "Auto", and
+     * the core measures it once for both.
+     *
+     * Null for a delay of zero, which is "never measured", and for one older
+     * than the round that asked — the answer to the previous question.
+     */
+    fun freshDelay(
+        groups: List<GroupSnapshot>,
+        group: String,
+        tag: String,
+        since: Long,
+    ): Long? {
+        val item = groups.firstOrNull { it.tag == group }?.items?.firstOrNull { it.tag == tag }
+            ?: groups.flatMap(GroupSnapshot::items).firstOrNull { it.tag == tag }
+            ?: return null
+        if (item.urlTestDelay <= 0 || item.urlTestTime < since) {
+            return null
+        }
+        return item.urlTestDelay.toLong()
+    }
+
     /** A threshold no line passes: the config switched the log off. */
     const val LOG_NONE = -1
 

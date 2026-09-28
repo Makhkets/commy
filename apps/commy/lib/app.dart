@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/rule_set_scheduler.dart';
 import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/subscription_scheduler.dart';
 import 'package:commy/src/state/system_intent_listener.dart';
@@ -63,6 +64,9 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // because a refresh falling due must not depend on the home screen
       // being the one on top.
       ..watch(subscriptionRefreshProvider)
+      // Rule sets on disk, fetched again on the interval the user chose —
+      // off unless they chose one (exceptions E-2 and E-3).
+      ..watch(ruleSetRefreshProvider)
       // Deep links, opened files, shared text and the Quick Settings tile.
       ..watch(systemIntentProvider)
       // Loading a locale is asynchronous — slang defers every non-base

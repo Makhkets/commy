@@ -10,6 +10,20 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **Backups.** Settings → Backup saves your subscriptions, servers, rules and
+  settings into one file under a password you choose, and brings such a file
+  back — on a new phone, or after a reinstall. The file is encrypted before it
+  is written (Argon2id and ChaCha20-Poly1305) and goes only where you save it:
+  Commy never uploads it. The password cannot be recovered. The device ID a
+  panel sees is not part of a backup: a restored phone is a new device to it.
+- **Rule sets can keep themselves fresh**: Rule sets → Update automatically —
+  daily, weekly or monthly; off unless you pick one. Only the sets already on
+  the phone and used by your rules are fetched again, from the same address as
+  the button. A running tunnel picks the new file up by itself.
+- The Android tunnel's decisions — what stays up when you disconnect under
+  the system kill switch, which routes and apps go into the tunnel — are
+  covered by JVM tests.
+
 ## [0.1.0-alpha.9]
 
 **The first release signed with Commy's own key.** Remove the previous version

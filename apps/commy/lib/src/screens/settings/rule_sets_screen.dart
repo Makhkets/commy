@@ -34,6 +34,20 @@ class RuleSetsScreen extends ConsumerWidget {
   /// Creates the screen.
   const RuleSetsScreen({super.key});
 
+  /// "Weekly", "Off" — how [days] reads as a schedule, capitalised as a value.
+  static String intervalLabel(Translations t, int days) {
+    final text = intervalPhrase(t, days);
+    return text.isEmpty ? text : text[0].toUpperCase() + text.substring(1);
+  }
+
+  /// "weekly", "off" — the same, to go inside a sentence.
+  static String intervalPhrase(Translations t, int days) => switch (days) {
+        1 => t.ruleSets.everyDay,
+        7 => t.ruleSets.everyWeek,
+        30 => t.ruleSets.everyMonth,
+        _ => t.ruleSets.autoUpdateOff,
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
@@ -92,6 +106,20 @@ class RuleSetsScreen extends ConsumerWidget {
                 isMonospaceSubtitle: settings.isRuleSetSourceEnabled,
                 onTap: () => unawaited(_editSource(context, ref, settings)),
               ),
+              // Exceptions E-2 and E-3 allow a refresh on an interval the
+              // user sets; this is where it is set, next to the address it
+              // goes to. Gone with the source: no source, nothing to refresh.
+              if (settings.isRuleSetSourceEnabled)
+                SettingsTile(
+                  icon: CommyIcons.clock,
+                  title: t.ruleSets.autoUpdate,
+                  subtitle: t.ruleSets.autoUpdateHint,
+                  value: RuleSetsScreen.intervalLabel(
+                    t,
+                    settings.ruleSetUpdateDays,
+                  ),
+                  onTap: () => unawaited(_editInterval(context, ref, settings)),
+                ),
             ],
           ),
           SectionLabel(t.ruleSets.needed),
@@ -218,6 +246,26 @@ class RuleSetsScreen extends ConsumerWidget {
         .setRuleSetSource(edited);
   }
 
+  Future<void> _editInterval(
+    BuildContext context,
+    WidgetRef ref,
+    AppSettings settings,
+  ) async {
+    final t = Translations.of(context);
+    final days = await CommySheet.show<int>(
+      context: context,
+      title: t.ruleSets.autoUpdateTitle,
+      builder: (context) =>
+          _IntervalSheet(current: settings.ruleSetUpdateDays),
+    );
+    if (days == null) {
+      return;
+    }
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .setRuleSetUpdateDays(days);
+  }
+
   Future<void> _confirmDelete(
     BuildContext context,
     RuleSetController controller,
@@ -240,6 +288,51 @@ class RuleSetsScreen extends ConsumerWidget {
 }
 
 /// One rule set: what it is, whether it is here, and what can be done to it.
+/// The four schedules, one tap each, with what they mean above them.
+class _IntervalSheet extends StatelessWidget {
+  const _IntervalSheet({required this.current});
+
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final spacing = context.spacing;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            t.ruleSets.autoUpdateBody,
+            style: context.typography.body.copyWith(
+              color: context.colors.textSecondary,
+            ),
+          ),
+          SizedBox(height: spacing.s3),
+          SettingsSection(
+            children: <Widget>[
+              for (final days in AppSettings.ruleSetUpdateChoices)
+                SettingsTile(
+                  title: RuleSetsScreen.intervalLabel(t, days),
+                  selected: days == current,
+                  trailing: CommyRadio<int>(
+                    value: days,
+                    groupValue: current,
+                    onChanged: (value) => Navigator.of(context).pop(value),
+                  ),
+                  onTap: () => Navigator.of(context).pop(days),
+                ),
+            ],
+          ),
+          SizedBox(height: spacing.s4),
+        ],
+      ),
+    );
+  }
+}
+
 class _RuleSetTile extends StatelessWidget {
   const _RuleSetTile({
     required this.tag,

@@ -211,4 +211,30 @@ abstract final class CommyIcons {
   /// Share a server or a subscription as a code another client can read.
   static const IconData qrCode =
       IconData(0xe1df, fontFamily: _family, fontPackage: _package); // qr-code
+
+  /// Save everything into a backup file.
+  static const IconData backup = IconData(
+    0xe3ab,
+    fontFamily: _family,
+    fontPackage: _package,
+  ); // database-backup
+
+  /// Bring a backup file back.
+  static const IconData restore = IconData(
+    0xe2cd,
+    fontFamily: _family,
+    fontPackage: _package,
+  ); // archive-restore
+
+  /// Something sealed under a password.
+  static const IconData lock =
+      IconData(0xe10b, fontFamily: _family, fontPackage: _package); // lock
+
+  /// Show what a password field hides.
+  static const IconData show =
+      IconData(0xe0ba, fontFamily: _family, fontPackage: _package); // eye
+
+  /// Hide it again.
+  static const IconData hide =
+      IconData(0xe0bb, fontFamily: _family, fontPackage: _package); // eye-off
 }

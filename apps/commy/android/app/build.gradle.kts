@@ -224,6 +224,22 @@ dependencies {
 
     implementation("androidx.core:core-ktx:1.19.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
+    // JVM unit tests of the tunnel's decisions (src/test). Test-only: none of
+    // this reaches the APK (rule R11), and none of it talks to a network.
+    //
+    // No Robolectric on purpose. What is worth testing here — which interface
+    // backs the VPN slot, in which order, which routes and apps go into the
+    // builder — was lifted out of CommyVpnService into classes that import
+    // nothing from android.*, so plain JUnit reaches it; Robolectric would
+    // add a few hundred megabytes of framework jars to fake the one class
+    // (VpnService.Builder) it cannot fake anyway.
+    //
+    // org.json because the android.jar that unit tests compile against has the
+    // package as stubs that throw; this is the reference implementation the
+    // platform's copy was taken from, so the wire JSON is checked for real.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20250517")
 }
 
 kotlin {

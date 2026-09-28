@@ -176,6 +176,25 @@ jobs:
           unzip -l "$apk" | grep -q 'lib/arm64-v8a/libbox.so' \
             || { echo "::error::APK contains no sing-box core"; exit 1; }
 
+      # The tunnel's decisions — which interface backs the VPN slot after each
+      # way down, which routes and apps go into the builder — on the JVM, no
+      # device. After the APK build, and it has to be: gradlew and
+      # local.properties are gitignored and only exist once a Flutter build
+      # has generated them. The compiled classes are reused as a bonus.
+      - name: Kotlin unit tests
+        working-directory: apps/commy/android
+        run: ./gradlew :app:testDebugUnitTest --console=plain
+
+      - name: Upload Kotlin test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kotlin-test-reports
+          # Flutter moves every module's build directory under apps/commy/build.
+          path: apps/commy/build/app/reports/tests/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v7
         with:
           name: commy-debug-apk
