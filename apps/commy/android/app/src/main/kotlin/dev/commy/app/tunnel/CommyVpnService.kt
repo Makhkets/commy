@@ -34,7 +34,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * The tunnel.
@@ -79,36 +78,26 @@ class CommyVpnService : VpnService(), CommandServerHandler {
 
     private var commandServer: CommandServer? = null
     private var bridge: CoreEventBridge? = null
-    private var tun: ParcelFileDescriptor? = null
 
-    @Volatile
-    internal var isCoreUp: Boolean = false
-        private set
+    private val marks by lazy { TunnelMarks(applicationContext) }
+
+    /**
+     * What backs the VPN slot — the core's interface, the blocking one, or
+     * nothing — and the order every change of it happens in. The decisions
+     * live there, where a JVM test reaches them; what is left here is Android.
+     */
+    private val slot by lazy { TunnelSlot(SlotPlatform(), marks) }
+
+    /** Which start is still wanted; see [StartLedger]. */
+    private val ledger = StartLedger()
+
+    internal val isCoreUp: Boolean get() = slot.isCoreUp
+
+    private val bringingUp: Boolean get() = ledger.bringingUp
 
     /** Set before any deliberate teardown, so the core's own stop is not read as a crash. */
     @Volatile
     private var stopping = false
-
-    /** Starts accepted and not yet finished, from ACTION_START to success or failure. */
-    private val startsInFlight = AtomicInteger(0)
-
-    private val bringingUp: Boolean get() = startsInFlight.get() > 0
-
-    /**
-     * Bumped by every request to stop, at the moment it is made. A start
-     * remembers the value it was accepted with and gives way if it changed:
-     * a stop that came after it wins, and a newer start cannot revive an older
-     * one that a stop already called off.
-     */
-    private val stops = AtomicInteger(0)
-
-    /** When the kill switch was last asked about while the core was up. */
-    @Volatile
-    private var lockdownCheckedAt = 0L
-
-    /** [tun] is the blocking interface, with no core behind it. See [holdBlock]. */
-    @Volatile
-    private var blocking = false
 
     @Volatile
     private var lockdownWatch: Job? = null
@@ -118,8 +107,6 @@ class CommyVpnService : VpnService(), CommandServerHandler {
 
     /** Held by every change of what backs the VPN slot; see [transition]. */
     private val lifecycle = Mutex()
-
-    private val marks by lazy { TunnelMarks(applicationContext) }
 
     override fun onCreate() {
         super.onCreate()
@@ -141,8 +128,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             ACTION_START -> {
                 // On this thread, before the launch: the lockdown watch and
                 // settle() must see a start coming before it holds the lock.
-                val generation = stops.get()
-                startsInFlight.incrementAndGet()
+                val generation = ledger.accept()
                 // Foreground first. Android gives a service started with
                 // startForegroundService five seconds to get here, and misses
                 // are a crash rather than a warning.
@@ -165,11 +151,12 @@ class CommyVpnService : VpnService(), CommandServerHandler {
                 // it's mid-setup onStartCommand will be sent twice" — Vpn.java),
                 // and standing down here would kill the tunnel the user just
                 // asked for.
-                if (isCoreUp || bringingUp || blocking) {
+                val always = slot.alwaysOnStart(bringingUp)
+                if (always != TunnelSlot.AlwaysOn.STAND_DOWN) {
                     Log.i(TAG, "always-on start while the slot is already ours; ignored")
-                    if (isCoreUp) {
+                    if (always == TunnelSlot.AlwaysOn.IGNORE_AND_RECHECK) {
                         // The user may have just switched the kill switch on.
-                        scope.launch { rememberLockdown(force = true) }
+                        scope.launch { slot.rememberLockdown(force = true) }
                     }
                     return START_STICKY
                 }
@@ -233,7 +220,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             // A tunnel that died is reason enough to ask about the kill
             // switch, whatever the hint says: it may have been turned on
             // while the tunnel was up.
-            val held = transition { tearDownLocked(mayBlock = true, assumeLockdown = wasTunnel) }
+            val held = transition { slot.tearDown(mayBlock = true, assumeLockdown = wasTunnel) }
             if (wasTunnel) {
                 // The app opens on what happened, not on a quiet "Disconnected".
                 TunnelController.onCoreFailure(
@@ -257,7 +244,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         // here is the exact failure M1 acceptance criterion 4 names. Unless
         // nothing was running: the user left Commy disconnected behind the
         // blocking interface and moved to another VPN, which is not an error.
-        if (!blocking) {
+        if (!slot.blocking) {
             TunnelController.onCoreFailure(
                 Wire.Errors.PERMISSION_DENIED,
                 "the VPN permission was revoked; another VPN app may have taken over",
@@ -267,7 +254,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         // Whatever the kill switch said, it now belongs to someone else, and
         // an alert inviting a tap to "connect again" would take the slot back.
         notifications.clearPrompt()
-        stops.incrementAndGet()
+        ledger.stop()
         scope.launch {
             marks.lockdown = false
             shutdown(report = false, mayBlock = false)
@@ -278,14 +265,11 @@ class CommyVpnService : VpnService(), CommandServerHandler {
     }
 
     override fun onDestroy() {
-        // Normally releaseCore() has already run inside shutdown(). This is the
+        // Normally the core is already released inside shutdown(). This is the
         // path where the system tore the service down under us, and leaking the
         // TUN descriptor here leaves the device with a black-hole route.
         lockdownWatch?.cancel()
-        blocking = false
-        releaseCore()
-        runCatching { tun?.close() }
-        tun = null
+        slot.destroy()
         TunnelController.detach(this)
         scope.cancel()
         super.onDestroy()
@@ -303,7 +287,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         assumeLockdown: Boolean = false,
         alert: Boolean = false,
     ) {
-        stops.incrementAndGet()
+        ledger.stop()
         scope.launch { shutdown(report = report, assumeLockdown = assumeLockdown, alert = alert) }
     }
 
@@ -351,19 +335,22 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         try {
             transition { bringUpLocked(generation) }
         } finally {
-            startsInFlight.decrementAndGet()
+            ledger.finish()
         }
     }
 
     private suspend fun bringUpLocked(generation: Int) {
         // A stop that arrived after the tap and before the lock wins: it is
         // waiting right behind this and will take down whatever is here.
-        if (stops.get() != generation) {
+        if (!ledger.isCurrent(generation)) {
             TunnelController.onStartAborted()
             return
         }
         stopping = false
-        endBlockLocked()
+        // The block ends here without closing: the core's interface replaces
+        // it (TunnelSlot.adopt), so there is no moment with no VPN at all.
+        lockdownWatch?.cancel()
+        slot.beginStart()
         val config = TunnelController.takePendingConfig()
         if (config == null) {
             failStart(
@@ -407,10 +394,10 @@ class CommyVpnService : VpnService(), CommandServerHandler {
 
             // Before the start, not after: the core's interface goes up inside
             // it, and a process that dies there has died with a tunnel up.
-            marks.tunnelUp = true
+            slot.coreComing()
             runCatching { server.startOrReloadService(config, noOverrides()) }
                 .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
-            if (stops.get() != generation) {
+            if (!ledger.isCurrent(generation)) {
                 // Up, but nobody wants it any more: the stop behind the lock
                 // releases it. Reporting "connected" first would flash it.
                 TunnelController.onStartAborted()
@@ -419,10 +406,9 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             // After the start, not before it: see startStreams.
             events.startStreams()
 
-            isCoreUp = true
-            // Asked now, with our interface up: the only time the platform
-            // answers. See TunnelMarks.
-            rememberLockdown(force = true)
+            // Asks the kill switch now, with our interface up: the only time
+            // the platform answers. See TunnelMarks.
+            slot.coreUp()
             // getStartedAt comes from the core and is the honest answer; the
             // clock reading is only a fallback. Either way it is recorded once
             // — the on-screen uptime hangs off it and must not jump.
@@ -494,17 +480,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         notifications.update(Wire.States.CONNECTED, bridge?.selectedNode, up, down)
         // Rides the once-a-second tick: the kill switch can be turned on
         // mid-session, and the platform answers only while our VPN is up.
-        rememberLockdown(force = false)
-    }
-
-    /** Records what the kill switch says now, while our VPN is up to be answered. */
-    private fun rememberLockdown(force: Boolean) {
-        val now = System.currentTimeMillis()
-        if (!force && now - lockdownCheckedAt < LOCKDOWN_REFRESH_MS) {
-            return
-        }
-        lockdownCheckedAt = now
-        marks.lockdown = isLockedDown()
+        slot.rememberLockdown(force = false)
     }
 
     // ── taking it down ────────────────────────────────────────────────────
@@ -524,7 +500,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         alert: Boolean = false,
     ) {
         stopping = true
-        val held = transition { tearDownLocked(mayBlock, assumeLockdown) }
+        val held = transition { slot.tearDown(mayBlock, assumeLockdown) }
         if (report) {
             TunnelController.onStopped()
         }
@@ -537,69 +513,6 @@ class CommyVpnService : VpnService(), CommandServerHandler {
     }
 
     /**
-     * Releases the core and leaves the slot either empty or blocking.
-     * Returns whether the blocking interface is up afterwards.
-     *
-     * The blocking interface is established before the core's is released, so
-     * there is no moment with no VPN at all: in that moment Android lets DNS
-     * out in the clear.
-     */
-    private fun tearDownLocked(mayBlock: Boolean, assumeLockdown: Boolean): Boolean {
-        if (mayBlock && blocking && !isCoreUp && tun != null) {
-            val lockedDown = isLockedDown()
-            marks.lockdown = lockedDown
-            if (lockedDown) {
-                return true
-            }
-        }
-        val block = if (mayBlock) raiseBlockIfLockedDown(assumeLockdown) else null
-        val previous = tun
-        tun = null
-        releaseCore()
-        if (previous != null && previous !== block) {
-            runCatching { previous.close() }
-        }
-        tun = block
-        blocking = block != null
-        marks.tunnelUp = false
-        return block != null
-    }
-
-    /**
-     * The blocking interface, if the system kill switch is on; null otherwise.
-     *
-     * The platform answers "is lockdown on?" only for an app whose VPN is up
-     * right now. With our interface up, it is simply asked. Without one — after
-     * a process death, from a failed first start, on an always-on start — the
-     * block is raised first and the question asked with it up; if the answer
-     * is no, it comes straight down. That costs a user without the kill switch
-     * one establish-and-close, and only when [TunnelMarks.lockdown] or
-     * [assumeLockdown] says it is worth asking.
-     */
-    private fun raiseBlockIfLockedDown(assumeLockdown: Boolean): ParcelFileDescriptor? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            // No way to ask below Android 10; nothing to raise.
-            return null
-        }
-        if (tun != null) {
-            val lockedDown = isLockedDown()
-            marks.lockdown = lockedDown
-            return if (lockedDown) establishBlock() else null
-        }
-        if (!assumeLockdown && !marks.lockdown) {
-            return null
-        }
-        val block = establishBlock() ?: return null
-        val lockedDown = isLockedDown()
-        marks.lockdown = lockedDown
-        if (lockedDown) {
-            return block
-        }
-        runCatching { block.close() }
-        return null
-    }
-
-    /**
      * Main thread: shows the outcome of a transition that has already
      * happened — the blocking notification, or the service going away.
      *
@@ -608,21 +521,17 @@ class CommyVpnService : VpnService(), CommandServerHandler {
      * notification.
      */
     private fun settle(held: Boolean) {
-        if (bringingUp || isCoreUp) {
-            return
+        when (slot.settle(held, bringingUp)) {
+            TunnelSlot.Settle.LEAVE -> Unit
+            TunnelSlot.Settle.HOLD_BLOCK -> holdBlock()
+            TunnelSlot.Settle.STOP -> {
+                notifications.cancel()
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+                // The id of the last command we saw: a start the platform has
+                // accepted since then keeps the service alive.
+                stopSelf(lastStartId)
+            }
         }
-        if (held && blocking) {
-            holdBlock()
-            return
-        }
-        if (blocking) {
-            return
-        }
-        notifications.cancel()
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-        // The id of the last command we saw: a start the platform has
-        // accepted since then keeps the service alive.
-        stopSelf(lastStartId)
     }
 
     // ── the blocking interface ────────────────────────────────────────────
@@ -648,7 +557,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
      * one closes — see [openTun]), when the kill switch is turned off
      * ([watchLockdown]), or when another VPN takes the slot ([onRevoke]).
      *
-     * Main thread; the interface itself is already up ([tearDownLocked]).
+     * Main thread; the interface itself is already up ([TunnelSlot.tearDown]).
      */
     private fun holdBlock() {
         val notification = notifications.blocked()
@@ -675,26 +584,13 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         lockdownWatch = scope.launch {
             while (isActive) {
                 delay(LOCKDOWN_POLL_MS)
-                val released = transition {
-                    if (!blocking || isCoreUp || bringingUp) {
-                        return@transition null
-                    }
-                    val lockedDown = isLockedDown()
-                    marks.lockdown = lockedDown
-                    if (lockedDown) {
-                        return@transition false
-                    }
-                    Log.i(TAG, "the system kill switch is off; releasing the blocking interface")
-                    // Not endBlockLocked(): that cancels this very coroutine,
-                    // and the notification and the service were then left
-                    // behind at the next suspension point (seen on the
-                    // emulator: "network closed" over a working network).
-                    blocking = false
-                    runCatching { tun?.close() }
-                    tun = null
-                    true
-                } ?: break
+                // Never by cancelling this watch from inside the transition:
+                // the notification and the service were then left behind at
+                // the next suspension point (seen on the emulator: "network
+                // closed" over a working network).
+                val released = transition { slot.releaseBlockIfUnlocked(bringingUp) } ?: break
                 if (released) {
+                    Log.i(TAG, "the system kill switch is off; released the blocking interface")
                     withContext(Dispatchers.Main) {
                         // An alert saying "nothing reaches the network" is
                         // now the opposite of the truth.
@@ -705,12 +601,6 @@ class CommyVpnService : VpnService(), CommandServerHandler {
                 }
             }
         }
-    }
-
-    /** With the lock held. Leaves [tun] alone: whoever ends the block decides what closes it. */
-    private fun endBlockLocked() {
-        lockdownWatch?.cancel()
-        blocking = false
     }
 
     /**
@@ -728,10 +618,10 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             // timeouts against a route that swallows everything.
             .setUnderlyingNetworks(emptyArray<Network>())
             .addAddress(BLOCK_V4, BLOCK_V4_PREFIX)
-            .addRoute(DEFAULT_V4, 0)
+            .addRoute(TunPlan.DEFAULT_V4, 0)
             .addDnsServer(BLOCK_V4_DNS)
             .addAddress(BLOCK_V6, BLOCK_V6_PREFIX)
-            .addRoute(DEFAULT_V6, 0)
+            .addRoute(TunPlan.DEFAULT_V6, 0)
             .addDnsServer(BLOCK_V6_DNS)
         runCatching { builder.addDisallowedApplication(packageName) }
         builder.establish()
@@ -739,27 +629,35 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         Log.w(TAG, "could not raise the blocking interface: ${it.message}")
     }.getOrNull()
 
-    /**
-     * Whether the system kill switch is on. Meaningful only while our VPN is
-     * up: without one the platform answers false whatever the setting is.
-     */
-    private fun isLockedDown(): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            runCatching { isAlwaysOn && isLockdownEnabled }.getOrDefault(false)
+    /** The half of [TunnelSlot] only Android can do. */
+    private inner class SlotPlatform : TunnelSlot.Platform<ParcelFileDescriptor> {
+        override val canAskLockdown: Boolean
+            get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
-    /** Synchronous, idempotent, safe to call twice. */
-    private fun releaseCore() {
-        isCoreUp = false
-        runCatching { bridge?.close() }
-        bridge = null
-        runCatching { doze.close() }
-        runCatching { commandServer?.closeService() }
-        runCatching { commandServer?.close() }
-        commandServer = null
-        monitor.onDefaultNetworkChanged = null
-        runCatching { monitor.close() }
-        runCatching { tun?.close() }
-        tun = null
+        /**
+         * Whether the system kill switch is on. Meaningful only while our VPN
+         * is up: without one the platform answers false whatever the setting is.
+         */
+        override fun isLockedDown(): Boolean =
+            canAskLockdown && runCatching { isAlwaysOn && isLockdownEnabled }.getOrDefault(false)
+
+        override fun establishBlock(): ParcelFileDescriptor? = this@CommyVpnService.establishBlock()
+
+        override fun close(handle: ParcelFileDescriptor) {
+            runCatching { handle.close() }
+        }
+
+        /** Synchronous, idempotent, safe to call twice. */
+        override fun releaseCore() {
+            runCatching { bridge?.close() }
+            bridge = null
+            runCatching { doze.close() }
+            runCatching { commandServer?.closeService() }
+            runCatching { commandServer?.close() }
+            commandServer = null
+            monitor.onDefaultNetworkChanged = null
+            runCatching { monitor.close() }
+        }
     }
 
     /**
@@ -778,35 +676,50 @@ class CommyVpnService : VpnService(), CommandServerHandler {
     /**
      * Turns [TunOptions] into a live TUN descriptor.
      *
-     * Every value here was computed by sing-box. Nothing is invented: not the
-     * routes, not the exclusions, not the package lists. The one thing added is
-     * our own package in the disallow list, and that is not policy — a client
-     * whose own traffic goes through the tunnel it is building cannot fetch the
-     * subscription that would fix it.
+     * What goes into the builder is decided by [TunPlan], from values sing-box
+     * computed; this only copies them out of Go memory and hands them to the
+     * platform. The one-line summary of the rules — sing-box's routes, never a
+     * default one over them; our own package always off the tunnel — is
+     * tested there, not here.
      */
     internal fun openTun(options: TunOptions): Int {
+        val plan = TunPlan.of(tunSpec(options), self = packageName, sdkInt = Build.VERSION.SDK_INT)
         val builder = Builder()
             .setSession(getString(R.string.app_name))
-            .setMtu(options.getMTU())
+            .setMtu(plan.mtu)
             .setConfigureIntent(configureIntent())
 
-        val v4 = options.inet4Address.drain()
-        val v6 = options.inet6Address.drain()
-        for (address in v4 + v6) {
+        for (address in plan.addresses) {
             builder.addAddress(address.address, address.length)
         }
-
-        if (options.autoRoute) {
-            runCatching { builder.addDnsServer(options.getDNSServerAddress().value) }
-            addRoutes(builder, options, hasV4 = v4.isNotEmpty(), hasV6 = v6.isNotEmpty())
-        } else {
-            for (route in options.inet4RouteAddress.drain() + options.inet6RouteAddress.drain()) {
-                builder.addRoute(route.address, route.length)
+        plan.dnsServer?.let { runCatching { builder.addDnsServer(it) } }
+        for (route in plan.routes) {
+            builder.addRoute(route.address, route.length)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            for (route in plan.excludedRoutes) {
+                runCatching {
+                    builder.excludeRoute(IpPrefix(InetAddress.getByName(route.address), route.length))
+                }
             }
         }
-
-        applyPackages(builder, options)
-        applyHttpProxy(builder, options)
+        // An app the user selected and then uninstalled throws
+        // NameNotFoundException. Dropping it silently is right: the
+        // alternative is a tunnel that refuses to start over a stale row in a
+        // picker.
+        for (name in plan.allowed) {
+            runCatching { builder.addAllowedApplication(name) }
+        }
+        for (name in plan.disallowed) {
+            runCatching { builder.addDisallowedApplication(name) }
+        }
+        plan.httpProxy?.let { proxy ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                runCatching {
+                    builder.setHttpProxy(ProxyInfo.buildDirectProxy(proxy.host, proxy.port, proxy.bypass))
+                }
+            }
+        }
 
         val descriptor = builder.establish()
             ?: throw IllegalStateException(
@@ -815,87 +728,37 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         // The descriptor stays ours. Go reads the raw fd, and closing this
         // ParcelFileDescriptor on teardown is what actually tears the interface
         // down — handing over detachFd() instead leaks it for the process life.
-        runCatching { tun?.close() }
-        tun = descriptor
+        slot.adopt(descriptor)
         return descriptor.fd
     }
 
-    private fun addRoutes(
-        builder: Builder,
-        options: TunOptions,
-        hasV4: Boolean,
-        hasV6: Boolean,
-    ) {
-        // RouteRange, not RouteAddress. sing-box computes the range with the
-        // exclusions already subtracted, which is the whole reason it exists;
-        // reaching for 0.0.0.0/0 here undoes every "do not tunnel this" rule
-        // the user set, silently.
-        val ranges = options.inet4RouteRange.drain() + options.inet6RouteRange.drain()
-        if (ranges.isEmpty()) {
-            if (hasV4) {
-                builder.addRoute(DEFAULT_V4, 0)
+    /** Everything [openTun] needs, drained while the Go objects are still valid. */
+    private fun tunSpec(options: TunOptions): TunSpec = TunSpec(
+        mtu = options.getMTU(),
+        inet4Address = options.inet4Address.drain(),
+        inet6Address = options.inet6Address.drain(),
+        autoRoute = options.autoRoute,
+        dnsServer = runCatching { options.getDNSServerAddress().value }.getOrNull(),
+        inet4RouteRange = options.inet4RouteRange.drain(),
+        inet6RouteRange = options.inet6RouteRange.drain(),
+        inet4RouteAddress = options.inet4RouteAddress.drain(),
+        inet6RouteAddress = options.inet6RouteAddress.drain(),
+        inet4RouteExclude = options.inet4RouteExcludeAddress.drain(),
+        inet6RouteExclude = options.inet6RouteExcludeAddress.drain(),
+        includePackage = options.includePackage.drain(),
+        excludePackage = options.excludePackage.drain(),
+        httpProxy = runCatching {
+            if (options.isHTTPProxyEnabled()) {
+                HttpProxy(
+                    host = options.getHTTPProxyServer(),
+                    port = options.getHTTPProxyServerPort(),
+                    bypass = options.getHTTPProxyBypassDomain().drain(),
+                )
+            } else {
+                null
             }
-            if (hasV6) {
-                builder.addRoute(DEFAULT_V6, 0)
-            }
-        } else {
-            for (route in ranges) {
-                builder.addRoute(route.address, route.length)
-            }
-        }
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return
-        }
-        // Android 13 can express an exclusion directly, which is more precise
-        // than the subtracted range and survives a later route being added.
-        val excluded = options.inet4RouteExcludeAddress.drain() +
-            options.inet6RouteExcludeAddress.drain()
-        for (route in excluded) {
-            runCatching {
-                builder.excludeRoute(IpPrefix(InetAddress.getByName(route.address), route.length))
-            }
-        }
-    }
-
-    private fun applyPackages(builder: Builder, options: TunOptions) {
-        val self = packageName
-        // Allow list and deny list are mutually exclusive in VpnService.Builder
-        // — mixing them throws. Which one is in play was decided in the config
-        // by commy_config; this only reads the answer.
-        val included = options.includePackage.drain().filterNot { it == self }
-        if (included.isNotEmpty()) {
-            for (name in included) {
-                // An app the user selected and then uninstalled throws
-                // NameNotFoundException. Dropping it silently is right: the
-                // alternative is a tunnel that refuses to start over a stale
-                // row in a picker.
-                runCatching { builder.addAllowedApplication(name) }
-            }
-            // Nothing to exclude: leaving our package out of the allow list
-            // already keeps it off the tunnel.
-            return
-        }
-        val excluded = LinkedHashSet(options.excludePackage.drain()).apply { add(self) }
-        for (name in excluded) {
-            runCatching { builder.addDisallowedApplication(name) }
-        }
-    }
-
-    private fun applyHttpProxy(builder: Builder, options: TunOptions) {
-        if (!options.isHTTPProxyEnabled() || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return
-        }
-        runCatching {
-            builder.setHttpProxy(
-                ProxyInfo.buildDirectProxy(
-                    options.getHTTPProxyServer(),
-                    options.getHTTPProxyServerPort(),
-                    options.getHTTPProxyBypassDomain().drain(),
-                ),
-            )
-        }
-    }
+        }.getOrNull(),
+    )
 
     // ── CommandServerHandler ──────────────────────────────────────────────
 
@@ -1025,9 +888,6 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         /** [ACTION_STOP] for a service whose process already died. */
         const val ACTION_CLEAR = "dev.commy.app.action.CLEAR"
 
-        private const val DEFAULT_V4 = "0.0.0.0"
-        private const val DEFAULT_V6 = "::"
-
         // The same private ranges sing-box gives its own TUN, so the blocking
         // interface never claims an address a user's network could be using.
         private const val BLOCK_V4 = "172.19.0.1"
@@ -1039,6 +899,5 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         private const val BLOCK_MTU = 1500
 
         private const val LOCKDOWN_POLL_MS = 5_000L
-        private const val LOCKDOWN_REFRESH_MS = 30_000L
     }
 }

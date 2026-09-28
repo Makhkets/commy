@@ -21,15 +21,15 @@ import android.content.Context
  * Written with `commit()`, because the case that reads them is the process
  * dying right after the write.
  */
-internal class TunnelMarks(context: Context) {
+internal class TunnelMarks(context: Context) : TunnelSlot.Marks {
 
     private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    var tunnelUp: Boolean
+    override var tunnelUp: Boolean
         get() = prefs.getBoolean(KEY_TUNNEL_UP, false)
         set(value) = write(KEY_TUNNEL_UP, value)
 
-    var lockdown: Boolean
+    override var lockdown: Boolean
         get() = prefs.getBoolean(KEY_LOCKDOWN, false)
         set(value) = write(KEY_LOCKDOWN, value)
 

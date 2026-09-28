@@ -218,11 +218,11 @@ internal class CoreEventBridge(
         // UNDISPATCHED so the collector is registered before the request goes
         // out. Started lazily, a fast core could answer into an empty room.
         val update = scope.async(start = CoroutineStart.UNDISPATCHED) {
-            groupUpdates.first { freshDelay(it, group, tag, since) != null }
+            groupUpdates.first { CoreSnapshots.freshDelay(it, group, tag, since) != null }
         }
         // A round that was already running may have measured this one before
         // we subscribed.
-        freshDelay(lastGroups, group, tag, since)?.let {
+        CoreSnapshots.freshDelay(lastGroups, group, tag, since)?.let {
             update.cancel()
             return it
         }
@@ -240,23 +240,7 @@ internal class CoreEventBridge(
             update.cancel()
             return null
         }
-        return freshDelay(groups, group, tag, since)
-    }
-
-    /** [tag]'s delay in [groups], if it was measured at or after [since]. */
-    private fun freshDelay(
-        groups: List<GroupSnapshot>,
-        group: String,
-        tag: String,
-        since: Long,
-    ): Long? {
-        val item = groups.firstOrNull { it.tag == group }?.items?.firstOrNull { it.tag == tag }
-            ?: groups.flatMap(GroupSnapshot::items).firstOrNull { it.tag == tag }
-            ?: return null
-        if (item.urlTestDelay <= 0 || item.urlTestTime < since) {
-            return null
-        }
-        return item.urlTestDelay.toLong()
+        return CoreSnapshots.freshDelay(groups, group, tag, since)
     }
 
     // ── plumbing ──────────────────────────────────────────────────────────
