@@ -7,7 +7,10 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:commy/src/platform/backup_files.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// A node store backed by a list.
@@ -29,6 +32,9 @@ class FakeNodeRepository implements NodeRepository {
 
   /// Everything currently stored.
   List<ProxyNode> get nodes => List<ProxyNode>.unmodifiable(_nodes);
+
+  /// Every group currently stored.
+  List<NodeGroup> get groups => List<NodeGroup>.unmodifiable(_groups);
 
   /// Releases the broadcast controllers.
   Future<void> dispose() async {
@@ -594,5 +600,146 @@ class FakeLatencyProbe implements LatencyProbe {
   Future<Duration?> echoTime(String host, {required Duration timeout}) async {
     echoed.add(host);
     return answer;
+  }
+}
+
+/// The system's file dialogs, answered from fields.
+class FakeBackupFiles implements BackupFiles {
+  /// What the next pick returns; null is "the user closed the dialog".
+  Uint8List? toPick;
+
+  /// Whether the next save goes through or is cancelled.
+  bool saveAccepted = true;
+
+  /// Every file saved, by name.
+  final Map<String, Uint8List> saved = <String, Uint8List>{};
+
+  @override
+  Future<Result<bool, CommyFailure>> save({
+    required String fileName,
+    required Uint8List bytes,
+    required String dialogTitle,
+  }) async {
+    if (saveAccepted) {
+      saved[fileName] = bytes;
+    }
+    return Ok<bool, CommyFailure>(saveAccepted);
+  }
+
+  @override
+  Future<Result<Uint8List?, CommyFailure>> pick() async =>
+      Ok<Uint8List?, CommyFailure>(toPick);
+}
+
+/// A cipher with the real one's shape and none of its cost: a magic, the
+/// password, the plaintext. Widget tests run under a fake clock, where the
+/// real cipher's isolates would never finish.
+class FakeBackupCipher implements BackupCipher {
+  static final List<int> _magic = utf8.encode('COMMYBAK');
+
+  @override
+  Future<Result<Uint8List, CommyFailure>> seal(
+    Uint8List plain,
+    String password,
+  ) async =>
+      Ok<Uint8List, CommyFailure>(sealed(plain, password));
+
+  @override
+  Future<Result<Uint8List, CommyFailure>> open(
+    Uint8List sealed,
+    String password,
+  ) async {
+    final problem = inspect(sealed);
+    if (problem != null) {
+      return Err<Uint8List, CommyFailure>(BackupFailure(problem));
+    }
+    final prefix = <int>[..._magic, ...utf8.encode('$password|')];
+    if (sealed.length < prefix.length || !_startsWith(sealed, prefix)) {
+      return const Err<Uint8List, CommyFailure>(
+        BackupFailure(BackupProblem.wrongPassword),
+      );
+    }
+    return Ok<Uint8List, CommyFailure>(
+      Uint8List.fromList(sealed.sublist(prefix.length)),
+    );
+  }
+
+  @override
+  BackupProblem? inspect(Uint8List sealed) =>
+      _startsWith(sealed, _magic) ? null : BackupProblem.notABackup;
+
+  /// What this cipher makes of [plain] under [password].
+  static Uint8List sealed(Uint8List plain, String password) =>
+      Uint8List.fromList(
+        <int>[..._magic, ...utf8.encode('$password|'), ...plain],
+      );
+
+  static bool _startsWith(Uint8List bytes, List<int> prefix) {
+    if (bytes.length < prefix.length) {
+      return false;
+    }
+    for (var i = 0; i < prefix.length; i++) {
+      if (bytes[i] != prefix[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
+/// A library store that replaces what the fake repositories hold.
+class FakeLibraryStore implements LibraryStore {
+  /// Creates the store over the harness's repositories.
+  FakeLibraryStore(this.nodes, this.subscriptions);
+
+  /// Servers.
+  final FakeNodeRepository nodes;
+
+  /// Subscriptions.
+  final FakeSubscriptionRepository subscriptions;
+
+  @override
+  Future<
+      Result<
+          ({
+            List<Subscription> subscriptions,
+            List<NodeGroup> groups,
+            List<ProxyNode> nodes,
+          }),
+          CommyFailure>> readLibrary() async {
+    return Ok<
+        ({
+          List<Subscription> subscriptions,
+          List<NodeGroup> groups,
+          List<ProxyNode> nodes,
+        }),
+        CommyFailure>(
+      (
+        subscriptions: subscriptions.items,
+        groups: nodes.groups,
+        nodes: nodes.nodes,
+      ),
+    );
+  }
+
+  @override
+  Future<Result<void, CommyFailure>> replaceLibrary({
+    required List<Subscription> subscriptions,
+    required List<NodeGroup> groups,
+    required List<ProxyNode> nodes,
+  }) async {
+    for (final node in this.nodes.nodes) {
+      await this.nodes.deleteById(node.id);
+    }
+    for (final subscription in this.subscriptions.items) {
+      await this.subscriptions.deleteById(subscription.id);
+    }
+    for (final subscription in subscriptions) {
+      await this.subscriptions.upsert(subscription);
+    }
+    for (final group in groups) {
+      await this.nodes.upsertGroup(group);
+    }
+    return this.nodes.upsertAll(nodes);
   }
 }

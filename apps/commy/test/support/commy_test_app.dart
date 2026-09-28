@@ -79,6 +79,12 @@ class CommyTestHarness {
   /// Daily traffic totals.
   final FakeTrafficHistoryRepository trafficHistory;
 
+  /// The save and open dialogs a backup goes through.
+  final FakeBackupFiles backupFiles = FakeBackupFiles();
+
+  /// Seals backups without the real cipher's seconds of key derivation.
+  final FakeBackupCipher backupCipher = FakeBackupCipher();
+
   final List<ProxyGroup>? _coreGroups;
 
   /// The tunnel. Deterministic, seeded, and never touches a device.
@@ -137,6 +143,11 @@ class CommyTestHarness {
       // a screen test can reach — builds instead of throwing "must override".
       secureStoreProvider.overrideWithValue(secureStore),
       clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
+      backupFilesProvider.overrideWithValue(backupFiles),
+      backupCipherProvider.overrideWithValue(backupCipher),
+      libraryStoreProvider.overrideWithValue(
+        FakeLibraryStore(nodeRepository, subscriptionRepository),
+      ),
       if (status != null)
         coreStatusProvider.overrideWith(
           (ref) => Stream<TunnelStatus>.value(status),

@@ -144,6 +144,39 @@ final disconnectUseCaseProvider = Provider<DisconnectUseCase>((ref) {
   return DisconnectUseCase(core: ref.watch(coreClientProvider));
 });
 
+/// Gathers the user's setup and seals it under their password (G10).
+final exportBackupUseCaseProvider = Provider<ExportBackupUseCase>((ref) {
+  return ExportBackupUseCase(
+    library: ref.watch(libraryStoreProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    routing: ref.watch(routingRepositoryProvider),
+    ruleSets: ref.watch(ruleSetRepositoryProvider),
+    cipher: ref.watch(backupCipherProvider),
+    appVersion: ref.watch(appInfoProvider).version,
+    platform: ref.watch(configPlatformProvider).name,
+  );
+});
+
+/// Opens a backup and reads what it holds, changing nothing.
+final readBackupUseCaseProvider = Provider<ReadBackupUseCase>((ref) {
+  return ReadBackupUseCase(cipher: ref.watch(backupCipherProvider));
+});
+
+/// Replaces what the phone has with what a backup holds.
+final restoreBackupUseCaseProvider = Provider<RestoreBackupUseCase>((ref) {
+  return RestoreBackupUseCase(
+    library: ref.watch(libraryStoreProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    routing: ref.watch(routingRepositoryProvider),
+    ruleSets: ref.watch(ruleSetRepositoryProvider),
+    platform: ref.watch(configPlatformProvider).name,
+    requiredRuleSets: (routing) => RouteSectionBuilder.requiredRuleSets(
+      routing: routing,
+      platform: ref.read(configPlatformProvider),
+    ),
+  );
+});
+
 /// Switches the outbound inside a running core.
 ///
 /// Deliberately not stop-then-start: restarting drops every open connection,

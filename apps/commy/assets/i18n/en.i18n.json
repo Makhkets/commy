@@ -369,6 +369,60 @@
       "icmp": "ICMP",
       "icmpHint": "A plain ping to the server's address. Many servers do not answer it"
     },
+    "backup": {
+      "title": "Backup",
+      "export": "Save a backup",
+      "exportHint": "Subscriptions, servers, rules and settings, in one file under a password",
+      "restore": "Restore from a backup",
+      "restoreHint": "Replaces everything here now",
+      "password": {
+        "exportTitle": "Backup password",
+        "exportBody": "The backup holds your subscriptions and the keys to your servers. Without the password nobody can open it: not whoever gets the file, and not you. A lost password cannot be recovered.",
+        "restoreTitle": "Password of the backup",
+        "label": "Password",
+        "repeat": "Password again",
+        "tooShort": "At least $min characters",
+        "mismatch": "The passwords do not match",
+        "empty": "Enter the password",
+        "show": "Show password",
+        "hide": "Hide password",
+        "save": "Encrypt and save",
+        "open": "Open"
+      },
+      "fileTitle": "Save a Commy backup",
+      "saved": "Backup saved · $contents",
+      "notSaved": "Backup not saved",
+      "subscriptions(plural, param=count)": {
+        "zero": "no subscriptions",
+        "one": "$count subscription",
+        "other": "$count subscriptions"
+      },
+      "servers(plural, param=count)": {
+        "zero": "no servers",
+        "one": "$count server",
+        "other": "$count servers"
+      },
+      "rules(plural, param=count)": {
+        "zero": "no rules of your own",
+        "one": "$count rule",
+        "other": "$count rules"
+      },
+      "restoreConfirm": {
+        "title": "Replace everything with the backup?",
+        "body": "Backup of $date: $contents. Subscriptions, servers, rules and settings on this phone will be replaced, and the tunnel disconnects. The device ID (HWID) is not carried over: the panel sees this phone, not the one the backup came from.",
+        "confirm": "Replace",
+        "cancel": "Cancel"
+      },
+      "restored": "Restored · $contents",
+      "ruleSetsMissing": "Rule sets are not part of a backup — download them again",
+      "ruleSetsAction": "Open",
+      "perAppDropped": "The app list was made on another system — it is turned off",
+      "skipped(plural, param=count)": {
+        "one": "$count entry of the backup was not read: a newer version made it",
+        "other": "$count entries of the backup were not read: a newer version made them"
+      },
+      "failed": "Could not restore the backup"
+    },
     "reset": {
       "title": "Reset",
       "network": "Reset network",
@@ -550,6 +604,14 @@
     "storage": {
       "message": "Could not save",
       "action": "Retry"
+    },
+    "backup": {
+      "notABackup": "This is not a Commy backup",
+      "newerVersion": "A newer Commy made this backup — update the app",
+      "wrongPassword": "The password does not fit — or the file was changed after it was saved",
+      "unreadable": "The backup is damaged and cannot be read",
+      "pickAnother": "Choose another file",
+      "retry": "Try again"
     },
     "unknown": {
       "message": "Something went wrong",

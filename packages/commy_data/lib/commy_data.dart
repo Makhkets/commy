@@ -17,6 +17,7 @@
 /// method returns `Result<T, CommyFailure>` (docs/02-architecture.md).
 library;
 
+export 'src/backup/password_backup_cipher.dart';
 export 'src/database/commy_database.dart';
 export 'src/database/database_encryption.dart';
 export 'src/database/database_opener.dart';
@@ -44,6 +45,7 @@ export 'src/mappers/routing_rule_mapper.dart';
 export 'src/mappers/subscription_mapper.dart';
 export 'src/models/stored_import_failure.dart';
 export 'src/repositories/drift_import_failure_store.dart';
+export 'src/repositories/drift_library_store.dart';
 export 'src/repositories/drift_node_repository.dart';
 export 'src/repositories/drift_routing_repository.dart';
 export 'src/repositories/drift_settings_repository.dart';

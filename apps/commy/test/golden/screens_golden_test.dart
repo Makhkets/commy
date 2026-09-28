@@ -1,7 +1,9 @@
 import 'dart:io';
 
+import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/diagnostics/logs_screen.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
+import 'package:commy/src/screens/settings/backup_password_sheet.dart';
 import 'package:commy/src/screens/settings/routing_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
 import 'package:commy/src/state/measurement_controller.dart';
@@ -222,10 +224,33 @@ void main() {
   // are the three ways of timing a server under "Ping".
   screenGolden(
     'settings',
-    size: const Size(390, 2150),
+    size: const Size(390, 2350),
     screen: const SettingsScreen(),
     seed: (harness) => harness.routingRepository.write(
       RoutingPolicy.defaults.copyWith(blockAds: true),
+    ),
+  );
+
+  // The sheet that chooses a backup password: the warning above the fields
+  // is the one sentence standing between a user and a backup nobody can
+  // open, so it is photographed, not just asserted.
+  final t = Translations();
+  screenGolden(
+    'backup_password',
+    size: const Size(390, 560),
+    screen: Scaffold(
+      body: Align(
+        alignment: Alignment.bottomCenter,
+        child: CommySheetSurface(
+          title: t.settings.backup.password.exportTitle,
+          child: BackupPasswordSheet(
+            confirm: true,
+            body: t.settings.backup.password.exportBody,
+            submitLabel: t.settings.backup.password.save,
+            onSubmit: (_) async => null,
+          ),
+        ),
+      ),
     ),
   );
 }

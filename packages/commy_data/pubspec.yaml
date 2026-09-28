@@ -12,6 +12,11 @@ environment:
 dependencies:
   commy_domain:
     path: ../commy_domain
+  # Seals the user's backup under their password: Argon2id and
+  # ChaCha20-Poly1305, pure Dart — no native code, nothing added to the
+  # platform folders. About 0.2 MB of the APK, measured; docs/adr/0017.
+  # Only the Dart* classes are used, so no plugin can swap the implementation.
+  cryptography: ^2.9.0
   dio: ^5.4.0
   drift: '>=2.20.0 <3.0.0'
   flutter:
