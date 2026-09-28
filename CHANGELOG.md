@@ -10,6 +10,10 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.10]
+
+Installs over alpha.9.
+
 - **Backups.** Settings → Backup saves your subscriptions, servers, rules and
   settings into one file under a password you choose, and brings such a file
   back — on a new phone, or after a reinstall. The file is encrypted before it
@@ -20,6 +24,9 @@ matching the tag out of this file and uses it as the release notes.
   daily, weekly or monthly; off unless you pick one. Only the sets already on
   the phone and used by your rules are fetched again, from the same address as
   the button. A running tunnel picks the new file up by itself.
+- A config file opened from the import sheet no longer leaves a copy of
+  itself, credentials and all, in the app's cache.
+- A subscription deleted while it was refreshing no longer comes back.
 - The Android tunnel's decisions — what stays up when you disconnect under
   the system kill switch, which routes and apps go into the tunnel — are
   covered by JVM tests.
