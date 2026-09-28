@@ -85,6 +85,18 @@ class UpdateSubscriptionUseCase {
       }
       final outcome = parsed.valueOrNull ?? ParseOutcome.empty;
 
+      // Asked again after the fetch, which can take seconds: the subscription
+      // may have been deleted, or the whole library replaced from a backup,
+      // while the panel was answering. Writing now would bring back what the
+      // user just removed — the upsert below creates as happily as it updates.
+      final current =
+          (await subscriptions.findById(subscriptionId)).valueOrNull;
+      if (current == null || current.url != existing.url) {
+        return const Err<SubscriptionSyncResult, CommyFailure>(
+          SubscriptionMalformedFailure('No such subscription'),
+        );
+      }
+
       final refreshed = payload.applyTo(
         existing.copyWith(lastUpdatedAt: DateTime.now()),
       );

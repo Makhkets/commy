@@ -135,6 +135,59 @@ void main() {
       expect(nodes.replaceCalls, isEmpty);
     });
   });
+
+  group('a refresh that outlives its subscription', () {
+    Subscription subscription({String token = 'token'}) => Subscription(
+          id: 'sub-1',
+          name: 'Example panel',
+          url: Uri.parse('https://panel.example.com/sub/$token'),
+          autoUpdate: true,
+        );
+
+    test('deleted while the panel was answering: nothing comes back', () async {
+      final subscriptions = FakeSubscriptionRepository()..seed(subscription());
+      final nodes = RecordingNodeRepository();
+      final useCase = UpdateSubscriptionUseCase(
+        fetcher: _DuringFetch(() => subscriptions.deleteById('sub-1')),
+        parser: StubLinkParser(
+          ParseOutcome(
+            nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt')],
+          ),
+        ),
+        subscriptions: subscriptions,
+        nodes: nodes,
+      );
+
+      final result = await useCase(subscriptionId: 'sub-1');
+
+      expect(result.isErr, isTrue);
+      expect(subscriptions.stored, isEmpty);
+      expect(nodes.stored, isEmpty);
+    });
+
+    test(
+        'replaced from a backup while the panel was answering: the '
+        'restored one stays', () async {
+      final subscriptions = FakeSubscriptionRepository()..seed(subscription());
+      final restored = subscription(token: 'restored');
+      final nodes = RecordingNodeRepository();
+      final useCase = UpdateSubscriptionUseCase(
+        fetcher: _DuringFetch(() => subscriptions.upsert(restored)),
+        parser: StubLinkParser(
+          ParseOutcome(
+            nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt')],
+          ),
+        ),
+        subscriptions: subscriptions,
+        nodes: nodes,
+      );
+
+      await useCase(subscriptionId: 'sub-1');
+
+      expect(subscriptions.stored.single.url, restored.url);
+      expect(nodes.replaceCalls, isEmpty);
+    });
+  });
 }
 
 UpdateSubscriptionUseCase _useCase({
@@ -156,4 +209,23 @@ UpdateSubscriptionUseCase _useCase({
     subscriptions: subscriptions,
     nodes: nodes,
   );
+}
+
+/// A panel that takes its time, during which [meanwhile] happens.
+class _DuringFetch implements SubscriptionFetcher {
+  _DuringFetch(this.meanwhile);
+
+  final Future<Object?> Function() meanwhile;
+
+  @override
+  Future<Result<SubscriptionPayload, CommyFailure>> fetch(
+    Uri url, {
+    required bool throughTunnel,
+    String? userAgent,
+  }) async {
+    await meanwhile();
+    return const Ok<SubscriptionPayload, CommyFailure>(
+      SubscriptionPayload(body: 'vless://...'),
+    );
+  }
 }
