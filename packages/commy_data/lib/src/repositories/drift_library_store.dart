@@ -63,6 +63,22 @@ class DriftLibraryStore implements LibraryStore {
               (table) => OrderingTerm(expression: table.sortIndex),
             ]))
           .get();
+      // A keystore that answers can still have lost entries — a reset of the
+      // platform keystore returns an empty store rather than an error, and a
+      // corrupt entry decodes to nothing. A row that says it has a secret and
+      // has none would go into the backup without it, looking complete.
+      final lost = subscriptionRows
+              .where((row) => !urls.containsKey(row.id))
+              .length +
+          nodeRows
+              .where(
+                (row) =>
+                    row.secretRef != null && (params[row.id]?.isEmpty ?? true),
+              )
+              .length;
+      if (lost > 0) {
+        throw StateError('$lost credentials are missing from the keystore');
+      }
       return (
         subscriptions: <Subscription>[
           for (final row in subscriptionRows)

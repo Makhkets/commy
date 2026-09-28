@@ -210,7 +210,8 @@ void main() {
       expect(find.text(t.error.backup.notABackup), findsOneWidget);
     });
 
-    testWidgets('a wrong password stays in the sheet; the right one asks, '
+    testWidgets(
+        'a wrong password stays in the sheet; the right one asks, '
         'then replaces everything', (tester) async {
       await pump(tester);
       harness.backupFiles.toPick = backupFile();
@@ -254,6 +255,30 @@ void main() {
       expect(system.startOnBootCalls, <bool>[false]);
     });
 
+    testWidgets(
+        'a backup from a newer Commy closes the sheet and says so, '
+        'instead of asking for the password again', (tester) async {
+      await pump(tester);
+      final newer = <String, Object?>{
+        'format': BackupSnapshot.format,
+        'schema': BackupSnapshot.schema + 1,
+      };
+      harness.backupFiles.toPick = FakeBackupCipher.sealed(
+        Uint8List.fromList(utf8.encode(jsonEncode(newer))),
+        password,
+      );
+
+      await tester.tap(find.text(t.settings.backup.restore));
+      await tester.pumpAndSettle();
+      await tester.enterText(field(0), password);
+      await tester.tap(find.text(t.settings.backup.password.open));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text(t.error.backup.newerVersion), findsOneWidget);
+      expect(harness.nodeRepository.nodes, const <ProxyNode>[oldServer]);
+    });
+
     testWidgets('saying no to the question changes nothing', (tester) async {
       await pump(tester);
       harness.backupFiles.toPick = backupFile();
@@ -272,8 +297,8 @@ void main() {
       ]);
     });
 
-    testWidgets('rule sets that are not on this phone are named, with a way '
-        'to get them', (tester) async {
+    testWidgets('rule sets that are not on this phone are named',
+        (tester) async {
       await pump(tester);
       // Ad blocking needs its list, and this phone has never downloaded it.
       harness.backupFiles.toPick = backupFile(blockAds: true);

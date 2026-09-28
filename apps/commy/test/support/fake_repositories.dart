@@ -734,6 +734,9 @@ class FakeLibraryStore implements LibraryStore {
     for (final subscription in this.subscriptions.items) {
       await this.subscriptions.deleteById(subscription.id);
     }
+    for (final group in this.nodes.groups) {
+      await this.nodes.deleteGroup(group.id);
+    }
     for (final subscription in subscriptions) {
       await this.subscriptions.upsert(subscription);
     }

@@ -55,11 +55,11 @@ void main() {
     phoneA = TestStack.create();
     phoneB = TestStack.create();
     await phoneA.subscriptions.upsert(Fixtures.subscription());
+    await phoneA.nodes.upsertGroup(const NodeGroup(id: 'g1', name: 'Work'));
     await phoneA.nodes.upsertAll(<ProxyNode>[
       Fixtures.vlessNode(subscriptionId: 'sub-1'),
-      Fixtures.trojanNode(),
+      Fixtures.trojanNode().copyWith(groupId: 'g1'),
     ]);
-    await phoneA.nodes.upsertGroup(const NodeGroup(id: 'g1', name: 'Work'));
     await phoneA.routing.write(
       const RoutingPolicy(
         rules: <RoutingRule>[
@@ -67,6 +67,19 @@ void main() {
             id: 'r1',
             matcher: 'domain_suffix:ru',
             action: RuleAction.direct,
+          ),
+          RoutingRule(
+            id: 'r2',
+            matcher: 'domain:example.org',
+            action: RuleAction.block,
+            sortIndex: 1,
+          ),
+          RoutingRule(
+            id: 'r3',
+            matcher: 'ip_cidr:10.0.0.0/8',
+            action: RuleAction.proxy,
+            sortIndex: 2,
+            enabled: false,
           ),
         ],
         blockAds: true,
@@ -129,7 +142,10 @@ void main() {
     );
     expect((await phoneB.nodes.watchGroups().first).single.name, 'Work');
     final policy = (await phoneB.routing.read()).valueOrNull!;
-    expect(policy.rules.single.matcher, 'domain_suffix:ru');
+    // In the order the user put them, the switched-off one still off.
+    expect(policy.rules.map((r) => r.id), <String>['r1', 'r2', 'r3']);
+    expect(policy.rules.last.enabled, isFalse);
+    expect(nodes.firstWhere((n) => n.id == 'node-trojan').groupId, 'g1');
     expect(policy.blockAds, isTrue);
     expect((await phoneB.routing.readDns()).valueOrNull!.fakeIp, isTrue);
     expect(

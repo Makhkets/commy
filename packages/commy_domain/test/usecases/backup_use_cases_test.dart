@@ -285,6 +285,15 @@ void main() {
       expect(result.valueOrNull!.perAppDropped, isTrue);
     });
 
+    test('an app list that is already off is not reported as dropped',
+        () async {
+      final result = await useCase(platform: 'windows')(
+        snapshot(policy: RoutingPolicy.defaults),
+      );
+
+      expect(result.valueOrNull!.perAppDropped, isFalse);
+    });
+
     test('a section that did not parse leaves what this phone has', () async {
       settings.settings = const AppSettings(hideUnavailable: true);
 

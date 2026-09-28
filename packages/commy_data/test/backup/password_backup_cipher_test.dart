@@ -174,6 +174,104 @@ void main() {
       );
     });
 
+    test('the whole header is authenticated, not only the ciphertext',
+        () async {
+      // Derive the key the way the cipher does and open the box by hand:
+      // with the header as associated data it opens, without it it must
+      // not — which is only true if sealing bound the header in.
+      final sealed = (await tiny().seal(plain, password)).valueOrNull!;
+      final header = sealed.sublist(0, PasswordBackupCipher.headerLength);
+      final key = await const DartArgon2id(
+        memory: 64,
+        iterations: 1,
+        parallelism: 1,
+        hashLength: 32,
+      ).deriveKey(
+        secretKey: SecretKey(utf8.encode(password)),
+        nonce: header.sublist(24, 40),
+      );
+      final box = SecretBox(
+        sealed.sublist(PasswordBackupCipher.headerLength, sealed.length - 16),
+        nonce: header.sublist(40, 52),
+        mac: Mac(sealed.sublist(sealed.length - 16)),
+      );
+      const aead = DartChacha20.poly1305Aead();
+
+      expect(await aead.decrypt(box, secretKey: key, aad: header), plain);
+      await expectLater(
+        aead.decrypt(box, secretKey: key),
+        throwsA(isA<SecretBoxAuthenticationError>()),
+      );
+    });
+
+    test('the password is taken as typed: every variation is another one',
+        () async {
+      final cipher = tiny();
+      final sealed = (await cipher.seal(plain, password)).valueOrNull!;
+
+      // Case, a trailing space, a composed "й" typed as "и" + breve: each
+      // is a different password, because each is different bytes.
+      for (final other in <String>[
+        password.toUpperCase(),
+        '$password ',
+        password.trimRight().substring(0, password.length - 1),
+      ]) {
+        expect(
+          (await cipher.open(sealed, other)).failureOrNull,
+          const BackupFailure(BackupProblem.wrongPassword),
+          reason: other,
+        );
+      }
+      final composed = (await cipher.seal(plain, 'пароль-й')).valueOrNull!;
+      expect(
+        (await cipher.open(composed, 'пароль-и\u0306')).failureOrNull,
+        const BackupFailure(BackupProblem.wrongPassword),
+      );
+    });
+
+    test('every header bound is checked before any work', () async {
+      final sealed = (await tiny().seal(plain, password)).valueOrNull!;
+      Uint8List edited(void Function(ByteData view) edit) {
+        final copy = Uint8List.fromList(sealed);
+        edit(ByteData.sublistView(copy));
+        return copy;
+      }
+
+      final refused = <String, Uint8List>{
+        'no lanes': edited((v) => v.setUint8(20, 0)),
+        'too many lanes': edited((v) => v.setUint8(20, 9)),
+        'less memory than lanes need': edited((v) {
+          v
+            ..setUint8(20, 8)
+            ..setUint32(12, 63);
+        }),
+        'no passes': edited((v) => v.setUint32(16, 0)),
+        'too much memory': edited((v) => v.setUint32(12, 131073)),
+        'a salt of another length': edited((v) => v.setUint8(21, 32)),
+        'a nonce of another length': edited((v) => v.setUint8(22, 24)),
+        'the reserved byte set': edited((v) => v.setUint8(23, 1)),
+      };
+      for (final entry in refused.entries) {
+        expect(
+          tiny().inspect(entry.value),
+          BackupProblem.unreadable,
+          reason: entry.key,
+        );
+      }
+      // And the largest allowed values are allowed.
+      expect(
+        tiny().inspect(
+          edited((v) {
+            v
+              ..setUint32(12, 131072)
+              ..setUint32(16, 6)
+              ..setUint8(20, 8);
+          }),
+        ),
+        isNull,
+      );
+    });
+
     test('the password is taken as typed: no trimming', () async {
       final cipher = tiny();
       final sealed = (await cipher.seal(plain, password)).valueOrNull!;
@@ -204,7 +302,7 @@ void main() {
       }
     });
 
-    test('changed Argon2 parameters within bounds fail authentication too',
+    test('changed Argon2 parameters within bounds derive another key',
         () async {
       final cipher = tiny();
       final sealed = (await cipher.seal(plain, password)).valueOrNull!;

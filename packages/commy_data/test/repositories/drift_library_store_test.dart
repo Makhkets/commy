@@ -165,7 +165,9 @@ void main() {
         groups: const <NodeGroup>[],
         nodes: <ProxyNode>[
           changed,
-          Fixtures.socksNode(id: 'orphan').copyWith(subscriptionId: 'nowhere'),
+          // With credentials of its own, so there is a keystore entry the
+          // rollback has to take away again.
+          Fixtures.trojanNode(id: 'orphan', subscriptionId: 'nowhere'),
         ],
       );
 
@@ -193,6 +195,33 @@ void main() {
             .param('password'),
         Fixtures.password,
       );
+    });
+
+    test('readLibrary fails when one server lost its credentials', () async {
+      await stack.store.delete(SecretKeys.nodeParams('node-vless'));
+
+      final result = await store.readLibrary();
+
+      expect(result.failureOrNull, isA<StorageFailure>());
+    });
+
+    test('readLibrary fails when a credential entry no longer decodes',
+        () async {
+      await stack.store.write(SecretKeys.nodeParams('node-trojan'), '{broken');
+
+      expect((await store.readLibrary()).failureOrNull, isA<StorageFailure>());
+    });
+
+    test('readLibrary fails when a subscription lost its URL', () async {
+      await stack.store.delete(SecretKeys.subscriptionUrl('sub-1'));
+
+      expect((await store.readLibrary()).failureOrNull, isA<StorageFailure>());
+    });
+
+    test('a server that never had credentials is not a lost one', () async {
+      await stack.nodes.upsertAll(<ProxyNode>[Fixtures.socksNode()]);
+
+      expect((await store.readLibrary()).isOk, isTrue);
     });
 
     test(
