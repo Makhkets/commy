@@ -38,7 +38,9 @@ class CommyTestHarness {
     AppSettings settings = AppSettings.defaults,
     List<ProxyGroup>? coreGroups,
     List<TrafficDay> trafficDays = const <TrafficDay>[],
+    List<RuleSet> ruleSets = const <RuleSet>[],
   })  : _coreGroups = coreGroups,
+        ruleSetRepository = FakeRuleSetRepository(ruleSets),
         trafficHistory = FakeTrafficHistoryRepository(trafficDays),
         nodeRepository = FakeNodeRepository(nodes),
         subscriptionRepository = FakeSubscriptionRepository(subscriptions),
@@ -74,7 +76,7 @@ class CommyTestHarness {
   final FakeSubscriptionFetcher subscriptionFetcher = FakeSubscriptionFetcher();
 
   /// The geoip and geosite files. Exception E-2, without a socket.
-  final FakeRuleSetRepository ruleSetRepository = FakeRuleSetRepository();
+  final FakeRuleSetRepository ruleSetRepository;
 
   /// Daily traffic totals.
   final FakeTrafficHistoryRepository trafficHistory;

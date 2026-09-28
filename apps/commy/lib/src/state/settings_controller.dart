@@ -107,6 +107,11 @@ class SettingsController extends Notifier<CommyFailure?> {
     return result.isOk;
   }
 
+  /// How often rule sets on disk are fetched again, in days; 0 turns it off.
+  Future<void> setRuleSetUpdateDays(int days) async {
+    await save((await _settings()).copyWith(ruleSetUpdateDays: days));
+  }
+
   /// Changes how the servers inside each list are ordered.
   Future<void> setNodeSort(NodeSort sort) async {
     await save((await _settings()).copyWith(nodeSort: sort));

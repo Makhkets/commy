@@ -209,4 +209,39 @@ void main() {
     expect(harness.routingRepository.policy.rules, hasLength(1));
     expect(find.text(t.ruleSets.missing), findsOneWidget);
   });
+
+  group('automatic updates (E-2, E-3)', () {
+    testWidgets('are off until the user picks an interval, and picking one '
+        'stores it', (tester) async {
+      await pumpScreen(tester, rules: <RoutingRule>[rule('geosite:ru')]);
+
+      expect(find.text(t.ruleSets.autoUpdate), findsOneWidget);
+      expect(
+        find.text(RuleSetsScreen.intervalLabel(t, 0)),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text(t.ruleSets.autoUpdate));
+      await tester.pumpAndSettle();
+      expect(find.text(t.ruleSets.autoUpdateBody), findsOneWidget);
+      await tester.tap(find.text(RuleSetsScreen.intervalLabel(t, 7)));
+      await tester.pumpAndSettle();
+
+      final stored = (await harness.settingsRepository.read()).valueOrNull!;
+      expect(stored.ruleSetUpdateDays, 7);
+      expect(find.text(RuleSetsScreen.intervalLabel(t, 7)), findsOneWidget);
+      // Choosing a schedule is not a download.
+      expect(harness.ruleSetRepository.requests, isEmpty);
+    });
+
+    testWidgets('have no row without a source to fetch from', (tester) async {
+      await pumpScreen(
+        tester,
+        rules: <RoutingRule>[rule('geosite:ru')],
+        source: '',
+      );
+
+      expect(find.text(t.ruleSets.autoUpdate), findsNothing);
+    });
+  });
 }

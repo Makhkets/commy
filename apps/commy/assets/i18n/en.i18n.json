@@ -228,7 +228,7 @@
 
   "ruleSets": {
     "title": "Rule sets",
-    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask, and the address below is the one that will be asked.",
+    "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask — with the button or the schedule below — and the address below is the one that will be asked.",
     "source": "Source",
     "sourceLabel": "Address template",
     "sourceHelp": "$token is replaced with the tag being fetched. Clear the field to make downloading unavailable.",
@@ -245,6 +245,14 @@
     "noneNeededBody": "Rules naming geosite: or geoip: are the ones that do. Plain domains and addresses work without anything downloaded.",
     "downloaded": "$tag downloaded",
     "downloadFailed": "Could not download the $tag set",
+    "autoUpdate": "Update automatically",
+    "autoUpdateHint": "Only sets already downloaded and used by your rules, from the same source",
+    "autoUpdateOff": "off",
+    "everyDay": "daily",
+    "everyWeek": "weekly",
+    "everyMonth": "monthly",
+    "autoUpdateTitle": "Updating rule sets",
+    "autoUpdateBody": "Commy fetches them again on this schedule — only the ones already on the phone and used by your rules, from the same address as the button. Off — only when you tap Update.",
     "deleteConfirm": {
       "title": "Delete this list?",
       "body": "The rules that name it stay where they are and stop applying until it is downloaded again.",
@@ -332,6 +340,7 @@
       "ipCheckHint": "only when you tap",
       "ruleSets": "geoip and geosite rule sets",
       "ruleSetsHint": "when you tap Refresh",
+      "ruleSetsHintAuto": "on a tap and $interval",
       "blockLists": "Ad block lists",
       "blockListsHint": "source is configurable",
       "blockListsMissing": "on, but the list is not downloaded — open Rule sets",

@@ -49,6 +49,7 @@ class AppSettings {
     this.latencyProbeUrl = defaultLatencyProbeUrl,
     this.ipCheckUrl = '',
     this.ruleSetSource = defaultRuleSetSource,
+    this.ruleSetUpdateDays = 0,
     this.logLevel = LogLevel.info,
     this.allowLan = false,
     this.mixedPort = defaultMixedPort,
@@ -87,6 +88,7 @@ class AppSettings {
           'ruleSetSource',
           orElse: defaultRuleSetSource,
         ),
+        ruleSetUpdateDays: _updateDaysOf(json),
         logLevel: LogLevel.values.byName(
           JsonRead.stringOr(json, 'logLevel', orElse: 'info'),
         ),
@@ -117,6 +119,16 @@ class AppSettings {
 
   /// The placeholder [ruleSetSource] substitutes the rule set tag into.
   static const String ruleSetTagToken = '{tag}';
+
+  /// What [ruleSetUpdateDays] may be: off, daily, weekly, monthly.
+  static const List<int> ruleSetUpdateChoices = <int>[0, 1, 7, 30];
+
+  /// A stored interval, or off when it is not one of the choices — a value
+  /// nobody offered is not a schedule anybody chose.
+  static int _updateDaysOf(JsonMap json) {
+    final days = JsonRead.integerOr(json, 'ruleSetUpdateDays', orElse: 0);
+    return ruleSetUpdateChoices.contains(days) ? days : 0;
+  }
 
   /// Local mixed (SOCKS + HTTP) inbound port.
   static const int defaultMixedPort = 2080;
@@ -211,6 +223,15 @@ class AppSettings {
   /// nothing has a reason to fetch it again. See [defaultRuleSetSource].
   final String ruleSetSource;
 
+  /// How often rule sets already on disk are fetched again, in days; 0 is
+  /// never, and never is the default.
+  ///
+  /// Exceptions E-2 and E-3 allow a refresh on an interval the user sets
+  /// (docs/09). Only a file the user downloaded once is refreshed — a timer
+  /// never fetches a rule set for the first time — and the request goes to
+  /// the same configurable [ruleSetSource] as the button.
+  final int ruleSetUpdateDays;
+
   /// Minimum severity kept in the log.
   final LogLevel logLevel;
 
@@ -235,6 +256,10 @@ class AppSettings {
   /// wants no such request available clears the field, and the button that
   /// would make it goes away with it.
   bool get isRuleSetSourceEnabled => ruleSetSource.trim().isNotEmpty;
+
+  /// Whether rule sets on disk are refreshed on their own.
+  bool get isRuleSetAutoUpdateEnabled =>
+      ruleSetUpdateDays > 0 && isRuleSetSourceEnabled;
 
   /// The URL [tag] is fetched from, or `null` when no source is configured.
   Uri? ruleSetUrl(String tag) {
@@ -261,6 +286,7 @@ class AppSettings {
     String? latencyProbeUrl,
     String? ipCheckUrl,
     String? ruleSetSource,
+    int? ruleSetUpdateDays,
     LogLevel? logLevel,
     bool? allowLan,
     int? mixedPort,
@@ -280,6 +306,7 @@ class AppSettings {
       latencyProbeUrl: latencyProbeUrl ?? this.latencyProbeUrl,
       ipCheckUrl: ipCheckUrl ?? this.ipCheckUrl,
       ruleSetSource: ruleSetSource ?? this.ruleSetSource,
+      ruleSetUpdateDays: ruleSetUpdateDays ?? this.ruleSetUpdateDays,
       logLevel: logLevel ?? this.logLevel,
       allowLan: allowLan ?? this.allowLan,
       mixedPort: mixedPort ?? this.mixedPort,
@@ -301,6 +328,7 @@ class AppSettings {
         'latencyProbeUrl': latencyProbeUrl,
         'ipCheckUrl': ipCheckUrl,
         'ruleSetSource': ruleSetSource,
+        'ruleSetUpdateDays': ruleSetUpdateDays,
         'logLevel': logLevel.name,
         'allowLan': allowLan,
         'mixedPort': mixedPort,
@@ -323,6 +351,7 @@ class AppSettings {
           other.latencyProbeUrl == latencyProbeUrl &&
           other.ipCheckUrl == ipCheckUrl &&
           other.ruleSetSource == ruleSetSource &&
+          other.ruleSetUpdateDays == ruleSetUpdateDays &&
           other.logLevel == logLevel &&
           other.allowLan == allowLan &&
           other.mixedPort == mixedPort &&
@@ -342,6 +371,7 @@ class AppSettings {
         latencyProbeUrl,
         ipCheckUrl,
         ruleSetSource,
+        ruleSetUpdateDays,
         logLevel,
         allowLan,
         mixedPort,

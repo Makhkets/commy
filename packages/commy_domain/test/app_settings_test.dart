@@ -61,4 +61,35 @@ void main() {
       expect(settings.copyWith(pingMethod: PingMethod.tcp), isNot(settings));
     });
   });
+
+  group('AppSettings.ruleSetUpdateDays', () {
+    test('off by default, also for settings stored before it existed', () {
+      expect(AppSettings.defaults.ruleSetUpdateDays, 0);
+      expect(AppSettings.defaults.isRuleSetAutoUpdateEnabled, isFalse);
+      expect(
+        AppSettings.fromJson(const <String, Object?>{}).ruleSetUpdateDays,
+        0,
+      );
+    });
+
+    test('round-trips through JSON', () {
+      const weekly = AppSettings(ruleSetUpdateDays: 7);
+
+      expect(AppSettings.fromJson(weekly.toJson()), weekly);
+    });
+
+    test('an interval nobody offered reads as off', () {
+      expect(
+        AppSettings.fromJson(const <String, Object?>{'ruleSetUpdateDays': 3})
+            .ruleSetUpdateDays,
+        0,
+      );
+    });
+
+    test('no source means no refresh, whatever the interval', () {
+      const noSource = AppSettings(ruleSetUpdateDays: 7, ruleSetSource: ' ');
+
+      expect(noSource.isRuleSetAutoUpdateEnabled, isFalse);
+    });
+  });
 }
