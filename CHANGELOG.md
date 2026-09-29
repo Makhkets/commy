@@ -10,6 +10,14 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- Android: **a settings change the core refuses no longer kills a running
+  tunnel.** Applying routing or DNS to a live tunnel used to stop the running
+  core before building the new one, so a refused document left no tunnel
+  while the app still said Connected. It is now checked first; the tunnel
+  keeps running on what it had, and the error is shown.
+- Android: "Only these apps" with none of the chosen apps installed any more
+  used to put **every** app in the tunnel — the platform reads an empty
+  allow list as all apps. The tunnel now refuses to start and says why.
 - **The subscription token no longer sits in the open database** on
   Marzban-family panels. Their `profile-web-page-url` is the subscription
   address itself, token included, and it was stored as a plain column. It now
