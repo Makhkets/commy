@@ -511,7 +511,8 @@
       "matcherHint": "geosite:ru, domain:example.com, geoip:private",
       "action": "Action",
       "save": "Save",
-      "empty": "A match cannot be empty"
+      "empty": "A match cannot be empty",
+      "unreadable": "This match does nothing here — check how it is written"
     },
     "emptyRules": "No rules of your own yet",
     "emptyRulesBody": "With no rules everything follows the final outcome. Add the first one to split the traffic."

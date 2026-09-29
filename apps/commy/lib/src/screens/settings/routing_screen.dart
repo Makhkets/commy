@@ -67,9 +67,10 @@ class _Body extends ConsumerWidget {
     final dns = ref.watch(dnsSettingsProvider).value ?? DnsSettings.defaults;
     final settings = ref.watch(settingsProvider).value ?? AppSettings.defaults;
     final rules = policy.rules;
+    final platform = ref.watch(configPlatformProvider);
     final needed = RouteSectionBuilder.requiredRuleSets(
       routing: policy,
-      platform: ref.watch(configPlatformProvider),
+      platform: platform,
     ).toSet();
     final ruleSets = <String>{
       for (final set in ref.watch(ruleSetsProvider).value ?? const <RuleSet>[])
@@ -149,7 +150,8 @@ class _Body extends ConsumerWidget {
                 variant: CommyButtonVariant.ghost,
                 isCompact: true,
                 icon: CommyIcons.add,
-                onPressed: () => unawaited(_addRule(context, controller)),
+                onPressed: () =>
+                    unawaited(_addRule(context, controller, platform)),
               ),
             ],
           ),
@@ -163,7 +165,8 @@ class _Body extends ConsumerWidget {
               title: t.routing.emptyRules,
               message: t.routing.emptyRulesBody,
               actionLabel: t.routing.addRule,
-              onAction: () => unawaited(_addRule(context, controller)),
+              onAction: () =>
+                  unawaited(_addRule(context, controller, platform)),
             ),
           )
         else
@@ -249,12 +252,13 @@ class _Body extends ConsumerWidget {
   Future<void> _addRule(
     BuildContext context,
     SettingsController controller,
+    ConfigPlatform platform,
   ) async {
     final t = Translations.of(context);
     final draft = await CommySheet.show<_RuleDraft>(
       context: context,
       title: t.routing.newRule.title,
-      builder: (context) => const _NewRuleSheet(),
+      builder: (context) => _NewRuleSheet(platform: platform),
     );
     if (draft == null) {
       return;
@@ -428,7 +432,11 @@ class _RuleDraft {
 }
 
 class _NewRuleSheet extends StatefulWidget {
-  const _NewRuleSheet();
+  const _NewRuleSheet({required this.platform});
+
+  /// What the rule is read for: `process_name` means something on a
+  /// desktop and nothing on a phone.
+  final ConfigPlatform platform;
 
   @override
   State<_NewRuleSheet> createState() => _NewRuleSheetState();
@@ -437,7 +445,7 @@ class _NewRuleSheet extends StatefulWidget {
 class _NewRuleSheetState extends State<_NewRuleSheet> {
   final TextEditingController _matcher = TextEditingController();
   RuleAction _action = RuleAction.direct;
-  bool _showError = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -460,12 +468,12 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
             controller: _matcher,
             labelText: t.routing.newRule.matcher,
             hintText: t.routing.newRule.matcherHint,
-            errorText: _showError ? t.routing.newRule.empty : null,
+            errorText: _error,
             autofocus: true,
             isMonospace: true,
             onChanged: (_) {
-              if (_showError) {
-                setState(() => _showError = false);
+              if (_error != null) {
+                setState(() => _error = null);
               }
             },
           ),
@@ -500,8 +508,9 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
             label: t.routing.newRule.save,
             onPressed: () {
               final matcher = _matcher.text.trim();
-              if (matcher.isEmpty) {
-                setState(() => _showError = true);
+              final error = _problem(t, matcher);
+              if (error != null) {
+                setState(() => _error = error);
                 return;
               }
               Navigator.of(context).pop(_RuleDraft(matcher, _action));
@@ -511,5 +520,20 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
         ],
       ),
     );
+  }
+
+  /// Why [matcher] cannot be saved, in the reader's language, or `null`.
+  ///
+  /// Read by the builder's own parser, so a rule it would leave out is
+  /// refused here, next to the typo, rather than saved and turned up later
+  /// as a line in the banner above the list.
+  String? _problem(Translations t, String matcher) {
+    if (matcher.isEmpty) {
+      return t.routing.newRule.empty;
+    }
+    final parsed = RouteMatcher.tryParse(matcher, platform: widget.platform);
+    return parsed == null || parsed.isEmpty
+        ? t.routing.newRule.unreadable
+        : null;
   }
 }

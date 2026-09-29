@@ -238,6 +238,38 @@ void main() {
     expect(stored().rules, isEmpty);
   });
 
+  testWidgets(
+      'a match the builder would leave out is refused where it is typed',
+      (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(EmptyState),
+        matching: find.text(t.routing.addRule),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(CommyTextField), 'regex:*.example.com');
+    await tester.tap(find.text(t.routing.newRule.save));
+    await tester.pumpAndSettle();
+
+    // Saved, it would only have turned up later as a line in the banner:
+    // the builder leaves out an expression the core cannot compile.
+    expect(find.text(t.routing.newRule.unreadable), findsOneWidget);
+    expect(find.text(t.routing.newRule.title), findsOneWidget);
+    expect(stored().rules, isEmpty);
+
+    // Xray's spelling of a range is one the builder rewrites, so it stays.
+    await tester.enterText(find.byType(CommyTextField), 'port_range:1000-2000');
+    await tester.pumpAndSettle();
+    expect(find.text(t.routing.newRule.unreadable), findsNothing);
+    await tester.tap(find.text(t.routing.newRule.save));
+    await tester.pumpAndSettle();
+
+    expect(storedMatchers(), <String>['port_range:1000-2000']);
+  });
+
   testWidgets('swiping a rule away removes exactly that rule', (tester) async {
     await pumpScreen(
       tester,
