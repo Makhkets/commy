@@ -13,6 +13,7 @@ import 'package:test/test.dart';
 /// one. Each case here is a link as panels and other clients write it, with
 /// the kind of value that used to get through — a flow, a cipher, a plugin,
 /// a port hop, an interface address — and the object the builder makes of it.
+/// The same goes for routing rules as users and other clients write them.
 /// This test holds the builder to the fixture; the Go test hands every object
 /// in the fixture to sing-box itself and fails on any it would not construct.
 ///
@@ -43,6 +44,29 @@ void main() {
         availableRuleSets: const <String>{},
       );
 
+  Map<String, Object?> routeFrom(
+    List<String> matchers, {
+    bool fakeIp = false,
+  }) =>
+      RouteSectionBuilder.build(
+        routing: RoutingPolicy(
+          rules: <RoutingRule>[
+            for (final (index, matcher) in matchers.indexed)
+              RoutingRule(
+                id: 'r$index',
+                matcher: matcher,
+                action: RuleAction.values[index % RuleAction.values.length],
+                sortIndex: index,
+              ),
+          ],
+        ),
+        platform: ConfigPlatform.android,
+        availableRuleSets: const <String>{},
+        ruleSetDirectory: null,
+        fakeIp: fakeIp,
+        warnings: <RoutingWarning>[],
+      );
+
   Map<String, Object?> loopbackProxy() => InboundSectionBuilder.mixed(
         settings: const AppSettings(ipCheckUrl: 'https://ip.example/json'),
         localAuth: const LocalProxyAuth(password: '00112233445566778899aabb'),
@@ -68,6 +92,12 @@ void main() {
               'name': name,
               'kind': 'dns',
               'object': dnsFrom(dns),
+            },
+          for (final (name, matchers, fakeIp) in _routes)
+            <String, Object?>{
+              'name': name,
+              'kind': 'route',
+              'object': routeFrom(matchers, fakeIp: fakeIp),
             },
           <String, Object?>{
             'name': _loopbackProxy,
@@ -95,6 +125,7 @@ void main() {
       <String>[
         for (final (name, _) in _links) name,
         for (final (name, _) in _resolvers) name,
+        for (final (name, _, _) in _routes) name,
         _loopbackProxy,
       ],
     );
@@ -106,17 +137,24 @@ void main() {
   final resolvers = Map<String, DnsSettings>.fromEntries(
     _resolvers.map((dns) => MapEntry<String, DnsSettings>(dns.$1, dns.$2)),
   );
+  final routes = <String, Map<String, Object?> Function()>{
+    for (final (name, matchers, fakeIp) in _routes)
+      name: () => routeFrom(matchers, fakeIp: fakeIp),
+  };
   for (final entry in cases) {
     final name = '${entry['name']}';
     test('the core is handed what the fixture promises: $name', () {
       final link = links[name];
       final dns = resolvers[name];
+      final route = routes[name];
       expect(
         link != null
             ? buildFrom(link)
             : dns != null
                 ? dnsFrom(dns)
-                : loopbackProxy(),
+                : route != null
+                    ? route()
+                    : loopbackProxy(),
         entry['object'],
       );
     });
@@ -138,6 +176,32 @@ const List<(String, DnsSettings)> _resolvers = <(String, DnsSettings)>[
   (
     'DNS, the direct resolver by name over TLS, FakeIP on',
     DnsSettings(direct: 'tls://dns.quad9.net', fakeIp: true),
+  ),
+];
+
+/// Route sections, for the rules the core parses before anything connects.
+///
+/// Each list is rules as users type them and other clients write them —
+/// Xray's port range with a dash, an expression with Go's inline flag, a
+/// bare address — and whether FakeIP is on, which adds a lookup ahead of
+/// the first rule on addresses.
+const List<(String, List<String>, bool)> _routes =
+    <(String, List<String>, bool)>[
+  (
+    'Route, rules as other clients write them',
+    <String>[
+      'port_range:1000-2000',
+      'port_range:443,3000:',
+      r'regex:(?i)^ads\.',
+      'ip_cidr:10.0.0.0/8,192.0.2.1',
+      'port:443,8443',
+    ],
+    false,
+  ),
+  (
+    'Route, FakeIP on, a rule on names and one on addresses',
+    <String>['domain_suffix:example.org', 'ip_cidr:203.0.113.0/24'],
+    true,
   ),
 ];
 

@@ -21,8 +21,9 @@ import (
 // the first one that fails fails the box. The fixture is what the builder
 // writes for links whose values used to reach the core as they were — a VLESS
 // flow only Xray knows, a plugin under another name, a single-port hop, a bare
-// WireGuard address, a direct resolver given by name. Each one is constructed
-// here, by the library itself.
+// WireGuard address, a direct resolver given by name, routing rules as users
+// and other clients type them. Each one is constructed here, by the library
+// itself.
 //
 // Run with the build tags, like the other tests in this package:
 //
@@ -60,6 +61,13 @@ func TestTheCoreConstructsWhatTheAppWrites(t *testing.T) {
 				// The section refers to the proxy group by its tag.
 				document = `{"log": {"disabled": true}, "dns": ` + string(c.Object) +
 					`, "outbounds": [{"type": "direct", "tag": "proxy"}]}`
+			case "route":
+				// The rules name the proxy group, the direct outbound and the
+				// two resolvers by their tags.
+				document = `{"log": {"disabled": true}, "dns": {"servers": [` +
+					`{"type": "local", "tag": "dns-remote"}, {"type": "local", "tag": "dns-direct"}]}` +
+					`, "route": ` + string(c.Object) +
+					`, "outbounds": [{"type": "direct", "tag": "proxy"}, {"type": "direct", "tag": "direct"}]}`
 			default:
 				t.Fatalf("unknown kind %q", c.Kind)
 			}
