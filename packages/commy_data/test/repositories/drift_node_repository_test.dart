@@ -190,6 +190,87 @@ void main() {
       expect(all.single.latency, equals(const Duration(milliseconds: 90)));
     });
 
+    group('several servers on one endpoint', () {
+      // host:443 with a WebSocket path per server is an ordinary panel
+      // layout. Ids come from the server's identity, path included, so the
+      // two are two ids on one endpoint — and matching on the endpoint alone
+      // gave one of them the other's id, collapsed the two rows into one and
+      // deleted the other server's credentials.
+      const subscriptionId = 'sub-1';
+
+      ProxyNode onPath(String path) => ProxyNode(
+            id: 'ws$path',
+            name: 'Frankfurt $path',
+            protocol: Protocol.vless,
+            host: 'cdn.vpn.example.com',
+            port: 443,
+            subscriptionId: subscriptionId,
+            params: <String, Object?>{
+              'uuid': 'uuid-of$path',
+              'type': 'ws',
+              'path': path,
+              'security': 'tls',
+            },
+          );
+
+      Future<Map<String, ProxyNode>> stored() async => <String, ProxyNode>{
+            for (final node in (await repository.getAll()).valueOrNull!)
+              node.id: node,
+          };
+
+      test('a reordered pair keeps both servers, each with its own id',
+          () async {
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/a'), onPath('/b')],
+        );
+        await repository.updateLatency(
+          id: 'ws/a',
+          latency: const Duration(milliseconds: 40),
+          checkedAt: DateTime.utc(2026, 9, 30),
+        );
+
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/b'), onPath('/a')],
+        );
+
+        final nodes = await stored();
+        expect(nodes.keys.toSet(), <String>{'ws/a', 'ws/b'});
+        expect(nodes['ws/a']!.param('path'), '/a');
+        expect(nodes['ws/a']!.param('uuid'), 'uuid-of/a');
+        expect(nodes['ws/b']!.param('uuid'), 'uuid-of/b');
+        expect(nodes['ws/a']!.latency, const Duration(milliseconds: 40));
+        expect(nodes['ws/b']!.latency, isNull);
+      });
+
+      test('a new server in front does not take the first one over', () async {
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/a')],
+        );
+        await repository.updateLatency(
+          id: 'ws/a',
+          latency: const Duration(milliseconds: 40),
+          checkedAt: DateTime.utc(2026, 9, 30),
+        );
+
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/new'), onPath('/a')],
+        );
+
+        final nodes = await stored();
+        expect(nodes.keys.toSet(), <String>{'ws/new', 'ws/a'});
+        expect(nodes['ws/a']!.latency, const Duration(milliseconds: 40));
+        expect(nodes['ws/new']!.param('uuid'), 'uuid-of/new');
+        expect(
+          stack.store.snapshot.containsKey(SecretKeys.nodeParams('ws/a')),
+          isTrue,
+        );
+      });
+    });
+
     test('drops servers the panel removed, with their credentials', () async {
       const subscriptionId = 'sub-1';
       await repository.replaceForSubscription(

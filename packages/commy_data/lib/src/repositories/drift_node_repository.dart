@@ -125,12 +125,18 @@ class DriftNodeRepository implements NodeRepository {
             ..where((table) => table.subscriptionId.equals(subscriptionId)))
           .get();
 
-      // A panel renames and reorders nodes freely; what identifies a server is
-      // protocol + host + port. Matching on that keeps the local id, and with
-      // it the measured latency and the user's current selection.
-      final byEndpoint = <String, NodeRow>{};
+      // A panel renames and reorders nodes freely, and ids made before they
+      // were derived from the server's identity (or by hand) do not match
+      // what the parser makes now. So a node keeps its own row first, and
+      // failing that takes over a row on the same protocol + host + port —
+      // which keeps the local id, and with it the measured latency and the
+      // user's current selection.
+      final rowById = <String, NodeRow>{
+        for (final row in existing) row.id: row,
+      };
+      final byEndpoint = <String, List<NodeRow>>{};
       for (final row in existing) {
-        byEndpoint.putIfAbsent(NodeMapper.endpointKeyOfRow(row), () => row);
+        (byEndpoint[NodeMapper.endpointKeyOfRow(row)] ??= <NodeRow>[]).add(row);
       }
 
       // Folded before anything is written: two companions sharing a primary
@@ -140,12 +146,28 @@ class DriftNodeRepository implements NodeRepository {
       // was actually stored (R2).
       final unique = NodeDuplicates.folded(nodes);
 
+      // One endpoint can carry several servers — host:443 with a WebSocket
+      // path each is an ordinary panel layout. Matching on the endpoint alone
+      // handed one of them another's id whenever the panel reordered them or
+      // put a new one in front; two rows with one key collapsed into one, and
+      // the other server's credentials were deleted. A row whose id an
+      // incoming node still owns is that node's, and nobody else's.
+      final incomingIds = unique.map((node) => node.id).toSet();
       final reusedIds = <String>{};
       final incoming = <ProxyNode>[];
       for (var index = 0; index < unique.length; index++) {
         final node = unique[index];
-        final previous = byEndpoint[NodeMapper.endpointKeyOf(node)];
-        final carried = previous == null || reusedIds.contains(previous.id)
+        final own = rowById[node.id];
+        final previous = own != null && !reusedIds.contains(own.id)
+            ? own
+            : (byEndpoint[NodeMapper.endpointKeyOf(node)] ?? const <NodeRow>[])
+                .where(
+                  (row) =>
+                      !reusedIds.contains(row.id) &&
+                      !incomingIds.contains(row.id),
+                )
+                .firstOrNull;
+        final carried = previous == null
             ? node
             : node.copyWith(
                 id: previous.id,

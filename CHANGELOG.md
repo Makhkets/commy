@@ -10,6 +10,10 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **A subscription refresh no longer loses servers that share an address.**
+  Several servers on one host and port — a WebSocket path each, a common
+  panel layout — could be merged into one when the panel reordered them or
+  added one in front, and the other server vanished with its credentials.
 - Android: **a settings change the core refuses no longer kills a running
   tunnel.** Applying routing or DNS to a live tunnel used to stop the running
   core before building the new one, so a refused document left no tunnel
