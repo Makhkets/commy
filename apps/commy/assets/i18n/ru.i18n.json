@@ -343,10 +343,17 @@
     "sections": "Разделы",
     "routing": "Маршрутизация",
     "routingSubtitle": "Режим, правила, приложения, DNS",
+    "routingModeRules": "По правилам",
+    "routingValue(plural, param=count)": {
+      "one": "$mode · $count правило",
+      "few": "$mode · $count правила",
+      "many": "$mode · $count правил",
+      "other": "$mode · $count правил"
+    },
     "diagnostics": "Диагностика",
     "diagnosticsSubtitle": "Логи, соединения, конфиг, статистика",
     "appearance": "Внешний вид",
-    "appearanceSubtitle": "Тема, язык, размер шрифта",
+    "appearanceSubtitle": "Тема и язык",
     "about": "О программе",
     "aboutSubtitle": "Версия, ядро, лицензии",
     "silence": {

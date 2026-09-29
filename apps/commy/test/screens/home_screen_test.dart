@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy/src/screens/home/widgets/auto_row.dart';
+import 'package:commy/src/screens/home/widgets/list_toolbar.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
 import 'package:commy/src/state/import_controller.dart';
+import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:file_picker/file_picker.dart';
@@ -788,6 +790,34 @@ void main() {
         (await three.settingsRepository.read()).valueOrNull!.nodeSort,
         NodeSort.latency,
       );
+    });
+
+    testWidgets('the order sheet is one choice of three, not three links',
+        (tester) async {
+      await pumpThree(tester);
+
+      await tester.tap(find.byType(CommyChip));
+      await tester.pumpAndSettle();
+
+      final sheet = find.byType(SortSheet);
+      expect(
+        find.descendant(of: sheet, matching: find.byType(CommyRadio<NodeSort>)),
+        findsNWidgets(NodeSort.values.length),
+      );
+      // A chevron promises another screen; picking an order opens none.
+      expect(
+        find.descendant(
+          of: sheet,
+          matching: find.byIcon(CommyIcons.chevronRight),
+        ),
+        findsNothing,
+      );
+      final chosen = tester
+          .widgetList<SettingsTile>(
+            find.descendant(of: sheet, matching: find.byType(SettingsTile)),
+          )
+          .where((tile) => tile.selected ?? false);
+      expect(chosen.single.title, Translations().home.sort.panel);
     });
 
     testWidgets('one server gets neither a search field nor an order chip',

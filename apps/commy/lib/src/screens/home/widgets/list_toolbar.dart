@@ -105,9 +105,15 @@ class SortSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
-    final colors = context.colors;
     final spacing = context.spacing;
     final current = ref.watch(nodeSortProvider);
+
+    void choose(NodeSort sort) {
+      unawaited(
+        ref.read(settingsControllerProvider.notifier).setNodeSort(sort),
+      );
+      Navigator.of(context).pop();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -115,24 +121,20 @@ class SortSheet extends ConsumerWidget {
       children: <Widget>[
         SettingsSection(
           children: <Widget>[
+            // Radio rows, as every other one-of-several sheet draws them.
+            // A tick on the chosen row left the other two with the chevron
+            // of a row that opens a screen, and a screen reader heard three
+            // buttons rather than one choice of three.
             for (final sort in NodeSort.values)
               SettingsTile(
                 title: sortLabel(t, sort),
-                trailing: sort == current
-                    ? Icon(
-                        CommyIcons.check,
-                        size: CommySizes.iconControl,
-                        color: colors.accentSolid,
-                      )
-                    : null,
-                onTap: () {
-                  unawaited(
-                    ref
-                        .read(settingsControllerProvider.notifier)
-                        .setNodeSort(sort),
-                  );
-                  Navigator.of(context).pop();
-                },
+                selected: sort == current,
+                trailing: CommyRadio<NodeSort>(
+                  value: sort,
+                  groupValue: current,
+                  onChanged: (_) => choose(sort),
+                ),
+                onTap: () => choose(sort),
               ),
           ],
         ),

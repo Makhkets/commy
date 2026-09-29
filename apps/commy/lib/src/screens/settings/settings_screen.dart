@@ -276,12 +276,14 @@ class _Body extends ConsumerWidget {
     if (policy == null) {
       return t.settings.routingSubtitle;
     }
+    // "По правилам", not the segment's "Правила": next to the count, the
+    // segment's word read "Правила · Правила: 3".
     final mode = switch (policy.mode) {
       RoutingMode.global => t.routing.mode.global,
-      RoutingMode.rules => t.routing.mode.rules,
+      RoutingMode.rules => t.settings.routingModeRules,
       RoutingMode.direct => t.routing.mode.direct,
     };
-    return '$mode · ${t.routing.rules}: ${policy.rules.length}';
+    return t.settings.routingValue(mode: mode, count: policy.rules.length);
   }
 }
 
@@ -330,10 +332,14 @@ class _SilencePanel extends ConsumerWidget {
                       color: colors.statusConnected,
                     ),
                     SizedBox(width: spacing.s2),
-                    Text(
-                      t.settings.silence.title,
-                      style: context.typography.title3.copyWith(
-                        color: colors.textPrimary,
+                    // Flexible: at the largest system font the English title
+                    // ran 40 pixels past the panel on a 360 dp phone.
+                    Flexible(
+                      child: Text(
+                        t.settings.silence.title,
+                        style: context.typography.title3.copyWith(
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ),
                   ],

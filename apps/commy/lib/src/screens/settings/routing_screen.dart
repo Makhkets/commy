@@ -5,6 +5,7 @@ import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
+import 'package:commy/src/screens/settings/dns_screen.dart';
 import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -219,9 +220,11 @@ class _Body extends ConsumerWidget {
             SettingsTile(
               icon: CommyIcons.routing,
               title: t.routing.dns,
+              // The strategy as the DNS screen words it: the row used to
+              // print the core's own token, "prefer_ipv4", in both languages.
               value: t.routing.dnsValue(
                 remote: dns.remote,
-                strategy: dns.strategy.wireName,
+                strategy: DnsScreen.strategyLabel(t, dns.strategy),
               ),
               onTap: () => context.go(AppRoutes.dns),
             ),

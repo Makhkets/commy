@@ -327,10 +327,15 @@
     "sections": "Sections",
     "routing": "Routing",
     "routingSubtitle": "Mode, rules, apps, DNS",
+    "routingModeRules": "Rule-based",
+    "routingValue(plural, param=count)": {
+      "one": "$mode · $count rule",
+      "other": "$mode · $count rules"
+    },
     "diagnostics": "Diagnostics",
     "diagnosticsSubtitle": "Logs, connections, config, statistics",
     "appearance": "Appearance",
-    "appearanceSubtitle": "Theme, language, text size",
+    "appearanceSubtitle": "Theme and language",
     "about": "About",
     "aboutSubtitle": "Version, core, licences",
     "silence": {

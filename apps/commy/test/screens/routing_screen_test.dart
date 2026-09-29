@@ -565,11 +565,13 @@ void main() {
       find.text(
         t.routing.dnsValue(
           remote: 'tls://9.9.9.9',
-          strategy: DnsStrategy.ipv4Only.wireName,
+          strategy: t.dns.strategyIpv4Only,
         ),
       ),
       findsOneWidget,
     );
+    // The core's token is for the core; the row is for a person.
+    expect(find.textContaining(DnsStrategy.ipv4Only.wireName), findsNothing);
   });
 
   testWidgets('the Apps row says everything while per-app routing is off',

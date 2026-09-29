@@ -28,6 +28,16 @@ class DnsScreen extends ConsumerWidget {
   /// Creates the screen.
   const DnsScreen({super.key});
 
+  /// "Both, IPv4 first" — how [strategy] reads, here and wherever the
+  /// resolver is summed up in a row.
+  static String strategyLabel(Translations t, DnsStrategy strategy) =>
+      switch (strategy) {
+        DnsStrategy.preferIpv4 => t.dns.strategyPreferIpv4,
+        DnsStrategy.preferIpv6 => t.dns.strategyPreferIpv6,
+        DnsStrategy.ipv4Only => t.dns.strategyIpv4Only,
+        DnsStrategy.ipv6Only => t.dns.strategyIpv6Only,
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
@@ -118,7 +128,7 @@ class _Body extends ConsumerWidget {
           children: <Widget>[
             for (final strategy in DnsStrategy.values)
               SettingsTile(
-                title: _strategyLabel(t, strategy),
+                title: DnsScreen.strategyLabel(t, strategy),
                 selected: dns.strategy == strategy,
                 trailing: CommyRadio<DnsStrategy>(
                   value: strategy,
@@ -198,14 +208,6 @@ class _Body extends ConsumerWidget {
     }
     await controller.saveDns(apply(edited));
   }
-
-  String _strategyLabel(Translations t, DnsStrategy strategy) =>
-      switch (strategy) {
-        DnsStrategy.preferIpv4 => t.dns.strategyPreferIpv4,
-        DnsStrategy.preferIpv6 => t.dns.strategyPreferIpv6,
-        DnsStrategy.ipv4Only => t.dns.strategyIpv4Only,
-        DnsStrategy.ipv6Only => t.dns.strategyIpv6Only,
-      };
 }
 
 /// One resolver, checked before it is allowed out of the sheet.

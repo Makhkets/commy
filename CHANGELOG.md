@@ -10,6 +10,16 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- Small things on screen: "Scan a QR code" now shows a QR code rather than a
+  magnifying glass; Settings → Routing reads "Rule-based · 3 rules" instead
+  of "Rules · Rules: 3"; the DNS row on the routing screen says "Both, IPv4
+  first" rather than the core's `prefer_ipv4`, and a value too long to sit
+  beside its title moves under it instead of being cut off; the server
+  order sheet is a choice of three rather than three rows with arrows;
+  Appearance no longer promises a text size setting it does not have; the
+  "Network silence" title no longer runs off the panel at the largest
+  system font.
+
 ## [0.1.0-alpha.11]
 
 Installs over alpha.10.

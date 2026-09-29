@@ -79,7 +79,7 @@ class FirstRunView extends ConsumerWidget {
                 SizedBox(width: spacing.s2),
                 Expanded(
                   child: _ImportChoice(
-                    icon: CommyIcons.search,
+                    icon: CommyIcons.qrCode,
                     label: t.home.empty.scan,
                     onTap: () => unawaited(QrScanSheet.show(context)),
                   ),

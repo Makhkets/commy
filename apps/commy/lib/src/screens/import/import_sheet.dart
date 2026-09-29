@@ -139,7 +139,7 @@ class _ImportSheetState extends ConsumerState<ImportSheet> {
               onTap: () => unawaited(_openChild(PasteSheet.show(context))),
             ),
             SettingsTile(
-              icon: CommyIcons.search,
+              icon: CommyIcons.qrCode,
               title: t.import.qr.title,
               subtitle: t.import.qr.permissionBody,
               onTap: () => unawaited(_openChild(QrScanSheet.show(context))),

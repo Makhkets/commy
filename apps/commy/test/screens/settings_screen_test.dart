@@ -207,20 +207,34 @@ void main() {
       ),
     );
 
-    final subtitle = tester
-        .widgetList<Text>(find.byType(Text))
-        .map((text) => text.data)
-        .whereType<String>()
-        .firstWhere(
-          (text) => text.startsWith(t.routing.mode.direct),
-          orElse: () => '',
-        );
-
-    expect(subtitle, contains(t.routing.rules));
-    expect(subtitle, contains('2'));
+    expect(
+      find.text(t.settings.routingValue(mode: t.routing.mode.direct, count: 2)),
+      findsOneWidget,
+    );
     // The static description is the fallback for a policy that has not
     // loaded; showing it over a loaded one would hide the live state.
     expect(find.text(t.settings.routingSubtitle), findsNothing);
+  });
+
+  testWidgets('the rules mode does not say "rules" twice', (tester) async {
+    // It read "Правила · Правила: 3": the segment's label for the mode, and
+    // then the word again in front of the count.
+    await pumpScreen(
+      tester,
+      policy: RoutingPolicy.defaults.copyWith(
+        mode: RoutingMode.rules,
+        rules: <RoutingRule>[
+          rule('geosite:ru'),
+          rule('domain:example.com'),
+          rule('geoip:private'),
+        ],
+      ),
+    );
+
+    final subtitle =
+        t.settings.routingValue(mode: t.settings.routingModeRules, count: 3);
+    expect(find.text(subtitle), findsOneWidget);
+    expect(subtitle, isNot(contains(t.routing.mode.rules)));
   });
 
   testWidgets('a policy still in flight does not fake an answer',
