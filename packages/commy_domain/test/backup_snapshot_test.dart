@@ -256,6 +256,30 @@ void main() {
      "groupId": null, "countryCode": "FI", "sortIndex": 3,
      "params": {"uuid": "8f3c1e6a-9d2b-4c7f-a1e5-0b6d4a2c9f88",
                 "sni": "www.microsoft.com"}},
+    {"id": "p01", "name": "vmess", "protocol": "vmess",
+     "host": "vmess.example.net", "port": 1001, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 1, "params": {}},
+    {"id": "p02", "name": "shadowsocks", "protocol": "shadowsocks",
+     "host": "shadowsocks.example.net", "port": 1002, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 2, "params": {}},
+    {"id": "p03", "name": "hysteria2", "protocol": "hysteria2",
+     "host": "hysteria2.example.net", "port": 1003, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 3, "params": {}},
+    {"id": "p04", "name": "tuic", "protocol": "tuic",
+     "host": "tuic.example.net", "port": 1004, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 4, "params": {}},
+    {"id": "p05", "name": "wireguard", "protocol": "wireguard",
+     "host": "wireguard.example.net", "port": 1005, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 5, "params": {}},
+    {"id": "p06", "name": "shadowtls", "protocol": "shadowtls",
+     "host": "shadowtls.example.net", "port": 1006, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 6, "params": {}},
+    {"id": "p07", "name": "socks", "protocol": "socks",
+     "host": "socks.example.net", "port": 1007, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 7, "params": {}},
+    {"id": "p08", "name": "http", "protocol": "http",
+     "host": "http.example.net", "port": 1008, "subscriptionId": null,
+     "groupId": null, "countryCode": null, "sortIndex": 8, "params": {}},
     {"id": "ffeeddccbbaa9988", "name": "Mine", "protocol": "trojan",
      "host": "mine.example.org", "port": 8443, "subscriptionId": null,
      "groupId": "g1", "countryCode": null, "sortIndex": 0,
@@ -294,10 +318,17 @@ void main() {
       expect(back.nodes.first.subscriptionId, 'sub-1');
       expect(back.nodes.last.groupId, 'g1');
       expect(back.nodes.last.protocol, Protocol.trojan);
+      // Every protocol, by the name version 1 wrote for it: a renamed enum
+      // constant would skip every such server in every backup there is.
+      expect(
+        back.nodes.map((node) => node.protocol).toSet(),
+        Protocol.values.toSet(),
+      );
       expect(back.routing!.rules.map((r) => r.id), <String>['r1', 'r2']);
       expect(back.routing!.rules.last.action, RuleAction.block);
       expect(back.routing!.rules.last.enabled, isFalse);
       expect(back.routing!.perAppMode, PerAppMode.exclude);
+      expect(back.routing!.perAppPackages, <String>['org.bank']);
       expect(back.routing!.blockAds, isTrue);
       expect(back.dns!.fakeIp, isTrue);
       expect(back.settings!.themeMode, AppThemeMode.dark);
