@@ -194,20 +194,32 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     final result =
         await ref.read(clipboardProvider).write(subscription.url.toString());
     final failure = result.failureOrNull;
-    state = failure == null
-        ? SubscriptionActionState.idle
-        : SubscriptionActionState(failure: failure);
+    _settle(failure);
     return failure == null;
   }
 
   /// Clears the last outcome once it has been shown.
-  void clear() => state = SubscriptionActionState.idle;
+  void clear() => _settle(null);
 
   Future<void> _run(
     Future<Result<void, CommyFailure>> Function() action,
   ) async {
     final result = await action();
-    final failure = result.failureOrNull;
+    _settle(result.failureOrNull);
+  }
+
+  /// Records how a menu action ended — unless a refresh is still running.
+  ///
+  /// A refresh owns the state until it ends. The card's spinner and the
+  /// one-at-a-time guard in [refresh] both read `refreshingId`, and a caller
+  /// tells a declined refresh from a failed one by a null `failure`. Writing
+  /// here used to clear the id, so collapsing a card mid-download stopped its
+  /// spinner and let a second refresh of the same panel start beside the
+  /// first. The refresh writes its own outcome the moment it ends.
+  void _settle(CommyFailure? failure) {
+    if (state.refreshingId != null) {
+      return;
+    }
     state = failure == null
         ? SubscriptionActionState.idle
         : SubscriptionActionState(failure: failure);
