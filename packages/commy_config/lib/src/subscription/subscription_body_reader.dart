@@ -17,7 +17,8 @@ import 'package:commy_domain/commy_domain.dart';
 /// 1. a list of protocol links, one per line;
 /// 2. the same list, base64 wrapped — what Marzban, Remnawave and x-ui do by
 ///    default;
-/// 3. a sing-box or Xray JSON document, read from `outbounds`;
+/// 3. a sing-box or Xray JSON document, read from `outbounds` (and, for
+///    sing-box 1.11 and later, `endpoints`, where WireGuard lives);
 /// 4. a Clash or Clash.Meta YAML document, read from `proxies`;
 /// 5. a bare JSON array of node objects.
 ///
@@ -186,10 +187,12 @@ class SubscriptionBodyReader {
     if (decoded is! Map<String, Object?>) {
       return null;
     }
-    final outbounds = MapRead.objectList(
-      decoded,
-      <String>['outbounds', 'outbound'],
-    );
+    // Since sing-box 1.11 WireGuard is an endpoint, not an outbound, and a
+    // WARP profile keeps nothing but `direct` among its outbounds.
+    final outbounds = <Map<String, Object?>>[
+      ...MapRead.objectList(decoded, <String>['outbounds', 'outbound']),
+      ...MapRead.objectList(decoded, <String>['endpoints']),
+    ];
     if (outbounds.isNotEmpty) {
       return _readEntries(
         outbounds.where(SingBoxOutboundReader.looksLikeServer).toList(),

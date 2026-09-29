@@ -125,6 +125,60 @@ void main() {
       expect(outcome.nodes.single.name, 'NL');
     });
 
+    test('reads WireGuard out of the endpoints of a sing-box 1.11 config', () {
+      // A WARP profile: the server is an endpoint, the outbounds are plumbing.
+      final wireguard = <String, Object?>{
+        'type': 'wireguard',
+        'tag': 'WARP',
+        'address': <String>['172.16.0.2/32'],
+        'private_key': 'PK',
+        'peers': <Map<String, Object?>>[
+          <String, Object?>{
+            'address': 'engage.example.com',
+            'port': 2408,
+            'public_key': 'PEER',
+          },
+        ],
+      };
+      final warp = reader.read(
+        jsonEncode(<String, Object?>{
+          'endpoints': <Map<String, Object?>>[wireguard],
+          'outbounds': <Map<String, Object?>>[
+            <String, Object?>{'type': 'direct', 'tag': 'direct'},
+          ],
+        }),
+      );
+
+      expect(warp.failures, isEmpty);
+      expect(warp.nodes, hasLength(1));
+      expect(warp.nodes.single.protocol, Protocol.wireguard);
+      expect(warp.nodes.single.name, 'WARP');
+
+      final mixed = reader.read(
+        jsonEncode(<String, Object?>{
+          'endpoints': <Map<String, Object?>>[
+            wireguard,
+            <String, Object?>{'type': 'tailscale', 'tag': 'ts'},
+          ],
+          'outbounds': <Map<String, Object?>>[
+            <String, Object?>{
+              'type': 'vless',
+              'tag': 'NL',
+              'server': 'nl.example.com',
+              'server_port': 443,
+              'uuid': 'the-uuid',
+            },
+          ],
+        }),
+      );
+
+      expect(mixed.failures, isEmpty);
+      expect(
+        mixed.nodes.map((node) => node.protocol),
+        <Protocol>[Protocol.vless, Protocol.wireguard],
+      );
+    });
+
     test('reads a bare JSON array of node objects', () {
       final document = jsonEncode(<Map<String, Object?>>[
         <String, Object?>{

@@ -79,6 +79,41 @@ void main() {
       expect(node.param(ParamKeys.localAddress), '10.0.0.2/32');
     });
 
+    test('reads the single-peer wireguard outbound of sing-box 1.10', () {
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'wireguard',
+        'tag': 'wg-old',
+        'server': 'wg.example.com',
+        'server_port': 51820,
+        'local_address': <String>['10.0.0.2/32', 'fd00::2/128'],
+        'private_key': 'PK',
+        'peer_public_key': 'PEER',
+        'pre_shared_key': 'PSK',
+        'reserved': <int>[1, 2, 3],
+        'mtu': 1280,
+      });
+
+      expect(node.protocol, Protocol.wireguard);
+      expect(node.host, 'wg.example.com');
+      expect(node.port, 51820);
+      expect(node.param(ParamKeys.privateKey), 'PK');
+      expect(node.param(ParamKeys.peerPublicKey), 'PEER');
+      expect(node.param(ParamKeys.preSharedKey), 'PSK');
+      expect(node.param(ParamKeys.reserved), '1,2,3');
+      expect(node.param(ParamKeys.localAddress), '10.0.0.2/32,fd00::2/128');
+    });
+
+    test('still refuses a wireguard entry with no peer at all', () {
+      expect(
+        () => SingBoxOutboundReader.read(<String, Object?>{
+          'type': 'wireguard',
+          'tag': 'wg',
+          'private_key': 'PK',
+        }),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
     test('refuses plumbing outbounds', () {
       expect(
         SingBoxOutboundReader.looksLikeServer(<String, Object?>{
