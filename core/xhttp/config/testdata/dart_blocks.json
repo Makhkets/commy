@@ -16,7 +16,7 @@
     },
     {
       "name": "Reality, auto, host, a path with a query of its own",
-      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@203.0.113.7:443?type=xhttp&security=reality&pbk=KEY&sid=ab12&sni=www.example.com&fp=chrome&mode=auto&host=cdn.example&path=%2Fapi%2Fv1%3Fed%3D2048#b",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@203.0.113.7:443?type=xhttp&security=reality&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k&sid=ab12&sni=www.example.com&fp=chrome&mode=auto&host=cdn.example&path=%2Fapi%2Fv1%3Fed%3D2048#b",
       "transport": {
         "type": "xhttp",
         "host": "cdn.example",

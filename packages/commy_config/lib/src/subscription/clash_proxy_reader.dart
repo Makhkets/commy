@@ -256,9 +256,10 @@ abstract final class ClashProxyReader {
       ParamKeys.security: security,
       ParamKeys.sni: _sni(proxy),
       ParamKeys.alpn: _alpn(proxy),
+      // `fingerprint` is something else in mihomo: a certificate pin.
       ParamKeys.fingerprint: MapRead.text(
         proxy,
-        <String>['client-fingerprint', 'fingerprint'],
+        <String>['client-fingerprint'],
       ),
       ParamKeys.publicKey: publicKey,
       ParamKeys.shortId:

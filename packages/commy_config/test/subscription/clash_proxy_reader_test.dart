@@ -239,6 +239,17 @@ void main() {
       });
     });
 
+    test('a certificate pin is not a uTLS fingerprint', () {
+      // In mihomo `fingerprint` pins the server certificate;
+      // `client-fingerprint` is the hello.
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{'path': '/xh'})
+          ..['fingerprint'] = 'aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44',
+      );
+
+      expect(node.param('fp'), isNull);
+    });
+
     test('works with no xhttp-opts at all', () {
       final node = ClashProxyReader.read(
         <String, Object?>{

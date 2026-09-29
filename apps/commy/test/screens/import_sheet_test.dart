@@ -35,7 +35,7 @@ void main() {
   final t = Translations();
 
   const uuid = '11111111-2222-3333-4444-555555555555';
-  const publicKey = 'aGVsbG8td29ybGQtcHVibGljLWtleQ';
+  const publicKey = 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k';
   const amsterdam = 'vless://$uuid@nl-03.example.net:443'
       '?security=reality&type=tcp&pbk=$publicKey&sid=ab12cd34#Amsterdam%2003';
   const warsaw = 'vless://99999999-8888-7777-6666-555555555555'

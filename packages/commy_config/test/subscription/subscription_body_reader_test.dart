@@ -4,6 +4,9 @@ import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:test/test.dart';
 
+/// A REALITY public key the core can decode: 32 bytes, URL-safe base64.
+const _realityKey = 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k';
+
 const _plainList = '''
 vless://uuid@nl.example.com:443?security=tls&sni=nl.example.com#NL
 trojan://pw@de.example.com:443#DE
@@ -180,7 +183,7 @@ void main() {
         'vless://11111111-2222-3333-4444-555555555555@nl.example.com:443'
         '?security=reality&type=xhttp&headerType=&path=%2Fapi%2Fv2&host='
         '&mode=auto&extra=${Uri.encodeComponent(extra)}'
-        '&sni=www.example.org&fp=chrome&pbk=PUBKEY&sid=ab12'
+        '&sni=www.example.org&fp=chrome&pbk=$_realityKey&sid=ab12'
         '#%F0%9F%87%B3%F0%9F%87%B1%20NL%20XHTTP';
     const behindCdn =
         'vless://11111111-2222-3333-4444-555555555555@cdn.example.com:443'
@@ -189,7 +192,7 @@ void main() {
     const vision =
         'vless://11111111-2222-3333-4444-555555555555@de.example.com:443'
         '?security=reality&type=tcp&flow=xtls-rprx-vision&sni=www.example.org'
-        '&fp=chrome&pbk=PUBKEY&sid=ab12#DE%20Vision';
+        '&fp=chrome&pbk=$_realityKey&sid=ab12#DE%20Vision';
     final list = <String>[realityOverXhttp, behindCdn, vision].join('\n');
 
     test('imports every entry of a base64 list, XHTTP ones included', () {

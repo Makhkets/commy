@@ -48,7 +48,31 @@ abstract final class TlsOptionsBuilder {
   /// Longest a Reality short id may be: eight bytes, written as hex.
   static const int maxShortIdLength = 16;
 
+  /// The uTLS fingerprints the pinned core has (`uTLSClientHelloID` in
+  /// common/tls/utls_client.go at v1.13.16). Any other name makes the core
+  /// refuse the whole document when it builds the outbound.
+  static const Set<String> coreFingerprints = <String>{
+    'chrome',
+    'chrome_psk',
+    'chrome_psk_shuffle',
+    'chrome_padding_psk_shuffle',
+    'chrome_pq',
+    'chrome_pq_psk',
+    'firefox',
+    'edge',
+    'safari',
+    '360',
+    'qq',
+    'ios',
+    'android',
+    'random',
+    'randomized',
+  };
+
   static final RegExp _hex = RegExp(r'^[0-9a-fA-F]*$');
+
+  /// 32 bytes in unpadded URL-safe base64.
+  static final RegExp _realityKey = RegExp(r'^[A-Za-z0-9_-]{43}$');
 
   /// Builds the block for [node], or returns `null` when TLS is off.
   ///
@@ -97,7 +121,7 @@ abstract final class TlsOptionsBuilder {
       options[SingBoxKeys.alpn] = alpn;
     }
 
-    final fingerprint = node.param(ParamKeys.fingerprint);
+    final fingerprint = coreFingerprint(node.param(ParamKeys.fingerprint));
     if (isReality) {
       options[SingBoxKeys.utls] = <String, Object?>{
         SingBoxKeys.enabled: true,
@@ -112,6 +136,21 @@ abstract final class TlsOptionsBuilder {
     }
 
     return options;
+  }
+
+  /// The fingerprint to hand the core for [raw], or `null` for none.
+  ///
+  /// Xray takes the name in any case; the core only in lower case. A name
+  /// the core does not have — Xray has a few more, `randomizednoalpn` or
+  /// `hellochrome_120` — becomes Chrome's, as Reality's always is (see
+  /// [realityFingerprint]): the server never checks it, it is there to blend
+  /// in, and the alternative is a document the core refuses whole.
+  static String? coreFingerprint(String? raw) {
+    final name = raw?.trim().toLowerCase();
+    if (name == null || name.isEmpty) {
+      return null;
+    }
+    return coreFingerprints.contains(name) ? name : realityFingerprint;
   }
 
   /// Whether [node] is XHTTP over HTTP/3, which is to say over QUIC.
@@ -171,24 +210,52 @@ abstract final class TlsOptionsBuilder {
   }
 
   static Map<String, Object?> _reality(ProxyNode node) {
-    final publicKey = node.param(ParamKeys.publicKey);
-    if (publicKey == null || publicKey.isEmpty) {
+    final rawKey = node.param(ParamKeys.publicKey);
+    if (rawKey == null || rawKey.isEmpty) {
       throw const ConfigBuildException('Reality needs a public key');
     }
     final reality = <String, Object?>{
       SingBoxKeys.enabled: true,
-      SingBoxKeys.publicKey: publicKey,
+      SingBoxKeys.publicKey: realityPublicKey(rawKey),
     };
     final shortId = node.param(ParamKeys.shortId);
     if (shortId != null && shortId.isNotEmpty) {
-      if (shortId.length > maxShortIdLength || !_hex.hasMatch(shortId)) {
+      // The core decodes it as hex into eight bytes: an odd length does not
+      // decode, and Xray refuses it for the same reason.
+      if (shortId.length > maxShortIdLength ||
+          shortId.length.isOdd ||
+          !_hex.hasMatch(shortId)) {
         throw const ConfigBuildException(
-          'Reality short id must be at most $maxShortIdLength hex characters',
+          'Reality short id must be an even number of hex characters, at '
+          'most $maxShortIdLength',
         );
       }
       reality[SingBoxKeys.shortId] = shortId;
     }
     return reality;
+  }
+
+  /// [raw] as the core decodes a Reality public key — unpadded URL-safe
+  /// base64 of an X25519 key, 32 bytes — or a [ConfigBuildException].
+  ///
+  /// A key written in standard base64, or padded, is the same key; it is
+  /// rewritten rather than refused. One that is not a key at all is refused
+  /// here, where it leaves one server out, and not by the core, which would
+  /// refuse the whole document.
+  ///
+  /// The check is Go's, not Dart's decoder: 43 characters of the URL-safe
+  /// alphabet. Go ignores the unused low bits of the last character, which
+  /// Dart's decoder refuses, and the core and Xray both decode with Go.
+  static String realityPublicKey(String raw) {
+    final key = raw
+        .trim()
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
+        .replaceAll('=', '');
+    if (!_realityKey.hasMatch(key)) {
+      throw const ConfigBuildException('Reality public key is not a key');
+    }
+    return key;
   }
 
   static bool _flag(ProxyNode node, String key) {

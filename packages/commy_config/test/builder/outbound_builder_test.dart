@@ -17,10 +17,102 @@ ProxyNode _node(
       params: params,
     );
 
+/// A REALITY public key the core can decode: 32 bytes, URL-safe base64.
+const _realityKey = 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k';
+
 Map<String, Object?> _build(ProxyNode node) =>
     OutboundBuilder.build(node: node, tag: 'proxy-out');
 
 void main() {
+  group('OutboundBuilder values the core would refuse whole', () {
+    // The core checks these when it builds the outbound, and a refusal there
+    // is a refusal of the whole document: no server connects. Here they leave
+    // one server out, with a reason, or are rewritten into what they mean.
+    const key = _realityKey;
+
+    Map<String, Object?> tlsOf(Map<String, Object?> params) => _build(
+          _node(
+            Protocol.vless,
+            <String, Object?>{'uuid': 'u', ...params},
+          ),
+        )['tls']! as Map<String, Object?>;
+
+    Map<String, Object?> realityOf(Map<String, Object?> params) =>
+        tlsOf(<String, Object?>{
+          'security': 'reality',
+          'sni': 's.example',
+          ...params,
+        })['reality']! as Map<String, Object?>;
+
+    test('a fingerprint in capitals is the same fingerprint', () {
+      final tls = tlsOf(<String, Object?>{'security': 'tls', 'fp': 'Firefox'});
+
+      expect(tls['utls'], <String, Object?>{
+        'enabled': true,
+        'fingerprint': 'firefox',
+      });
+    });
+
+    test('a fingerprint the core does not have becomes Chrome', () {
+      for (final name in <String>['randomizednoalpn', 'hellochrome_120']) {
+        final tls = tlsOf(<String, Object?>{'security': 'tls', 'fp': name});
+
+        expect(
+          (tls['utls']! as Map<String, Object?>)['fingerprint'],
+          'chrome',
+          reason: name,
+        );
+      }
+    });
+
+    test('a Reality key in standard or padded base64 is rewritten', () {
+      const standard = 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k=';
+
+      expect(realityOf(<String, Object?>{'pbk': standard})['public_key'], key);
+      expect(
+        realityOf(
+          <String, Object?>{'pbk': 'a+b/${key.substring(4)}'},
+        )['public_key'],
+        'a-b_${key.substring(4)}',
+      );
+    });
+
+    test('a Reality key is read as Go reads it, stray low bits and all', () {
+      // The last character carries two bits no key uses; Go ignores them,
+      // Dart's decoder would not.
+      final stray = '${key.substring(0, 42)}l';
+
+      expect(realityOf(<String, Object?>{'pbk': stray})['public_key'], stray);
+    });
+
+    test('a Reality key that is not one leaves the server out', () {
+      for (final bad in <String>['KEY', '${key}AAAA', '!!!']) {
+        expect(
+          () => realityOf(<String, Object?>{'pbk': bad}),
+          throwsA(
+            isA<ConfigBuildException>().having(
+              (error) => error.reason,
+              'reason',
+              contains('public key'),
+            ),
+          ),
+          reason: bad,
+        );
+      }
+    });
+
+    test('a short id of odd length leaves the server out', () {
+      expect(
+        () => realityOf(<String, Object?>{'pbk': key, 'sid': 'abc'}),
+        throwsA(isA<ConfigBuildException>()),
+      );
+      expect(
+        realityOf(<String, Object?>{'pbk': key, 'sid': 'abcd'})['short_id'],
+        'abcd',
+      );
+    });
+  });
+
   group('OutboundBuilder vless', () {
     test('never writes spider_x, which the core has no field for', () {
       final outbound = _build(
@@ -28,7 +120,7 @@ void main() {
           'uuid': 'u',
           'security': 'reality',
           'sni': 's.example',
-          'pbk': 'KEY',
+          'pbk': _realityKey,
           'sid': 'ab12',
           'spx': '/spider',
         }),
@@ -51,7 +143,7 @@ void main() {
           'uuid': 'u',
           'security': 'reality',
           'sni': 's.example',
-          'pbk': 'KEY',
+          'pbk': _realityKey,
         }),
       );
       final tls = outbound['tls']! as Map<String, Object?>;
@@ -83,7 +175,7 @@ void main() {
             'uuid': 'u',
             'security': 'reality',
             'sni': 's.example',
-            'pbk': 'KEY',
+            'pbk': _realityKey,
             'fp': named,
           }),
         );
@@ -155,7 +247,7 @@ void main() {
             'uuid': 'u',
             'security': 'reality',
             'sni': 's.example',
-            'pbk': 'KEY',
+            'pbk': _realityKey,
             'sid': 'not-hex!',
           }),
         ),
@@ -346,7 +438,7 @@ void main() {
           'uuid': 'u',
           'type': 'xhttp',
           'security': 'reality',
-          'pbk': 'KEY',
+          'pbk': _realityKey,
           'sni': 's.example',
           'alpn': 'h3',
         }),
