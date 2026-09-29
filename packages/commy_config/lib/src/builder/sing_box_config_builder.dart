@@ -169,6 +169,7 @@ class SingBoxConfigBuilder {
         settings: request.settings,
         routing: request.routing,
         platform: request.platform,
+        localAuth: request.localProxyAuth,
       ),
       if (endpoints.isNotEmpty) SingBoxKeys.endpoints: endpoints,
       SingBoxKeys.outbounds: outbounds,

@@ -38,6 +38,9 @@ abstract final class SecretKeys {
   /// Key of the token the desktop UI authenticates to the helper with.
   static const String helperToken = '${prefix}core.helper_token';
 
+  /// Key of the password the loopback proxy of the IP check asks for.
+  static const String localProxySecret = '${prefix}core.local_proxy';
+
   /// The installation's identifier, sent to subscription hosts as `x-hwid`.
   ///
   /// Not a credential, and kept here anyway: it is the one value that links

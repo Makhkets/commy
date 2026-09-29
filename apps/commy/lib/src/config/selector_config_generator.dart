@@ -21,6 +21,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
     required this.knownNodes,
     this.ruleSetDirectory,
     this.availableRuleSets = _noRuleSets,
+    this.localProxyAuth,
     this.builder = const SingBoxConfigBuilder(),
     this.onWarnings,
     this.onLeftOut,
@@ -46,6 +47,10 @@ class SelectorConfigGenerator implements ConfigGenerator {
   /// and not a promise: a set deleted between two builds simply stops
   /// applying, and the banner on the routing screen says so.
   final Set<String> Function() availableRuleSets;
+
+  /// What the loopback proxy of the IP check asks for; without an answer it
+  /// is not opened (see `LocalProxyAuth`).
+  final LocalProxyAuth? Function()? localProxyAuth;
 
   static Set<String> _noRuleSets() => const <String>{};
 
@@ -94,6 +99,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
         autoSelect: settings.autoSelect,
         ruleSetDirectory: ruleSetDirectory?.call(),
         availableRuleSets: availableRuleSets(),
+        localProxyAuth: localProxyAuth?.call(),
       ),
     );
     return result.map((built) {

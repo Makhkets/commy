@@ -218,6 +218,17 @@ class SecretVault {
   Future<Result<String, CommyFailure>> ensureClashApiSecret() =>
       _ensureRandomHex(SecretKeys.clashApiSecret, databaseKeyBytes);
 
+  /// Reads the loopback proxy's password, creating one on first use.
+  ///
+  /// The IP check (exception E-1) goes through the tunnel by aiming at a
+  /// loopback proxy, and one without a password is open to every app on the
+  /// device — which is how an app would learn where the tunnel comes out.
+  /// Kept, not drawn per start: the tunnel outlives the app's process on
+  /// Android, and the next process has to know the password of the running
+  /// core.
+  Future<Result<String, CommyFailure>> ensureLocalProxySecret() =>
+      _ensureRandomHex(SecretKeys.localProxySecret, databaseKeyBytes);
+
   /// Reads the desktop helper token, creating one on first use.
   Future<Result<String, CommyFailure>> ensureHelperToken() =>
       _ensureRandomHex(SecretKeys.helperToken, databaseKeyBytes);

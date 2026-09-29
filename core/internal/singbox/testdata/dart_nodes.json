@@ -257,6 +257,22 @@
         "strategy": "prefer_ipv4",
         "independent_cache": true
       }
+    },
+    {
+      "name": "The loopback proxy, with its user",
+      "kind": "inbound",
+      "object": {
+        "type": "mixed",
+        "tag": "mixed-in",
+        "listen": "127.0.0.1",
+        "listen_port": 2080,
+        "users": [
+          {
+            "username": "commy",
+            "password": "00112233445566778899aabb"
+          }
+        ]
+      }
     }
   ]
 }

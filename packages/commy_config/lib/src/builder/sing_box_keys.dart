@@ -147,6 +147,9 @@ abstract final class SingBoxKeys {
   /// SOCKS and HTTP user name.
   static const String username = 'username';
 
+  /// Credentials a local inbound accepts.
+  static const String users = 'users';
+
   /// VLESS sub-protocol.
   static const String flow = 'flow';
 

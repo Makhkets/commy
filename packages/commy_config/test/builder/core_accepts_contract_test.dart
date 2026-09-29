@@ -43,6 +43,11 @@ void main() {
         availableRuleSets: const <String>{},
       );
 
+  Map<String, Object?> loopbackProxy() => InboundSectionBuilder.mixed(
+        settings: const AppSettings(ipCheckUrl: 'https://ip.example/json'),
+        localAuth: const LocalProxyAuth(password: '00112233445566778899aabb'),
+      );
+
   if (update) {
     test('regenerates the fixture', () {
       final document = <String, Object?>{
@@ -64,6 +69,11 @@ void main() {
               'kind': 'dns',
               'object': dnsFrom(dns),
             },
+          <String, Object?>{
+            'name': _loopbackProxy,
+            'kind': 'inbound',
+            'object': loopbackProxy(),
+          },
         ],
       };
       fixture.writeAsStringSync(
@@ -85,6 +95,7 @@ void main() {
       <String>[
         for (final (name, _) in _links) name,
         for (final (name, _) in _resolvers) name,
+        _loopbackProxy,
       ],
     );
   });
@@ -99,13 +110,21 @@ void main() {
     final name = '${entry['name']}';
     test('the core is handed what the fixture promises: $name', () {
       final link = links[name];
+      final dns = resolvers[name];
       expect(
-        link == null ? dnsFrom(resolvers[name]!) : buildFrom(link),
+        link != null
+            ? buildFrom(link)
+            : dns != null
+                ? dnsFrom(dns)
+                : loopbackProxy(),
         entry['object'],
       );
     });
   }
 }
+
+/// The loopback proxy of the IP check, which asks for a password.
+const String _loopbackProxy = 'The loopback proxy, with its user';
 
 /// DNS sections, for the resolvers the core has to be told how to find.
 const List<(String, DnsSettings)> _resolvers = <(String, DnsSettings)>[

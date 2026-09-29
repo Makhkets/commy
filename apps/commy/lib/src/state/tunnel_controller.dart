@@ -538,7 +538,8 @@ class TunnelController extends Notifier<TunnelActionState> {
     ref
       ..listen(nodesProvider, (_, __) {})
       ..listen(ruleSetsProvider, (_, __) {})
-      ..listen(ruleSetDirectoryProvider, (_, __) {});
+      ..listen(ruleSetDirectoryProvider, (_, __) {})
+      ..listen(localProxyAuthProvider, (_, __) {});
     return TunnelActionState.initial;
   }
 
@@ -1014,11 +1015,12 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// Waits for what the configuration generator reads without waiting.
   ///
   /// The generator is a synchronous port: it takes the server list, the rule
-  /// sets on disk and their directory from providers with `ref.read`. Until
-  /// their first value has arrived that read is "loading", and the build went
-  /// ahead without them — so on a cold start the first connect, autoconnect
-  /// included, dropped every `geosite:` and `geoip:` rule and the ad list.
-  /// Once loaded the wait is free: [build] keeps them listened to.
+  /// sets on disk, their directory and the loopback proxy's password from
+  /// providers with `ref.read`. Until their first value has arrived that
+  /// read is "loading", and the build went ahead without them — so on a cold
+  /// start the first connect, autoconnect included, dropped every `geosite:`
+  /// and `geoip:` rule and the ad list. Once loaded the wait is free: [build]
+  /// keeps them listened to.
   Future<void> _loadConfigInputs() async {
     // Listened to here as well, for the same reason [_connectTarget] does:
     // autoconnect can call before any screen listens to this controller, and
@@ -1027,12 +1029,14 @@ class TunnelController extends Notifier<TunnelActionState> {
       ref.listen(nodesProvider, (_, __) {}),
       ref.listen(ruleSetsProvider, (_, __) {}),
       ref.listen(ruleSetDirectoryProvider, (_, __) {}),
+      ref.listen(localProxyAuthProvider, (_, __) {}),
     ];
     try {
       await Future.wait<Object?>(<Future<Object?>>[
         ref.read(nodesProvider.future),
         ref.read(ruleSetsProvider.future),
         ref.read(ruleSetDirectoryProvider.future),
+        ref.read(localProxyAuthProvider.future),
       ]).timeout(_configInputsTimeout);
     } on Object catch (error) {
       // What did not load reads as empty, as it always has; the generator

@@ -54,6 +54,8 @@ func TestTheCoreConstructsWhatTheAppWrites(t *testing.T) {
 				document = `{"log": {"disabled": true}, "outbounds": [` + string(c.Object) + `]}`
 			case "endpoint":
 				document = `{"log": {"disabled": true}, "endpoints": [` + string(c.Object) + `]}`
+			case "inbound":
+				document = `{"log": {"disabled": true}, "inbounds": [` + string(c.Object) + `]}`
 			case "dns":
 				// The section refers to the proxy group by its tag.
 				document = `{"log": {"disabled": true}, "dns": ` + string(c.Object) +

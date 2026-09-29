@@ -10,6 +10,10 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **The local proxy of the IP check asks for a password.** With the IP check
+  on, the app kept a proxy open on `127.0.0.1` for the whole session, and any
+  other app on the phone could find it by scanning and learn through it where
+  the tunnel comes out. It now accepts only the app itself.
 - **"Add to Happ" and "Import to sing-box" buttons work.** A panel's
   subscription page links to other clients (`happ://add/…`,
   `sing-box://import-remote-profile?url=…`, `clash://install-config?url=…`,

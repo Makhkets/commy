@@ -30,6 +30,7 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
       for (final set in ref.read(ruleSetsProvider).value ?? const <RuleSet>[])
         set.tag,
     },
+    localProxyAuth: () => ref.read(localProxyAuthProvider).value,
     onWarnings: (warnings) {
       ref.read(configWarningsProvider.notifier).report(warnings);
       final logger = ref.read(appLoggerProvider);
@@ -47,6 +48,17 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
       }
     },
   );
+});
+
+/// What the loopback proxy of the IP check asks for, from the keystore.
+///
+/// `null` while the keystore has not answered, and for good when it cannot:
+/// the builder then leaves that proxy out rather than open it to every app.
+final localProxyAuthProvider = FutureProvider<LocalProxyAuth?>((ref) async {
+  final secret =
+      (await ref.watch(secretVaultProvider).ensureLocalProxySecret())
+          .valueOrNull;
+  return secret == null ? null : LocalProxyAuth(password: secret);
 });
 
 /// What the last configuration build had to leave out.
@@ -235,9 +247,14 @@ final ipCheckProbeProvider = Provider<IpCheckProbe>((ref) {
     ),
   );
   final info = ref.watch(appInfoProvider);
+  final auth = ref.watch(localProxyAuthProvider).value;
   final client = CommyHttpClient(
     userAgent: CommyUserAgent.honest(info.version),
-    tunnelProxy: ProxyEndpoint.loopback(port),
+    tunnelProxy: ProxyEndpoint.loopback(
+      port,
+      username: auth?.username,
+      password: auth?.password,
+    ),
   );
   ref.onDispose(client.close);
   return HttpIpCheckProbe(client: client);
