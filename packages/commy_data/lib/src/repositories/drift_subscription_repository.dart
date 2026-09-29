@@ -59,20 +59,30 @@ class DriftSubscriptionRepository implements SubscriptionRepository {
   @override
   Future<Result<void, CommyFailure>> upsert(Subscription subscription) {
     return StorageGuard.runVoid(() async {
-      // URL first. A row whose secret never landed is a subscription that
-      // cannot be refreshed and gives no hint why.
-      _rethrowFailure(
-        await _secrets.writeSubscriptionUrl(
-          subscription.id,
-          subscription.url,
-        ),
-      );
-      _rethrowFailure(
-        await _secrets.writeSubscriptionPage(
-          subscription.id,
-          subscription.profileWebPageUrl,
-        ),
-      );
+      // A placeholder URL means this object was built while the keystore
+      // could not be read (ADR-0008): the row came back with its redacted
+      // form in place of the secret. The card's menu writes such an object
+      // back whole on a rename or a flipped switch, and sending its URL on
+      // would overwrite the real, token-bearing one for good — every refresh
+      // after that asks the panel for `/redacted`. The page beside it came
+      // from the same failed read, and its null would erase the stored one.
+      // So only the row is written; the keystore keeps what it has.
+      if (!SubscriptionIdentity.isUnknown(subscription.url)) {
+        // URL first. A row whose secret never landed is a subscription that
+        // cannot be refreshed and gives no hint why.
+        _rethrowFailure(
+          await _secrets.writeSubscriptionUrl(
+            subscription.id,
+            subscription.url,
+          ),
+        );
+        _rethrowFailure(
+          await _secrets.writeSubscriptionPage(
+            subscription.id,
+            subscription.profileWebPageUrl,
+          ),
+        );
+      }
       await _db
           .into(_db.subscriptionRows)
           .insertOnConflictUpdate(SubscriptionMapper.toCompanion(subscription));

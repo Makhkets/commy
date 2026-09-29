@@ -133,6 +133,33 @@ void main() {
       expect(loaded.url.toString(), isNot(contains('9f8e7d6c')));
     });
 
+    test(
+        'a subscription read while the keystore was down cannot overwrite '
+        'its own URL', () async {
+      // The list is built from objects hydrated with the redacted URL when
+      // the keystore's read fails. A rename from the card's menu writes such
+      // an object back whole; that must not replace the real URL with the
+      // placeholder, nor erase the page, which that same read never saw.
+      final page = Uri.parse('https://panel.example.com/u/9f8e7d6c5b4a');
+      await repository.upsert(
+        Fixtures.subscription().copyWith(profileWebPageUrl: page),
+      );
+      final seenWhileDown = Fixtures.subscription().copyWith(
+        url: Redact.uriValue(Fixtures.subscriptionUrl),
+        profileWebPageUrl: null,
+      );
+      expect(SubscriptionIdentity.isUnknown(seenWhileDown.url), isTrue);
+
+      final result =
+          await repository.upsert(seenWhileDown.copyWith(name: 'Work'));
+
+      final loaded = (await repository.findById('sub-1')).valueOrNull!;
+      expect(result.isOk, isTrue);
+      expect(loaded.name, 'Work');
+      expect(loaded.url, Fixtures.subscriptionUrl);
+      expect(loaded.profileWebPageUrl, page);
+    });
+
     test('watchAll emits in display order', () async {
       await repository.upsert(Fixtures.subscription(id: 'b', sortIndex: 1));
       await repository.upsert(Fixtures.subscription());
