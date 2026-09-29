@@ -10,6 +10,12 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **"Add to Happ" and "Import to sing-box" buttons work.** A panel's
+  subscription page links to other clients (`happ://add/…`,
+  `sing-box://import-remote-profile?url=…`, `clash://install-config?url=…`,
+  `sn://subscription?url=…`); Commy opened on the tap and then failed to read
+  the link. The subscription inside is now added, with the name the link
+  gives it. Encrypted Happ links still cannot be opened by anyone but Happ.
 - **A subscription refresh no longer loses servers that share an address.**
   Several servers on one host and port — a WebSocket path each, a common
   panel layout — could be merged into one when the panel reordered them or

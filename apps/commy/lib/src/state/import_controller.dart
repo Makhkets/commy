@@ -223,6 +223,13 @@ class ImportController extends Notifier<ImportState> {
     if (_alreadyRunning || input.trim().isEmpty) {
       return null;
     }
+    // Another client's import link — "Add to Happ", "Import to sing-box" on
+    // a panel's page — carries a subscription inside. The scheme is
+    // registered, so the tap lands here; the link parser knows none of these.
+    final foreign = ForeignImportLink.unwrap(input);
+    if (foreign != null) {
+      return addSubscription(url: foreign.url, name: foreign.name);
+    }
     final subscription = subscriptionAddress(input);
     if (subscription != null) {
       return addSubscription(url: subscription);

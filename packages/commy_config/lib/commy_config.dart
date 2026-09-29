@@ -52,6 +52,7 @@ export 'src/parsers/wireguard_link_parser.dart';
 export 'src/sing_box_config_generator.dart';
 export 'src/subscription/clash_proxy_reader.dart';
 export 'src/subscription/clash_yaml_reader.dart';
+export 'src/subscription/foreign_import_link.dart';
 export 'src/subscription/sing_box_outbound_reader.dart';
 export 'src/subscription/subscription_body_reader.dart';
 export 'src/subscription/subscription_headers.dart';
