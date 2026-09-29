@@ -28,3 +28,18 @@ func StartFakeXrayHTTP2(t testing.TB, options config.Options, serve func(io.Read
 
 // RequestCount reports how many HTTP requests the server has recorded.
 func (f *FakeEndpoint) RequestCount() int { return len(f.e.server.recorded()) }
+
+// DownloadDoorHTTP2 is a second front door to the same server, as a CDN in
+// front of an Xray inbound is: its own TLS listener and XHTTP options, the
+// server's sessions. A download route aimed at it meets the uploads sent to
+// [f].
+func (f *FakeEndpoint) DownloadDoorHTTP2(t testing.TB, options config.Options) *FakeEndpoint {
+	e := serveHTTP2(t, f.e.server.twin(options))
+	return &FakeEndpoint{Addr: e.addr, e: e}
+}
+
+// GetCount reports how many GETs — downloads — the server has recorded.
+func (f *FakeEndpoint) GetCount() int {
+	gets, _ := countMethods(f.e.server.recorded())
+	return gets
+}

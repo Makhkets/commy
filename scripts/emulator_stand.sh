@@ -17,6 +17,10 @@
 #   Xray        VLESS REALITY Vision (18443), REALITY gRPC (18444), REALITY
 #               XHTTP (18445), TLS XHTTP h2 (18446), Trojan TLS (18447),
 #               Shadowsocks 2022 (18448), VMess WebSocket (18449)
+#   door        a second front door to the TLS XHTTP inbound (18452): a TCP
+#               relay, as a CDN would be, for the node whose downloadSettings
+#               sends the download through it. It counts what it carries into
+#               door.log — "down" is the download, "up" should stay small.
 #   core        Hysteria2 (18450/udp) and TUIC (18451/udp) — our pinned
 #               sing-box (core/cmd/devbox), built here with the overlay
 #   panel       http://10.0.2.2:18080/sub/<token> — a subscription the way
@@ -78,14 +82,25 @@ readonly SS_KEY="bIRlc3RhbmQta2V5LTE2Yg=="
 readonly REALITY_PRIVATE="OM6hs0J8f634S9InrMZ1IHVgiqRD4vtOM48EkKZFPW0"
 readonly REALITY_PUBLIC="EDz_uy9HLU1rYpRN9VKIPOpFqCGbvs9oHlxZBwwwWSc"
 readonly SHORT_ID="0123456789abcdef"
-readonly DECOY_PORT=18440 PANEL_PORT=18080 BLOB_PORT=18090
+readonly DECOY_PORT=18440 PANEL_PORT=18080 BLOB_PORT=18090 DOOR_PORT=18452
 readonly BLOB_IP="203.0.113.10"
 
 die() { printf '\n\033[31merror:\033[0m %s\n\n' "$*" >&2; exit 1; }
 say() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 
 links() {
-  local vmess
+  local vmess split
+  # The upload straight to an address, the download through the door found by
+  # name: the deployment downloadSettings is for, and the one where the
+  # transport, not sing-box, has to resolve the download server.
+  split="$(python3 -c 'import json, sys, urllib.parse
+host, sni, port = sys.argv[1], sys.argv[2], int(sys.argv[3])
+route = {"downloadSettings": {"address": host, "port": port, "network": "xhttp",
+         "security": "tls", "tlsSettings": {"serverName": sni, "alpn": ["h2"],
+         "fingerprint": "chrome", "allowInsecure": True},
+         "xhttpSettings": {"path": "/xt"}}}
+print(urllib.parse.quote(json.dumps(route, separators=(",", ":")), safe=""))' \
+    "${HOST}" "${SNI}" "${DOOR_PORT}")"
   vmess="$(printf '{"v":"2","ps":"🇺🇸 VMess WS","add":"%s","port":"18449","id":"%s","aid":"0","scy":"auto","net":"ws","type":"none","host":"","path":"/vm","tls":""}' \
     "${HOST}" "${UUID}" | base64 -w0)"
   cat <<LINKS
@@ -93,6 +108,7 @@ vless://${UUID}@${HOST}:18443?security=reality&encryption=none&pbk=${REALITY_PUB
 vless://${UUID}@${HOST}:18444?security=reality&encryption=none&pbk=${REALITY_PUBLIC}&fp=chrome&type=grpc&serviceName=grpc&sni=${SNI}&sid=${SHORT_ID}#🇩🇪 REALITY gRPC
 vless://${UUID}@${HOST}:18445?security=reality&encryption=none&pbk=${REALITY_PUBLIC}&fp=chrome&type=xhttp&path=%2Fxh&mode=auto&sni=${SNI}&sid=${SHORT_ID}#🇫🇮 REALITY XHTTP
 vless://${UUID}@${HOST}:18446?security=tls&encryption=none&type=xhttp&path=%2Fxt&mode=auto&sni=${SNI}&alpn=h2&fp=chrome&allowInsecure=1#🇸🇪 TLS XHTTP
+vless://${UUID}@10.0.2.2:18446?security=tls&encryption=none&type=xhttp&path=%2Fxt&mode=packet-up&sni=${SNI}&alpn=h2&fp=chrome&allowInsecure=1&extra=${split}#🇳🇴 TLS XHTTP, download apart
 trojan://${PASSWORD}@${HOST}:18447?security=tls&sni=${SNI}&type=tcp&allowInsecure=1#🇫🇷 Trojan
 ss://$(printf '2022-blake3-aes-128-gcm:%s' "${SS_KEY}" | base64 -w0)@${HOST}:18448#🇬🇧 Shadowsocks 2022
 vmess://${vmess}
@@ -218,6 +234,54 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 
 Server(("127.0.0.1", port), Handler).serve_forever()
+PY
+}
+
+door_py() {
+  cat <<'PY'
+import socket, sys, threading, time
+
+listen, target, log = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+totals = {"down": 0, "up": 0, "connections": 0}
+lock = threading.Lock()
+
+def pump(src, dst, label):
+    try:
+        while True:
+            data = src.recv(1 << 16)
+            if not data:
+                break
+            dst.sendall(data)
+            with lock:
+                totals[label] += len(data)
+    except OSError:
+        pass
+    try:
+        dst.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+
+def report():
+    while True:
+        with lock:
+            text = "".join(f"{k} {v}\n" for k, v in totals.items())
+        with open(log, "w") as f:
+            f.write(text)
+        time.sleep(0.5)
+
+threading.Thread(target=report, daemon=True).start()
+server = socket.create_server(("127.0.0.1", listen))
+while True:
+    client, _ = server.accept()
+    try:
+        upstream = socket.create_connection(("127.0.0.1", target))
+    except OSError:
+        client.close()
+        continue
+    with lock:
+        totals["connections"] += 1
+    threading.Thread(target=pump, args=(client, upstream, "up"), daemon=True).start()
+    threading.Thread(target=pump, args=(upstream, client, "down"), daemon=True).start()
 PY
 }
 
@@ -436,6 +500,7 @@ start() {
   panel_py > "${STAND_DIR}/panel.py"
   blob_py > "${STAND_DIR}/blob.py"
   decoy_py > "${STAND_DIR}/decoy.py"
+  door_py > "${STAND_DIR}/door.py"
 
   local pids=()
   # What REALITY borrows its handshake from: any TLS 1.3 server will do — as
@@ -450,6 +515,8 @@ start() {
   setsid python3 "${STAND_DIR}/panel.py" "${PANEL_PORT}" "${STAND_DIR}/links.txt" \
     "${STAND_DIR}/panel.log" > "${STAND_DIR}/panel.out" 2>&1 < /dev/null & pids+=($!)
   setsid python3 "${STAND_DIR}/blob.py" "${BLOB_PORT}" > "${STAND_DIR}/blob.out" 2>&1 < /dev/null & pids+=($!)
+  setsid python3 "${STAND_DIR}/door.py" "${DOOR_PORT}" 18446 "${STAND_DIR}/door.log" \
+    > "${STAND_DIR}/door.out" 2>&1 < /dev/null & pids+=($!)
   printf '%s\n' "${pids[@]}" > "${STAND_DIR}/pids"
   sleep 2
 
@@ -465,7 +532,7 @@ start() {
   echo "    subscription   http://10.0.2.2:${PANEL_PORT}/sub/stand"
   echo "    with HWID      http://10.0.2.2:${PANEL_PORT}/sub/hwid-stand"
   echo "    through it     http://${BLOB_IP}/blob?mb=8  (only reachable through a proxy)"
-  echo "    logs           ${STAND_DIR}/{xray-access,core,panel}.log"
+  echo "    logs           ${STAND_DIR}/{xray-access,core,panel,door}.log"
 }
 
 stop() {

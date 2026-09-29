@@ -3,8 +3,10 @@ import 'package:commy_config/src/internal/link_format_exception.dart';
 import 'package:commy_config/src/internal/map_read.dart';
 import 'package:commy_config/src/internal/node_factory.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/internal/xhttp_download_settings.dart';
 import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
+import 'package:commy_config/src/parsers/xray_stream_reader.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Reads one outbound out of a sing-box or an Xray/v2rayN document.
@@ -29,22 +31,6 @@ abstract final class SingBoxOutboundReader {
     'loopback',
     'selector',
     'urltest',
-  };
-
-  /// Xray `streamSettings.network` values mapped onto our transport names.
-  static const Map<String, String> xrayNetworks = <String, String>{
-    'tcp': 'tcp',
-    'raw': 'tcp',
-    'ws': 'ws',
-    'websocket': 'ws',
-    'grpc': 'grpc',
-    'gun': 'grpc',
-    'h2': 'http',
-    'http': 'http',
-    'httpupgrade': 'httpupgrade',
-    'quic': 'quic',
-    'xhttp': TransportParams.xhttp,
-    'splithttp': TransportParams.xhttp,
   };
 
   /// Whether [outbound] looks like something this reader can turn into a node.
@@ -253,12 +239,53 @@ abstract final class SingBoxOutboundReader {
     if (normalised == TransportParams.xhttp) {
       // The block our own builder writes, and the one the sing-box forks that
       // carry XHTTP write: Xray's settings in snake_case, flat.
+      final settings = XhttpSettings.read(transport);
+      final mode = MapRead.text(transport, <String>['mode']);
+      final download = MapRead.object(transport, <String>['download']);
       TransportParams.readXhttpInto(
         params,
-        mode: MapRead.text(transport, <String>['mode']),
-        extra: XhttpSettings.read(transport).toExtraJson(),
+        mode: mode,
+        extra: settings
+            .withDownloadSettings(
+              download == null ? null : _xrayDownload(download, mode: mode),
+            )
+            .toExtraJson(),
       );
     }
+  }
+
+  /// The second XHTTP route of a sing-box block, as Xray spells it.
+  ///
+  /// The block is the one our builder writes, and the sing-box-extended fork
+  /// before it: the settings of the route, flat, with `server`,
+  /// `server_port` and an outbound's `tls` beside them. It is read with the
+  /// readers of a whole outbound, and stored in the shape links carry.
+  /// Without a server it describes no route and is dropped.
+  ///
+  /// The fork's route has no mode of its own and is held to the rules of
+  /// [mode], the main route's; so it is stored with that mode, which Xray
+  /// checks a route's settings by and uses for nothing else.
+  static Map<String, Object?>? _xrayDownload(
+    Map<String, Object?> download, {
+    required String? mode,
+  }) {
+    final server = MapRead.text(download, <String>['server']);
+    if (server == null) {
+      return null;
+    }
+    final params = <String, Object?>{};
+    _readNativeTls(params, download, Protocol.vless);
+    final settings = XhttpSettings.read(download);
+    final hosts = MapRead.stringList(download, <String>['host']);
+    params[ParamKeys.host] = hosts.isEmpty ? settings.hostHeader : hosts.first;
+    params[ParamKeys.path] = MapRead.text(download, <String>['path']);
+    params[ParamKeys.mode] = MapRead.text(download, <String>['mode']) ?? mode;
+    params[ParamKeys.extra] = settings.toExtraJson();
+    return XhttpDownloadSettings.write(
+      address: server,
+      port: MapRead.integer(download, <String>['server_port']),
+      params: params,
+    );
   }
 
   static ProxyNode _readXray(String rawType, Map<String, Object?> outbound) {
@@ -314,7 +341,11 @@ abstract final class SingBoxOutboundReader {
           'Outbound protocol "$rawType" is not supported',
         );
     }
-    _readXrayStream(params, outbound);
+    XrayStreamReader.readInto(
+      params,
+      MapRead.object(outbound, <String>['streamSettings']) ??
+          const <String, Object?>{},
+    );
 
     return NodeFactory.build(
       protocol: protocol,
@@ -340,102 +371,6 @@ abstract final class SingBoxOutboundReader {
     throw LinkFormatException(
       '${protocol.wireName} outbound has neither vnext nor servers',
     );
-  }
-
-  static void _readXrayStream(
-    Map<String, Object?> params,
-    Map<String, Object?> outbound,
-  ) {
-    final stream = MapRead.object(outbound, <String>['streamSettings']) ??
-        const <String, Object?>{};
-    final rawNetwork = MapRead.text(stream, <String>['network']) ?? 'tcp';
-    final transport = xrayNetworks[rawNetwork.toLowerCase()];
-    if (transport == null || !TransportParams.supported.contains(transport)) {
-      throw LinkFormatException(
-        'Transport "$rawNetwork" is not supported by the core',
-      );
-    }
-    params[ParamKeys.transport] = transport;
-
-    final reality = MapRead.object(stream, <String>['realitySettings']);
-    final tls = MapRead.object(stream, <String>['tlsSettings']);
-    final security = MapRead.text(stream, <String>['security'])?.toLowerCase();
-    if (reality != null || security == 'reality') {
-      params[ParamKeys.security] = ParamKeys.securityReality;
-      params[ParamKeys.publicKey] =
-          reality == null ? null : MapRead.text(reality, <String>['publicKey']);
-      params[ParamKeys.shortId] =
-          reality == null ? null : MapRead.text(reality, <String>['shortId']);
-      params[ParamKeys.spiderX] =
-          reality == null ? null : MapRead.text(reality, <String>['spiderX']);
-      params[ParamKeys.sni] = reality == null
-          ? null
-          : MapRead.text(reality, <String>['serverName']);
-      params[ParamKeys.fingerprint] = reality == null
-          ? null
-          : MapRead.text(reality, <String>['fingerprint']);
-    } else if (security == 'tls' || security == 'xtls') {
-      params[ParamKeys.security] = ParamKeys.securityTls;
-      params[ParamKeys.sni] =
-          tls == null ? null : MapRead.text(tls, <String>['serverName']);
-      params[ParamKeys.fingerprint] =
-          tls == null ? null : MapRead.text(tls, <String>['fingerprint']);
-      params[ParamKeys.alpn] = tls == null
-          ? null
-          : _joinOrNull(MapRead.stringList(tls, <String>['alpn']));
-      params[ParamKeys.allowInsecure] = tls != null &&
-          (MapRead.boolean(tls, <String>['allowInsecure']) ?? false);
-    } else {
-      params[ParamKeys.security] = ParamKeys.securityNone;
-    }
-
-    switch (transport) {
-      case 'ws':
-        final options = MapRead.object(stream, <String>['wsSettings']);
-        if (options != null) {
-          params[ParamKeys.path] = MapRead.text(options, <String>['path']);
-          final headers = MapRead.object(options, <String>['headers']);
-          params[ParamKeys.host] = MapRead.text(options, <String>['host']) ??
-              (headers == null
-                  ? null
-                  : MapRead.text(headers, <String>['host']));
-        }
-      case 'grpc':
-        final options = MapRead.object(stream, <String>['grpcSettings']);
-        if (options != null) {
-          params[ParamKeys.serviceName] =
-              MapRead.text(options, <String>['serviceName']);
-        }
-      case 'http':
-        final options = MapRead.object(stream, <String>['httpSettings']);
-        if (options != null) {
-          params[ParamKeys.path] = MapRead.text(options, <String>['path']);
-          params[ParamKeys.host] =
-              _joinOrNull(MapRead.stringList(options, <String>['host']));
-        }
-      case 'httpupgrade':
-        final options = MapRead.object(stream, <String>['httpupgradeSettings']);
-        if (options != null) {
-          params[ParamKeys.path] = MapRead.text(options, <String>['path']);
-          params[ParamKeys.host] = MapRead.text(options, <String>['host']);
-        }
-      case TransportParams.xhttp:
-        final options = MapRead.object(
-              stream,
-              <String>['xhttpSettings', 'splithttpSettings'],
-            ) ??
-            const <String, Object?>{};
-        params[ParamKeys.path] = MapRead.text(options, <String>['path']);
-        params[ParamKeys.host] = MapRead.text(options, <String>['host']);
-        // Xray lets the settings sit beside host and path or inside `extra`,
-        // and when `extra` is there it replaces the rest wholesale.
-        final extra = MapRead.object(options, <String>['extra']);
-        TransportParams.readXhttpInto(
-          params,
-          mode: MapRead.text(options, <String>['mode']),
-          extra: XhttpSettings.read(extra ?? options).toExtraJson(),
-        );
-    }
   }
 
   static String? _joinOrNull(List<String> values) =>

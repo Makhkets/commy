@@ -1,4 +1,5 @@
 import 'package:commy_config/src/builder/sing_box_keys.dart';
+import 'package:commy_config/src/builder/xhttp_download_builder.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
 import 'package:commy_config/src/internal/xhttp_settings.dart';
@@ -147,18 +148,54 @@ abstract final class TransportOptionsBuilder {
 
   static Map<String, Object?> _xhttp(ProxyNode node) {
     final mode = xhttpMode(node);
-    // Checked again here, not only at import: the node may come from a
-    // database written before a rule existed, and what the core refuses it
-    // refuses for the whole document, not for one server.
-    final settings =
-        (XhttpSettings.tryParseExtra(node.param(ParamKeys.extra)) ??
-            XhttpSettings.read(const <String, Object?>{}))
-          ..validate(mode);
+    final settings = _xhttpSettings(node, mode);
 
     final options = <String, Object?>{SingBoxKeys.type: TransportParams.xhttp};
     if (mode != XhttpSettings.modeAuto) {
       options['mode'] = mode;
     }
+    options.addAll(_xhttpRoute(node, settings));
+    final download = XhttpDownloadBuilder.build(
+      settings.downloadSettings,
+      mainPort: node.port,
+      mainMode: mode,
+    );
+    if (download != null) {
+      options[SingBoxKeys.download] = download;
+    }
+    return options;
+  }
+
+  /// The host, path and settings of the XHTTP route [node] describes,
+  /// without its type and mode: the part of the block a second route has
+  /// too. With [download], only what that route's GET is dressed by (see
+  /// XhttpSettings.toCore).
+  static Map<String, Object?> xhttpRoute(
+    ProxyNode node, {
+    bool download = false,
+  }) =>
+      _xhttpRoute(
+        node,
+        _xhttpSettings(node, xhttpMode(node)),
+        download: download,
+      );
+
+  /// The settings of [node], held to the rules of [mode].
+  static XhttpSettings _xhttpSettings(ProxyNode node, String mode) {
+    // Checked again here, not only at import: the node may come from a
+    // database written before a rule existed, and what the core refuses it
+    // refuses for the whole document, not for one server.
+    return (XhttpSettings.tryParseExtra(node.param(ParamKeys.extra)) ??
+        XhttpSettings.read(const <String, Object?>{}))
+      ..validate(mode);
+  }
+
+  static Map<String, Object?> _xhttpRoute(
+    ProxyNode node,
+    XhttpSettings settings, {
+    bool download = false,
+  }) {
+    final options = <String, Object?>{};
     final host = node.param(ParamKeys.host) ?? settings.hostHeader;
     if (host != null && host.isNotEmpty) {
       // One name, unlike `http`: it becomes the Host header as it stands.
@@ -170,7 +207,7 @@ abstract final class TransportOptionsBuilder {
       // is sent to the server as written — `?ed=` means nothing here.
       options[SingBoxKeys.path] = path;
     }
-    return options..addAll(settings.toCore());
+    return options..addAll(settings.toCore(download: download));
   }
 
   static bool _isHttpMethod(String value) => const <String>{

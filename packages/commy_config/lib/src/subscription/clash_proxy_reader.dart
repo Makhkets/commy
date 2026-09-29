@@ -3,6 +3,7 @@ import 'package:commy_config/src/internal/link_format_exception.dart';
 import 'package:commy_config/src/internal/map_read.dart';
 import 'package:commy_config/src/internal/node_factory.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/internal/xhttp_download_settings.dart';
 import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -266,7 +267,12 @@ abstract final class ClashProxyReader {
           reality == null ? null : MapRead.text(reality, <String>['short-id']),
       ParamKeys.allowInsecure: _insecure(proxy),
     };
-    _readTransportOptions(params, proxy, transport);
+    _readTransportOptions(
+      params,
+      proxy,
+      transport,
+      defaultSecurity: defaultSecurity,
+    );
     return params;
   }
 
@@ -288,8 +294,9 @@ abstract final class ClashProxyReader {
   static void _readTransportOptions(
     Map<String, Object?> params,
     Map<String, Object?> proxy,
-    String transport,
-  ) {
+    String transport, {
+    required String defaultSecurity,
+  }) {
     switch (transport) {
       case 'ws':
         final options = MapRead.object(proxy, <String>['ws-opts']);
@@ -334,14 +341,110 @@ abstract final class ClashProxyReader {
         // with XMUX under `reuse-settings`.
         final options = MapRead.object(proxy, <String>['xhttp-opts']) ??
             const <String, Object?>{};
+        final settings = XhttpSettings.read(options);
         params[ParamKeys.path] = MapRead.text(options, <String>['path']);
-        params[ParamKeys.host] = MapRead.text(options, <String>['host']);
+        params[ParamKeys.host] =
+            MapRead.text(options, <String>['host']) ?? settings.hostHeader;
+        final download = MapRead.object(options, <String>['download-settings']);
         TransportParams.readXhttpInto(
           params,
           mode: MapRead.text(options, <String>['mode']),
-          extra: XhttpSettings.read(options).toExtraJson(),
+          extra: settings
+              .withDownloadSettings(
+                download == null
+                    ? null
+                    : _xrayDownload(
+                        proxy,
+                        options,
+                        download,
+                        defaultSecurity: defaultSecurity,
+                      ),
+              )
+              .toExtraJson(),
         );
     }
+  }
+
+  /// Keys of a `download-settings` that describe the server, as they do on
+  /// a proxy.
+  static const List<String> _downloadProxyKeys = <String>[
+    'server',
+    'port',
+    'tls',
+    'alpn',
+    'reality-opts',
+    'skip-cert-verify',
+    'servername',
+    'client-fingerprint',
+  ];
+
+  /// Keys of a `download-settings` that are XHTTP settings, as they are in
+  /// `xhttp-opts`.
+  static const List<String> _downloadXhttpKeys = <String>[
+    'path',
+    'host',
+    'headers',
+    'reuse-settings',
+  ];
+
+  /// Clash.Meta's `download-settings`, as Xray spells a second route.
+  ///
+  /// Where Xray's route inherits nothing, mihomo's inherits everything it
+  /// does not set (adapter/outbound/vless.go): the server, port, TLS and
+  /// REALITY of the proxy, and the proxy's XHTTP settings, of which the block
+  /// may replace the path, host, headers and XMUX. So the block is laid over
+  /// the proxy, read as a whole proxy is read, and written out complete — the
+  /// route then means the same to every reader.
+  static Map<String, Object?> _xrayDownload(
+    Map<String, Object?> proxy,
+    Map<String, Object?> options,
+    Map<String, Object?> download, {
+    required String defaultSecurity,
+  }) {
+    final mergedOptions = _over(
+      <String, Object?>{
+        for (final entry in options.entries)
+          if (MapRead.normalise(entry.key) !=
+              MapRead.normalise('download-settings'))
+            entry.key: entry.value,
+      },
+      download,
+      _downloadXhttpKeys,
+    );
+    final merged = _over(proxy, download, _downloadProxyKeys)
+      ..['network'] = TransportParams.xhttp
+      ..['xhttp-opts'] = mergedOptions;
+    final params = _stream(merged, defaultSecurity: defaultSecurity);
+    // mihomo's Host: the route's, else the proxy's, else the server name —
+    // TLS or not. Xray and the core fall back to the SNI only under TLS, so
+    // the name is written as the host where it would otherwise be lost.
+    params[ParamKeys.host] ??= _sni(merged);
+    return XhttpDownloadSettings.write(
+      address: MapRead.text(merged, <String>['server']) ?? '',
+      port: MapRead.integer(merged, <String>['port']),
+      params: params,
+    );
+  }
+
+  /// [base] with the [keys] that [top] sets taken from [top].
+  static Map<String, Object?> _over(
+    Map<String, Object?> base,
+    Map<String, Object?> top,
+    List<String> keys,
+  ) {
+    final result = Map<String, Object?>.of(base);
+    for (final key in keys) {
+      final value = MapRead.value(top, <String>[key]);
+      if (value == null) {
+        continue;
+      }
+      result
+        ..removeWhere(
+          (name, _) => MapRead.normalise(name) == MapRead.normalise(key),
+        )
+        ..[key] = value;
+    }
+    return result;
   }
 
   static List<String> _withMasks(List<String> addresses) => <String>[

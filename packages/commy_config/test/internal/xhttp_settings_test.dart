@@ -130,14 +130,83 @@ void main() {
       expect(settings.headers, <String, String>{'X-Api-Key': 'k'});
     });
 
-    test('keeps a download route for export and out of the core', () {
+    test('keeps a download route as it came, for export', () {
+      final route = <String, Object?>{'address': 'dl.example', 'port': 443};
       final settings = XhttpSettings.read(<String, Object?>{
-        'downloadSettings': <String, Object?>{'address': 'dl.example'},
+        'downloadSettings': route,
       });
 
-      expect(settings.hasDownloadSettings, isTrue);
+      expect(settings.downloadSettings, route);
+      expect(settings.isEmpty, isFalse);
+      expect(settings.toXray()['downloadSettings'], route);
+      // The core is told about it by XhttpDownloadBuilder, not by toCore.
       expect(settings.toCore(), isEmpty);
-      expect(settings.toXray()['downloadSettings'], isNotNull);
+    });
+
+    test('reads a route only under the name Xray gives it', () {
+      // A sing-box fork's `download` is another shape; its reader converts it.
+      final settings = XhttpSettings.read(<String, Object?>{
+        'download': <String, Object?>{'server': 'dl.example'},
+      });
+
+      expect(settings.downloadSettings, isNull);
+    });
+
+    test('a route can be replaced, or dropped', () {
+      final settings = XhttpSettings.read(<String, Object?>{
+        'xPaddingBytes': '200-400',
+        'downloadSettings': <String, Object?>{'address': 'a.example'},
+      });
+
+      final replaced =
+          settings.withDownloadSettings(<String, Object?>{'address': 'b'});
+      final dropped = settings.withDownloadSettings(null);
+
+      expect(replaced.downloadSettings, <String, Object?>{'address': 'b'});
+      expect(replaced.toCore(), settings.toCore());
+      expect(dropped.toXray().containsKey('downloadSettings'), isFalse);
+      expect(dropped.toXray()['xPaddingBytes'], '200-400');
+    });
+
+    test('a download route carries only what its GET is dressed by', () {
+      final settings = XhttpSettings.read(<String, Object?>{
+        'headers': <String, Object?>{'X-Edge': '1'},
+        'xPaddingBytes': '200-400',
+        'xPaddingObfsMode': true,
+        'xPaddingKey': 'p',
+        'xPaddingHeader': 'X-P',
+        'xPaddingPlacement': 'header',
+        'xPaddingMethod': 'tokenish',
+        'sessionPlacement': 'query',
+        'sessionKey': 's',
+        'seqPlacement': 'header',
+        'seqKey': 'X-Seq',
+        'noGRPCHeader': true,
+        'scMaxEachPostBytes': 1000,
+        'scMinPostsIntervalMs': 10,
+        'uplinkHTTPMethod': 'PUT',
+        'uplinkDataPlacement': 'body',
+        'uplinkDataKey': 'd',
+        'uplinkChunkSize': 100,
+        'sessionIDTable': 'hex',
+        'sessionIDLength': 16,
+        'xmux': <String, Object?>{'maxConnections': 2},
+      });
+
+      expect(settings.toCore(download: true), <String, Object?>{
+        'headers': <String, String>{'X-Edge': '1'},
+        'x_padding_bytes': '200-400',
+        'x_padding_obfs_mode': true,
+        'x_padding_key': 'p',
+        'x_padding_header': 'X-P',
+        'x_padding_placement': 'header',
+        'x_padding_method': 'tokenish',
+        'session_placement': 'query',
+        'session_key': 's',
+        'seq_placement': 'header',
+        'seq_key': 'X-Seq',
+        'xmux': <String, Object?>{'max_connections': 2},
+      });
     });
 
     test('never throws on a document from the internet', () {

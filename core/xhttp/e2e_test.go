@@ -159,12 +159,120 @@ func TestSingBoxCarriesTrafficOverXHTTP(t *testing.T) {
 	}
 }
 
+// The deployment downloadSettings exists for: the upload straight to the
+// server's IP, the download through another front door found by name — a
+// CDN in real life, a second listener here. sing-box resolves an outbound's
+// server only when it is a name; the download server is resolved by the
+// transport, through the route's default domain resolver, which is what this
+// proves together with the split itself. The DNS router's own final server
+// answers with an address nothing listens on, as Commy's remote DNS — through
+// the tunnel, or a fake IP — would be the wrong answer too.
+func TestSingBoxTakesTheDownloadRouteByName(t *testing.T) {
+	for _, mode := range []string{"auto", "packet-up", "stream-up"} {
+		t.Run(mode, func(t *testing.T) {
+			payload := make([]byte, 1<<20)
+			if _, err := rand.Read(payload); err != nil {
+				t.Fatal(err)
+			}
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				body, _ := io.ReadAll(r.Body)
+				_, _ = w.Write(body)
+			}))
+			defer target.Close()
+
+			vlessPort, mixedPort := freePort(t), freePort(t)
+			fake := xhttp.StartFakeXrayHTTP2(t, config.Options{Mode: mode, Path: "/up"}, func(conn io.ReadWriteCloser) {
+				defer conn.Close()
+				upstream, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", vlessPort))
+				if err != nil {
+					return
+				}
+				defer upstream.Close()
+				go func() { _, _ = io.Copy(upstream, conn) }()
+				_, _ = io.Copy(conn, upstream)
+			})
+			door := fake.DownloadDoorHTTP2(t, config.Options{Mode: mode, Path: "/down"})
+
+			document := fmt.Sprintf(`{
+			  "log": {"level": "debug"},
+			  "dns": {"servers": [{"type": "hosts", "tag": "decoy",
+			                       "predefined": {"dl.test": "127.0.0.9"}},
+			                      {"type": "hosts", "tag": "hosts",
+			                       "predefined": {"dl.test": "127.0.0.1"}}],
+			          "final": "decoy"},
+			  "inbounds": [
+			    {"type": "mixed", "tag": "in", "listen": "127.0.0.1", "listen_port": %d},
+			    {"type": "vless", "tag": "vless-in", "listen": "127.0.0.1", "listen_port": %d,
+			     "users": [{"uuid": %q}]}
+			  ],
+			  "outbounds": [
+			    {"type": "vless", "tag": "proxy", "server": "127.0.0.1", "server_port": %d,
+			     "uuid": %q,
+			     "tls": {"enabled": true, "server_name": "xhttp.test", "insecure": true},
+			     "transport": {"type": "xhttp", "mode": %q, "path": "/up",
+			                   "download": {"server": "dl.test", "server_port": %d, "path": "/down",
+			                                "tls": {"enabled": true, "server_name": "xhttp.test",
+			                                        "insecure": true}}}},
+			    {"type": "direct", "tag": "direct"}
+			  ],
+			  "route": {"default_domain_resolver": "hosts", "rules": [
+			    {"inbound": "in", "outbound": "proxy"},
+			    {"inbound": "vless-in", "outbound": "direct"}
+			  ]}
+			}`, mixedPort, vlessPort, uuid, fake.Addr.Port, uuid, mode, door.Addr.Port)
+
+			ctx := include.Context(context.Background())
+			options, err := json.UnmarshalExtendedContext[option.Options](ctx, []byte(document))
+			if err != nil {
+				t.Fatalf("sing-box refused the document: %v", err)
+			}
+			instance, err := box.New(box.Options{Context: ctx, Options: options})
+			if err != nil {
+				t.Fatalf("box.New: %v", err)
+			}
+			if err := instance.Start(); err != nil {
+				t.Fatalf("start: %v", err)
+			}
+			defer instance.Close()
+
+			proxy, _ := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", mixedPort))
+			client := &http.Client{
+				Transport: &http.Transport{Proxy: http.ProxyURL(proxy)},
+				Timeout:   30 * time.Second,
+			}
+			response, err := client.Post(target.URL, "application/octet-stream", bytes.NewReader(payload))
+			if err != nil {
+				t.Fatalf("request through the tunnel: %v", err)
+			}
+			defer response.Body.Close()
+			echoed, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(echoed, payload) {
+				t.Fatalf("sent %d bytes, got %d back, contents differ", len(payload), len(echoed))
+			}
+			if door.GetCount() == 0 || fake.GetCount() != 0 {
+				t.Fatalf("downloads: %d through the second door, %d through the first; want some and none",
+					door.GetCount(), fake.GetCount())
+			}
+			if fake.RequestCount() == 0 {
+				t.Fatal("the uploads did not go to the main route")
+			}
+		})
+	}
+}
+
 func TestSingBoxRefusesAnXHTTPBlockItCannotHonour(t *testing.T) {
 	cases := map[string]string{
 		// Not an empty object: sing-box drops those before it looks at keys.
-		"unknown field": `{"type": "xhttp", "download": {"server": "other.example"}}`,
-		"bad mode":      `{"type": "xhttp", "mode": "stream-down"}`,
-		"bad range":     `{"type": "xhttp", "x_padding_bytes": "a-b"}`,
+		"unknown field": `{"type": "xhttp", "no_sse_header": true}`,
+		"download in stream-one": `{"type": "xhttp", "mode": "stream-one",
+		  "download": {"server": "127.0.0.1", "server_port": 443}}`,
+		"download tls unknown": `{"type": "xhttp",
+		  "download": {"server": "127.0.0.1", "server_port": 443, "tls": {"enabled": true, "bogus": 1}}}`,
+		"bad mode":  `{"type": "xhttp", "mode": "stream-down"}`,
+		"bad range": `{"type": "xhttp", "x_padding_bytes": "a-b"}`,
 	}
 	for name, transport := range cases {
 		document := fmt.Sprintf(`{"outbounds": [{"type": "vless", "tag": "p", "server": "127.0.0.1",

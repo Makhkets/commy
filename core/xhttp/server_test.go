@@ -34,7 +34,7 @@ type fakeXray struct {
 	// serve is what happens to a proxied connection. Default: echo.
 	serve func(conn io.ReadWriteCloser)
 
-	sessions sync.Map // string -> *fakeSession
+	sessions *sync.Map // string -> *fakeSession
 
 	mu            sync.Mutex
 	requests      []recordedRequest
@@ -62,7 +62,19 @@ func newFakeXray(t testing.TB, options config.Options) *fakeXray {
 	if err != nil {
 		t.Fatalf("server options: %v", err)
 	}
-	return &fakeXray{t: t, options: resolved, path: resolved.NormalizedPath()}
+	return &fakeXray{t: t, options: resolved, path: resolved.NormalizedPath(), sessions: new(sync.Map)}
+}
+
+// twin is another front door to the same server: its own options — path,
+// padding, placements, as the download route's are its own — and this
+// server's sessions and what it does with a connection. One Xray inbound,
+// reached directly for the upload and through a CDN for the download, is
+// exactly this.
+func (s *fakeXray) twin(options config.Options) *fakeXray {
+	twin := newFakeXray(s.t, options)
+	twin.sessions = s.sessions
+	twin.serve = s.serve
+	return twin
 }
 
 func (s *fakeXray) recorded() []recordedRequest {

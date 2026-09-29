@@ -88,10 +88,25 @@ class XhttpSettings {
       hostHeader: hostHeader,
       downloadSettings: MapRead.value(
         source,
-        const <String>['downloadSettings', 'download'],
+        const <String>['downloadSettings'],
       ),
     );
   }
+
+  /// These settings with [value] as the second route, in Xray's shape — or
+  /// with none, when [value] is `null`.
+  ///
+  /// For the readers of formats that describe the route in a shape of their
+  /// own: Clash's `download-settings`, a sing-box fork's `download`. They
+  /// convert it to Xray's, which is what a link carries and what the builder
+  /// reads, and put it here in place of what [XhttpSettings.read] found.
+  XhttpSettings withDownloadSettings(Object? value) => XhttpSettings._(
+        values: _values,
+        xmux: _xmux,
+        headers: headers,
+        hostHeader: hostHeader,
+        downloadSettings: value,
+      );
 
   /// Reads the `extra=` value of a share link, or returns `null` when it is
   /// not a JSON object.
@@ -145,15 +160,15 @@ class XhttpSettings {
   ];
 
   static const List<_Field> _fields = <_Field>[
-    _Field('xPaddingBytes', 'x_padding_bytes', _Kind.range),
+    _Field('xPaddingBytes', 'x_padding_bytes', _Kind.range, get: true),
     _Field('noGRPCHeader', 'no_grpc_header', _Kind.flag),
     _Field('scMaxEachPostBytes', 'sc_max_each_post_bytes', _Kind.range),
     _Field('scMinPostsIntervalMs', 'sc_min_posts_interval_ms', _Kind.range),
-    _Field('xPaddingObfsMode', 'x_padding_obfs_mode', _Kind.flag),
-    _Field('xPaddingKey', 'x_padding_key', _Kind.text),
-    _Field('xPaddingHeader', 'x_padding_header', _Kind.text),
-    _Field('xPaddingPlacement', 'x_padding_placement', _Kind.text),
-    _Field('xPaddingMethod', 'x_padding_method', _Kind.text),
+    _Field('xPaddingObfsMode', 'x_padding_obfs_mode', _Kind.flag, get: true),
+    _Field('xPaddingKey', 'x_padding_key', _Kind.text, get: true),
+    _Field('xPaddingHeader', 'x_padding_header', _Kind.text, get: true),
+    _Field('xPaddingPlacement', 'x_padding_placement', _Kind.text, get: true),
+    _Field('xPaddingMethod', 'x_padding_method', _Kind.text, get: true),
     _Field('uplinkHTTPMethod', 'uplink_http_method', _Kind.text),
     // Xray renamed these two after v26.3.27; servers of both kinds exist.
     _Field(
@@ -161,15 +176,20 @@ class XhttpSettings {
       'session_placement',
       _Kind.text,
       aliases: <String>['sessionIDPlacement'],
+      get: true,
     ),
     _Field(
       'sessionKey',
       'session_key',
       _Kind.text,
       aliases: <String>['sessionIDKey'],
+      get: true,
     ),
-    _Field('seqPlacement', 'seq_placement', _Kind.text),
-    _Field('seqKey', 'seq_key', _Kind.text),
+    // A GET carries no sequence number, but where the uploads carry theirs
+    // decides whether its path ends in a slash — and the server matches
+    // paths by prefix.
+    _Field('seqPlacement', 'seq_placement', _Kind.text, get: true),
+    _Field('seqKey', 'seq_key', _Kind.text, get: true),
     _Field('uplinkDataPlacement', 'uplink_data_placement', _Kind.text),
     _Field('uplinkDataKey', 'uplink_data_key', _Kind.text),
     _Field('uplinkChunkSize', 'uplink_chunk_size', _Kind.range),
@@ -210,13 +230,14 @@ class XhttpSettings {
   /// The caller uses it as the transport's host when no host was given.
   final String? hostHeader;
 
-  /// Whether the source asked for a second route for the download.
+  /// Xray's `downloadSettings` as the source had it: a second route for the
+  /// download, or `null`.
   ///
-  /// The core does not implement it (docs/adr/0010-xhttp-transport.md): both
-  /// directions then use the main route, which is the same server in every
-  /// deployment this was written for. The value is kept in [toXray] so that a
-  /// node exported again is the node that was imported.
-  bool get hasDownloadSettings => _downloadSettings != null;
+  /// It is kept as it came, whatever its shape, and written back by [toXray]
+  /// so that a node exported again is the node that was imported. What the
+  /// core is told is built from it by `XhttpDownloadBuilder`, which is where
+  /// it is judged.
+  Object? get downloadSettings => _downloadSettings;
 
   /// Whether the source set nothing a client reads.
   bool get isEmpty =>
@@ -259,14 +280,20 @@ class XhttpSettings {
   String? toExtraJson() => isEmpty ? null : jsonEncode(toXray());
 
   /// The settings as the core's `transport` block spells them.
-  Map<String, Object?> toCore() {
+  ///
+  /// With [download], only what the download's GET is dressed by: the block
+  /// of a second route. Everything about uploads — how they are cut, sent and
+  /// numbered, and the session id, which the main route makes — belongs to
+  /// the main route; the core refuses the upload-only rules where no mode
+  /// makes them hold, and Xray's own client never reads them there.
+  Map<String, Object?> toCore({bool download = false}) {
     final block = <String, Object?>{};
     if (headers.isNotEmpty) {
       block['headers'] = headers;
     }
     for (final field in _fields) {
       final value = _values[field.xray];
-      if (value != null) {
+      if (value != null && (field.get || !download)) {
         block[field.core] = _wire(value);
       }
     }
@@ -424,6 +451,7 @@ class _Field {
     this.core,
     this.kind, {
     this.aliases = const <String>[],
+    this.get = false,
   });
 
   /// The key in an Xray document and in the `extra` of a share link.
@@ -436,4 +464,8 @@ class _Field {
 
   /// Other names Xray has used for the same key.
   final List<String> aliases;
+
+  /// Whether the download's GET is dressed by this key, so that a second
+  /// route carries it.
+  final bool get;
 }

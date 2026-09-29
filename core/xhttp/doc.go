@@ -25,9 +25,23 @@
 // Every request carries padding of a random length so that request sizes say
 // nothing about what is inside.
 //
+// # A second route for the download
+//
+// Xray's `downloadSettings`, here the `download` block: the GET of stream-up
+// and packet-up goes to another address — usually a CDN in front of the same
+// server — with its own TLS, HTTP version, path, headers, padding and XMUX
+// pool. Nothing is inherited from the main route but the session id, which is
+// what the server pairs the two by. The uploads stay on the main route; the
+// mode is decided by the main route alone, and with REALITY, where auto would
+// pick stream-one, it picks stream-up, since one request cannot take two
+// routes. stream-one with a download route is refused, as Xray refuses it.
+//
+// The download route dials through the outbound's own dialer, so its sockets
+// are protected like the main route's; Xray's per-route sockopt and
+// dialerProxy have no equivalent. A server given by name is resolved through
+// the route's default domain resolver.
+//
 // # What is not here
 //
-// The server half, the browser dialer, and `downloadSettings` (a second route
-// for the download). The first two have no place in a client app; the third is
-// named as a limitation in docs/adr/0010-xhttp-transport.md.
+// The server half and the browser dialer: neither has a place in a client app.
 package xhttp

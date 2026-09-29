@@ -33,6 +33,10 @@ readonly REALITY_PRIVATE="OM6hs0J8f634S9InrMZ1IHVgiqRD4vtOM48EkKZFPW0"
 readonly REALITY_PUBLIC="EDz_uy9HLU1rYpRN9VKIPOpFqCGbvs9oHlxZBwwwWSc"
 readonly SHORT_ID="0123456789abcdef"
 readonly TARGET_PORT=21080 SERVER_PORT=21443 CLIENT_PORT=21090 DECOY_PORT=21444
+# A second front door to the same inbound, for the download route: a plain
+# TCP relay, as a CDN or a second IP of the server would be.
+readonly DOOR_PORT=21445
+readonly BLOB_BYTES=$((24 << 20))
 
 die() { printf '\n\033[31merror:\033[0m %s\n\n' "$*" >&2; exit 1; }
 say() { printf '\033[36m==>\033[0m %s\n' "$*"; }
@@ -92,18 +96,70 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True
 Server(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
 PY
+# The second front door. It forwards bytes and counts them, so a scenario can
+# tell that the download came through it and the upload did not.
+cat > "${WORK}/door.py" <<'PY'
+import socket, sys, threading, time
+listen, target, log = int(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+# "via" and "edge" count what only the download route's own options put into
+# a request — readable when the route is cleartext.
+totals = {"down": 0, "up": 0, "via": 0, "edge": 0}
+lock = threading.Lock()
+def pump(src, dst, label):
+    try:
+        while True:
+            data = src.recv(1 << 16)
+            if not data:
+                break
+            dst.sendall(data)
+            with lock:
+                totals[label] += len(data)
+                if label == "up":
+                    totals["via"] += data.count(b"via=door")
+                    totals["edge"] += data.count(b"X-Edge: 1")
+    except OSError:
+        pass
+    try:
+        dst.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+def report():
+    # Totals so far, rewritten as they grow: the script reads them after it
+    # has stopped everything, this relay included.
+    while True:
+        with lock:
+            text = "".join(f"{k} {v}\n" for k, v in totals.items())
+        with open(log, "w") as f:
+            f.write(text)
+        time.sleep(0.2)
+threading.Thread(target=report, daemon=True).start()
+server = socket.create_server(("127.0.0.1", listen))
+while True:
+    client, _ = server.accept()
+    try:
+        upstream = socket.create_connection(("127.0.0.1", target))
+    except OSError:
+        client.close()
+        continue
+    threading.Thread(target=pump, args=(client, upstream, "up"), daemon=True).start()
+    threading.Thread(target=pump, args=(upstream, client, "down"), daemon=True).start()
+PY
 head -c 16777216 /dev/urandom > "${WORK}/upload.bin"
 readonly UPLOAD_DIGEST="$(sha256sum "${WORK}/upload.bin" | cut -d' ' -f1)"
 
 passed=0 failed=0
 
-# scenario <name> <security> <server mode> <client mode> [server extra] [client extra]
+# scenario <name> <security> <server mode> <client mode> [server extra] [client extra] [client top]
 #   security: none | tls | tls-h1 | tls-h3 | reality
 #   extras are JSON fragments starting with a comma: Xray's spelling for the
-#   server (inside xhttpSettings), the core's for the client (inside transport).
+#   server (inside xhttpSettings), the core's for the client (inside transport),
+#   and top-level sections for the client's document.
+#   A client extra with a "download" route has the second front door started
+#   and is held to having taken it: the whole download through the door, the
+#   upload not.
 scenario() {
   local name="$1" security="$2" server_mode="$3" client_mode="$4"
-  local server_extra="${5:-}" client_extra="${6:-}"
+  local server_extra="${5:-}" client_extra="${6:-}" client_top="${7:-}"
   [[ -z "${FILTER}" || "${name}" == *"${FILTER}"* ]] || return 0
 
   local certs="\"certificates\": [{\"certificateFile\": \"${WORK}/cert.pem\", \"keyFile\": \"${WORK}/key.pem\"}]"
@@ -137,7 +193,7 @@ scenario() {
   "outbounds": [{"protocol": "freedom", "settings": {"finalRules": [{"action": "allow"}]}}] }
 JSON
   cat > "${WORK}/client.json" <<JSON
-{ "log": {"level": "debug", "timestamp": false},
+{ "log": {"level": "debug", "timestamp": false} ${client_top},
   "inbounds": [{"type": "mixed", "tag": "in", "listen": "127.0.0.1", "listen_port": ${CLIENT_PORT}}],
   "outbounds": [{"type": "vless", "tag": "proxy", "server": "127.0.0.1", "server_port": ${SERVER_PORT},
     "uuid": "${UUID}" ${client_tls},
@@ -145,6 +201,12 @@ JSON
 JSON
 
   python3 "${WORK}/target.py" "${TARGET_PORT}" & pids+=($!)
+  local door=""
+  if [[ "${client_extra}" == *'"download"'* ]]; then
+    door="${WORK}/door.log"
+    : > "${door}"
+    python3 "${WORK}/door.py" "${DOOR_PORT}" "${SERVER_PORT}" "${door}" & pids+=($!)
+  fi
   if [[ "${security}" == reality ]]; then
     # What REALITY borrows its handshake from: any TLS 1.3 server will do.
     openssl s_server -accept "${DECOY_PORT}" -cert "${WORK}/cert.pem" -key "${WORK}/key.pem" \
@@ -171,15 +233,28 @@ JSON
   done
   sent="$(curl -s --max-time 60 -x "${proxy}" -T "${WORK}/upload.bin" "http://127.0.0.1:${TARGET_PORT}/put")"
 
-  local how
-  how="$(grep -ao 'mode [a-z-]*, HTTP/[0-9.]*' "${WORK}/client.log" | sort -u | tr '\n' ' ')"
-  if [[ ${#want} -eq 64 && "${got}" == "${want}" && "${sent}" == "${UPLOAD_DIGEST}" ]]; then
+  local how door_ok=1 door_down=0 door_up=0 door_via=0 door_edge=0
+  how="$(grep -ao 'mode [a-z-]*, HTTP/[0-9.]*\(, download over HTTP/[0-9.]*\)\?' "${WORK}/client.log" | sort -u | tr '\n' ' ')"
+  if [[ -n "${door}" ]]; then
+    sleep 0.5
+    door_down="$(awk '$1 == "down" {s += $2} END {print s + 0}' "${door}")"
+    door_up="$(awk '$1 == "up" {s += $2} END {print s + 0}' "${door}")"
+    (( door_down >= BLOB_BYTES && door_up < (1 << 20) )) || door_ok=0
+    # A route that marks its requests has to be seen marking them.
+    if [[ "${client_extra}" == *'via=door'* ]]; then
+      door_via="$(awk '$1 == "via" {print $2}' "${door}")"
+      door_edge="$(awk '$1 == "edge" {print $2}' "${door}")"
+      (( ${door_via:-0} > 0 && ${door_edge:-0} > 0 )) || door_ok=0
+    fi
+  fi
+  if [[ ${#want} -eq 64 && "${got}" == "${want}" && "${sent}" == "${UPLOAD_DIGEST}" && ${door_ok} -eq 1 ]]; then
     printf '\033[32mPASS\033[0m  %-28s %s(attempt %s)\n' "${name}" "${how}" "${attempt}"
     passed=$((passed + 1))
   else
     printf '\033[31mFAIL\033[0m  %-28s %s\n' "${name}" "${how}"
     [[ "${got}" == "${want}" ]] || echo "      download: want ${want:-<target never came up>} got ${got}"
     [[ "${sent}" == "${UPLOAD_DIGEST}" ]] || echo "      upload:   want ${UPLOAD_DIGEST} got ${sent}"
+    [[ ${door_ok} -eq 1 ]] || echo "      second door: ${door_down} bytes down, ${door_up} up, marks ${door_via}/${door_edge}; want the download, no upload, and the route's own dressing"
     grep -a 'ERROR\|WARN' "${WORK}/client.log" | sed 's/\x1b\[[0-9;]*m//g' | tail -3 | cut -c1-240 | sed 's/^/      client: /'
     grep -ai 'invalid\|failed\|not allowed\|too large' "${WORK}/server.log" | tail -3 | cut -c1-240 | sed 's/^/      server: /'
     failed=$((failed + 1))
@@ -234,6 +309,36 @@ scenario extra-upload-in-headers tls packet-up packet-up \
 scenario extra-upload-in-cookies tls packet-up packet-up \
   ', "uplinkDataPlacement": "cookie", "scMaxEachPostBytes": 3000' \
   ', "uplink_data_placement": "cookie", "sc_max_each_post_bytes": 3000, "sc_min_posts_interval_ms": 1'
+
+# ── downloadSettings: the GET through a second front door ─────────────────────
+# The door leads to the same inbound, which pairs the GET with the uploads by
+# session id — Xray's own deployment of this, with the CDN left out.
+door_tls='"tls": {"enabled": true, "server_name": "xhttp.test", "insecure": true, "utls": {"enabled": true, "fingerprint": "chrome"}}'
+door_reality="\"tls\": {\"enabled\": true, \"server_name\": \"xhttp.test\", \"utls\": {\"enabled\": true, \"fingerprint\": \"chrome\"}, \"reality\": {\"enabled\": true, \"public_key\": \"${REALITY_PUBLIC}\", \"short_id\": \"${SHORT_ID}\"}}"
+scenario download-packet-up tls auto packet-up '' \
+  ", \"download\": {\"server\": \"127.0.0.1\", \"server_port\": ${DOOR_PORT}, ${door_tls}, \"path\": \"/xh\"}"
+scenario download-stream-up tls auto stream-up '' \
+  ", \"download\": {\"server\": \"127.0.0.1\", \"server_port\": ${DOOR_PORT}, ${door_tls}, \"path\": \"/xh\"}"
+# auto with REALITY is stream-one, which cannot take two routes: stream-up.
+scenario download-reality-auto reality auto auto '' \
+  ", \"download\": {\"server\": \"127.0.0.1\", \"server_port\": ${DOOR_PORT}, ${door_reality}, \"path\": \"/xh\"}"
+scenario download-cleartext-h1 none auto packet-up '' \
+  ", \"download\": {\"server\": \"127.0.0.1\", \"server_port\": ${DOOR_PORT}, \"path\": \"/xh\"}"
+# Cleartext, so the door can read the GET: it must carry the route's own query
+# and header, which the main route does not have.
+scenario download-own-dressing none packet-up packet-up \
+  ', "xPaddingObfsMode": true, "xPaddingPlacement": "header", "sessionPlacement": "query", "sessionIDPlacement": "query"' \
+  ", \"x_padding_obfs_mode\": true, \"x_padding_placement\": \"header\", \"session_placement\": \"query\", \"download\": {\"server\": \"127.0.0.1\", \"server_port\": ${DOOR_PORT}, \"path\": \"/xh?via=door\", \"headers\": {\"X-Edge\": \"1\"}, \"x_padding_bytes\": \"300-600\", \"x_padding_obfs_mode\": true, \"x_padding_placement\": \"header\", \"session_placement\": \"query\", \"xmux\": {\"max_connections\": 1}}"
+# Uploads that outlive their connection's request budget move to a fresh one
+# many times over; every one of those has to come from the main pool.
+scenario download-rotation tls packet-up packet-up ', "scMaxEachPostBytes": 30000' \
+  ", \"sc_max_each_post_bytes\": 30000, \"sc_min_posts_interval_ms\": 1, \"xmux\": {\"h_max_request_times\": \"2-3\"}, \"download\": {\"server\": \"127.0.0.1\", \"server_port\": ${DOOR_PORT}, ${door_tls}, \"path\": \"/xh\"}"
+# The door found by name, as a CDN is: the transport resolves it through the
+# route's default domain resolver, which Commy always sets — and not through
+# the DNS router's final server, which here answers with a dead address.
+scenario download-by-name tls auto packet-up '' \
+  ", \"download\": {\"server\": \"door.test\", \"server_port\": ${DOOR_PORT}, ${door_tls}, \"path\": \"/xh\"}" \
+  ', "dns": {"servers": [{"type": "hosts", "tag": "decoy", "predefined": {"door.test": "127.0.0.9"}}, {"type": "hosts", "tag": "hosts", "predefined": {"door.test": "127.0.0.1"}}], "final": "decoy"}, "route": {"default_domain_resolver": "hosts"}'
 
 echo
 if [[ ${failed} -eq 0 && ${passed} -gt 0 ]]; then
