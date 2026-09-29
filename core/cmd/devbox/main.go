@@ -1,8 +1,8 @@
 // Command devbox runs the pinned core on a desktop with a configuration file,
 // and nothing else: no TUN, no platform interface, no app.
 //
-//	OVERLAY=$(go run ./cmd/overlaygen)
-//	GODEBUG=goindex=0 go build -overlay="$OVERLAY" -tags "<core tags>" \
+//	MODFILE=$(go run ./cmd/overlaygen)
+//	go build -modfile="$MODFILE" -tags "<core tags>" \
 //	    -ldflags "-checklinkname=0" -o build/devbox ./cmd/devbox
 //	build/devbox config.json
 //

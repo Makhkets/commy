@@ -27,7 +27,7 @@ import (
 //
 // Run with the build tags, like the other tests in this package:
 //
-//	GODEBUG=goindex=0 go test -overlay="$(go run ./cmd/overlaygen)" \
+//	go test -modfile="$(go run ./cmd/overlaygen)" \
 //	    -tags "<core tags>,commy_overlay" ./internal/singbox/
 func TestTheCoreConstructsWhatTheAppWrites(t *testing.T) {
 	raw, err := os.ReadFile("testdata/dart_nodes.json")

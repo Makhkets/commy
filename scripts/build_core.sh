@@ -11,8 +11,9 @@
 # We do not wrap sing-box by hand. It already ships experimental/libbox, which is
 # built for exactly this and is what the official sing-box Android app binds with
 # gomobile. core/ exists to pin the version, choose build tags, and add the one
-# transport sing-box does not have: XHTTP (core/xhttp, applied as a build
-# overlay — see prepare_overlay below and docs/adr/0010-xhttp-transport.md).
+# transport sing-box does not have: XHTTP (core/xhttp, reached through a few
+# edits to patched copies of sing-box — see prepare_modules below and
+# docs/adr/0010-xhttp-transport.md, docs/adr/0018-core-module-copies.md).
 #
 # Every value below is verified against the sing-box source, not copied from a
 # blog post. See docs/13-libbox-reference.md.
@@ -28,10 +29,9 @@ readonly SINGBOX_VERSION="v1.13.16"
 readonly LIBBOX_PKG="github.com/sagernet/sing-box/experimental/libbox"
 # Ours, bound into the same library: what Commy adds to the libbox API (today,
 # measuring servers with no tunnel up). A package of its own rather than an
-# overlay edit to libbox, because gomobile writes the Java and Objective-C
-# bindings from the source files on disk — an overlaid function compiles into
-# the library and never gets a binding. With -javapkg it is
-# io.nekohasekai.mobile.Mobile.
+# edit to libbox: the edits to upstream are kept to what cannot live anywhere
+# else, and each is one more thing a sing-box bump has to re-base. With
+# -javapkg it is io.nekohasekai.mobile.Mobile.
 readonly MOBILE_PKG="github.com/Makhkets/commy/core/mobile"
 
 # Shorter than upstream's list on purpose.
@@ -58,7 +58,7 @@ die() { printf '\n\033[31merror:\033[0m %s\n\n' "$*" >&2; exit 1; }
 say() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 
 need_go() {
-  command -v go >/dev/null 2>&1 || die "go is not on PATH. Install Go 1.24+."
+  command -v go >/dev/null 2>&1 || die "go is not on PATH. Install Go 1.26+ (or any Go that can fetch the toolchain core/go.mod names)."
 }
 
 # gomobile shells out to javac to compile the generated Java bindings, and it
@@ -102,64 +102,42 @@ sync_modules() {
 # (ADR-0011) and client version (ADR-0013), the selector that started on its
 # cache (ADR-0014), and the gVisor reader that outlived its stack (ADR-0012).
 #
-# core/cmd/overlaygen patches five upstream files, four in sing-box and one
-# in sing-tun, and writes a `go build -overlay` map. The modules in go.mod stay
-# the published versions; the transport itself is ordinary code in core/xhttp.
+# core/cmd/overlaygen copies the two upstream modules it edits — four files of
+# sing-box, one of sing-tun — out of the module cache, patches the copies, and
+# writes a go.mod that replaces the published modules with them. The go.mod in
+# core/ keeps naming the published versions; the transport itself is ordinary
+# code in core/xhttp.
 #
-# Two things here are not optional, and both fail in ways that do not say why:
-#
-#   GODEBUG=goindex=0   The go command takes the import list of a module-cache
-#                       package from its module index, which knows nothing
-#                       about overlays. Both patched files add an import, so
-#                       with the index on the build dies with
-#                         could not import github.com/Makhkets/commy/core/xhttp
-#                         (open : no such file or directory)
-#   no spaces in path   GOFLAGS is split on spaces and has no quoting. An
-#                       overlay under "C:/Users/John Doe/" would be read as two
-#                       flags, the second one nonsense.
-#
-# The flags travel in the environment because gomobile runs `go build` itself.
+# gomobile is run from a copy of core/ whose own go.mod is that one. It lists
+# the module it runs in, writes a go.mod of its own for the binding and builds
+# in a temporary directory — so the replacements have to be in the module's
+# go.mod: a -modfile flag would travel into that temporary build and point it
+# at the wrong module. This used to be `go build -overlay` over the cached
+# files, which Go 1.25 refuses ("Files beneath GOMODCACHE must not be
+# replaced"), and which held the core to a Go line without security fixes
+# (docs/adr/0018-core-module-copies.md).
 readonly XHTTP_MARKER='commy/core/xhttp.NewClient'
-OVERLAY=""
+readonly CORE_COPY="${BUILD_DIR}/_core"
 
-prepare_overlay() {
-  say "generating the build overlay (XHTTP, REALITY, selector default, gVisor reader)"
-  # `_overlay`, not `overlay`: Go skips directories that start with an
-  # underscore, and these files must not be mistaken for packages of core/.
-  OVERLAY="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen -out "${BUILD_DIR}/_overlay")" \
-    || die "could not generate the build overlay; the message above says which
+prepare_modules() {
+  [[ "${BUILD_DIR}" != *[[:space:]]* ]] || die \
+    "the build directory contains whitespace: ${BUILD_DIR}
+   The patched go.mod names absolute paths, unquoted. Build from a directory without spaces."
+  say "patching the upstream modules (XHTTP, REALITY, selector default, gVisor reader)"
+  local modfile
+  modfile="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen -out "${BUILD_DIR}/_overlay")" \
+    || die "could not patch the upstream modules; the message above says which
    upstream file changed. A sing-box bump has to re-base core/cmd/overlaygen."
-  [[ -f "${OVERLAY}" ]] || die "overlaygen reported ${OVERLAY}, which does not exist."
-  [[ "${OVERLAY}" != *[[:space:]]* ]] || die \
-    "the overlay path contains whitespace: ${OVERLAY}
-   GOFLAGS cannot carry such a path. Build from a directory without spaces."
-  export GOFLAGS="${GOFLAGS:+${GOFLAGS} }-overlay=${OVERLAY}"
-  export GODEBUG="${GODEBUG:+${GODEBUG},}goindex=0"
+  [[ -f "${modfile}" ]] || die "overlaygen reported ${modfile}, which does not exist."
+  # A fresh copy of core/ — its build directory left behind — under that go.mod.
+  rm -rf "${CORE_COPY}"
+  mkdir -p "${CORE_COPY}"
+  ( cd "${CORE_DIR}" && tar --exclude=./build -cf - . ) | ( cd "${CORE_COPY}" && tar -xf - )
+  cp "${modfile}" "${CORE_COPY}/go.mod"
+  cp "$(dirname "${modfile}")/go.sum" "${CORE_COPY}/go.sum"
 }
 
-# gomobile OVERWRITES GOFLAGS for every Apple target (cmd/gomobile/env.go sets
-# GOFLAGS=-tags=ios), which would drop the overlay without a word and produce a
-# framework that refuses every XHTTP server. A `go` wrapper first on PATH puts
-# the flag back on whatever GOFLAGS it is handed. Android does not need this —
-# gomobile leaves GOFLAGS alone there — and must not rely on it: on Windows
-# gomobile.exe resolves `go` to go.exe and never sees a shell script.
-install_go_shim() {
-  local real_go shim_dir
-  real_go="$(command -v go)"
-  shim_dir="${BUILD_DIR}/goshim"
-  mkdir -p "${shim_dir}"
-  cat > "${shim_dir}/go" <<SHIM
-#!/bin/sh
-GOFLAGS="\${GOFLAGS:+\$GOFLAGS }-overlay=${OVERLAY}"
-GODEBUG="\${GODEBUG:+\$GODEBUG,}goindex=0"
-export GOFLAGS GODEBUG
-exec "${real_go}" "\$@"
-SHIM
-  chmod +x "${shim_dir}/go"
-  export PATH="${shim_dir}:${PATH}"
-}
-
-# An overlay that did not apply still builds a working core. The only honest
+# A core built without the edits still builds, and runs. The only honest
 # check is to look inside the artefact: Go keeps function names in the binary
 # even with -s -w, and this one exists only if the transport was linked in.
 # One map carries every edit, so the marker stands for all of them.
@@ -171,7 +149,7 @@ verify_xhttp_in() {
   # that has not. That is not a guess — it is how this check first failed.
   found="$("$@" | grep -a -c "${XHTTP_MARKER}" || true)"
   if [[ "${found:-0}" -eq 0 ]]; then
-    die "${label} was built WITHOUT the XHTTP transport: the build overlay did
+    die "${label} was built WITHOUT the XHTTP transport: the patched modules did
    not apply. Nothing else would have told you — the core runs, and refuses
    every xhttp server at connect time."
   fi
@@ -241,12 +219,12 @@ build_android() {
   sync_modules
   ensure_gomobile
   mkdir -p "${BUILD_DIR}"
-  prepare_overlay
+  prepare_modules
 
   say "gomobile bind ${LIBBOX_PKG} ${MOBILE_PKG} for ${ANDROID_ABIS}"
   say "this compiles the whole core once per ABI and is slow on a weak machine;"
   say "set COMMY_ANDROID_ABIS=android/arm64 to build only what a phone needs."
-  ( cd "${CORE_DIR}" && gomobile bind -v \
+  ( cd "${CORE_COPY}" && gomobile bind -v \
       -target="${ANDROID_ABIS}" \
       -androidapi "${ANDROID_API}" \
       -javapkg=io.nekohasekai \
@@ -276,10 +254,9 @@ build_apple() {
   ensure_gomobile
   mkdir -p "${BUILD_DIR}"
   [[ "$(uname -s)" == "Darwin" ]] || die "the Apple target needs macOS with Xcode."
-  prepare_overlay
-  install_go_shim
+  prepare_modules
   say "gomobile bind ${LIBBOX_PKG} ${MOBILE_PKG} for Apple"
-  ( cd "${CORE_DIR}" && gomobile bind -v \
+  ( cd "${CORE_COPY}" && gomobile bind -v \
       -target=ios,iossimulator,macos \
       -tags "${TAGS},with_low_memory" \
       -ldflags "${LDFLAGS}" \
@@ -301,9 +278,9 @@ build_cshared() {
   need_go
   sync_modules
   mkdir -p "${BUILD_DIR}"
-  prepare_overlay
+  prepare_modules
   say "building c-shared core for ${goos}"
-  ( cd "${CORE_DIR}" && CGO_ENABLED=1 GOOS="${goos}" go build \
+  ( cd "${CORE_COPY}" && CGO_ENABLED=1 GOOS="${goos}" go build \
       -buildmode=c-shared \
       -tags "${TAGS}" \
       -ldflags "${LDFLAGS}" \

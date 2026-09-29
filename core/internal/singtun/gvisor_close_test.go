@@ -17,9 +17,9 @@ import (
 	N "github.com/sagernet/sing/common/network"
 )
 
-// This test needs the build overlay, because the defect is in sing-tun:
+// This test needs the patched modules, because the defect is in sing-tun:
 //
-//	GODEBUG=goindex=0 go test -overlay="$(go run ./cmd/overlaygen)" \
+//	go test -modfile="$(go run ./cmd/overlaygen)" \
 //	    -tags "<core tags>,commy_overlay" ./internal/singtun/
 //
 // A closed gVisor stack has to stop reading its device. Without the edit it

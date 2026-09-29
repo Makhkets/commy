@@ -43,7 +43,7 @@
 | [0007](0007-database-encryption.md) | Два хранилища вместо шифрования всей БД | Accepted |
 | [0008](0008-subscription-identity.md) | Что значит «та же подписка» и что делает повторное добавление | Accepted |
 | [0009](0009-device-identifier.md) | Идентификатор устройства для подписки (HWID) и заглушки панели | Accepted |
-| [0010](0010-xhttp-transport.md) | Транспорт XHTTP: свой клиент в `core/xhttp`, в sing-box — оверлеем сборки | Accepted |
+| [0010](0010-xhttp-transport.md) | Транспорт XHTTP: свой клиент в `core/xhttp`, в sing-box — оверлеем сборки (механизм заменён ADR-0018) | Accepted |
 | [0011](0011-reality-client-hello.md) | ClientHello REALITY: сначала современный, обрезанный — после отказа сервера; для REALITY всегда отпечаток `chrome` | Accepted (владелец, 2026-09-23) |
 | [0012](0012-gvisor-reader-stop.md) | Читатель gVisor, переживший стек: правка sing-tun оверлеем | Accepted (2026-09-23) |
 | [0013](0013-reality-client-version.md) | Версия клиента в REALITY: 26.9.9 вместо 1.8.1 (порог Xray 26.7.28) | Accepted (2026-09-23) |
@@ -51,3 +51,4 @@
 | [0015](0015-ping-methods.md) | Пинг: GET через сервер по умолчанию, отдельным экземпляром ядра; TCP и ICMP по выбору | Accepted (владелец, 2026-09-23) |
 | [0016](0016-blocking-tun-under-lockdown.md) | Блокирующий TUN, пока туннель снят под системным kill switch: DNS больше не уходит в сеть открытым текстом | Accepted (по поручению владельца, 2026-09-24) |
 | [0017](0017-encrypted-backup.md) | Резервная копия: один файл под паролем, Argon2id + ChaCha20-Poly1305, восстановление — полная замена | Accepted (по поручению владельца, 2026-09-29) |
+| [0018](0018-core-module-copies.md) | Правки ядра — в копиях модулей вне кеша (вместо `go build -overlay`); Go — поддерживаемая линия 1.26 | Accepted (по поручению владельца, 2026-09-30) |

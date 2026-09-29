@@ -26,9 +26,9 @@ import (
 	"github.com/Makhkets/commy/core/xhttp/config"
 )
 
-// This test needs the build overlay, because it goes through sing-box itself:
+// This test needs the patched modules, because it goes through sing-box itself:
 //
-//	GODEBUG=goindex=0 go test -overlay="$(go run ./cmd/overlaygen)" \
+//	go test -modfile="$(go run ./cmd/overlaygen)" \
 //	    -tags "<core tags>,commy_overlay" ./xhttp/
 //
 // It is what proves the two upstream switches were really reached — that a

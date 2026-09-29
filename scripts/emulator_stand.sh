@@ -22,7 +22,7 @@
 #               sends the download through it. It counts what it carries into
 #               door.log — "down" is the download, "up" should stay small.
 #   core        Hysteria2 (18450/udp) and TUIC (18451/udp) — our pinned
-#               sing-box (core/cmd/devbox), built here with the overlay
+#               sing-box (core/cmd/devbox), built here from the patched modules
 #   panel       http://10.0.2.2:18080/sub/<token> — a subscription the way
 #               Remnawave serves one: base64 list, subscription-userinfo,
 #               profile-title, announce. Tokens starting with "hwid" behave like
@@ -484,11 +484,11 @@ start() {
   [[ -f "${STAND_DIR}/pids" ]] && die "already running — scripts/emulator_stand.sh stop"
   mkdir -p "${STAND_DIR}"
 
-  say "building the pinned core with the overlay"
-  local tags overlay
+  say "building the pinned core from the patched modules"
+  local tags modfile
   tags="$(grep -oP '(?<=^readonly TAGS=")[^"]+' "${REPO_ROOT}/scripts/build_core.sh")"
-  overlay="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen)" || die "overlaygen failed."
-  ( cd "${CORE_DIR}" && GODEBUG=goindex=0 go build -overlay="${overlay}" -tags "${tags}" \
+  modfile="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen)" || die "overlaygen failed."
+  ( cd "${CORE_DIR}" && go build -modfile="${modfile}" -tags "${tags}" \
       -ldflags "-checklinkname=0" -o "${STAND_DIR}/devbox" ./cmd/devbox ) || die "the core did not build."
 
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \

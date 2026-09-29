@@ -71,8 +71,8 @@ jobs:
         working-directory: core
         run: go test -race ./...
 
-      # The XHTTP transport reaches sing-box through a build overlay that
-      # patches upstream files, sing-tun's among them. This step is what
+      # The XHTTP transport reaches sing-box through patched copies of the
+      # upstream modules, sing-tun's among them (ADR-0018). This step is what
       # notices a sing-box bump that moved them: overlaygen refuses a file
       # whose hash it does not know. The tagged tests then go through the
       # libraries themselves — a real sing-box instance, a VLESS outbound over
@@ -80,12 +80,12 @@ jobs:
       # its device once closed; a REALITY client that Xray's default
       # version floor lets through; and a selector that starts on the
       # server the configuration names.
-      - name: Build overlay applies, and the edits hold in the libraries
+      - name: The edits to upstream apply, and hold in the libraries
         working-directory: core
         run: |
           TAGS=$(grep -oP '(?<=^readonly TAGS=")[^"]+' ../scripts/build_core.sh)
-          OVERLAY=$(go run ./cmd/overlaygen -out build/_overlay)
-          GODEBUG=goindex=0 go test -overlay="$OVERLAY" \
+          MODFILE=$(go run ./cmd/overlaygen -out build/_overlay)
+          go test -modfile="$MODFILE" \
             -tags "$TAGS,commy_overlay" -ldflags "-checklinkname=0" \
             ./xhttp/ ./internal/singtun/ ./internal/singbox/
 
