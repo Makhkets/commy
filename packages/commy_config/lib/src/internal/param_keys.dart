@@ -22,7 +22,8 @@ abstract final class ParamKeys {
   /// VLESS sub-protocol, currently only `xtls-rprx-vision`.
   static const String flow = 'flow';
 
-  /// VLESS encryption field, which is always `none` in practice.
+  /// VLESS encryption field: `none` or nothing. Xray's VLESS Encryption is
+  /// refused at import, since the core has no such layer.
   static const String encryption = 'encryption';
 
   /// VMess cipher: `auto`, `aes-128-gcm`, `chacha20-poly1305`, `none`.

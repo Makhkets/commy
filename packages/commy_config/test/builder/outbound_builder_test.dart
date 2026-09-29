@@ -577,6 +577,27 @@ void main() {
       }
     });
 
+    test('refuses a stored vless node that asks for VLESS Encryption', () {
+      expect(
+        () => _build(
+          _node(Protocol.vless, <String, Object?>{
+            'uuid': 'u',
+            'encryption': 'mlkem768x25519plus.native.0rtt.AAAA',
+          }),
+        ),
+        throwsA(isA<ConfigBuildException>()),
+      );
+      expect(
+        _build(
+          _node(Protocol.vless, <String, Object?>{
+            'uuid': 'u',
+            'encryption': 'none',
+          }),
+        ).containsKey('encryption'),
+        isFalse,
+      );
+    });
+
     test('refuses a transport the core does not have', () {
       expect(
         () => _build(

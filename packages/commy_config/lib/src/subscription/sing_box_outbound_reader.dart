@@ -6,6 +6,7 @@ import 'package:commy_config/src/internal/param_keys.dart';
 import 'package:commy_config/src/internal/xhttp_download_settings.dart';
 import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
+import 'package:commy_config/src/parsers/vless_link_parser.dart';
 import 'package:commy_config/src/parsers/xray_stream_reader.dart';
 import 'package:commy_domain/commy_domain.dart';
 
@@ -314,8 +315,9 @@ abstract final class SingBoxOutboundReader {
       case Protocol.vless:
         params[ParamKeys.uuid] = MapRead.text(user, <String>['id']);
         params[ParamKeys.flow] = MapRead.text(user, <String>['flow']);
-        params[ParamKeys.encryption] =
-            MapRead.text(user, <String>['encryption']);
+        final encryption = MapRead.text(user, <String>['encryption']);
+        VlessLinkParser.requireSupportedEncryption(encryption);
+        params[ParamKeys.encryption] = encryption;
       case Protocol.vmess:
         params[ParamKeys.uuid] = MapRead.text(user, <String>['id']);
         params[ParamKeys.vmessSecurity] =

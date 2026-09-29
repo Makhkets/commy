@@ -596,6 +596,36 @@ void main() {
       );
     });
 
+    test('rejects a vless user with VLESS Encryption', () {
+      Map<String, Object?> outbound(String encryption) => <String, Object?>{
+            'tag': 'proxy',
+            'protocol': 'vless',
+            'settings': <String, Object?>{
+              'vnext': <Map<String, Object?>>[
+                <String, Object?>{
+                  'address': 'xray.example.com',
+                  'port': 443,
+                  'users': <Map<String, Object?>>[
+                    <String, Object?>{'id': 'u', 'encryption': encryption},
+                  ],
+                },
+              ],
+            },
+          };
+
+      expect(
+        () => SingBoxOutboundReader.read(
+          outbound('mlkem768x25519plus.native.0rtt.AAAA'),
+        ),
+        throwsA(isA<LinkFormatException>()),
+      );
+      expect(
+        SingBoxOutboundReader.read(outbound('none'))
+            .param(ParamKeys.encryption),
+        'none',
+      );
+    });
+
     test('reads a trojan outbound out of servers', () {
       final node = SingBoxOutboundReader.read(<String, Object?>{
         'tag': 'tr',

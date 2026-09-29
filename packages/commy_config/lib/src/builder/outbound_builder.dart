@@ -5,6 +5,7 @@ import 'package:commy_config/src/builder/tls_options_builder.dart';
 import 'package:commy_config/src/builder/transport_options_builder.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
+import 'package:commy_config/src/parsers/vless_link_parser.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Turns one [ProxyNode] into the object the core expects.
@@ -116,6 +117,13 @@ abstract final class OutboundBuilder {
       };
 
   static Map<String, Object?> _vless(ProxyNode node, String tag) {
+    // Checked again here, not only at import: a node stored before the rule
+    // existed would otherwise connect as plain VLESS and be refused.
+    final refusal =
+        VlessLinkParser.encryptionRefusal(node.param(ParamKeys.encryption));
+    if (refusal != null) {
+      throw ConfigBuildException(refusal);
+    }
     final options = _head(node, tag)
       ..[SingBoxKeys.uuid] = _require(node, ParamKeys.uuid, 'user id');
     final flow = _vlessFlow(node);

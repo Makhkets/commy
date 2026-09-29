@@ -174,6 +174,30 @@ void main() {
       );
     });
 
+    test('rejects VLESS Encryption without naming its key', () {
+      expect(
+        () => parser.parse(
+          'vless://uuid@a.example:443?security=tls'
+          '&encryption=mlkem768x25519plus.native.0rtt.SECRETKEY#n',
+        ),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            allOf(contains('mlkem768x25519plus'), isNot(contains('SECRET'))),
+          ),
+        ),
+      );
+    });
+
+    test('accepts encryption=none and a link that leaves it out', () {
+      final none = parser.parse('vless://uuid@a.example:443?encryption=none#n');
+      final missing = parser.parse('vless://uuid@a.example:443#n');
+
+      expect(none.param(ParamKeys.encryption), 'none');
+      expect(missing.param(ParamKeys.encryption), isNull);
+    });
+
     test('rejects another protocol', () {
       expect(
         () => parser.parse('trojan://pass@example.com:443#x'),

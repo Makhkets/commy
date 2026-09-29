@@ -17,6 +17,33 @@ class VlessLinkParser implements NodeLinkParser {
   /// Creates the parser.
   const VlessLinkParser();
 
+  /// Why the core cannot carry a VLESS user with [encryption], or `null`
+  /// when it can.
+  ///
+  /// Xray's VLESS Encryption (`mlkem768x25519plus.native.0rtt.<key>`, which
+  /// 3x-ui and Remnawave share) is a layer sing-box does not have. A node
+  /// that asks for it would connect as plain VLESS and be turned away by the
+  /// server every time, so it is refused by name instead. Only the scheme is
+  /// named: the rest of the value is the server's key, and the reason may
+  /// reach a log.
+  static String? encryptionRefusal(String? encryption) {
+    final value = encryption?.trim();
+    if (value == null || value.isEmpty || value.toLowerCase() == 'none') {
+      return null;
+    }
+    final scheme = value.split('.').first;
+    return 'VLESS encryption "$scheme" is not supported by the core';
+  }
+
+  /// Throws [LinkFormatException] when [encryption] is one the core cannot
+  /// carry (see [encryptionRefusal]).
+  static void requireSupportedEncryption(String? encryption) {
+    final refusal = encryptionRefusal(encryption);
+    if (refusal != null) {
+      throw LinkFormatException(refusal);
+    }
+  }
+
   @override
   Set<String> get schemes => const <String>{'vless'};
 
@@ -37,9 +64,11 @@ class VlessLinkParser implements NodeLinkParser {
     if (port == null) {
       throw const LinkFormatException('vless:// link carries no server port');
     }
+    final encryption = link.query.first('encryption');
+    requireSupportedEncryption(encryption);
     final params = <String, Object?>{
       ParamKeys.uuid: uuid,
-      ParamKeys.encryption: link.query.first('encryption'),
+      ParamKeys.encryption: encryption,
     };
     TransportParams.readInto(
       params,

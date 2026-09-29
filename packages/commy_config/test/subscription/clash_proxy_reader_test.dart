@@ -154,6 +154,29 @@ void main() {
       );
     });
 
+    test('rejects VLESS Encryption and keeps encryption none', () {
+      Map<String, Object?> entry(String encryption) => <String, Object?>{
+            'name': 'n',
+            'type': 'vless',
+            'server': 'a.example',
+            'port': 443,
+            'uuid': 'the-uuid',
+            'encryption': encryption,
+          };
+
+      expect(
+        () => ClashProxyReader.read(
+          entry('mlkem768x25519plus.native.0rtt.AAAA'),
+        ),
+        throwsA(isA<LinkFormatException>()),
+      );
+      expect(
+        ClashProxyReader.read(entry('none')).param(ParamKeys.encryption),
+        'none',
+      );
+      expect(ClashProxyReader.read(entry('')).protocol, Protocol.vless);
+    });
+
     test('rejects an entry with no port', () {
       expect(
         () => ClashProxyReader.read(<String, Object?>{
