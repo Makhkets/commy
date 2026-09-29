@@ -461,6 +461,10 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
   /// Set to make every fetch fail.
   CommyFailure? failure;
 
+  /// Set to hold every fetch until it completes, so a test can look at a
+  /// screen while a download is still in the air.
+  Completer<void>? gate;
+
   /// The URLs asked for, in order.
   final List<Uri> requests = <Uri>[];
 
@@ -474,6 +478,7 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
     String? userAgent,
   }) async {
     requests.add(url);
+    await gate?.future;
     final refused = failure;
     if (refused != null) {
       return Err<SubscriptionPayload, CommyFailure>(refused);
