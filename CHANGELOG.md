@@ -10,6 +10,18 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **`geoip:` rules work.** The default source asked for geoip lists in the
+  repository that publishes only geosite lists, so every download of one
+  answered 404 and every `geoip:` rule stayed unapplied. The address template
+  gains a `{kind}` placeholder (`geoip` or `geosite`), the default uses it, and
+  a stored copy of the old default is read as the new one. A mirror you typed
+  yourself is left as it is.
+- **Rules that need a rule set apply from the first connect.** Right after
+  the app started, the first connect — autoconnect included — was built before
+  the list of downloaded rule sets had loaded, and went up without every
+  `geosite:`/`geoip:` rule and without the ad list, until something opened the
+  settings. A rule set downloaded in the background was likewise missed until
+  then.
 - Small things on screen: "Scan a QR code" now shows a QR code rather than a
   magnifying glass; Settings → Routing reads "Rule-based · 3 rules" instead
   of "Rules · Rules: 3"; the DNS row on the routing screen says "Both, IPv4

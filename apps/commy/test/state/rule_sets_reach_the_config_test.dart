@@ -1,5 +1,6 @@
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -113,5 +114,53 @@ void main() {
       container.read(configWarningsProvider).join('\n'),
       contains('geosite-ru'),
     );
+  });
+
+  test('the first connect after a cold start has the rule sets too', () async {
+    // Every case above listens to the providers first, the way a screen
+    // would. A cold start has no such screen: the tunnel button, or
+    // autoconnect, is the first thing to read them, and a read of a stream
+    // nobody watched yet is "loading" — the build used to go ahead with no
+    // rule sets at all, and the file on disk counted for nothing.
+    harness = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
+    await harness.routingRepository.write(
+      RoutingPolicy.defaults.copyWith(
+        mode: RoutingMode.rules,
+        blockAds: true,
+        rules: const <RoutingRule>[
+          RoutingRule(
+            id: 'ru',
+            matcher: 'geosite:ru',
+            action: RuleAction.direct,
+          ),
+        ],
+      ),
+    );
+    for (final tag in <String>['geosite-ru', 'geosite-category-ads-all']) {
+      await harness.ruleSetRepository.download(
+        tag: tag,
+        from: Uri.parse('https://mirror.example/$tag.srs'),
+      );
+    }
+    container = ProviderContainer(overrides: harness.overrides());
+    addTearDown(() async {
+      container.dispose();
+      await harness.dispose();
+    });
+
+    // Nothing listens, not even to the controller: autoconnect can fire
+    // before the home screen has built.
+    final connected = await container
+        .read(tunnelControllerProvider.notifier)
+        .connect(nodeId: testNode().id);
+
+    expect(connected, isTrue);
+    final document = harness.core.lastConfig!.encode();
+    expect(document, contains('${FakeRuleSetRepository.path}/geosite-ru.srs'));
+    expect(
+      document,
+      contains('${FakeRuleSetRepository.path}/geosite-category-ads-all.srs'),
+    );
+    expect(container.read(configWarningsProvider), isEmpty);
   });
 }

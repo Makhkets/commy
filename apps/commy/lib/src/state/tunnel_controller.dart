@@ -528,7 +528,19 @@ class TunnelNotice {
 /// Connect, disconnect, switch and check.
 class TunnelController extends Notifier<TunnelActionState> {
   @override
-  TunnelActionState build() => TunnelActionState.initial;
+  TunnelActionState build() {
+    // Awake for as long as this controller lives. The configuration generator
+    // reads these three without waiting, and a provider nobody listens to is
+    // paused: its value stays where the last screen that watched it left it.
+    // The rule sets were watched only by the settings screens, so a set
+    // downloaded or deleted since — by the scheduler, say — was invisible to
+    // the next connect. [_loadConfigInputs] covers the first read.
+    ref
+      ..listen(nodesProvider, (_, __) {})
+      ..listen(ruleSetsProvider, (_, __) {})
+      ..listen(ruleSetDirectoryProvider, (_, __) {});
+    return TunnelActionState.initial;
+  }
 
   /// Starts the tunnel on [nodeId], or on the current selection, or — when
   /// nothing was ever picked — on the first server there is.
@@ -559,6 +571,7 @@ class TunnelController extends Notifier<TunnelActionState> {
     final logger = ref.read(appLoggerProvider)
       ..info('connect requested: ${_describe(target)}', tag: _tag);
 
+    await _loadConfigInputs();
     final result = await ref.read(connectUseCaseProvider)(nodeId: target);
     final failure = result.failureOrNull;
     if (failure != null) {
@@ -757,6 +770,7 @@ class TunnelController extends Notifier<TunnelActionState> {
     final logger = ref.read(appLoggerProvider)
       ..info('reload requested', tag: _tag);
 
+    await _loadConfigInputs();
     final result = await ref.read(reloadUseCaseProvider)(nodeId: nodeId);
     final failure = result.failureOrNull;
     if (failure != null) {
@@ -996,6 +1010,45 @@ class TunnelController extends Notifier<TunnelActionState> {
       servers.close();
     }
   }
+
+  /// Waits for what the configuration generator reads without waiting.
+  ///
+  /// The generator is a synchronous port: it takes the server list, the rule
+  /// sets on disk and their directory from providers with `ref.read`. Until
+  /// their first value has arrived that read is "loading", and the build went
+  /// ahead without them — so on a cold start the first connect, autoconnect
+  /// included, dropped every `geosite:` and `geoip:` rule and the ad list.
+  /// Once loaded the wait is free: [build] keeps them listened to.
+  Future<void> _loadConfigInputs() async {
+    // Listened to here as well, for the same reason [_connectTarget] does:
+    // autoconnect can call before any screen listens to this controller, and
+    // an unlistened controller's own subscriptions are paused with it.
+    final handles = <ProviderSubscription<Object?>>[
+      ref.listen(nodesProvider, (_, __) {}),
+      ref.listen(ruleSetsProvider, (_, __) {}),
+      ref.listen(ruleSetDirectoryProvider, (_, __) {}),
+    ];
+    try {
+      await Future.wait<Object?>(<Future<Object?>>[
+        ref.read(nodesProvider.future),
+        ref.read(ruleSetsProvider.future),
+        ref.read(ruleSetDirectoryProvider.future),
+      ]).timeout(_configInputsTimeout);
+    } on Object catch (error) {
+      // What did not load reads as empty, as it always has; the generator
+      // reports the rules that had nothing to point at.
+      ref
+          .read(appLoggerProvider)
+          .warn('configuration inputs not ready: $error', tag: _tag);
+    } finally {
+      for (final handle in handles) {
+        handle.close();
+      }
+    }
+  }
+
+  /// How long a connect waits for [_loadConfigInputs] before building anyway.
+  static const Duration _configInputsTimeout = Duration(seconds: 5);
 
   /// Rebuilds the configuration that was just sent, for the diagnostics tab.
   ///
