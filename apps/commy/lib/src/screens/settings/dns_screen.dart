@@ -92,6 +92,7 @@ class _Body extends ConsumerWidget {
                   title: t.dns.remote,
                   current: dns.remote,
                   fallback: DnsSettings.defaultRemote,
+                  throughTunnel: true,
                   apply: (value) => dns.copyWith(remote: value),
                 ),
               ),
@@ -194,6 +195,7 @@ class _Body extends ConsumerWidget {
     required String current,
     required String fallback,
     required DnsSettings Function(String value) apply,
+    bool throughTunnel = false,
   }) async {
     final edited = await CommySheet.show<String>(
       context: context,
@@ -201,6 +203,7 @@ class _Body extends ConsumerWidget {
       builder: (context) => _ResolverSheet(
         current: current,
         fallback: fallback,
+        throughTunnel: throughTunnel,
       ),
     );
     if (edited == null) {
@@ -217,10 +220,17 @@ class _Body extends ConsumerWidget {
 /// the core can be handed; anything it refuses would otherwise have surfaced
 /// as a build failure on the next connect, two screens away from the typo.
 class _ResolverSheet extends StatefulWidget {
-  const _ResolverSheet({required this.current, required this.fallback});
+  const _ResolverSheet({
+    required this.current,
+    required this.fallback,
+    required this.throughTunnel,
+  });
 
   final String current;
   final String fallback;
+
+  /// The resolver asked through the tunnel, which may not be the system one.
+  final bool throughTunnel;
 
   @override
   State<_ResolverSheet> createState() => _ResolverSheetState();
@@ -253,7 +263,9 @@ class _ResolverSheetState extends State<_ResolverSheet> {
             controller: _value,
             labelText: t.dns.edit.label,
             hintText: t.dns.edit.hint,
-            helperText: t.dns.edit.help(schemes: _schemes),
+            helperText: widget.throughTunnel
+                ? t.dns.edit.helpRemote(schemes: _schemes)
+                : t.dns.edit.help(schemes: _schemes),
             errorText: _errorText(t),
             autofocus: true,
             isMonospace: true,
@@ -288,12 +300,16 @@ class _ResolverSheetState extends State<_ResolverSheet> {
   String? _errorText(Translations t) => switch (_problem) {
         ResolverProblem.unsupportedScheme => t.dns.edit.unsupportedScheme,
         ResolverProblem.missingAddress => t.dns.edit.missingAddress,
+        ResolverProblem.systemThroughTunnel => t.dns.edit.systemThroughTunnel,
         null => null,
       };
 
   void _submit() {
     final value = _value.text.trim();
-    final problem = DnsSectionBuilder.checkResolver(value);
+    final problem = DnsSectionBuilder.checkResolver(
+      value,
+      throughTunnel: widget.throughTunnel,
+    );
     if (problem != null) {
       setState(() => _problem = problem);
       return;

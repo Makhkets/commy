@@ -10,6 +10,12 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **DNS.** A direct resolver given by name (`https://dns.google/dns-query`,
+  `tls://dns.quad9.net`) no longer stops the tunnel from starting — it finds
+  its own server through the system resolver, as the core requires. And the
+  resolver through the tunnel can no longer be `local`: the system resolver
+  answers outside the tunnel, so every proxied name would have been looked up
+  in the clear. The DNS screen refuses it and says why.
 - **One server's odd setting no longer stops all of them** (the rest of the
   class fixed for TLS in alpha.11). A VLESS flow the core does not know, a
   Shadowsocks cipher or plugin it does not have, a Shadowsocks 2022 key of the

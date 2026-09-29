@@ -307,9 +307,11 @@
       "label": "Resolver",
       "hint": "tls://1.1.1.1",
       "help": "Schemes: $schemes. A bare address means plain UDP. \"local\" hands the query to the system.",
+      "helpRemote": "Schemes: $schemes. A bare address means plain UDP.",
       "reset": "Use the default",
       "unsupportedScheme": "The core has no transport for that scheme",
-      "missingAddress": "There is no address after the scheme"
+      "missingAddress": "There is no address after the scheme",
+      "systemThroughTunnel": "The system resolver answers outside the tunnel: every name going through the proxy would leak. Give a resolver address"
     }
   },
 

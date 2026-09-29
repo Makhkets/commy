@@ -230,12 +230,7 @@ class SingBoxConfigBuilder {
         CoreConfig(<String, Object?>{
           SingBoxKeys.log: <String, Object?>{SingBoxKeys.disabled: true},
           SingBoxKeys.dns: <String, Object?>{
-            SingBoxKeys.servers: <Map<String, Object?>>[
-              DnsSectionBuilder.parseResolver(
-                dns.direct,
-                tag: SingBoxTags.dnsDirect,
-              ),
-            ],
+            SingBoxKeys.servers: DnsSectionBuilder.directResolvers(dns.direct),
             SingBoxKeys.finalTag: SingBoxTags.dnsDirect,
             SingBoxKeys.strategy: dns.strategy.wireName,
           },

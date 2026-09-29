@@ -107,6 +107,33 @@ void main() {
       expect(stored().direct, DnsSettings.defaultDirect);
     });
 
+    testWidgets('refuses the system resolver for the tunnel, not for direct',
+        (tester) async {
+      // "local" through the tunnel is the system resolver, which answers
+      // outside it: every proxied name would be looked up in the clear.
+      await pumpScreen(tester);
+
+      await tester.tap(find.text(t.dns.remote));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(CommyTextField), 'local');
+      await tester.tap(find.text(t.common.save));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.dns.edit.systemThroughTunnel), findsOneWidget);
+      expect(stored().remote, DnsSettings.defaultRemote);
+
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.dns.direct));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(CommyTextField), 'local');
+      await tester.tap(find.text(t.common.save));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.dns.edit.systemThroughTunnel), findsNothing);
+      expect(stored().direct, 'local');
+    });
+
     testWidgets('everything it accepts, the builder can build', (tester) async {
       // The screen and the core agreeing is the whole reason the check lives
       // in `commy_config` rather than being retyped here.

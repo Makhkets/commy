@@ -36,6 +36,13 @@ void main() {
     return OutboundBuilder.build(node: outcome!.nodes.single, tag: 'out');
   }
 
+  Map<String, Object?> dnsFrom(DnsSettings dns) => DnsSectionBuilder.build(
+        dns: dns,
+        routing: RoutingPolicy.defaults,
+        platform: ConfigPlatform.android,
+        availableRuleSets: const <String>{},
+      );
+
   if (update) {
     test('regenerates the fixture', () {
       final document = <String, Object?>{
@@ -46,9 +53,16 @@ void main() {
             <String, Object?>{
               'name': name,
               'link': link,
-              'endpoint':
-                  buildFrom(link)['type'] == Protocol.wireguard.wireName,
+              'kind': buildFrom(link)['type'] == Protocol.wireguard.wireName
+                  ? 'endpoint'
+                  : 'outbound',
               'object': buildFrom(link),
+            },
+          for (final (name, dns) in _resolvers)
+            <String, Object?>{
+              'name': name,
+              'kind': 'dns',
+              'object': dnsFrom(dns),
             },
         ],
       };
@@ -65,19 +79,48 @@ void main() {
       .cast<Map<String, Object?>>()
       .toList(growable: false);
 
-  test('the fixture holds every link below, and nothing else', () {
+  test('the fixture holds every case below, and nothing else', () {
     expect(
-      <String>[for (final entry in cases) '${entry['link']}'],
-      <String>[for (final (_, link) in _links) link],
+      <String>[for (final entry in cases) '${entry['name']}'],
+      <String>[
+        for (final (name, _) in _links) name,
+        for (final (name, _) in _resolvers) name,
+      ],
     );
   });
 
+  final links = Map<String, String>.fromEntries(
+    _links.map((link) => MapEntry<String, String>(link.$1, link.$2)),
+  );
+  final resolvers = Map<String, DnsSettings>.fromEntries(
+    _resolvers.map((dns) => MapEntry<String, DnsSettings>(dns.$1, dns.$2)),
+  );
   for (final entry in cases) {
-    test('the core is handed what the fixture promises: ${entry['name']}', () {
-      expect(buildFrom('${entry['link']}'), entry['object']);
+    final name = '${entry['name']}';
+    test('the core is handed what the fixture promises: $name', () {
+      final link = links[name];
+      expect(
+        link == null ? dnsFrom(resolvers[name]!) : buildFrom(link),
+        entry['object'],
+      );
     });
   }
 }
+
+/// DNS sections, for the resolvers the core has to be told how to find.
+const List<(String, DnsSettings)> _resolvers = <(String, DnsSettings)>[
+  (
+    'DNS, the direct resolver by name over HTTPS',
+    DnsSettings(
+      remote: 'https://dns.google/dns-query',
+      direct: 'https://cloudflare-dns.com/dns-query',
+    ),
+  ),
+  (
+    'DNS, the direct resolver by name over TLS, FakeIP on',
+    DnsSettings(direct: 'tls://dns.quad9.net', fakeIp: true),
+  ),
+];
 
 const String _dartHalf =
     'packages/commy_config/test/builder/core_accepts_contract_test.dart';

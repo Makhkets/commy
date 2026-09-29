@@ -3,6 +3,7 @@ import 'package:commy_config/src/builder/route_matcher.dart';
 import 'package:commy_config/src/builder/route_section_builder.dart';
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/builder/sing_box_tags.dart';
+import 'package:commy_config/src/builder/tls_options_builder.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_domain/commy_domain.dart';
 
@@ -17,6 +18,11 @@ enum ResolverProblem {
 
   /// Nothing is left to connect to once the scheme has been taken off.
   missingAddress,
+
+  /// `local` — the system resolver — where the resolver has to be asked
+  /// through the tunnel. The system answers outside it, so every name the
+  /// tunnel carries would be looked up in the clear (rule R6).
+  systemThroughTunnel,
 }
 
 /// Builds the `dns` section.
@@ -68,13 +74,20 @@ abstract final class DnsSectionBuilder {
     required ConfigPlatform platform,
     required Set<String> availableRuleSets,
   }) {
+    if (checkResolver(dns.remote, throughTunnel: true) ==
+        ResolverProblem.systemThroughTunnel) {
+      throw const ConfigBuildException(
+        'The resolver through the tunnel is the system one, which would look '
+        'up every proxied name outside the tunnel',
+      );
+    }
     final servers = <Map<String, Object?>>[
       parseResolver(
         dns.remote,
         tag: SingBoxTags.dnsRemote,
         detour: SingBoxTags.proxyGroup,
       ),
-      parseResolver(dns.direct, tag: SingBoxTags.dnsDirect),
+      ...directResolvers(dns.direct),
       if (dns.fakeIp)
         <String, Object?>{
           SingBoxKeys.type: 'fakeip',
@@ -124,7 +137,44 @@ abstract final class DnsSectionBuilder {
   ///
   /// Reads the same dissection [parseResolver] does, so the two cannot start
   /// disagreeing about what a resolver is.
-  static ResolverProblem? checkResolver(String raw) => _dissect(raw).problem;
+  ///
+  /// [throughTunnel] is for the resolver asked through the tunnel, which may
+  /// not be `local`.
+  static ResolverProblem? checkResolver(
+    String raw, {
+    bool throughTunnel = false,
+  }) {
+    final dissected = _dissect(raw);
+    if (throughTunnel && dissected.isLocal) {
+      return ResolverProblem.systemThroughTunnel;
+    }
+    return dissected.problem;
+  }
+
+  /// The direct resolver, and the one it finds its own server with.
+  ///
+  /// A resolver given by name — `https://dns.google/dns-query` — has to look
+  /// that name up before it can ask anything, and sing-box will not guess
+  /// how: a DNS server whose address is a domain and that has no detour needs
+  /// a `domain_resolver`, or the core refuses to start ("missing domain
+  /// resolver for domain server address"). It gets the system resolver,
+  /// which is where a direct lookup goes anyway. The one through the tunnel
+  /// needs nothing: its name travels to the server inside the tunnel.
+  static List<Map<String, Object?>> directResolvers(String raw) {
+    final direct = parseResolver(raw, tag: SingBoxTags.dnsDirect);
+    final server = direct[SingBoxKeys.server];
+    if (server is! String || TlsOptionsBuilder.isIpLiteral(server)) {
+      return <Map<String, Object?>>[direct];
+    }
+    direct[SingBoxKeys.domainResolver] = SingBoxTags.dnsBootstrap;
+    return <Map<String, Object?>>[
+      direct,
+      <String, Object?>{
+        SingBoxKeys.type: 'local',
+        SingBoxKeys.tag: SingBoxTags.dnsBootstrap,
+      },
+    ];
+  }
 
   /// Turns a resolver string such as `tls://1.1.1.1` into a server object.
   ///
@@ -137,6 +187,9 @@ abstract final class DnsSectionBuilder {
   }) {
     final parsed = _dissect(raw);
     switch (parsed.problem) {
+      case ResolverProblem.systemThroughTunnel:
+        // Only [checkResolver] says this; [build] refuses it before here.
+        throw ConfigBuildException('Resolver "$raw" cannot be used here');
       case ResolverProblem.unsupportedScheme:
         throw ConfigBuildException(
           'Resolver "${parsed.scheme}://" is not one the core can speak',

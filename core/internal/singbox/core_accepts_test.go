@@ -21,7 +21,8 @@ import (
 // the first one that fails fails the box. The fixture is what the builder
 // writes for links whose values used to reach the core as they were — a VLESS
 // flow only Xray knows, a plugin under another name, a single-port hop, a bare
-// WireGuard address. Each one is constructed here, by the library itself.
+// WireGuard address, a direct resolver given by name. Each one is constructed
+// here, by the library itself.
 //
 // Run with the build tags, like the other tests in this package:
 //
@@ -34,9 +35,9 @@ func TestTheCoreConstructsWhatTheAppWrites(t *testing.T) {
 	}
 	var fixture struct {
 		Cases []struct {
-			Name     string          `json:"name"`
-			Endpoint bool            `json:"endpoint"`
-			Object   json.RawMessage `json:"object"`
+			Name   string          `json:"name"`
+			Kind   string          `json:"kind"`
+			Object json.RawMessage `json:"object"`
 		} `json:"cases"`
 	}
 	if err := json.Unmarshal(raw, &fixture); err != nil {
@@ -47,12 +48,19 @@ func TestTheCoreConstructsWhatTheAppWrites(t *testing.T) {
 	}
 	for _, c := range fixture.Cases {
 		t.Run(c.Name, func(t *testing.T) {
-			list := "outbounds"
-			if c.Endpoint {
-				list = "endpoints"
+			var document string
+			switch c.Kind {
+			case "outbound":
+				document = `{"log": {"disabled": true}, "outbounds": [` + string(c.Object) + `]}`
+			case "endpoint":
+				document = `{"log": {"disabled": true}, "endpoints": [` + string(c.Object) + `]}`
+			case "dns":
+				// The section refers to the proxy group by its tag.
+				document = `{"log": {"disabled": true}, "dns": ` + string(c.Object) +
+					`, "outbounds": [{"type": "direct", "tag": "proxy"}]}`
+			default:
+				t.Fatalf("unknown kind %q", c.Kind)
 			}
-			document := `{"log": {"disabled": true}, "` + list + `": [` +
-				string(c.Object) + `]}`
 
 			ctx, cancel := context.WithCancel(include.Context(context.Background()))
 			defer cancel()
