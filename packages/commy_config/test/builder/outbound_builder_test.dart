@@ -113,6 +113,175 @@ void main() {
     });
   });
 
+  group('OutboundBuilder values only one server should pay for', () {
+    // The same class as the group above, for the protocol fields: a flow, a
+    // cipher, a plugin, a hop range, an interface address. What means
+    // something the core knows is rewritten into it; the rest leaves this one
+    // server out. core_accepts_contract_test.dart holds the rewritten forms
+    // to what sing-box itself constructs.
+    Matcher leftOut(String reason) => throwsA(
+          isA<ConfigBuildException>().having(
+            (error) => error.reason,
+            'reason',
+            contains(reason),
+          ),
+        );
+
+    Map<String, Object?> ss(Map<String, Object?> params) => _build(
+          _node(Protocol.shadowsocks, <String, Object?>{
+            'method': 'aes-128-gcm',
+            'password': 'p',
+            ...params,
+          }),
+        );
+
+    Map<String, Object?> hy2(Map<String, Object?> params) => _build(
+          _node(Protocol.hysteria2, <String, Object?>{
+            'password': 'p',
+            ...params,
+          }),
+        );
+
+    Map<String, Object?> wg(String addresses) => _build(
+          _node(Protocol.wireguard, <String, Object?>{
+            'private_key': 'k',
+            'peerPublicKey': 'p',
+            'localAddress': addresses,
+          }),
+        );
+
+    test('a VLESS flow is vision, none, or this server out', () {
+      Object? flowOf(String flow) => _build(
+            _node(Protocol.vless, <String, Object?>{'uuid': 'u', 'flow': flow}),
+          )['flow'];
+
+      expect(flowOf('xtls-rprx-vision'), 'xtls-rprx-vision');
+      expect(flowOf('XTLS-RPRX-VISION-UDP443'), 'xtls-rprx-vision');
+      expect(flowOf('none'), isNull);
+      expect(() => flowOf('xtls-rprx-direct'), leftOut('flow'));
+    });
+
+    test('a cipher the core does not register leaves the server out', () {
+      expect(
+        ss(<String, Object?>{'method': 'AES-256-GCM'})['method'],
+        'aes-256-gcm',
+      );
+      expect(
+        ss(<String, Object?>{'method': 'xchacha20-poly1305'})['method'],
+        'xchacha20-ietf-poly1305',
+      );
+      expect(
+        ss(<String, Object?>{'method': 'none', 'password': null})['password'],
+        '',
+      );
+      expect(
+        () => ss(<String, Object?>{'method': 'camellia-256-cfb'}),
+        leftOut('cipher'),
+      );
+    });
+
+    test('a 2022 cipher checks its keys the way the core decodes them', () {
+      expect(
+        () => ss(<String, Object?>{
+          'method': '2022-blake3-aes-256-gcm',
+          'password': 'not-a-key',
+        }),
+        leftOut('32 bytes'),
+      );
+      // Sixteen bytes is the AES-128 key; the AES-256 cipher wants 32.
+      expect(
+        () => ss(<String, Object?>{
+          'method': '2022-blake3-aes-256-gcm',
+          'password': 'AAECAwQFBgcICQoLDA0ODw==',
+        }),
+        leftOut('32 bytes'),
+      );
+      expect(
+        () => ss(<String, Object?>{
+          'method': '2022-blake3-chacha20-poly1305',
+          'password': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=:'
+              'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=',
+        }),
+        leftOut('single key'),
+      );
+    });
+
+    test('a plugin is obfs-local or v2ray-plugin, in a mode the core has', () {
+      expect(ss(<String, Object?>{'plugin': 'obfs'})['plugin'], 'obfs-local');
+      expect(
+        () => ss(<String, Object?>{'plugin': 'shadow-tls'}),
+        leftOut('plugin'),
+      );
+      expect(
+        () => ss(<String, Object?>{
+          'plugin': 'obfs-local',
+          'pluginOpts': 'obfs=quic;obfs-host=a.example',
+        }),
+        leftOut('obfs mode'),
+      );
+      expect(
+        () => ss(<String, Object?>{
+          'plugin': 'v2ray-plugin',
+          'pluginOpts': 'mode=quic;host=a.example',
+        }),
+        leftOut('v2ray-plugin mode'),
+      );
+      // An escaped separator is part of the value, not the end of it.
+      expect(
+        ss(<String, Object?>{
+          'plugin': 'v2ray-plugin',
+          'pluginOpts': r'mode=websocket;path=/a\;b',
+        })['plugin'],
+        'v2ray-plugin',
+      );
+    });
+
+    test('a hop range is always start:end, or this server out', () {
+      expect(
+        hy2(<String, Object?>{'serverPorts': '443'})['server_ports'],
+        <String>['443:443'],
+      );
+      expect(
+        hy2(<String, Object?>{'serverPorts': '1000-2000, 3000:3100'})[
+            'server_ports'],
+        <String>['1000:2000', '3000:3100'],
+      );
+      for (final bad in <String>['2000-1000', '0-10', '70000', 'a-b']) {
+        expect(
+          () => hy2(<String, Object?>{'serverPorts': bad}),
+          leftOut('port range'),
+          reason: bad,
+        );
+      }
+    });
+
+    test('obfuscation is salamander with a password, or this server out', () {
+      expect(
+        hy2(<String, Object?>{'obfs': 'none'}).containsKey('obfs'),
+        isFalse,
+      );
+      expect(
+        () => hy2(<String, Object?>{'obfs': 'salamander'}),
+        leftOut('no password'),
+      );
+      expect(
+        () => hy2(<String, Object?>{'obfs': 'gfw', 'obfs-password': 'x'}),
+        leftOut('obfuscation'),
+      );
+    });
+
+    test('a bare WireGuard address is one host, anything else is refused', () {
+      expect(
+        wg('10.0.0.2, fd00::2')['address'],
+        <String>['10.0.0.2/32', 'fd00::2/128'],
+      );
+      expect(wg('10.0.0.2/24')['address'], <String>['10.0.0.2/24']);
+      for (final bad in <String>['10.0.0.256', 'host.example', '10.0.0.2/33']) {
+        expect(() => wg(bad), leftOut('WireGuard address'), reason: bad);
+      }
+    });
+  });
+
   group('OutboundBuilder vless', () {
     test('never writes spider_x, which the core has no field for', () {
       final outbound = _build(

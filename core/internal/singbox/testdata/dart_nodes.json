@@ -1,0 +1,191 @@
+{
+  "_comment": "Written by packages/commy_config/test/builder/core_accepts_contract_test.dart; read by core/internal/singbox/core_accepts_test.go. Every object must be one sing-box constructs.",
+  "cases": [
+    {
+      "name": "VLESS REALITY with Xray vision-udp443",
+      "link": "vless://11111111-2222-3333-4444-555555555555@example.com:443?security=reality&sni=www.example.com&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k&sid=ab12cd34&fp=chrome&flow=xtls-rprx-vision-udp443&type=tcp#vision-udp443",
+      "endpoint": false,
+      "object": {
+        "type": "vless",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "uuid": "11111111-2222-3333-4444-555555555555",
+        "flow": "xtls-rprx-vision",
+        "tls": {
+          "enabled": true,
+          "server_name": "www.example.com",
+          "utls": {
+            "enabled": true,
+            "fingerprint": "chrome"
+          },
+          "reality": {
+            "enabled": true,
+            "public_key": "xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k",
+            "short_id": "ab12cd34"
+          }
+        }
+      }
+    },
+    {
+      "name": "VLESS with the flow written as none",
+      "link": "vless://11111111-2222-3333-4444-555555555555@example.com:443?security=tls&sni=example.com&flow=none&type=ws&path=%2Fws&host=example.com#flow-none",
+      "endpoint": false,
+      "object": {
+        "type": "vless",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "uuid": "11111111-2222-3333-4444-555555555555",
+        "tls": {
+          "enabled": true,
+          "server_name": "example.com"
+        },
+        "transport": {
+          "type": "ws",
+          "path": "/ws",
+          "headers": {
+            "Host": "example.com"
+          }
+        }
+      }
+    },
+    {
+      "name": "Shadowsocks 2022, one key",
+      "link": "ss://MjAyMi1ibGFrZTMtYWVzLTI1Ni1nY206QUFFQ0F3UUZCZ2NJQ1FvTERBME9EeEFSRWhNVUZSWVhHQmthR3h3ZEhoOD0@example.com:8388#ss2022",
+      "endpoint": false,
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "2022-blake3-aes-256-gcm",
+        "password": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+      }
+    },
+    {
+      "name": "Shadowsocks 2022, two keys",
+      "link": "ss://MjAyMi1ibGFrZTMtYWVzLTEyOC1nY206QUFFQ0F3UUZCZ2NJQ1FvTERBME9Edz09OkFBRUNBd1FGQmdjSUNRb0xEQTBPRHc9PQ@example.com:8388#ss2022-eih",
+      "endpoint": false,
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "2022-blake3-aes-128-gcm",
+        "password": "AAECAwQFBgcICQoLDA0ODw==:AAECAwQFBgcICQoLDA0ODw=="
+      }
+    },
+    {
+      "name": "Shadowsocks with the plugin called simple-obfs",
+      "link": "ss://YWVzLTEyOC1nY206cGFzcy13b3Jk@example.com:8388?plugin=simple-obfs%3Bobfs%3Dhttp%3Bobfs-host%3Dexample.com#simple-obfs",
+      "endpoint": false,
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "aes-128-gcm",
+        "password": "pass-word",
+        "plugin": "obfs-local",
+        "plugin_opts": "obfs=http;obfs-host=example.com"
+      }
+    },
+    {
+      "name": "Shadowsocks with v2ray-plugin over websocket and TLS",
+      "link": "ss://YWVzLTEyOC1nY206cGFzcy13b3Jk@example.com:443?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bhost%3Dexample.com%3Bpath%3D%2Fws%3Btls#v2ray-plugin",
+      "endpoint": false,
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "method": "aes-128-gcm",
+        "password": "pass-word",
+        "plugin": "v2ray-plugin",
+        "plugin_opts": "mode=websocket;host=example.com;path=/ws;tls"
+      }
+    },
+    {
+      "name": "Shadowsocks with the Xray spelling of ChaCha20",
+      "link": "ss://Y2hhY2hhMjAtcG9seTEzMDU6cGFzcy13b3Jk@example.com:8388#chacha",
+      "endpoint": false,
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "chacha20-ietf-poly1305",
+        "password": "pass-word"
+      }
+    },
+    {
+      "name": "Hysteria 2 hopping over a single port",
+      "link": "hysteria2://pass-word@example.com:443?sni=example.com&mport=443#hy2-single",
+      "endpoint": false,
+      "object": {
+        "type": "hysteria2",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "password": "pass-word",
+        "server_ports": [
+          "443:443"
+        ],
+        "tls": {
+          "enabled": true,
+          "server_name": "example.com"
+        }
+      }
+    },
+    {
+      "name": "Hysteria 2 hopping over a range, with salamander",
+      "link": "hy2://pass-word@example.com:443?sni=example.com&mport=20000-30000&obfs=salamander&obfs-password=secret#hy2-range",
+      "endpoint": false,
+      "object": {
+        "type": "hysteria2",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "password": "pass-word",
+        "server_ports": [
+          "20000:30000"
+        ],
+        "obfs": {
+          "type": "salamander",
+          "password": "secret"
+        },
+        "tls": {
+          "enabled": true,
+          "server_name": "example.com"
+        }
+      }
+    },
+    {
+      "name": "WireGuard with bare interface addresses",
+      "link": "wireguard://CAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHkg%3D@example.com:51820?publickey=ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1%2Bf4CBgoM%3D&address=10.0.0.2,fd00::2&mtu=1420#wg-bare",
+      "endpoint": true,
+      "object": {
+        "type": "wireguard",
+        "tag": "out",
+        "address": [
+          "10.0.0.2/32",
+          "fd00::2/128"
+        ],
+        "private_key": "CAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHkg=",
+        "peers": [
+          {
+            "address": "example.com",
+            "port": 51820,
+            "public_key": "ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoM=",
+            "allowed_ips": [
+              "0.0.0.0/0",
+              "::/0"
+            ]
+          }
+        ],
+        "mtu": 1420
+      }
+    }
+  ]
+}

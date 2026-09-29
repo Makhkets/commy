@@ -10,6 +10,17 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **One server's odd setting no longer stops all of them** (the rest of the
+  class fixed for TLS in alpha.11). A VLESS flow the core does not know, a
+  Shadowsocks cipher or plugin it does not have, a Shadowsocks 2022 key of the
+  wrong length, a Hysteria 2 port hop written as a single port, obfuscation
+  without a password, a WireGuard address without its prefix — each used to
+  make the core refuse the whole configuration. What means something the core
+  knows is now written the way it reads it (Xray's `xtls-rprx-vision-udp443`
+  is vision, `simple-obfs` is `obfs-local`, `chacha20-poly1305` is
+  `chacha20-ietf-poly1305`, port `443` is `443:443`, `10.0.0.2` is
+  `10.0.0.2/32`); the rest leaves that one server out, with the reason in the
+  log.
 - **`geoip:` rules work.** The default source asked for geoip lists in the
   repository that publishes only geosite lists, so every download of one
   answered 404 and every `geoip:` rule stayed unapplied. The address template
