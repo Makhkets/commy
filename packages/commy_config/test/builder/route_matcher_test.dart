@@ -176,6 +176,25 @@ void main() {
           });
     });
 
+    test('says which matchers need a name resolved into addresses', () {
+      bool needs(String raw) => _parse(raw)!.needsResolvedAddress;
+
+      expect(needs('ip_cidr:10.0.0.0/8'), isTrue);
+      expect(needs('10.1.2.3'), isTrue);
+      expect(needs('geoip:ru'), isTrue);
+      expect(needs('rule_set:geoip-ru'), isTrue);
+      // The private ranges are for addresses dialled as addresses.
+      expect(needs('geoip:private'), isFalse);
+      for (final raw in <String>[
+        'domain:a.example',
+        'geosite:ru',
+        'port:443',
+        'network:udp',
+      ]) {
+        expect(needs(raw), isFalse, reason: raw);
+      }
+    });
+
     test('drops something it cannot make sense of', () {
       expect(_parse(''), isNull);
       expect(_parse('   '), isNull);

@@ -151,6 +151,7 @@ class SingBoxConfigBuilder {
       platform: request.platform,
       availableRuleSets: _usableRuleSets(request),
       ruleSetDirectory: request.ruleSetDirectory,
+      fakeIp: request.dns.fakeIp,
       warnings: warnings,
     );
 

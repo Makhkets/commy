@@ -366,6 +366,23 @@ class RouteMatcher {
   /// Whether the matcher produced anything the core can act on.
   bool get isEmpty => fields.isEmpty;
 
+  /// Whether the matcher says nothing about a connection that carries a name
+  /// until that name is resolved: `ip_cidr`, and a `geoip` country.
+  ///
+  /// Under FakeIP every connection whose name went through the resolver
+  /// carries that name and no address, so these match nothing on their own.
+  /// `RouteSectionBuilder` resolves the name ahead of the first of them.
+  ///
+  /// `geoip:private` is not counted, for the reason the LAN bypass is not:
+  /// what it is for is a private address dialled as an address, which FakeIP
+  /// leaves alone. Resolving every name ahead of it would give up what FakeIP
+  /// is for, a connection that does not wait for a lookup, for the sake of
+  /// names like `router.lan` that the resolver through the tunnel cannot
+  /// answer anyway.
+  bool get needsResolvedAddress =>
+      fields.containsKey(SingBoxKeys.ipCidr) ||
+      ruleSets.any((tag) => tag.startsWith(SingBoxTags.geoipPrefix));
+
   @override
   String toString() => 'RouteMatcher(${fields.keys.join(', ')})';
 }

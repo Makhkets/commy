@@ -924,4 +924,117 @@ void main() {
       );
     });
   });
+
+  group('FakeIP and rules that look at addresses', () {
+    // A connection to a FakeIP address reaches the router as its name, with
+    // no address. An `ip_cidr` or `geoip` rule matched nothing there:
+    // `geoip:ru` -> Direct sent every such connection through the proxy.
+    const resolve = <String, Object?>{
+      'action': 'resolve',
+      'server': 'dns-remote',
+    };
+
+    RoutingRule rule(String matcher, RuleAction action, int index) =>
+        RoutingRule(
+          id: 'r$index',
+          matcher: matcher,
+          action: action,
+          sortIndex: index,
+        );
+
+    List<Object?> rulesOf(
+      List<RoutingRule> rules, {
+      bool fakeIp = true,
+      Set<String> onDisk = const <String>{'geoip-ru'},
+    }) {
+      final config = _build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: RoutingPolicy(rules: rules),
+          dns: DnsSettings(fakeIp: fakeIp),
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          ruleSetDirectory: '/data/rulesets',
+          availableRuleSets: onDisk,
+        ),
+      );
+      final route = config.document['route']! as Map<String, Object?>;
+      return route['rules']! as List<Object?>;
+    }
+
+    test('resolves the name once, just ahead of the first of them', () {
+      final rules = rulesOf(<RoutingRule>[
+        rule('domain_suffix:example.org', RuleAction.proxy, 0),
+        rule('geoip:ru', RuleAction.direct, 1),
+        rule('ip_cidr:203.0.113.0/24', RuleAction.block, 2),
+      ]);
+
+      // A name rule ahead of it still decides without a lookup.
+      expect(rules.sublist(rules.length - 4), <Object?>[
+        <String, Object?>{
+          'domain_suffix': <String>['example.org'],
+          'outbound': 'proxy',
+        },
+        resolve,
+        <String, Object?>{
+          'rule_set': <String>['geoip-ru'],
+          'outbound': 'direct',
+        },
+        <String, Object?>{
+          'ip_cidr': <String>['203.0.113.0/24'],
+          'action': 'reject',
+        },
+      ]);
+    });
+
+    test('resolves nothing without FakeIP, or with no such rule', () {
+      final addressRules = <RoutingRule>[
+        rule('geoip:ru', RuleAction.direct, 0),
+        rule('ip_cidr:203.0.113.0/24', RuleAction.block, 1),
+      ];
+      final nameRules = <RoutingRule>[
+        rule('domain_suffix:example.org', RuleAction.direct, 0),
+        rule('geosite:ru', RuleAction.direct, 1),
+        rule('port:443', RuleAction.proxy, 2),
+      ];
+
+      expect(
+        rulesOf(addressRules, fakeIp: false),
+        isNot(contains(equals(resolve))),
+      );
+      expect(
+        rulesOf(nameRules, onDisk: const <String>{'geosite-ru'}),
+        isNot(contains(equals(resolve))),
+      );
+    });
+
+    test('resolves nothing for the private ranges, like the LAN bypass', () {
+      // A private address is dialled as an address, which FakeIP leaves
+      // alone; resolving every name for it would spend what FakeIP is for.
+      final rules = rulesOf(<RoutingRule>[
+        rule('geoip:private', RuleAction.direct, 0),
+      ]);
+
+      expect(rules, isNot(contains(equals(resolve))));
+    });
+
+    test('counts only a rule that is written, not one that was left out', () {
+      final rules = rulesOf(
+        <RoutingRule>[
+          rule('geoip:ru', RuleAction.direct, 0),
+          rule('domain_suffix:example.org', RuleAction.proxy, 1),
+          rule('ip_cidr:203.0.113.0/24', RuleAction.block, 2),
+        ],
+        onDisk: const <String>{},
+      );
+
+      expect(rules.sublist(rules.length - 2), <Object?>[
+        resolve,
+        <String, Object?>{
+          'ip_cidr': <String>['203.0.113.0/24'],
+          'action': 'reject',
+        },
+      ]);
+    });
+  });
 }
