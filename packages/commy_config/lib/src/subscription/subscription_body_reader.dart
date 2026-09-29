@@ -20,7 +20,8 @@ import 'package:commy_domain/commy_domain.dart';
 /// 3. a sing-box or Xray JSON document, read from `outbounds` (and, for
 ///    sing-box 1.11 and later, `endpoints`, where WireGuard lives);
 /// 4. a Clash or Clash.Meta YAML document, read from `proxies`;
-/// 5. a bare JSON array of node objects.
+/// 5. a bare JSON array of node objects, or of whole Xray configurations —
+///    the Xray JSON subscription of Marzban, Remnawave and 3x-ui.
 ///
 /// The first format that yields at least one node wins. A format that yields
 /// nothing but failures is not a match: a Clash file with one broken entry
@@ -160,9 +161,10 @@ class SubscriptionBodyReader {
 
   /// Reads a JSON document, or returns `null` when it is not valid JSON.
   ///
-  /// Understands three shapes: a sing-box or Xray configuration with an
+  /// Understands four shapes: a sing-box or Xray configuration with an
   /// `outbounds` array, a Clash document rendered as JSON with a `proxies`
-  /// array, and a bare array of node objects or link strings.
+  /// array, a bare array of node objects or link strings, and an array of
+  /// whole Xray configurations, one per server.
   ParseOutcome? readJson(
     String body, {
     String? subscriptionId,
@@ -176,9 +178,8 @@ class SubscriptionBodyReader {
       return null;
     }
     if (decoded is List) {
-      return _readEntries(
-        _asObjects(decoded),
-        _plainStrings(decoded),
+      return _readArray(
+        decoded,
         subscriptionId: subscriptionId,
         groupId: groupId,
         startIndex: startIndex,
@@ -187,20 +188,14 @@ class SubscriptionBodyReader {
     if (decoded is! Map<String, Object?>) {
       return null;
     }
-    // Since sing-box 1.11 WireGuard is an endpoint, not an outbound, and a
-    // WARP profile keeps nothing but `direct` among its outbounds.
-    final outbounds = <Map<String, Object?>>[
-      ...MapRead.objectList(decoded, <String>['outbounds', 'outbound']),
-      ...MapRead.objectList(decoded, <String>['endpoints']),
-    ];
-    if (outbounds.isNotEmpty) {
-      return _readEntries(
-        outbounds.where(SingBoxOutboundReader.looksLikeServer).toList(),
-        const <String>[],
-        subscriptionId: subscriptionId,
-        groupId: groupId,
-        startIndex: startIndex,
-      );
+    final fromDocument = _readDocument(
+      decoded,
+      subscriptionId: subscriptionId,
+      groupId: groupId,
+      startIndex: startIndex,
+    );
+    if (fromDocument != null) {
+      return fromDocument;
     }
     final proxies = MapRead.objectList(decoded, <String>['proxies']);
     if (proxies.isNotEmpty) {
@@ -248,6 +243,117 @@ class SubscriptionBodyReader {
       startIndex: startIndex,
     );
   }
+
+  /// Reads a top-level JSON array.
+  ///
+  /// Usually its elements are nodes or links. An Xray JSON subscription
+  /// (Marzban's `v2ray-json`, Remnawave's XRAY_JSON, 3x-ui's JSON
+  /// subscription) is instead an array of whole configurations, one per
+  /// server, each with its own `outbounds`: those are read as documents, in
+  /// order, so the panel's order survives.
+  ParseOutcome _readArray(
+    List<Object?> array, {
+    String? subscriptionId,
+    String? groupId,
+    int startIndex = 0,
+  }) {
+    final objects = _asObjects(array);
+    if (!objects.any(_isDocument)) {
+      return _readEntries(
+        objects,
+        _plainStrings(array),
+        subscriptionId: subscriptionId,
+        groupId: groupId,
+        startIndex: startIndex,
+      );
+    }
+    var outcome = ParseOutcome.empty;
+    var index = startIndex;
+    for (final object in objects) {
+      final part = _readDocument(
+            object,
+            subscriptionId: subscriptionId,
+            groupId: groupId,
+            startIndex: index,
+          ) ??
+          _readEntries(
+            <Map<String, Object?>>[object],
+            const <String>[],
+            subscriptionId: subscriptionId,
+            groupId: groupId,
+            startIndex: index,
+          );
+      outcome = outcome.merge(part);
+      index += part.nodes.length;
+    }
+    final links = _plainStrings(array);
+    if (links.isEmpty) {
+      return outcome;
+    }
+    return outcome.merge(
+      _readEntries(
+        const <Map<String, Object?>>[],
+        links,
+        subscriptionId: subscriptionId,
+        groupId: groupId,
+        startIndex: index,
+      ),
+    );
+  }
+
+  /// Reads the servers of one sing-box or Xray configuration, or returns
+  /// `null` when it has neither outbounds nor endpoints.
+  ///
+  /// An Xray configuration names itself in `remarks`, while its server
+  /// outbound is tagged `proxy` in every panel's template, so the remarks
+  /// are the node's name. Several servers in one configuration keep their
+  /// own names after it, so they stay apart.
+  ParseOutcome? _readDocument(
+    Map<String, Object?> document, {
+    String? subscriptionId,
+    String? groupId,
+    int startIndex = 0,
+  }) {
+    final outbounds = _serversOf(document);
+    if (outbounds.isEmpty) {
+      return null;
+    }
+    final outcome = _readEntries(
+      outbounds.where(SingBoxOutboundReader.looksLikeServer).toList(),
+      const <String>[],
+      subscriptionId: subscriptionId,
+      groupId: groupId,
+      startIndex: startIndex,
+    );
+    final remarks = MapRead.text(document, <String>['remarks']);
+    if (remarks == null || !outcome.hasNodes) {
+      return outcome;
+    }
+    final single = outcome.nodes.length == 1;
+    return outcome.copyWith(
+      nodes: <ProxyNode>[
+        for (final node in outcome.nodes)
+          node.copyWith(name: single ? remarks : '$remarks ${node.name}'),
+      ],
+    );
+  }
+
+  /// The outbounds and endpoints of [document], plumbing included.
+  ///
+  /// Since sing-box 1.11 WireGuard is an endpoint, not an outbound, and a
+  /// WARP profile keeps nothing but `direct` among its outbounds.
+  static List<Map<String, Object?>> _serversOf(Map<String, Object?> document) =>
+      <Map<String, Object?>>[
+        ...MapRead.objectList(document, <String>['outbounds', 'outbound']),
+        ...MapRead.objectList(document, <String>['endpoints']),
+      ];
+
+  /// Whether [object] is a whole configuration rather than one node.
+  ///
+  /// A sing-box selector has `outbounds` too, but as a list of tags, which
+  /// holds no objects.
+  static bool _isDocument(Map<String, Object?> object) =>
+      _serversOf(object).isNotEmpty;
 
   ParseOutcome _readEntries(
     List<Map<String, Object?>> objects,
