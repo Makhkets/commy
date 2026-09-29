@@ -106,24 +106,38 @@ class LogRedactor {
   /// Everything [redact] removes, plus the addresses of the user's own servers,
   /// which become `[server]` (docs/09-security-privacy.md, "Что вырезается
   /// всегда").
-  String redactForExport(String message) {
-    final redacted = redact(message);
-    final hosts = _serverHosts?.call();
-    if (hosts == null) {
-      return redacted;
-    }
-    final pattern = _hostPattern(hosts);
-    if (pattern == null) {
-      return redacted;
-    }
-    return redacted.replaceAll(pattern, Redact.serverPlaceholder);
-  }
+  String redactForExport(String message) =>
+      _hideServers(redact(message), _serversNow());
 
   /// Applies [redact] or [redactForExport] to a whole line.
   LogLine redactLine(LogLine line, {required bool forExport}) => line.copyWith(
         message:
             forExport ? redactForExport(line.message) : redact(line.message),
       );
+
+  /// Applies [redactForExport] to every one of [lines].
+  ///
+  /// The server list is asked for once, not once a line: an export is the
+  /// whole buffer, two thousand lines, on the UI isolate, and building the
+  /// same pattern two thousand times is a pause the user sees.
+  List<LogLine> redactLinesForExport(Iterable<LogLine> lines) {
+    final servers = _serversNow();
+    return <LogLine>[
+      for (final line in lines)
+        line.copyWith(message: _hideServers(redact(line.message), servers)),
+    ];
+  }
+
+  /// The pattern of the user's servers as they are now, or `null` for none.
+  RegExp? _serversNow() {
+    final hosts = _serverHosts?.call();
+    return hosts == null ? null : _hostPattern(hosts);
+  }
+
+  static String _hideServers(String redacted, RegExp? servers) =>
+      servers == null
+          ? redacted
+          : redacted.replaceAll(servers, Redact.serverPlaceholder);
 
   static String _redactUrlMatch(Match match) {
     final scheme = match.group(1)!;

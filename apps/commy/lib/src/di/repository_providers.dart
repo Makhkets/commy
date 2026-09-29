@@ -9,6 +9,7 @@ library;
 import 'dart:io';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -61,8 +62,24 @@ final ruleSetRepositoryProvider = Provider<RuleSetRepository>((ref) {
 ///
 /// It is deliberately not persisted: a log that survives a reinstall is a log
 /// that outlives the user's intent to keep it.
+///
+/// An export or a copy replaces the addresses of the user's own servers with
+/// `[server]` (docs/09-security-privacy.md, «Что вырезается всегда»): a log
+/// pasted into a public chat must not hand anyone the address to block. The
+/// redactor only does that when it is told what those addresses are, and it
+/// was never told — every dial line went out with the real IP or domain in
+/// it. The list is read, not watched, and read at export time: the servers
+/// that exist then are the ones to hide. Notices are left out on purpose;
+/// `0.0.0.0` is nobody's server.
 final logRepositoryProvider = Provider<LogRepository>((ref) {
-  final repository = RingBufferLogRepository();
+  final repository = RingBufferLogRepository(
+    redactor: LogRedactor(
+      serverHosts: () => <String>[
+        for (final node in ref.read(nodesProvider).value ?? const <ProxyNode>[])
+          node.host,
+      ],
+    ),
+  );
   ref.onDispose(repository.dispose);
   return repository;
 });
