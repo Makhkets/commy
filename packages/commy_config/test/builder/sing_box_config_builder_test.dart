@@ -869,5 +869,15 @@ void main() {
         '$adsTag.srs',
       );
     });
+
+    test('asks for a geoip list where SagerNet publishes geoip lists', () {
+      // `sing-geosite` holds no geoip-*.srs: every `geoip:` rule used to be
+      // a download that answered 404 and a rule that never applied.
+      expect(
+        AppSettings.defaults.ruleSetUrl('geoip-ru').toString(),
+        'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/'
+        'geoip-ru.srs',
+      );
+    });
   });
 }

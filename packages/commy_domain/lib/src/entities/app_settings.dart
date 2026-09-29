@@ -83,11 +83,7 @@ class AppSettings {
           orElse: defaultLatencyProbeUrl,
         ),
         ipCheckUrl: JsonRead.stringOr(json, 'ipCheckUrl', orElse: ''),
-        ruleSetSource: JsonRead.stringOr(
-          json,
-          'ruleSetSource',
-          orElse: defaultRuleSetSource,
-        ),
+        ruleSetSource: _ruleSetSourceOf(json),
         ruleSetUpdateDays: _updateDaysOf(json),
         logLevel: LogLevel.values.byName(
           JsonRead.stringOr(json, 'logLevel', orElse: 'info'),
@@ -113,12 +109,36 @@ class AppSettings {
   /// fetched. Exception E-2 requires the source to be the user's to change,
   /// their own mirror included, so this is a default rather than a constant —
   /// and nothing is ever fetched from it except on an explicit button press.
+  ///
+  /// [ruleSetKindToken] picks the repository: SagerNet publishes the geosite
+  /// lists in `sing-geosite` and the geoip lists in `sing-geoip`, and a
+  /// template that named one of them answered every `geoip:` rule with 404.
   static const String defaultRuleSetSource =
+      'https://raw.githubusercontent.com/SagerNet/sing-{kind}/rule-set/'
+      '{tag}.srs';
+
+  /// The default before [ruleSetKindToken] existed, which could only ever
+  /// serve geosite. A stored copy of it is read as [defaultRuleSetSource]:
+  /// nobody chose it over the default, it was the default.
+  static const String legacyRuleSetSource =
       'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/'
       '{tag}.srs';
 
   /// The placeholder [ruleSetSource] substitutes the rule set tag into.
   static const String ruleSetTagToken = '{tag}';
+
+  /// The placeholder [ruleSetSource] substitutes the kind of list into:
+  /// `geoip` or `geosite`, the part of the tag before the first dash.
+  static const String ruleSetKindToken = '{kind}';
+
+  static String _ruleSetSourceOf(JsonMap json) {
+    final stored = JsonRead.stringOr(
+      json,
+      'ruleSetSource',
+      orElse: defaultRuleSetSource,
+    );
+    return stored == legacyRuleSetSource ? defaultRuleSetSource : stored;
+  }
 
   /// What [ruleSetUpdateDays] may be: off, daily, weekly, monthly.
   static const List<int> ruleSetUpdateChoices = <int>[0, 1, 7, 30];
@@ -267,7 +287,13 @@ class AppSettings {
     if (template.isEmpty) {
       return null;
     }
-    return Uri.tryParse(template.replaceAll(ruleSetTagToken, tag));
+    final dash = tag.indexOf('-');
+    final kind = dash < 0 ? tag : tag.substring(0, dash);
+    return Uri.tryParse(
+      template
+          .replaceAll(ruleSetTagToken, tag)
+          .replaceAll(ruleSetKindToken, kind),
+    );
   }
 
   /// Returns a copy with the given fields replaced.

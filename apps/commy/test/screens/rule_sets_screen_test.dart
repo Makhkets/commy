@@ -109,7 +109,7 @@ void main() {
 
     expect(
       harness.ruleSetRepository.requests.single.toString(),
-      AppSettings.defaultRuleSetSource.replaceAll('{tag}', 'geosite-ru'),
+      AppSettings.defaults.ruleSetUrl('geosite-ru').toString(),
     );
     expect(harness.ruleSetRepository.sets.single.tag, 'geosite-ru');
     expect(find.text(t.ruleSets.downloaded(tag: 'geosite-ru')), findsOneWidget);

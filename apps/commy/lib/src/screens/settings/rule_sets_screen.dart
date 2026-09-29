@@ -441,6 +441,7 @@ class _SourceSheetState extends State<_SourceSheet> {
             labelText: t.ruleSets.sourceLabel,
             helperText: t.ruleSets.sourceHelp(
               token: AppSettings.ruleSetTagToken,
+              kind: AppSettings.ruleSetKindToken,
             ),
             errorText: _showError ? t.ruleSets.sourceInvalid : null,
             autofocus: true,
@@ -473,7 +474,11 @@ class _SourceSheetState extends State<_SourceSheet> {
   }
 
   bool _isHttp(String raw) {
-    final url = Uri.tryParse(raw.replaceAll(AppSettings.ruleSetTagToken, 'x'));
+    final url = Uri.tryParse(
+      raw
+          .replaceAll(AppSettings.ruleSetTagToken, 'x')
+          .replaceAll(AppSettings.ruleSetKindToken, 'x'),
+    );
     if (url == null || url.host.isEmpty) {
       return false;
     }

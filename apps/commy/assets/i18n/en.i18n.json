@@ -231,7 +231,7 @@
     "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask — with the button or a schedule. The address below is the one that will be asked.",
     "source": "Source",
     "sourceLabel": "Address template",
-    "sourceHelp": "$token is replaced with the tag being fetched. Clear the field to make downloading unavailable.",
+    "sourceHelp": "$token is replaced with the tag being fetched, $kind with geoip or geosite. Clear the field to make downloading unavailable.",
     "sourceOff": "No source — downloading is off",
     "sourceInvalid": "That does not look like an http or https address",
     "needed": "Needed by your rules",
