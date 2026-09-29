@@ -275,6 +275,56 @@ void main() {
 
         expect(subscriptions.stored.single.updateIntervalHours, 12);
       });
+
+      test('a card deleted while the panel was answering stays deleted',
+          () async {
+        // The sheet can be dismissed mid-download and the card deleted from
+        // its menu. The upsert creates as happily as it updates, so the add
+        // has to look again before it writes.
+        final subscriptions = FakeSubscriptionRepository()
+          ..seed(Subscription(id: 'sub-old', name: 'Work', url: _url));
+        final nodes = RecordingNodeRepository();
+        final useCase = AddSubscriptionUseCase(
+          fetcher: MeanwhileFetcher(() => subscriptions.deleteById('sub-old')),
+          parser: StubLinkParser(
+            ParseOutcome(
+              nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt 07')],
+            ),
+          ),
+          subscriptions: subscriptions,
+          nodes: nodes,
+          ids: FixedIdGenerator('sub-new'),
+        );
+
+        final result = await useCase(url: _url);
+
+        expect(result.failureOrNull, isA<SubscriptionMalformedFailure>());
+        expect(subscriptions.stored, isEmpty);
+        expect(nodes.stored, isEmpty);
+      });
+
+      test('a collapse made while the panel was answering survives', () async {
+        final subscriptions = FakeSubscriptionRepository()
+          ..seed(Subscription(id: 'sub-old', name: 'Work', url: _url));
+        final useCase = AddSubscriptionUseCase(
+          fetcher: MeanwhileFetcher(
+            () => subscriptions.setCollapsed(id: 'sub-old', isCollapsed: true),
+          ),
+          parser: StubLinkParser(
+            ParseOutcome(
+              nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt 07')],
+            ),
+          ),
+          subscriptions: subscriptions,
+          nodes: RecordingNodeRepository(),
+          ids: FixedIdGenerator('sub-new'),
+        );
+
+        await useCase(url: _url);
+
+        expect(subscriptions.stored.single.isCollapsed, isTrue);
+        expect(subscriptions.stored.single.name, 'Work');
+      });
     });
 
     group('a panel that answers with a notice', () {

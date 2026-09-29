@@ -148,7 +148,7 @@ void main() {
       final subscriptions = FakeSubscriptionRepository()..seed(subscription());
       final nodes = RecordingNodeRepository();
       final useCase = UpdateSubscriptionUseCase(
-        fetcher: _DuringFetch(() => subscriptions.deleteById('sub-1')),
+        fetcher: MeanwhileFetcher(() => subscriptions.deleteById('sub-1')),
         parser: StubLinkParser(
           ParseOutcome(
             nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt')],
@@ -172,7 +172,7 @@ void main() {
       final restored = subscription(token: 'restored');
       final nodes = RecordingNodeRepository();
       final useCase = UpdateSubscriptionUseCase(
-        fetcher: _DuringFetch(() => subscriptions.upsert(restored)),
+        fetcher: MeanwhileFetcher(() => subscriptions.upsert(restored)),
         parser: StubLinkParser(
           ParseOutcome(
             nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt')],
@@ -186,6 +186,81 @@ void main() {
 
       expect(subscriptions.stored.single.url, restored.url);
       expect(nodes.replaceCalls, isEmpty);
+    });
+  });
+
+  group('a refresh that outlives an edit', () {
+    // The card's menu stays usable while its spinner turns, and on a slow
+    // link that is seconds. Whatever the user changed in them is the user's;
+    // the refresh brings the panel's half of the row, not the whole row as it
+    // was before it set off.
+    final original = Subscription(
+      id: 'sub-1',
+      name: 'Example panel',
+      url: Uri.parse('https://panel.example.com/sub/token'),
+      autoUpdate: true,
+    );
+    const answer = SubscriptionPayload(
+      body: 'vless://...',
+      profileTitle: 'Example VPN',
+      userInfo: SubscriptionUserInfo(upload: 1, download: 2, total: 100),
+    );
+
+    UpdateSubscriptionUseCase useCase(
+      FakeSubscriptionRepository subscriptions,
+      Future<void> Function() meanwhile,
+    ) {
+      return UpdateSubscriptionUseCase(
+        fetcher: MeanwhileFetcher(meanwhile, payload: answer),
+        parser: StubLinkParser(ParseOutcome.empty),
+        subscriptions: subscriptions,
+        nodes: RecordingNodeRepository(),
+      );
+    }
+
+    test('auto-update switched off stays off', () async {
+      final subscriptions = FakeSubscriptionRepository()..seed(original);
+      final refresh = useCase(
+        subscriptions,
+        () => subscriptions.upsert(original.copyWith(autoUpdate: false)),
+      );
+
+      final result = await refresh(subscriptionId: 'sub-1');
+
+      expect(result.isOk, isTrue);
+      expect(subscriptions.stored.single.autoUpdate, isFalse);
+      expect(result.valueOrNull?.subscription.autoUpdate, isFalse);
+    });
+
+    test('a rename, a collapse and a move all survive', () async {
+      final subscriptions = FakeSubscriptionRepository()..seed(original);
+      final refresh = useCase(subscriptions, () async {
+        await subscriptions.upsert(original.copyWith(name: 'Work'));
+        await subscriptions.setCollapsed(id: 'sub-1', isCollapsed: true);
+        await subscriptions.reorder(<String>['other', 'sub-1']);
+      });
+
+      await refresh(subscriptionId: 'sub-1');
+
+      final stored = subscriptions.stored.single;
+      expect(stored.name, 'Work');
+      expect(stored.isCollapsed, isTrue);
+      expect(stored.sortIndex, 1);
+    });
+
+    test("the panel's half of the row is still the panel's", () async {
+      final subscriptions = FakeSubscriptionRepository()..seed(original);
+      final refresh = useCase(
+        subscriptions,
+        () => subscriptions.upsert(original.copyWith(name: 'Work')),
+      );
+
+      await refresh(subscriptionId: 'sub-1');
+
+      final stored = subscriptions.stored.single;
+      expect(stored.profileTitle, 'Example VPN');
+      expect(stored.userInfo?.total, 100);
+      expect(stored.lastUpdatedAt, isNotNull);
     });
   });
 }
@@ -209,23 +284,4 @@ UpdateSubscriptionUseCase _useCase({
     subscriptions: subscriptions,
     nodes: nodes,
   );
-}
-
-/// A panel that takes its time, during which [meanwhile] happens.
-class _DuringFetch implements SubscriptionFetcher {
-  _DuringFetch(this.meanwhile);
-
-  final Future<Object?> Function() meanwhile;
-
-  @override
-  Future<Result<SubscriptionPayload, CommyFailure>> fetch(
-    Uri url, {
-    required bool throughTunnel,
-    String? userAgent,
-  }) async {
-    await meanwhile();
-    return const Ok<SubscriptionPayload, CommyFailure>(
-      SubscriptionPayload(body: 'vless://...'),
-    );
-  }
 }
