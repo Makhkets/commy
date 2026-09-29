@@ -117,6 +117,34 @@ void main() {
       expect(result.valueOrNull?.outcome.failures, <ImportFailure>[skipped]);
     });
 
+    test('a notice of two lines is reported and stored as two', () async {
+      // An expired user's panel says why and then what to do, one entry per
+      // line on the same nowhere address — one id, told apart by text alone.
+      ProxyNode line(String text) =>
+          buildNode(id: 'stub', name: text).copyWith(host: '0.0.0.0', port: 1);
+      final nodes = RecordingNodeRepository();
+      final useCase = _useCase(
+        parser: StubLinkParser(
+          ParseOutcome(
+            nodes: <ProxyNode>[
+              line('Subscription expired'),
+              line('Contact support'),
+            ],
+          ),
+        ),
+        nodes: nodes,
+      );
+
+      final result = await useCase(subscriptionId: 'sub-1');
+
+      expect(
+        result.valueOrNull?.panelNotices,
+        <String>['Subscription expired', 'Contact support'],
+      );
+      expect(result.valueOrNull?.importedCount, 0);
+      expect(nodes.stored, hasLength(2));
+    });
+
     test('an unknown subscription is refused before anything is written',
         () async {
       final nodes = RecordingNodeRepository();

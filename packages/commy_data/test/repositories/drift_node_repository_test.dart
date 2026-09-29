@@ -344,6 +344,50 @@ void main() {
       expect(all.single.param('uuid'), equals(Fixtures.uuid));
     });
 
+    test('a notice of two lines keeps both lines, refresh after refresh',
+        () async {
+      // A panel with two lines to say sends two entries at the same nowhere
+      // address under one placeholder credential: one id, two texts. Folded
+      // by id, only the last line — "Contact support" — was ever stored.
+      const subscriptionId = 'sub-1';
+      ProxyNode line(String text) => ProxyNode(
+            id: 'stub',
+            name: text,
+            protocol: Protocol.vless,
+            host: '0.0.0.0',
+            port: 1,
+            subscriptionId: subscriptionId,
+            params: const <String, Object?>{
+              'uuid': '00000000-0000-0000-0000-000000000000',
+            },
+          );
+      Future<List<String>> messages() async => PanelNotice.messages(
+            (await repository.findBySubscription(subscriptionId)).valueOrNull!,
+          );
+
+      for (var refresh = 0; refresh < 2; refresh++) {
+        final result = await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[
+            line('Subscription expired'),
+            line('Contact support'),
+          ],
+        );
+        expect(result.isOk, isTrue);
+        expect(
+          await messages(),
+          <String>['Subscription expired', 'Contact support'],
+        );
+      }
+
+      await repository.replaceForSubscription(
+        subscriptionId: subscriptionId,
+        nodes: <ProxyNode>[line('Device limit reached'), line('Contact us')],
+      );
+
+      expect(await messages(), <String>['Device limit reached', 'Contact us']);
+    });
+
     test('a repeated server leaves no hole in the display order', () async {
       const subscriptionId = 'sub-1';
 
