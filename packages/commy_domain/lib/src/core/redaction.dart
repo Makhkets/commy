@@ -62,11 +62,51 @@ abstract final class Redact {
     }
     final credentials = parsed.userInfo.isEmpty ? '' : '$placeholder@';
     final port = parsed.hasPort ? ':${parsed.port}' : '';
+    final address =
+        parsed.userInfo.isEmpty && isOpaqueAuthority(parsed.scheme, parsed.host)
+            ? placeholder
+            : '${parsed.host}$port';
     final query = parsed.hasQuery ? '?$placeholder' : '';
     final fragment = parsed.hasFragment ? '#${_nodeName(parsed.fragment)}' : '';
-    return '${parsed.scheme}://$credentials'
-        '${parsed.host}$port$query$fragment';
+    return '${parsed.scheme}://$credentials$address$query$fragment';
   }
+
+  /// Schemes whose share links can carry the whole server, credential
+  /// included, base64-encoded where the address would be: `vmess://` with
+  /// its JSON, the legacy `ss://` with `method:password@host:port`, `ssr://`.
+  static const Set<String> _encodedSchemes = <String>{'vmess', 'ss', 'ssr'};
+
+  /// Shortest dotless authority read as an encoded blob rather than a host.
+  static const int _opaqueAuthorityLength = 16;
+
+  /// Whether [authority] — the part of a [scheme] link after `//`, with no
+  /// user info in it — is an encoded credential rather than an address.
+  ///
+  /// With no `@`, `Uri` takes a base64 body for the host: `=` and `+` are
+  /// legal there, and it hands the body back lowercased. Keeping the host
+  /// then kept the body, and lowercasing hides nothing — each group of four
+  /// characters decodes on its own, and of its few case variants one is the
+  /// readable one. `vmess://eyj2ijoi…` came back as the uuid, the legacy
+  /// `ss://` as `aes-256-gcm:password@1.2.3.4:8388`.
+  ///
+  /// A `vmess`, `ss` or `ssr` link with no user info is always a blob. For any
+  /// other scheme a blob is told from an address by shape: base64 has no
+  /// dot, an IPv6 literal comes in brackets, and a host name that is one long
+  /// label is rare enough that blanking it costs less than printing a key.
+  /// A trailing `:port` is not part of the question.
+  static bool isOpaqueAuthority(String scheme, String authority) {
+    if (_encodedSchemes.contains(scheme.toLowerCase())) {
+      return true;
+    }
+    if (authority.startsWith('[')) {
+      return false;
+    }
+    final host = authority.replaceFirst(_trailingPort, '');
+    return !host.contains('.') && host.length >= _opaqueAuthorityLength;
+  }
+
+  /// A `:443` at the end of an authority.
+  static final RegExp _trailingPort = RegExp(r':\d*$');
 
   /// The display name a link's fragment holds, ready to be shown.
   ///

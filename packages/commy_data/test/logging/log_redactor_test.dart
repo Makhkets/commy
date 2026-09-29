@@ -103,6 +103,53 @@ void main() {
       expect(result, contains('Amsterdam 03'));
     });
 
+    group('a link that is base64 where the address would be', () {
+      // `vmess://<base64 JSON>` and the legacy `ss://<base64>` have no `@`:
+      // the whole server, uuid or password included, sits where the address
+      // would be, and it used to be kept byte for byte.
+      const vmessBody = 'eyJ2IjoiMiIsInBzIjoiRnJhbmtmdXJ0IiwiYWRkIjoiMS4yLjMu'
+          'NCIsInBvcnQiOiI0NDMiLCJpZCI6ImI4MzEzODFkLTYzMjQtNGQ1My1hZDRmLThj'
+          'ZGE0OGIzMDgxMSJ9';
+      const legacySs = 'YWVzLTI1Ni1nY206U3VwZXJTZWNyZXRQYXNzQDEuMi4zLjQ6ODM4OA';
+
+      test('a vmess body is blanked, in the view and in an export', () {
+        for (final body in <String>[vmessBody, '$vmessBody==']) {
+          final line = 'failed to parse vmess://$body';
+
+          for (final result in <String>[
+            redactor.redact(line),
+            redactor.redactForExport(line),
+          ]) {
+            expect(result, 'failed to parse vmess://${Redact.placeholder}');
+          }
+        }
+      });
+
+      test('a legacy shadowsocks link keeps only its name', () {
+        const line = 'import: skipped ss://$legacySs#Frankfurt';
+
+        final result = redactor.redact(line);
+
+        expect(result, isNot(contains(legacySs.substring(0, 16))));
+        expect(result, 'import: skipped ss://${Redact.placeholder}#Frankfurt');
+      });
+
+      test('redacting twice changes nothing more', () {
+        const line = 'failed to parse ss://$legacySs#Frankfurt';
+
+        final once = redactor.redact(line);
+
+        expect(redactor.redact(once), once);
+      });
+
+      test('a bare origin is still readable', () {
+        const line = 'dns: exchange tls://1.1.1.1 and https://dns.google/ '
+            'via udp://[2001:db8::1]:53 and http://localhost:9090';
+
+        expect(redactor.redact(line), line);
+      });
+    });
+
     test('a uuid escaped into the node name stays redacted', () {
       const line = 'failed to parse vmess://${Fixtures.uuid}'
           '@de1.vpn.example.com:443#node%2D${Fixtures.uuid}';

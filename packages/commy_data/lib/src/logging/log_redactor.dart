@@ -144,11 +144,18 @@ class LogRedactor {
     final authority = match.group(2)!;
     final rest = match.group(3) ?? '';
 
-    // `user:password@host` — the whole userinfo is a credential.
+    // `user:password@host` — the whole userinfo is a credential. With no `@`
+    // the authority can be the credential itself: `vmess://<base64 JSON>`
+    // and the legacy `ss://<base64>` put the whole server there, uuid and
+    // password included, and it walked out of the log byte for byte. The
+    // rule for telling a blob from an address is `Redact`'s, so the two
+    // redactors cannot drift apart on it.
     final atSign = authority.lastIndexOf('@');
-    final safeAuthority = atSign < 0
-        ? authority
-        : '${Redact.placeholder}@${authority.substring(atSign + 1)}';
+    final safeAuthority = atSign >= 0
+        ? '${Redact.placeholder}@${authority.substring(atSign + 1)}'
+        : Redact.isOpaqueAuthority(scheme, authority)
+            ? Redact.placeholder
+            : authority;
 
     // The fragment survives: on a proxy link it is the display name of the
     // node, and "failed to parse vless://…#🇩🇪 Frankfurt" is a readable error
