@@ -758,6 +758,50 @@ void main() {
       expect(route.containsKey('rule_set'), isFalse);
     });
 
+    test('drops a rule the core could not read, and builds the rest', () {
+      // The core parses every rule when it starts and refuses the whole
+      // document over one it cannot: one typo stopped every server.
+      final result = const SingBoxConfigBuilder().build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: const RoutingPolicy(
+            rules: <RoutingRule>[
+              RoutingRule(
+                id: 'r1',
+                matcher: 'regex:*.example.com',
+                action: RuleAction.block,
+              ),
+              RoutingRule(
+                id: 'r2',
+                matcher: 'port_range:1000-2000',
+                action: RuleAction.direct,
+                sortIndex: 1,
+              ),
+            ],
+          ),
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+      final built = result.valueOrNull!;
+      final document = built.config.document;
+      final route = document['route']! as Map<String, Object?>;
+      final dns = document['dns']! as Map<String, Object?>;
+
+      expect(built.warnings, <RoutingWarning>[
+        const RoutingWarning(
+          RoutingWarningKind.ruleNotApplicable,
+          'regex:*.example.com',
+        ),
+      ]);
+      expect((route['rules']! as List<Object?>).last, <String, Object?>{
+        'port_range': <String>['1000:2000'],
+        'outbound': 'direct',
+      });
+      expect(dns.containsKey('rules'), isFalse);
+    });
+
     test('writes a local rule set when the file is on disk', () {
       final result = const SingBoxConfigBuilder().build(
         SingBoxBuildRequest.single(

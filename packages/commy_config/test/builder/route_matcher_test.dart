@@ -111,6 +111,71 @@ void main() {
       });
     });
 
+    test('writes a port range the way the core reads one', () {
+      List<Object?>? rangesOf(String raw) =>
+          _parse(raw)!.fields['port_range'] as List<Object?>?;
+
+      // Xray and Clash write a range with a dash; the core refuses the whole
+      // document over one ("bad port range").
+      expect(rangesOf('port_range:1000-2000'), <String>['1000:2000']);
+      expect(rangesOf('port_range:443'), <String>['443:443']);
+      expect(
+        rangesOf('port_range:1000:2000,3000:'),
+        <String>['1000:2000', '3000:65535'],
+      );
+      expect(rangesOf('port_range::1024'), <String>['0:1024']);
+      const bad = <String>['abc', '2000-1000', '1:70000', '-1', '1-2-'];
+      for (final range in bad) {
+        expect(_parse('port_range:$range')!.isEmpty, isTrue, reason: range);
+      }
+      expect(rangesOf('port_range:80:90,abc'), <String>['80:90']);
+    });
+
+    test('keeps only ports and addresses the core can decode', () {
+      // A port is a 16-bit number to the core; an address goes through
+      // netip. Anything else fails the whole document rather than one rule.
+      expect(_parse('port:443,70000,-1,abc')!.fields, <String, Object?>{
+        'port': <int>[443],
+      });
+      expect(_parse('port:70000')!.isEmpty, isTrue);
+      expect(
+        _parse('ip_cidr:10.0.0.0/8,10.0.0.0/33,fd00::/8,010.0.0.1')!.fields,
+        <String, Object?>{
+          'ip_cidr': <String>['10.0.0.0/8', 'fd00::/8'],
+        },
+      );
+      expect(_parse('ip:10.0.0.1')!.fields, <String, Object?>{
+        'ip_cidr': <String>['10.0.0.1'],
+      });
+      for (final bad in <String>['1.2.3', '10.0.0.0/08', 'host.example']) {
+        expect(_parse('ip_cidr:$bad')!.isEmpty, isTrue, reason: bad);
+      }
+      expect(_parse('999.1.1.1')!.isEmpty, isTrue);
+    });
+
+    test('drops an expression the core would not compile', () {
+      // The core compiles these with Go's regexp; one that fails fails the
+      // whole document, and Dart's RegExp alone would let several through.
+      for (final bad in <String>[
+        '*.example.com',
+        r'(?=ads)\.example',
+        r'(a)\1',
+        r'\q',
+        '[]',
+        'a{1001}',
+      ]) {
+        expect(_parse('regex:$bad'), isNull, reason: bad);
+      }
+      expect(_parse(r'regex:(?i)^ads\.')!.fields, <String, Object?>{
+        'domain_regex': <String>[r'(?i)^ads\.'],
+      });
+      expect(
+          _parse(r'regex:^[a-z]{1,3}\.example\.com$')!.fields,
+          <String, Object?>{
+            'domain_regex': <String>[r'^[a-z]{1,3}\.example\.com$'],
+          });
+    });
+
     test('drops something it cannot make sense of', () {
       expect(_parse(''), isNull);
       expect(_parse('   '), isNull);
