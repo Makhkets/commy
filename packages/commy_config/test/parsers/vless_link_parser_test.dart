@@ -223,6 +223,53 @@ void main() {
       expect(node.param('host'), 'front.example');
     });
 
+    test('keeps a stream-one server whose download route cannot apply', () {
+      final extra = Uri.encodeQueryComponent(
+        '{"downloadSettings":{"address":"d.example","port":443}}',
+      );
+      final node = parser.parse(
+        'vless://uuid@example.com:443?type=xhttp&mode=stream-one'
+        '&extra=$extra#x',
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport.containsKey('download'), isFalse);
+    });
+
+    test('refuses a download route Xray would refuse, by the rule it breaks',
+        () {
+      final extra = Uri.encodeQueryComponent(
+        '{"downloadSettings":{"address":"d.example","network":"ws"}}',
+      );
+      expect(
+        () => parser.parse(
+          'vless://uuid@example.com:443?type=xhttp&extra=$extra#x',
+        ),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            allOf(contains('downloadSettings'), contains('ws')),
+          ),
+        ),
+      );
+    });
+
+    test('keeps a download route in the link exactly as it came', () {
+      const route = '{"downloadSettings":{"address":"cdn.example","port":443,'
+          '"network":"xhttp","security":"tls","sockopt":{"mark":255}}}';
+      final node = parser.parse(
+        'vless://uuid@example.com:443?type=xhttp&security=tls'
+        '&extra=${Uri.encodeQueryComponent(route)}#x',
+      );
+      final again = parser.parse(parser.toLink(node));
+
+      expect(node.param('extra'), route);
+      expect(again.param('extra'), route);
+    });
+
     test('exports mode and extra so the link survives a round trip', () {
       const link = 'vless://uuid@example.com:443?type=xhttp&security=tls'
           '&sni=s.example&path=%2Fxh&host=cdn.example&mode=stream-up'

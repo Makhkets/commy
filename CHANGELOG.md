@@ -10,6 +10,23 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **XHTTP servers with a separate download route now use it.** A server whose
+  link carries `downloadSettings` — the download through a CDN, the upload
+  straight to the server — is connected the way Xray connects it: the
+  download goes to its own address with its own TLS or REALITY, the upload
+  stays on the main route. Read from links, Xray JSON, Clash.Meta
+  (`download-settings`) and sing-box subscriptions. A route Xray itself would
+  refuse is refused on import, and the reason names the rule.
+- Xray JSON subscriptions: a REALITY key under its newer name (`password`) is
+  read, and a `Host` written among the XHTTP headers is kept as the host.
+- **One broken server no longer stops all of them.** A REALITY key that is
+  not a key, or a short id of odd length, now leaves that one server out with
+  the reason, instead of making the core refuse to start. A key written in
+  standard base64 and a fingerprint in capitals are read as what they mean,
+  and a fingerprint the core does not have becomes Chrome's.
+- Clash.Meta: `fingerprint` (a certificate pin there) is no longer taken for
+  the TLS fingerprint.
+
 ## [0.1.0-alpha.10]
 
 Installs over alpha.9.

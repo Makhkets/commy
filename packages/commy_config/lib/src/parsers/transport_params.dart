@@ -1,3 +1,4 @@
+import 'package:commy_config/src/builder/xhttp_download_builder.dart';
 import 'package:commy_config/src/internal/config_build_exception.dart';
 import 'package:commy_config/src/internal/link_format_exception.dart';
 import 'package:commy_config/src/internal/param_keys.dart';
@@ -240,6 +241,14 @@ abstract final class TransportParams {
     } else {
       try {
         settings.validate(effectiveMode);
+        // A second route that could never be built is refused now, with the
+        // entry, rather than at every connect. The port only stands in for a
+        // route that names none; any will do for the check.
+        XhttpDownloadBuilder.build(
+          settings.downloadSettings,
+          mainPort: 443,
+          mainMode: effectiveMode,
+        );
       } on ConfigBuildException catch (error) {
         throw LinkFormatException(error.reason);
       }

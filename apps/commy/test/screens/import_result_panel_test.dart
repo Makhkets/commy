@@ -32,7 +32,7 @@ import '../support/commy_test_app.dart';
 void main() {
   final t = Translations();
 
-  const publicKey = 'aGVsbG8td29ybGQtcHVibGljLWtleQ';
+  const publicKey = 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k';
   const amsterdam = 'vless://11111111-2222-3333-4444-555555555555'
       '@nl-03.example.net:443?security=reality&type=tcp'
       '&pbk=$publicKey&sid=ab12cd34#Amsterdam%2003';

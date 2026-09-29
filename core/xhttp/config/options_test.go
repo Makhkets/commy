@@ -138,6 +138,20 @@ func TestWhatXrayRefusesIsRefused(t *testing.T) {
 		"session id absurdly long":        {SessionIDTable: "hex", SessionIDLength: r(16, 2000000000)},
 		"post size zero":                  {ScMaxEachPostBytes: r(0, 100)},
 		"both xmux limits":                {Xmux: &Xmux{MaxConnections: r(2, 2), MaxConcurrency: r(4, 4)}},
+		// downloadSettings, as Xray checks it — and where Xray would panic.
+		"download in stream-one":  {Mode: ModeStreamOne, Download: &Download{Server: "d", ServerPort: 443}},
+		"download without server": {Download: &Download{ServerPort: 443}},
+		"download without port":   {Download: &Download{Server: "d"}},
+		"download with a mode": {
+			Download: &Download{Server: "d", ServerPort: 443, Options: Options{Mode: ModePacketUp}},
+		},
+		"download of a download": {Download: &Download{
+			Server: "d", ServerPort: 443,
+			Options: Options{Download: &Download{Server: "e", ServerPort: 443}},
+		}},
+		"download with bad options": {Download: &Download{
+			Server: "d", ServerPort: 443, Options: Options{SessionPlacement: "body"},
+		}},
 	}
 	for name, options := range cases {
 		if _, err := options.Resolve(); err == nil {
@@ -227,5 +241,32 @@ func TestTheBlockDecodesFromTheJSONWeEmit(t *testing.T) {
 	}
 	if second.XPaddingBytes != resolved.XPaddingBytes || second.MaxConcurrency != resolved.MaxConcurrency {
 		t.Fatal("the block does not survive a round trip through JSON")
+	}
+}
+
+func TestADownloadRouteResolvesOnItsOwn(t *testing.T) {
+	// Its own defaults and rules, not the main route's values.
+	options := Options{
+		Path:             "/up",
+		SessionPlacement: PlacementHeader,
+		Download: &Download{
+			Server: "cdn.example", ServerPort: 443,
+			Options: Options{Path: "/down"},
+		},
+	}
+
+	resolved, err := options.Resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	download := resolved.Download
+	if download == nil || download.Server != "cdn.example" || download.ServerPort != 443 {
+		t.Fatalf("download route: %+v", download)
+	}
+	if download.Path != "/down" || download.SessionPlacement != PlacementPath {
+		t.Fatalf("download route kept the main route's options: %+v", download.Resolved)
+	}
+	if download.XPaddingBytes != (Range{From: 100, To: 1000}) {
+		t.Fatalf("download route did not get its own defaults: %+v", download.XPaddingBytes)
 	}
 }

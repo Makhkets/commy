@@ -163,6 +163,40 @@ void main() {
       expect(jsonDecode(exported), config.document);
     });
 
+    test('reaches into an XHTTP download route', () {
+      const split = CoreConfig(<String, Object?>{
+        'outbounds': <Map<String, Object?>>[
+          <String, Object?>{
+            'type': 'vless',
+            'tag': 'proxy',
+            'server': 'up.example.com',
+            'transport': <String, Object?>{
+              'type': 'xhttp',
+              'download': <String, Object?>{
+                'server': 'cdn.example.com',
+                'server_port': 443,
+                'headers': <String, Object?>{'X-Token': 'cdn-secret'},
+                'tls': <String, Object?>{
+                  'enabled': true,
+                  'reality': <String, Object?>{
+                    'enabled': true,
+                    'public_key': 'PUBKEY',
+                    'short_id': 'cd34',
+                  },
+                },
+              },
+            },
+          },
+        ],
+      });
+
+      final exported = ConfigRedactor.export(split, hideServers: true);
+
+      expect(exported, isNot(contains('cdn.example.com')));
+      expect(exported, isNot(contains('cdn-secret')));
+      expect(exported, isNot(contains('cd34')));
+    });
+
     test('blanks request headers, where a CDN token goes', () {
       // An XHTTP link can carry any header the operator made up, and there is
       // no list of secret header names to match — so the list is of the two

@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"math/big"
 	"net"
 	"net/http"
@@ -64,12 +65,20 @@ type endpoint struct {
 	addr     M.Socksaddr
 	tls      aTLS.Config
 	listener *countingListener
+	// tlsJSON is [tls] as a sing-box outbound `tls` block: what a download
+	// route carries, and what sing-box's own constructor turns back into a
+	// TLS config. Nil for cleartext.
+	tlsJSON json.RawMessage
 }
 
 // startHTTP1 serves XHTTP over cleartext HTTP/1.1.
 func startHTTP1(t testing.TB, options config.Options) *endpoint {
 	t.Helper()
-	server := newFakeXray(t, options)
+	return serveHTTP1(t, newFakeXray(t, options))
+}
+
+func serveHTTP1(t testing.TB, server *fakeXray) *endpoint {
+	t.Helper()
 	listener := listenTCP(t)
 	httpServer := httptest.NewUnstartedServer(server)
 	httpServer.Listener = listener
@@ -81,7 +90,11 @@ func startHTTP1(t testing.TB, options config.Options) *endpoint {
 // startHTTP2 serves XHTTP over TLS with ALPN h2.
 func startHTTP2(t testing.TB, options config.Options) *endpoint {
 	t.Helper()
-	server := newFakeXray(t, options)
+	return serveHTTP2(t, newFakeXray(t, options))
+}
+
+func serveHTTP2(t testing.TB, server *fakeXray) *endpoint {
+	t.Helper()
 	listener := listenTCP(t)
 	httpServer := httptest.NewUnstartedServer(server)
 	httpServer.Listener = listener
@@ -94,13 +107,18 @@ func startHTTP2(t testing.TB, options config.Options) *endpoint {
 		addr:     M.SocksaddrFromNet(listener.Addr()),
 		tls:      &stdTLS{&tls.Config{InsecureSkipVerify: true, ServerName: "xhttp.test"}},
 		listener: listener,
+		tlsJSON:  json.RawMessage(`{"enabled":true,"server_name":"xhttp.test","insecure":true}`),
 	}
 }
 
 // startHTTP3 serves XHTTP over QUIC.
 func startHTTP3(t testing.TB, options config.Options) *endpoint {
 	t.Helper()
-	server := newFakeXray(t, options)
+	return serveHTTP3(t, newFakeXray(t, options))
+}
+
+func serveHTTP3(t testing.TB, server *fakeXray) *endpoint {
+	t.Helper()
 	packetConn, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +140,16 @@ func startHTTP3(t testing.TB, options config.Options) *endpoint {
 			ServerName:         "xhttp.test",
 			NextProtos:         []string{"h3"},
 		}},
+		tlsJSON: json.RawMessage(
+			`{"enabled":true,"server_name":"xhttp.test","insecure":true,"alpn":["h3"]}`),
 	}
+}
+
+// withDownload is [main] with a download route to [d], dressed by [route].
+func withDownload(main config.Options, d *endpoint, route config.Options) config.Options {
+	host, port := d.addr.AddrString(), d.addr.Port
+	main.Download = &config.Download{Server: host, ServerPort: port, TLS: d.tlsJSON, Options: route}
+	return main
 }
 
 func listenTCP(t testing.TB) *countingListener {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:test/test.dart';
@@ -198,6 +200,299 @@ void main() {
         'path': '/xh',
         'x_padding_bytes': '5-9',
       });
+    });
+
+    test('reads a REALITY key under its newer name, and a Host header', () {
+      final outbound = xray(
+        <String, Object?>{
+          'path': '/xh',
+          'headers': <String, Object?>{'Host': 'front.example', 'X-A': '1'},
+        },
+        'xhttpSettings',
+      );
+      (outbound['streamSettings']! as Map<String, Object?>)
+        ..remove('tlsSettings')
+        ..['security'] = 'reality'
+        ..['realitySettings'] = <String, Object?>{
+          'serverName': 'www.example.com',
+          'password': 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k',
+          'shortId': 'ab12',
+        };
+
+      final node = SingBoxOutboundReader.read(outbound);
+      final built = OutboundBuilder.build(node: node, tag: 't');
+
+      expect(
+        node.param(ParamKeys.publicKey),
+        'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k',
+      );
+      expect(node.param(ParamKeys.host), 'front.example');
+      expect(
+        ((built['tls']! as Map<String, Object?>)['reality']!
+            as Map<String, Object?>)['public_key'],
+        'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k',
+      );
+      expect(built['transport'], <String, Object?>{
+        'type': 'xhttp',
+        'host': 'front.example',
+        'path': '/xh',
+        'headers': <String, String>{'X-A': '1'},
+      });
+    });
+
+    test('reads an Xray download route and hands it to the core', () {
+      final node = SingBoxOutboundReader.read(
+        xray(
+          <String, Object?>{
+            'path': '/xh',
+            'extra': <String, Object?>{
+              'downloadSettings': <String, Object?>{
+                'address': 'cdn.example',
+                'port': 443,
+                'network': 'xhttp',
+                'security': 'tls',
+                'xhttpSettings': <String, Object?>{'path': '/xh'},
+              },
+            },
+          },
+          'xhttpSettings',
+        ),
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport['download'], <String, Object?>{
+        'server': 'cdn.example',
+        'server_port': 443,
+        'tls': <String, Object?>{
+          'enabled': true,
+          'server_name': 'cdn.example',
+        },
+        'path': '/xh',
+      });
+    });
+
+    test('refuses an Xray download route the core could never dial', () {
+      expect(
+        () => SingBoxOutboundReader.read(
+          xray(
+            <String, Object?>{
+              'path': '/xh',
+              'downloadSettings': <String, Object?>{
+                'address': '0.0.0.0',
+                'port': 443,
+              },
+            },
+            'xhttpSettings',
+          ),
+        ),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            contains('downloadSettings'),
+          ),
+        ),
+      );
+    });
+
+    test('keeps a stream-one sing-box outbound with a download route', () {
+      // sing-box-extended ignores the route in stream-one.
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'up.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'tls': <String, Object?>{'enabled': true},
+        'transport': <String, Object?>{
+          'type': 'xhttp',
+          'mode': 'stream-one',
+          'path': '/x',
+          'download': <String, Object?>{
+            'server': 'cdn.example',
+            'server_port': 443,
+            'tls': <String, Object?>{'enabled': true},
+            'path': '/x',
+          },
+        },
+      });
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport.containsKey('download'), isFalse);
+    });
+
+    test('reads back the download route our own builder writes', () {
+      const download = <String, Object?>{
+        'server': 'cdn.example',
+        'server_port': 8443,
+        'tls': <String, Object?>{
+          'enabled': true,
+          'server_name': 'a.example',
+          'alpn': <String>['h2'],
+          'utls': <String, Object?>{'enabled': true, 'fingerprint': 'firefox'},
+        },
+        'host': 'c.example',
+        'path': '/down',
+        'headers': <String, String>{'X-Edge': '1'},
+        'x_padding_bytes': '200-400',
+        'session_placement': 'query',
+        'xmux': <String, Object?>{'max_connections': 2},
+      };
+      final transport = <String, Object?>{
+        'type': 'xhttp',
+        'mode': 'packet-up',
+        'path': '/up',
+        'download': download,
+      };
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'a.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'tls': <String, Object?>{'enabled': true, 'server_name': 's.example'},
+        'transport': transport,
+      });
+
+      // Stored as Xray spells it, so a link made from the node is one Xray
+      // reads.
+      final extra =
+          jsonDecode(node.param(ParamKeys.extra)!) as Map<String, Object?>;
+      final route = extra['downloadSettings']! as Map<String, Object?>;
+      expect(route['address'], 'cdn.example');
+      expect(route['port'], 8443);
+      expect(route['security'], 'tls');
+      expect(route.containsKey('server'), isFalse);
+      // And built back into the block it came from.
+      expect(
+        OutboundBuilder.build(node: node, tag: 't')['transport'],
+        transport,
+      );
+    });
+
+    test('a download route that sends no SNI keeps sending none', () {
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'a.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'transport': <String, Object?>{
+          'type': 'xhttp',
+          'download': <String, Object?>{
+            'server': 'dl.example',
+            'server_port': 443,
+            'tls': <String, Object?>{'enabled': true, 'disable_sni': true},
+          },
+        },
+      });
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+      final download = transport['download']! as Map<String, Object?>;
+
+      expect(
+        (download['tls']! as Map<String, Object?>)['disable_sni'],
+        isTrue,
+      );
+    });
+
+    test('holds a sing-box download route to the main mode', () {
+      // The fork's route has no mode and repeats the main settings, the
+      // upload-only ones included; it is checked against the main mode.
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'a.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'transport': <String, Object?>{
+          'type': 'xhttp',
+          'mode': 'packet-up',
+          'uplink_http_method': 'GET',
+          'download': <String, Object?>{
+            'server': 'dl.example',
+            'server_port': 443,
+            'path': '/xh',
+            'uplink_http_method': 'GET',
+          },
+        },
+      });
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport['download'], <String, Object?>{
+        'server': 'dl.example',
+        'server_port': 443,
+        'path': '/xh',
+      });
+    });
+
+    test('drops a sing-box download route that names no server', () {
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'a.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'transport': <String, Object?>{
+          'type': 'xhttp',
+          'download': <String, Object?>{'path': '/down'},
+        },
+      });
+
+      expect(node.param(ParamKeys.extra), isNull);
+    });
+
+    test('reads the transport under its newer key, which wins', () {
+      Map<String, Object?> outbound(Map<String, Object?> keys) {
+        final value = xray(<String, Object?>{'path': '/m'}, 'xhttpSettings');
+        (value['streamSettings']! as Map<String, Object?>)
+          ..remove('network')
+          ..addAll(keys);
+        return value;
+      }
+
+      final alone = SingBoxOutboundReader.read(
+        outbound(<String, Object?>{'method': 'xhttp'}),
+      );
+      final both = SingBoxOutboundReader.read(
+        outbound(<String, Object?>{'network': 'tcp', 'method': 'xhttp'}),
+      );
+
+      expect(alone.param(ParamKeys.transport), 'xhttp');
+      expect(both.param(ParamKeys.transport), 'xhttp');
+    });
+
+    test('keeps the insecure flag and a Host header of a sing-box route', () {
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'vless',
+        'tag': 'x',
+        'server': 'a.example',
+        'server_port': 443,
+        'uuid': 'the-uuid',
+        'transport': <String, Object?>{
+          'type': 'xhttp',
+          'download': <String, Object?>{
+            'server': 'dl.example',
+            'server_port': 443,
+            'tls': <String, Object?>{'enabled': true, 'insecure': true},
+            'headers': <String, Object?>{'Host': 'front.example'},
+          },
+        },
+      });
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+      final download = transport['download']! as Map<String, Object?>;
+
+      expect((download['tls']! as Map<String, Object?>)['insecure'], isTrue);
+      expect(download['host'], 'front.example');
     });
 
     test('reads the settings under their first name too', () {

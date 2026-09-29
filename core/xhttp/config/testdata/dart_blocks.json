@@ -16,7 +16,7 @@
     },
     {
       "name": "Reality, auto, host, a path with a query of its own",
-      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@203.0.113.7:443?type=xhttp&security=reality&pbk=KEY&sid=ab12&sni=www.example.com&fp=chrome&mode=auto&host=cdn.example&path=%2Fapi%2Fv1%3Fed%3D2048#b",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@203.0.113.7:443?type=xhttp&security=reality&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k&sid=ab12&sni=www.example.com&fp=chrome&mode=auto&host=cdn.example&path=%2Fapi%2Fv1%3Fed%3D2048#b",
       "transport": {
         "type": "xhttp",
         "host": "cdn.example",
@@ -95,7 +95,7 @@
       }
     },
     {
-      "name": "extra: headers keep their case, Host becomes the host, server-side keys and the download route are left out",
+      "name": "extra: headers keep their case, Host becomes the host, server-side keys are left out, the download route is its own",
       "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&path=%2Fh&extra=%7B%22headers%22%3A%7B%22Host%22%3A%22front.example%22%2C%22X-Api-Key%22%3A%22k%22%2C%22User-Agent%22%3A%22chrome%22%7D%2C%22noSSEHeader%22%3Atrue%2C%22scMaxBufferedPosts%22%3A30%2C%22scStreamUpServerSecs%22%3A%2220-80%22%2C%22serverMaxHeaderBytes%22%3A8192%2C%22downloadSettings%22%3A%7B%22address%22%3A%22dl.example%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fh%22%7D%7D%7D#h",
       "transport": {
         "type": "xhttp",
@@ -104,6 +104,15 @@
         "headers": {
           "X-Api-Key": "k",
           "User-Agent": "chrome"
+        },
+        "download": {
+          "server": "dl.example",
+          "server_port": 443,
+          "tls": {
+            "enabled": true,
+            "server_name": "dl.example"
+          },
+          "path": "/h"
         }
       }
     },
@@ -114,6 +123,148 @@
         "type": "xhttp",
         "mode": "stream-one",
         "path": "/t"
+      }
+    },
+    {
+      "name": "download: Reality up, a CDN down with TLS of its own, sockopt dropped",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@203.0.113.7:443?type=xhttp&security=reality&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k&sid=ab12&sni=www.example.com&fp=chrome&path=%2Fxh&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22cdn.example.com%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22tlsSettings%22%3A%7B%22serverName%22%3A%22a.example.com%22%2C%22alpn%22%3A%5B%22h2%22%5D%2C%22fingerprint%22%3A%22firefox%22%7D%2C%22xhttpSettings%22%3A%7B%22host%22%3A%22c.example.com%22%2C%22path%22%3A%22%2Fxh%22%2C%22extra%22%3A%7B%22headers%22%3A%7B%22X-Edge%22%3A%221%22%7D%2C%22xPaddingBytes%22%3A%22200-400%22%2C%22xmux%22%3A%7B%22maxConcurrency%22%3A1%7D%7D%7D%2C%22sockopt%22%3A%7B%22mark%22%3A255%7D%7D%7D#j",
+      "transport": {
+        "type": "xhttp",
+        "path": "/xh",
+        "download": {
+          "server": "cdn.example.com",
+          "server_port": 443,
+          "tls": {
+            "enabled": true,
+            "server_name": "a.example.com",
+            "alpn": [
+              "h2"
+            ],
+            "utls": {
+              "enabled": true,
+              "fingerprint": "firefox"
+            }
+          },
+          "host": "c.example.com",
+          "path": "/xh",
+          "headers": {
+            "X-Edge": "1"
+          },
+          "x_padding_bytes": "200-400",
+          "xmux": {
+            "max_concurrency": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "download: TLS up with XMUX, Reality down to an IP, the key under its newer name, Host among the headers",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&sni=example.com&mode=packet-up&path=%2Fk&extra=%7B%22xmux%22%3A%7B%22maxConnections%22%3A%222-4%22%7D%2C%22downloadSettings%22%3A%7B%22address%22%3A%22203.0.113.9%22%2C%22port%22%3A8443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22reality%22%2C%22realitySettings%22%3A%7B%22serverName%22%3A%22www.example.com%22%2C%22password%22%3A%221DAalBWi7wanx8nAzAav6HMYGp39vjczgu1sd4Q1S1k%22%2C%22shortId%22%3A%22cd34%22%2C%22fingerprint%22%3A%22safari%22%7D%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fk%22%2C%22headers%22%3A%7B%22Host%22%3A%22dl-front.example%22%7D%7D%7D%7D#k",
+      "transport": {
+        "type": "xhttp",
+        "mode": "packet-up",
+        "path": "/k",
+        "xmux": {
+          "max_connections": "2-4"
+        },
+        "download": {
+          "server": "203.0.113.9",
+          "server_port": 8443,
+          "tls": {
+            "enabled": true,
+            "server_name": "www.example.com",
+            "utls": {
+              "enabled": true,
+              "fingerprint": "chrome"
+            },
+            "reality": {
+              "enabled": true,
+              "public_key": "1DAalBWi7wanx8nAzAav6HMYGp39vjczgu1sd4Q1S1k",
+              "short_id": "cd34"
+            }
+          },
+          "host": "dl-front.example",
+          "path": "/k"
+        }
+      }
+    },
+    {
+      "name": "download: no port takes the main one, no security is cleartext, a route inside the route is dropped",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:8443?type=xhttp&security=tls&mode=stream-up&path=%2Fxh&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22plain.example%22%2C%22network%22%3A%22xhttp%22%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fxh%22%2C%22extra%22%3A%7B%22downloadSettings%22%3A%7B%22address%22%3A%22nested.example%22%2C%22port%22%3A1%7D%7D%7D%7D%7D#l",
+      "transport": {
+        "type": "xhttp",
+        "mode": "stream-up",
+        "path": "/xh",
+        "download": {
+          "server": "plain.example",
+          "server_port": 8443,
+          "path": "/xh"
+        }
+      }
+    },
+    {
+      "name": "download: HTTP/3, so no uTLS",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&path=%2Fm&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22h3.example%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22tlsSettings%22%3A%7B%22alpn%22%3A%5B%22h3%22%5D%2C%22fingerprint%22%3A%22chrome%22%7D%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fm%22%7D%7D%7D#m",
+      "transport": {
+        "type": "xhttp",
+        "path": "/m",
+        "download": {
+          "server": "h3.example",
+          "server_port": 443,
+          "tls": {
+            "enabled": true,
+            "server_name": "h3.example",
+            "alpn": [
+              "h3"
+            ]
+          },
+          "path": "/m"
+        }
+      }
+    },
+    {
+      "name": "download: Xray's template with the address left empty is no route",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&path=%2Fn&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fn%22%7D%7D%7D#n",
+      "transport": {
+        "type": "xhttp",
+        "path": "/n"
+      }
+    },
+    {
+      "name": "download: what only uploads use is not carried, what the GET is dressed by is",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&mode=packet-up&path=%2Fo&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22dl.example%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fo%22%2C%22mode%22%3A%22packet-up%22%2C%22extra%22%3A%7B%22uplinkDataPlacement%22%3A%22header%22%2C%22scMaxEachPostBytes%22%3A1000%2C%22xPaddingObfsMode%22%3Atrue%2C%22xPaddingPlacement%22%3A%22header%22%2C%22sessionPlacement%22%3A%22query%22%7D%7D%7D%7D#o",
+      "transport": {
+        "type": "xhttp",
+        "mode": "packet-up",
+        "path": "/o",
+        "download": {
+          "server": "dl.example",
+          "server_port": 443,
+          "tls": {
+            "enabled": true,
+            "server_name": "dl.example"
+          },
+          "path": "/o",
+          "x_padding_obfs_mode": true,
+          "x_padding_placement": "header",
+          "session_placement": "query"
+        }
+      }
+    },
+    {
+      "name": "download: TLS to an address, no server name: the core checks the certificate against the address",
+      "link": "vless://4f6a3b2c-9d1e-4c5a-8b7f-0123456789ab@example.com:443?type=xhttp&security=tls&path=%2Fp&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22203.0.113.9%22%2C%22port%22%3A443%2C%22network%22%3A%22xhttp%22%2C%22security%22%3A%22tls%22%2C%22xhttpSettings%22%3A%7B%22path%22%3A%22%2Fp%22%7D%7D%7D#p",
+      "transport": {
+        "type": "xhttp",
+        "path": "/p",
+        "download": {
+          "server": "203.0.113.9",
+          "server_port": 443,
+          "tls": {
+            "enabled": true
+          },
+          "path": "/p"
+        }
       }
     }
   ]

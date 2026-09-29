@@ -218,7 +218,8 @@ void main() {
   Future<ProviderContainer> buildConfig(WidgetTester tester) async {
     const link = 'vless://11111111-2222-3333-4444-555555555555'
         '@nl-03.example.net:443?security=reality&type=tcp'
-        '&pbk=aGVsbG8td29ybGQtcHVibGljLWtleQ&sid=ab12cd34#Amsterdam%2003';
+        '&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k'
+        '&sid=ab12cd34#Amsterdam%2003';
     final container = ProviderScope.containerOf(
       tester.element(find.byType(ConfigScreen)),
       listen: false,

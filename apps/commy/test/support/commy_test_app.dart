@@ -217,7 +217,7 @@ ProxyNode testNode({
       'uuid': '11111111-2222-3333-4444-555555555555',
       'security': 'reality',
       'type': 'tcp',
-      'pbk': 'aGVsbG8td29ybGQtcHVibGljLWtleQ',
+      'pbk': 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k',
       'sid': 'ab12cd34',
     },
   );

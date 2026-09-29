@@ -16,10 +16,12 @@ void main() {
 
   const document = 'vless://11111111-2222-3333-4444-555555555555'
       '@nl-03.example.net:443?security=reality&type=tcp'
-      '&pbk=aGVsbG8td29ybGQtcHVibGljLWtleQ&sid=ab12cd34#Amsterdam%2003\n'
+      '&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k'
+      '&sid=ab12cd34#Amsterdam%2003\n'
       'vless://11111111-2222-3333-4444-555555555555'
       '@pl-01.example.net:443?security=reality&type=tcp'
-      '&pbk=aGVsbG8td29ybGQtcHVibGljLWtleQ&sid=ab12cd34#Warsaw%2001';
+      '&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k'
+      '&sid=ab12cd34#Warsaw%2001';
 
   late CommyTestHarness harness;
 

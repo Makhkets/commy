@@ -14,6 +14,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 	"strings"
@@ -84,6 +85,30 @@ type Options struct {
 	UplinkChunkSize     *Range `json:"uplink_chunk_size,omitempty"`
 	SessionIDTable      string `json:"session_id_table,omitempty"`
 	SessionIDLength     *Range `json:"session_id_length,omitempty"`
+
+	// Download is Xray's downloadSettings: a second route for the download
+	// half of stream-up and packet-up. Nil means both halves use this one.
+	Download *Download `json:"download,omitempty"`
+}
+
+// Download is where the download GET of stream-up and packet-up goes, and
+// how it is dressed — a whole second route, as Xray has it: its own server,
+// TLS or REALITY, HTTP version, host, path, headers, padding, session
+// placement and XMUX pool. Nothing is inherited from the main route except
+// the session id, which pairs the two halves at the server.
+//
+// The typical deployment uploads straight to the server over REALITY and
+// downloads through a CDN, or the other way round; both reach one Xray
+// inbound, which matches the GET to its upload by that id.
+type Download struct {
+	Server     string `json:"server"`
+	ServerPort uint16 `json:"server_port"`
+	// TLS is a sing-box outbound `tls` block, kept raw: sing-box's option
+	// package imports this one, so it cannot be a typed field here. Package
+	// xhttp decodes it as strictly as sing-box decodes its own.
+	TLS json.RawMessage `json:"tls,omitempty"`
+
+	Options
 }
 
 // Xmux decides how many HTTP connections carry the tunnel's streams and when
@@ -133,6 +158,9 @@ var PredefinedTables = map[string]string{
 // The transport works from this and never from Options, so "is this field
 // set" is asked in exactly one place.
 type Resolved struct {
+	// Download is the second route, resolved; nil without one.
+	Download *ResolvedDownload
+
 	Mode    string
 	Host    string
 	Path    string
@@ -172,6 +200,14 @@ type Resolved struct {
 //
 // An option the server would refuse is refused here, when the outbound is
 // created, rather than as a 400 the user has to find in a log.
+// ResolvedDownload is [Download] with its own options resolved.
+type ResolvedDownload struct {
+	Server     string
+	ServerPort uint16
+	TLS        json.RawMessage
+	Resolved
+}
+
 func (o Options) Resolve() (Resolved, error) {
 	r := Resolved{
 		Mode:                 o.Mode,
@@ -362,7 +398,53 @@ func (o Options) Resolve() (Resolved, error) {
 		}
 	}
 
+	if o.Download != nil {
+		download, err := o.Download.resolve(r.Mode)
+		if err != nil {
+			return Resolved{}, err
+		}
+		r.Download = download
+	}
+
 	return r, nil
+}
+
+// resolve checks the route the way Xray checks downloadSettings, then
+// resolves its options on their own: the same defaults and rules as the main
+// route's, applied to the download route's values.
+func (d *Download) resolve(mainMode string) (*ResolvedDownload, error) {
+	// One request carries both directions in stream-one; there is no GET to
+	// send anywhere else. Xray: `Can not use "downloadSettings" in
+	// "stream-one" mode`.
+	if mainMode == ModeStreamOne {
+		return nil, errors.New(`download can't be used in stream-one mode`)
+	}
+	// Xray dials `*memory2.Destination` with no check and panics without one;
+	// a route that goes nowhere is refused here instead.
+	if d.Server == "" {
+		return nil, errors.New("download: server is required")
+	}
+	if d.ServerPort == 0 {
+		return nil, errors.New("download: server_port is required")
+	}
+	// The mode is the main route's to decide; one written here would suggest
+	// otherwise. And a route has one download, not a chain of them.
+	if d.Mode != "" {
+		return nil, errors.New("download: mode belongs to the main route")
+	}
+	if d.Options.Download != nil {
+		return nil, errors.New("download: a download route can't have its own download")
+	}
+	resolved, err := d.Options.Resolve()
+	if err != nil {
+		return nil, errors.New("download: " + err.Error())
+	}
+	return &ResolvedDownload{
+		Server:     d.Server,
+		ServerPort: d.ServerPort,
+		TLS:        d.TLS,
+		Resolved:   resolved,
+	}, nil
 }
 
 // NormalizedPath is the path part of `path`, always starting and ending with

@@ -248,6 +248,10 @@ abstract final class SingBoxKeys {
   /// HTTP request method.
   static const String httpMethod = 'method';
 
+  /// XHTTP's second route, for the download (`config.Download` in
+  /// core/xhttp/config).
+  static const String download = 'download';
+
   // ── endpoint: wireguard (option/wireguard.go) ─────────────────────────
 
   /// Local private key.

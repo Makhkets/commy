@@ -22,17 +22,30 @@ var _ adapter.V2RayClientTransport = (*Client)(nil)
 
 // Client is the XHTTP transport of one outbound.
 type Client struct {
-	ctx         context.Context
-	options     config.Resolved
-	mode        string
-	httpVersion string
-	requestURL  string
+	ctx  context.Context
+	mode string
+	// upload carries stream-one, the stream-up POST and the packet-up POSTs;
+	// its options make the session id. download carries the GET of stream-up
+	// and packet-up — the same route unless a download route was given
+	// (Xray's downloadSettings).
+	upload   *route
+	download *route
 
+	// access guards both routes' pools: muxManager is not safe for
+	// concurrent use, and one connection takes a client from each.
 	access sync.Mutex
-	mux    *muxManager
 	// reset is closed by Close; connections still draining give up on it. Each
 	// Close installs a fresh one for the connections that come after.
 	reset chan struct{}
+}
+
+// route is one way to the server: where requests go, how they are dressed,
+// and the pool of connections that carries them.
+type route struct {
+	options     config.Resolved
+	httpVersion string
+	requestURL  string
+	mux         *muxManager
 }
 
 // NewClient builds the transport. It dials nothing: connections are made when
@@ -48,7 +61,41 @@ func NewClient(
 	if err != nil {
 		return nil, err
 	}
+	upload, err := newRoute(dialer, serverAddr, resolved, tlsConfig)
+	if err != nil {
+		return nil, err
+	}
+	reality := tlsConfig != nil && isReality(tlsConfig)
+	client := &Client{
+		ctx:      ctx,
+		mode:     decideMode(resolved.Mode, reality, resolved.Download != nil),
+		upload:   upload,
+		download: upload,
+		reset:    make(chan struct{}),
+	}
+	if d := resolved.Download; d != nil {
+		addr := M.ParseSocksaddrHostPort(d.Server, d.ServerPort)
+		downloadTLS, err := newDownloadTLS(ctx, d)
+		if err != nil {
+			return nil, E.Cause(err, "xhttp download")
+		}
+		client.download, err = newRoute(newDownloadDialer(ctx, dialer, addr), addr, d.Resolved, downloadTLS)
+		if err != nil {
+			return nil, E.Cause(err, "xhttp download")
+		}
+	}
+	return client, nil
+}
 
+// newRoute works out one route: its HTTP version, the URL its requests go
+// to, and a pool that dials serverAddr through dialer when a connection is
+// wanted.
+func newRoute(
+	dialer N.Dialer,
+	serverAddr M.Socksaddr,
+	resolved config.Resolved,
+	tlsConfig tls.Config,
+) (*route, error) {
 	reality := tlsConfig != nil && isReality(tlsConfig)
 	httpVersion := decideHTTPVersion(tlsConfig, reality)
 	if tlsConfig != nil && httpVersion == httpVersion2 && len(tlsConfig.NextProtos()) == 0 {
@@ -66,13 +113,10 @@ func NewClient(
 	}
 	requestURL := baseURL(&resolved, tlsConfig != nil, host)
 
-	client := &Client{
-		ctx:         ctx,
+	r := &route{
 		options:     resolved,
-		mode:        decideMode(resolved.Mode, reality),
 		httpVersion: httpVersion,
 		requestURL:  requestURL.String(),
-		reset:       make(chan struct{}),
 	}
 	var tlsDialer tls.Dialer
 	if tlsConfig != nil {
@@ -89,27 +133,27 @@ func NewClient(
 		// Build one now and throw it away: the only thing that can fail is the
 		// TLS configuration, and that is a fact about the outbound, not about
 		// a connection.
-		_, shutdown, err := newHTTP3(&client.options, dialer, serverAddr, tlsConfig)
+		_, shutdown, err := newHTTP3(&r.options, dialer, serverAddr, tlsConfig)
 		if err != nil {
 			return nil, err
 		}
 		shutdown()
 	}
-	client.mux = newMuxManager(&client.options, func() *httpClient {
+	r.mux = newMuxManager(&r.options, func() *httpClient {
 		if httpVersion != httpVersion3 {
-			return newHTTPClient(&client.options, httpVersion, dial, nil, nil)
+			return newHTTPClient(&r.options, httpVersion, dial, nil, nil)
 		}
-		transport, shutdown, err := newHTTP3(&client.options, dialer, serverAddr, tlsConfig)
+		transport, shutdown, err := newHTTP3(&r.options, dialer, serverAddr, tlsConfig)
 		if err != nil {
 			// Checked above with the same arguments; kept so that a change
 			// there cannot turn into a nil round tripper here.
-			closed := newHTTPClient(&client.options, httpVersion1, dial, nil, nil)
+			closed := newHTTPClient(&r.options, httpVersion1, dial, nil, nil)
 			closed.close()
 			return closed
 		}
-		return newHTTPClient(&client.options, httpVersion, dial, transport, shutdown)
+		return newHTTPClient(&r.options, httpVersion, dial, transport, shutdown)
 	})
-	return client, nil
+	return r, nil
 }
 
 // decideHTTPVersion mirrors Xray: REALITY is HTTP/2, no TLS is HTTP/1.1, and
@@ -138,59 +182,89 @@ func decideHTTPVersion(tlsConfig tls.Config, reality bool) string {
 
 // decideMode resolves `auto`. With REALITY the client talks to the server
 // directly, nothing in between buffers, and one request can carry both
-// directions. Anything else may sit behind a CDN, and packet-up is the mode
-// that survives one.
-func decideMode(mode string, reality bool) string {
+// directions — unless the download is to take another route, which one
+// request cannot do; then stream-up, as Xray decides it. Anything else may
+// sit behind a CDN, and packet-up is the mode that survives one.
+func decideMode(mode string, reality, download bool) string {
 	if mode != config.ModeAuto {
 		return mode
 	}
 	if reality {
+		if download {
+			return config.ModeStreamUp
+		}
 		return config.ModeStreamOne
 	}
 	return config.ModePacketUp
 }
 
-// acquire picks the HTTP client for a new proxied connection, or for an
-// uploader whose client has been retired, and takes the matching hold on it.
+// acquireConn picks the HTTP clients for a new proxied connection — one from
+// each route, the same one when there is a single route — and takes a hold
+// on each.
 //
-// The hold is taken under the same lock the pool retires clients under. Taken
-// outside it, another dial could retire the client in between, find nobody
-// holding it, and close it under the caller's feet.
+// The holds are taken under the same lock the pools retire clients under.
+// Taken outside it, another dial could retire a client in between, find
+// nobody holding it, and close it under the caller's feet.
 //
 // The channel returned is the one the next Close will close.
-func (c *Client) acquire(forUpload bool) (*muxClient, <-chan struct{}) {
+func (c *Client) acquireConn() (up, down *muxClient, reset <-chan struct{}) {
 	c.access.Lock()
 	defer c.access.Unlock()
-	client := c.mux.get()
-	if forUpload {
-		client.holdUpload()
-	} else {
-		client.running.Add(1)
+	up = c.upload.mux.get()
+	up.running.Add(1)
+	down = up
+	if c.download != c.upload {
+		down = c.download.mux.get()
+		down.running.Add(1)
 	}
-	return client, c.reset
+	return up, down, c.reset
+}
+
+// acquireUpload picks a client of the upload route for an uploader whose
+// client has been retired, holding it for uploads. Never the download route:
+// a CDN in front of the download is exactly where the posts must not go.
+func (c *Client) acquireUpload() *muxClient {
+	c.access.Lock()
+	defer c.access.Unlock()
+	client := c.upload.mux.get()
+	client.holdUpload()
+	return client
 }
 
 // DialContext opens one proxied connection.
 func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
-	muxClient, reset := c.acquire(false)
+	up, down, reset := c.acquireConn()
+	release := up.doneRunning
+	if down != up {
+		release = func() {
+			down.doneRunning()
+			up.doneRunning()
+		}
+	}
 	// The package-level logger, looked up on every use: a transport is handed
 	// no logger of its own, and libbox points this one at the running
-	// instance's log only after the outbounds have been built.
-	log.DebugContext(ctx, "xhttp: dialing, mode ", c.mode, ", HTTP/", c.httpVersion)
+	// instance's log only after the outbounds have been built. No host in it:
+	// the log is exported, and a server's name is the user's (R3).
+	if c.download != c.upload {
+		log.DebugContext(ctx, "xhttp: dialing, mode ", c.mode, ", HTTP/", c.upload.httpVersion,
+			", download over HTTP/", c.download.httpVersion)
+	} else {
+		log.DebugContext(ctx, "xhttp: dialing, mode ", c.mode, ", HTTP/", c.upload.httpVersion)
+	}
 
 	flushed := make(chan struct{})
 	var flushedOnce sync.Once
 	markFlushed := func() { flushedOnce.Do(func() { close(flushed) }) }
-	conn := &splitConn{onClose: muxClient.doneRunning, flushed: flushed, abandon: reset}
+	conn := &splitConn{onClose: release, flushed: flushed, abandon: reset}
 	fail := func(err error) (net.Conn, error) {
-		muxClient.doneRunning()
+		release()
 		return nil, E.Cause(err, "xhttp")
 	}
 
 	if c.mode == config.ModeStreamOne {
-		muxClient.leftRequests.Add(-1)
+		up.leftRequests.Add(-1)
 		bodyReader, bodyWriter := io.Pipe()
-		reader, addrs, err := muxClient.http.openStream(ctx, c.requestURL, "", bodyReader, false, markFlushed)
+		reader, addrs, err := up.http.openStream(ctx, c.upload.requestURL, "", bodyReader, false, markFlushed)
 		if err != nil {
 			return fail(err)
 		}
@@ -199,9 +273,11 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		return conn, nil
 	}
 
-	sessionID := newSessionID(&c.options)
-	muxClient.leftRequests.Add(-1)
-	reader, addrs, err := muxClient.http.openStream(ctx, c.requestURL, sessionID, nil, false, nil)
+	// The id comes from the upload route, as Xray makes it from the main
+	// config; the GET carries it however the download route places it.
+	sessionID := newSessionID(&c.upload.options)
+	down.leftRequests.Add(-1)
+	reader, addrs, err := down.http.openStream(ctx, c.download.requestURL, sessionID, nil, false, nil)
 	if err != nil {
 		return fail(err)
 	}
@@ -209,9 +285,9 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 	conn.localAddr, conn.remoteAddr = addrs.local, addrs.remote
 
 	if c.mode == config.ModeStreamUp {
-		muxClient.leftRequests.Add(-1)
+		up.leftRequests.Add(-1)
 		bodyReader, bodyWriter := io.Pipe()
-		upload, _, err := muxClient.http.openStream(ctx, c.requestURL, sessionID, bodyReader, true, markFlushed)
+		upload, _, err := up.http.openStream(ctx, c.upload.requestURL, sessionID, bodyReader, true, markFlushed)
 		if err != nil {
 			_ = reader.Close()
 			return fail(err)
@@ -220,12 +296,12 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 		return conn, nil
 	}
 
-	maxUpload := int(c.options.ScMaxEachPostBytes.Pick())
+	maxUpload := int(c.upload.options.ScMaxEachPostBytes.Pick())
 	queue := newUploadQueue(maxUpload)
 	conn.writer = queue
 	go func() {
 		defer markFlushed()
-		c.uploadLoop(context.WithoutCancel(ctx), queue, reader, muxClient, sessionID)
+		c.uploadLoop(context.WithoutCancel(ctx), queue, reader, up, sessionID)
 	}()
 	return conn, nil
 }
@@ -289,7 +365,7 @@ func (c *Client) uploadLoop(
 			return
 		}
 
-		if interval := c.options.ScMinPostsIntervalMs.Pick(); interval > 0 && !lastWrite.IsZero() {
+		if interval := c.upload.options.ScMinPostsIntervalMs.Pick(); interval > 0 && !lastWrite.IsZero() {
 			if wait := time.Duration(interval)*time.Millisecond - time.Since(lastWrite); wait > 0 {
 				time.Sleep(wait)
 			}
@@ -302,7 +378,7 @@ func (c *Client) uploadLoop(
 		// them to the session by id, not by connection.
 		if poster.leftRequests.Add(-1) <= 0 ||
 			(!poster.unreusableAt.IsZero() && lastWrite.After(poster.unreusableAt)) {
-			next, _ := c.acquire(true)
+			next := c.acquireUpload()
 			poster.doneUpload()
 			poster = next
 		}
@@ -319,7 +395,7 @@ func (c *Client) uploadLoop(
 		go func(client *muxClient, seq int64) {
 			defer inFlight.Done()
 			defer client.doneUpload()
-			err := client.http.postPacket(traced, c.requestURL, sessionID, seq, payload)
+			err := client.http.postPacket(traced, c.upload.requestURL, sessionID, seq, payload)
 			markWritten()
 			if err != nil {
 				log.DebugContext(ctx, "xhttp: upload failed: ", err)
@@ -352,6 +428,9 @@ func (c *Client) Close() error {
 	defer c.access.Unlock()
 	close(c.reset)
 	c.reset = make(chan struct{})
-	c.mux.closeAll()
+	c.upload.mux.closeAll()
+	if c.download != c.upload {
+		c.download.mux.closeAll()
+	}
 	return nil
 }

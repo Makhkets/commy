@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:test/test.dart';
@@ -237,6 +239,183 @@ void main() {
         'sc_max_each_post_bytes': 800000,
         'xmux': <String, Object?>{'max_concurrency': '16-32'},
       });
+    });
+
+    test('a download route inherits from the proxy what it leaves unsaid', () {
+      // mihomo fills every field the block does not set from the proxy.
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/up',
+          'mode': 'packet-up',
+          'x-padding-bytes': '200-400',
+          'download-settings': <String, Object?>{'path': '/down'},
+        })
+          ..['client-fingerprint'] = 'firefox',
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport['download'], <String, Object?>{
+        'server': 'a.example',
+        'server_port': 443,
+        'tls': <String, Object?>{
+          'enabled': true,
+          'server_name': 's.example',
+          'utls': <String, Object?>{'enabled': true, 'fingerprint': 'firefox'},
+        },
+        // Under TLS the same name the core would fall back to.
+        'host': 's.example',
+        'path': '/down',
+        'x_padding_bytes': '200-400',
+      });
+    });
+
+    test('a download route replaces what it sets, REALITY included', () {
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'host': 'up-front.example',
+          'download-settings': <String, Object?>{
+            'server': '203.0.113.9',
+            'port': 8443,
+            'servername': 'www.example.com',
+            'reality-opts': <String, Object?>{
+              'public-key': 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k',
+              'short-id': 'cd34',
+            },
+            'host': 'dl-front.example',
+            'headers': <String, Object?>{'X-Edge': '1'},
+            'reuse-settings': <String, Object?>{'max-connections': '1'},
+          },
+        }),
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+      final download = transport['download']! as Map<String, Object?>;
+
+      expect(download['server'], '203.0.113.9');
+      expect(download['server_port'], 8443);
+      expect(download['host'], 'dl-front.example');
+      expect(download['headers'], <String, String>{'X-Edge': '1'});
+      expect(download['xmux'], <String, Object?>{'max_connections': 1});
+      final tls = download['tls']! as Map<String, Object?>;
+      expect(tls['server_name'], 'www.example.com');
+      expect(tls['reality'], <String, Object?>{
+        'enabled': true,
+        'public_key': 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k',
+        'short_id': 'cd34',
+      });
+      // The main route keeps its own.
+      expect(transport['host'], 'up-front.example');
+      expect(transport.containsKey('headers'), isFalse);
+    });
+
+    test('a download route without TLS still names the server as its host', () {
+      // mihomo: the route's host, else the proxy's, else the server name.
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'download-settings': <String, Object?>{
+            'server': '104.16.1.1',
+            'port': 80,
+            'tls': false,
+          },
+        }),
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport['download'], <String, Object?>{
+        'server': '104.16.1.1',
+        'server_port': 80,
+        'host': 's.example',
+        'path': '/xh',
+      });
+    });
+
+    test('a download route replaces the TLS details it sets', () {
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'download-settings': <String, Object?>{
+            'skip-cert-verify': true,
+            'alpn': <String>['http/1.1'],
+            'client-fingerprint': 'safari',
+          },
+        })
+          ..['alpn'] = <String>['h2']
+          ..['client-fingerprint'] = 'firefox'
+          ..['skip-cert-verify'] = false,
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+      final tls = (transport['download']! as Map<String, Object?>)['tls']!
+          as Map<String, Object?>;
+
+      expect(tls['insecure'], isTrue);
+      expect(tls['alpn'], <String>['http/1.1']);
+      expect(tls['utls'], <String, Object?>{
+        'enabled': true,
+        'fingerprint': 'safari',
+      });
+    });
+
+    test('a Host among the xhttp-opts headers is the host', () {
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'headers': <String, Object?>{'Host': 'front.example'},
+        }),
+      );
+
+      expect(node.param('host'), 'front.example');
+    });
+
+    test('a certificate pin is not a uTLS fingerprint', () {
+      // In mihomo `fingerprint` pins the server certificate;
+      // `client-fingerprint` is the hello.
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{'path': '/xh'})
+          ..['fingerprint'] = 'aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44',
+      );
+
+      expect(node.param('fp'), isNull);
+    });
+
+    test('a download route is stored as Xray spells it', () {
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'path': '/xh',
+          'download-settings': <String, Object?>{'server': 'cdn.example'},
+        }),
+      );
+      final extra = jsonDecode(node.param('extra')!) as Map<String, Object?>;
+      final route = extra['downloadSettings']! as Map<String, Object?>;
+
+      expect(route['address'], 'cdn.example');
+      expect(route['port'], 443);
+      expect(route['network'], 'xhttp');
+      expect(route['security'], 'tls');
+      expect(route.containsKey('server'), isFalse);
+    });
+
+    test('ignores a download route in stream-one', () {
+      // mihomo refuses the pair; a server that connects is kept instead.
+      final node = ClashProxyReader.read(
+        proxy(<String, Object?>{
+          'mode': 'stream-one',
+          'download-settings': <String, Object?>{'server': 'cdn.example'},
+        }),
+      );
+      final transport =
+          OutboundBuilder.build(node: node, tag: 't')['transport']!
+              as Map<String, Object?>;
+
+      expect(transport.containsKey('download'), isFalse);
     });
 
     test('works with no xhttp-opts at all', () {

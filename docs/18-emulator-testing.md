@@ -93,6 +93,7 @@ scripts/emulator_stand.sh stop
 |---|---|
 | Xray: REALITY Vision / gRPC / XHTTP, TLS‑XHTTP h2, Trojan, SS 2022, VMess WS | 18443–18449 |
 | Наше закреплённое ядро (`core/cmd/devbox`): Hysteria2, TUIC | 18450/udp, 18451/udp |
+| «Дверь» — второй вход в TLS‑XHTTP (TCP‑ретранслятор, как CDN) для узла «TLS XHTTP, download apart», у которого скачивание идёт отдельным маршрутом (`downloadSettings`). Считает байты в `door.log`: `down` — скачивание, `up` должен остаться маленьким | 18452 |
 | Подписка как у Remnawave | `http://10.0.2.2:18080/sub/stand` |
 | То же с лимитом устройств 1 | `http://10.0.2.2:18080/sub/hwid-stand` — без `x-hwid` отвечает заглушкой «App not supported», второму устройству — «Device limit reached» |
 | «Blob» — цель для замеров | `http://203.0.113.10/blob?mb=N` **только через прокси**: узлы перенаправляют этот адрес на локальный сервер; запрос, ушедший мимо туннеля, не дойдёт никуда |
