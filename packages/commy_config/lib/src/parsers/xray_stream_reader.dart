@@ -114,6 +114,28 @@ abstract final class XrayStreamReader {
     }
 
     switch (transport) {
+      case 'tcp':
+        // `rawSettings` is the name since Xray renamed TCP to RAW.
+        final options =
+            MapRead.object(stream, <String>['tcpSettings', 'rawSettings']);
+        final header = options == null
+            ? null
+            : MapRead.object(options, <String>['header']);
+        final type =
+            header == null ? null : MapRead.text(header, <String>['type']);
+        params[ParamKeys.headerType] =
+            type == null || type.toLowerCase() == 'none' ? null : type;
+        final request =
+            header == null ? null : MapRead.object(header, <String>['request']);
+        if (request != null) {
+          params[ParamKeys.path] =
+              _joinOrNull(MapRead.stringList(request, <String>['path']));
+          final headers = MapRead.object(request, <String>['headers']);
+          params[ParamKeys.host] = headers == null
+              ? null
+              : _joinOrNull(MapRead.stringList(headers, <String>['host']));
+        }
+        TransportParams.checkTcpHeader(params);
       case 'ws':
         final options = MapRead.object(stream, <String>['wsSettings']);
         if (options != null) {

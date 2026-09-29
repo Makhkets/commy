@@ -509,6 +509,74 @@ void main() {
       );
     });
 
+    test('opens tcp with an http header as a GET through the http transport',
+        () {
+      // Xray's TCP header sends GET; sing-box's http transport defaults to PUT.
+      final node = const VlessLinkParser().parse(
+        'vless://u@a.example:80?type=tcp&headerType=http'
+        '&host=b.example,c.example&path=%2Fa,%2Fb#n',
+      );
+
+      expect(_build(node)['transport'], <String, Object?>{
+        'type': 'http',
+        'host': <String>['b.example', 'c.example'],
+        'path': '/a',
+        'method': 'GET',
+      });
+    });
+
+    test('gives an http header with no path the root path', () {
+      final outbound = _build(
+        _node(Protocol.vmess, <String, Object?>{
+          'uuid': 'u',
+          'type': 'tcp',
+          'security': 'none',
+          'headerType': 'HTTP',
+        }),
+      );
+
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'http',
+        'path': '/',
+        'method': 'GET',
+      });
+    });
+
+    test('leaves bare tcp without a transport block', () {
+      for (final header in <String?>[null, '', 'none']) {
+        final outbound = _build(
+          _node(Protocol.vless, <String, Object?>{
+            'uuid': 'u',
+            'type': 'tcp',
+            'headerType': header,
+          }),
+        );
+
+        expect(outbound.containsKey('transport'), isFalse, reason: '$header');
+      }
+    });
+
+    test('refuses a stored tcp http header the core cannot carry', () {
+      // Over TLS the core's http transport is HTTP/2, which no Xray TCP
+      // inbound with an HTTP header accepts.
+      for (final params in <Map<String, Object?>>[
+        <String, Object?>{'security': 'tls', 'headerType': 'http'},
+        <String, Object?>{'security': 'none', 'headerType': 'srtp'},
+      ]) {
+        expect(
+          () => _build(
+            _node(Protocol.trojan, <String, Object?>{
+              'password': 'p',
+              'type': 'tcp',
+              ...params,
+            }),
+          ),
+          throwsA(isA<ConfigBuildException>()),
+          reason: '$params',
+        );
+      }
+    });
+
     test('refuses a transport the core does not have', () {
       expect(
         () => _build(

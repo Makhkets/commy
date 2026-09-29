@@ -136,6 +136,44 @@ void main() {
       );
     });
 
+    test('reads a tcp http header without tls', () {
+      final node = parser.parse(
+        'vless://uuid@example.com:80?type=tcp&headerType=http'
+        '&host=b.example&path=%2F#x',
+      );
+
+      expect(node.param(ParamKeys.transport), 'tcp');
+      expect(node.param(ParamKeys.headerType), 'http');
+      expect(node.param(ParamKeys.host), 'b.example');
+    });
+
+    test('rejects a tcp http header over tls or reality, by name', () {
+      for (final security in <String>['security=tls', 'pbk=KEY&sni=a.ex']) {
+        expect(
+          () => parser.parse(
+            'vless://uuid@example.com:443?type=tcp&headerType=http&$security#x',
+          ),
+          throwsA(
+            isA<LinkFormatException>().having(
+              (error) => error.reason,
+              'reason',
+              contains('HTTP header'),
+            ),
+          ),
+          reason: security,
+        );
+      }
+    });
+
+    test('rejects a tcp header the core has no way to send', () {
+      expect(
+        () => parser.parse(
+          'vless://uuid@example.com:443?type=tcp&headerType=srtp#x',
+        ),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
     test('rejects another protocol', () {
       expect(
         () => parser.parse('trojan://pass@example.com:443#x'),

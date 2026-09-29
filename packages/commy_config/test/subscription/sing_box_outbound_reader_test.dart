@@ -546,6 +546,56 @@ void main() {
       expect(node.param(ParamKeys.spiderX), '/');
     });
 
+    test('reads the http header of a tcp stream', () {
+      Map<String, Object?> outbound(String security) => <String, Object?>{
+            'tag': 'proxy',
+            'protocol': 'vless',
+            'settings': <String, Object?>{
+              'vnext': <Map<String, Object?>>[
+                <String, Object?>{
+                  'address': 'xray.example.com',
+                  'port': 80,
+                  'users': <Map<String, Object?>>[
+                    <String, Object?>{'id': 'the-uuid', 'encryption': 'none'},
+                  ],
+                },
+              ],
+            },
+            'streamSettings': <String, Object?>{
+              'network': 'raw',
+              'security': security,
+              'rawSettings': <String, Object?>{
+                'header': <String, Object?>{
+                  'type': 'http',
+                  'request': <String, Object?>{
+                    'path': <String>['/a', '/b'],
+                    'headers': <String, Object?>{
+                      'Host': <String>['b.example'],
+                    },
+                  },
+                },
+              },
+            },
+          };
+
+      final node = SingBoxOutboundReader.read(outbound('none'));
+
+      expect(node.param(ParamKeys.headerType), 'http');
+      expect(
+        OutboundBuilder.build(node: node, tag: 'proxy-out')['transport'],
+        <String, Object?>{
+          'type': 'http',
+          'host': <String>['b.example'],
+          'path': '/a',
+          'method': 'GET',
+        },
+      );
+      expect(
+        () => SingBoxOutboundReader.read(outbound('tls')),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
     test('reads a trojan outbound out of servers', () {
       final node = SingBoxOutboundReader.read(<String, Object?>{
         'tag': 'tr',

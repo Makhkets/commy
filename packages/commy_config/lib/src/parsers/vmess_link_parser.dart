@@ -176,6 +176,7 @@ class VmessLinkParser implements NodeLinkParser {
       ParamKeys.flow: _text(decoded['flow']),
       ParamKeys.mode: _text(decoded['mode']),
     };
+    TransportParams.checkTcpHeader(params);
     if (isXhttp) {
       final extra = decoded['extra'];
       TransportParams.readXhttpInto(
