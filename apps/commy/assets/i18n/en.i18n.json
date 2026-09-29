@@ -197,6 +197,7 @@
       "confirm": "Delete",
       "cancel": "Cancel"
     },
+    "refreshBusy": "Another subscription is refreshing — try this one again in a moment",
     "linkCopied": "Link copied",
     "panelSaid": "Your panel sent this instead of servers:",
     "deviceIdOff": "Sending the device identifier (HWID) is off, and a panel that limits devices answers like this without it.",
