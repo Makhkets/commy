@@ -1,5 +1,6 @@
 import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/fixtures.dart';
@@ -45,6 +46,77 @@ void main() {
       expect(
         (await stack.dumpAllValues()).join('\n'),
         isNot(contains(Fixtures.subscriptionUrl.path)),
+      );
+    });
+
+    test('the profile page lives in the keystore too: panels put the token in',
+        () async {
+      // Marzban sends `profile-web-page-url` as the address the subscription
+      // was fetched from, token and all.
+      final subscription = Fixtures.subscription().copyWith(
+        profileWebPageUrl: Fixtures.subscriptionUrl,
+      );
+      await repository.upsert(subscription);
+
+      expect(
+        stack.store.snapshot[SecretKeys.subscriptionPage(subscription.id)],
+        Fixtures.subscriptionUrl.toString(),
+      );
+      expect(
+        (await stack.dumpAllValues()).join('\n'),
+        isNot(contains(Fixtures.subscriptionUrl.path)),
+      );
+      final loaded = (await repository.findById(subscription.id)).valueOrNull!;
+      expect(loaded.profileWebPageUrl, Fixtures.subscriptionUrl);
+      final listed = await repository.watchAll().first;
+      expect(listed.single.profileWebPageUrl, Fixtures.subscriptionUrl);
+    });
+
+    test('a page an earlier build wrote into the row is moved out of it',
+        () async {
+      await repository.upsert(Fixtures.subscription());
+      // What an older build left: the page in its column.
+      await (stack.database.update(stack.database.subscriptionRows)
+            ..where((table) => table.id.equals('sub-1')))
+          .write(
+        SubscriptionRowsCompanion(
+          profileWebPageUrl:
+              Value<String?>(Fixtures.subscriptionUrl.toString()),
+        ),
+      );
+
+      final loaded = await stack.subscriptions.watchAll().first;
+
+      expect(loaded.single.profileWebPageUrl, Fixtures.subscriptionUrl);
+      expect(
+        stack.store.snapshot[SecretKeys.subscriptionPage('sub-1')],
+        Fixtures.subscriptionUrl.toString(),
+      );
+      expect(
+        (await stack.dumpAllValues()).join('\n'),
+        isNot(contains(Fixtures.subscriptionUrl.path)),
+      );
+    });
+
+    test('a page the panel stopped sending is removed, as is a deleted one',
+        () async {
+      final subscription = Fixtures.subscription().copyWith(
+        profileWebPageUrl: Uri.parse('https://panel.example.net/u/abc'),
+      );
+      await repository.upsert(subscription);
+      await repository.upsert(subscription.copyWith(profileWebPageUrl: null));
+
+      expect(
+        stack.store.snapshot.containsKey(SecretKeys.subscriptionPage('sub-1')),
+        isFalse,
+      );
+
+      await repository.upsert(subscription);
+      await repository.deleteById('sub-1');
+
+      expect(
+        stack.store.snapshot.keys.where((key) => key.contains('sub-1')),
+        isEmpty,
       );
     });
 

@@ -10,6 +10,11 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **The subscription token no longer sits in the open database** on
+  Marzban-family panels. Their `profile-web-page-url` is the subscription
+  address itself, token included, and it was stored as a plain column. It now
+  lives in the encrypted store beside the subscription URL, and a copy an
+  earlier build wrote is moved there on the first start.
 - **DNS.** A direct resolver given by name (`https://dns.google/dns-query`,
   `tls://dns.quad9.net`) no longer stops the tunnel from starting — it finds
   its own server through the system resolver, as the core requires. And the

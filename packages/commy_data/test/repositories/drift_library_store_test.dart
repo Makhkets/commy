@@ -64,6 +64,29 @@ void main() {
       expect(back.subscriptionId, 'sub-new');
     });
 
+    test('a restored profile page goes back to the keystore', () async {
+      final page = Uri.parse('https://other.example.net/sub/0123456789abcdef');
+
+      await store.replaceLibrary(
+        subscriptions: <Subscription>[
+          newSubscription().copyWith(profileWebPageUrl: page),
+        ],
+        groups: const <NodeGroup>[],
+        nodes: const <ProxyNode>[],
+      );
+
+      final library = (await store.readLibrary()).valueOrNull!;
+      expect(library.subscriptions.single.profileWebPageUrl, page);
+      expect(
+        stack.store.snapshot[SecretKeys.subscriptionPage('sub-new')],
+        page.toString(),
+      );
+      expect(
+        (await stack.dumpAllValues()).join('\n'),
+        isNot(contains(page.path)),
+      );
+    });
+
     test('the credentials of what was replaced leave the keystore', () async {
       await store.replaceLibrary(
         subscriptions: <Subscription>[newSubscription()],

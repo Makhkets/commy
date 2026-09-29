@@ -139,13 +139,54 @@ class SecretVault {
         return result;
       });
 
-  /// Removes the URL of a subscription.
+  /// Removes the URL of a subscription, and its profile page with it.
   Future<Result<void, CommyFailure>> deleteSubscriptionUrl(
     String subscriptionId,
   ) =>
-      StorageGuard.runVoid(
-        () => _store.delete(SecretKeys.subscriptionUrl(subscriptionId)),
-      );
+      StorageGuard.runVoid(() async {
+        await _store.delete(SecretKeys.subscriptionUrl(subscriptionId));
+        await _store.delete(SecretKeys.subscriptionPage(subscriptionId));
+      });
+
+  /// Stores the profile page the panel named, or removes it for `null`.
+  Future<Result<void, CommyFailure>> writeSubscriptionPage(
+    String subscriptionId,
+    Uri? page,
+  ) =>
+      StorageGuard.runVoid(() async {
+        final key = SecretKeys.subscriptionPage(subscriptionId);
+        await (page == null
+            ? _store.delete(key)
+            : _store.write(key, page.toString()));
+      });
+
+  /// Every subscription URL and profile page, in one pass of the keystore.
+  ///
+  /// One pass because a keystore read decrypts every entry it returns, the
+  /// servers' credentials included, and the subscription list is read on
+  /// every change to it.
+  Future<
+      Result<({Map<String, Uri> urls, Map<String, Uri> pages}),
+          CommyFailure>> readAllSubscriptionSecrets() =>
+      StorageGuard.run(() async {
+        final all = await _store.readAll();
+        final urls = <String, Uri>{};
+        final pages = <String, Uri>{};
+        for (final entry in all.entries) {
+          final urlOf = SecretKeys.subscriptionIdOf(entry.key);
+          final pageOf = SecretKeys.subscriptionPageIdOf(entry.key);
+          final parsed = Uri.tryParse(entry.value);
+          if (parsed == null) {
+            continue;
+          }
+          if (urlOf != null) {
+            urls[urlOf] = parsed;
+          } else if (pageOf != null) {
+            pages[pageOf] = parsed;
+          }
+        }
+        return (urls: urls, pages: pages);
+      });
 
   // ── Core configuration and control-channel secrets ────────────────────────
 

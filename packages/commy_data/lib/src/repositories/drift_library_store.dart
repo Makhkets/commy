@@ -46,7 +46,8 @@ class DriftLibraryStore implements LibraryStore {
     return StorageGuard.run(() async {
       // Unlike the repositories, a keystore that cannot be read fails the
       // read: see LibraryStore.readLibrary.
-      final urls = _unwrap(await _secrets.readAllSubscriptionUrls());
+      final secrets = _unwrap(await _secrets.readAllSubscriptionSecrets());
+      final urls = secrets.urls;
       final params = _unwrap(await _secrets.readAllNodeParams());
       final subscriptionRows = await (_db.select(_db.subscriptionRows)
             ..orderBy(<OrderClauseGenerator<$SubscriptionRowsTable>>[
@@ -82,7 +83,11 @@ class DriftLibraryStore implements LibraryStore {
       return (
         subscriptions: <Subscription>[
           for (final row in subscriptionRows)
-            SubscriptionMapper.toDomain(row, url: urls[row.id]),
+            SubscriptionMapper.toDomain(
+              row,
+              url: urls[row.id],
+              page: secrets.pages[row.id],
+            ),
         ],
         groups: groupRows.map(NodeGroupMapper.toDomain).toList(),
         nodes: <ProxyNode>[
@@ -112,7 +117,7 @@ class DriftLibraryStore implements LibraryStore {
       // restoring onto the same phone reuses every id — so a failed batch
       // can hand the old library its own credentials back.
       final oldParams = _unwrap(await _secrets.readAllNodeParams());
-      final oldUrls = _unwrap(await _secrets.readAllSubscriptionUrls());
+      final oldSecrets = _unwrap(await _secrets.readAllSubscriptionSecrets());
 
       // Credentials first. A row whose secret never landed is a server that
       // fails later with no hint why; a secret whose row never landed is
@@ -123,6 +128,12 @@ class DriftLibraryStore implements LibraryStore {
             await _secrets.writeSubscriptionUrl(
               subscription.id,
               subscription.url,
+            ),
+          );
+          _rethrowFailure(
+            await _secrets.writeSubscriptionPage(
+              subscription.id,
+              subscription.profileWebPageUrl,
             ),
           );
         }
@@ -139,7 +150,8 @@ class DriftLibraryStore implements LibraryStore {
         await _putBack(
           subscriptions: subscriptions,
           nodes: nodes,
-          oldUrls: oldUrls,
+          oldUrls: oldSecrets.urls,
+          oldPages: oldSecrets.pages,
           oldParams: oldParams,
         );
         rethrow;
@@ -199,6 +211,7 @@ class DriftLibraryStore implements LibraryStore {
     required List<Subscription> subscriptions,
     required List<ProxyNode> nodes,
     required Map<String, Uri> oldUrls,
+    required Map<String, Uri> oldPages,
     required Map<String, Map<String, Object?>> oldParams,
   }) async {
     for (final subscription in subscriptions) {
@@ -206,6 +219,10 @@ class DriftLibraryStore implements LibraryStore {
       await (old == null
           ? _secrets.deleteSubscriptionUrl(subscription.id)
           : _secrets.writeSubscriptionUrl(subscription.id, old));
+      await _secrets.writeSubscriptionPage(
+        subscription.id,
+        oldPages[subscription.id],
+      );
     }
     for (final node in nodes) {
       final old = oldParams[node.id];
