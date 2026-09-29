@@ -270,6 +270,27 @@ void main() {
       );
     });
 
+    test('WireGuard reserved bytes are three, or this server out', () {
+      // Three is what the core copies into the peer; any other count stops
+      // the endpoint, and every endpoint is built, chosen or not. Three
+      // valid bytes are pinned by 'wireguard becomes an endpoint with one
+      // peer' below.
+      for (final bad in <String>['1,2', '1,2,3,4', '7']) {
+        expect(
+          () => _build(
+            _node(Protocol.wireguard, <String, Object?>{
+              'private_key': 'k',
+              'peerPublicKey': 'p',
+              'localAddress': '10.0.0.2/32',
+              'reserved': bad,
+            }),
+          ),
+          leftOut('reserved'),
+          reason: bad,
+        );
+      }
+    });
+
     test('a bare WireGuard address is one host, anything else is refused', () {
       expect(
         wg('10.0.0.2, fd00::2')['address'],

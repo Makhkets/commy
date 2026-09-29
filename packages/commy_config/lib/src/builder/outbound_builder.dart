@@ -327,7 +327,10 @@ abstract final class OutboundBuilder {
       final bytes = <int>[
         for (final part in reserved) int.tryParse(part) ?? -1,
       ];
-      if (bytes.any((value) => value < 0 || value > 255)) {
+      // Three, not "up to three": the core refuses any other count when it
+      // builds the endpoint (`transport/wireguard/endpoint.go`), and it
+      // builds every endpoint in the document, not only the chosen one.
+      if (bytes.length != 3 || bytes.any((value) => value < 0 || value > 255)) {
         throw const ConfigBuildException(
           'WireGuard reserved bytes must be three numbers in 0..255',
         );
