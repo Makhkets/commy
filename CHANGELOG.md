@@ -10,6 +10,20 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **Tapping the button while it says "Connecting…" cancels**, as promised: it
+  used to do nothing until the core answered, up to half a minute.
+- A change made while the previous one was still being applied to the tunnel
+  is no longer lost; one more pass applies it.
+- A rule set downloaded while the tunnel is up is applied at once, not at the
+  next connect.
+- On Auto, tapping a server added mid-session really switches to it — the
+  rebuilt tunnel used to keep going through Auto's pick while the list marked
+  the tapped server.
+- Deleting the subscription the tunnel runs on stops the tunnel and clears the
+  choice, as deleting that server does; a choice that no longer exists no
+  longer fails the next connect — the first server is used instead.
+- A check that comes back after its tunnel was disconnected says nothing,
+  instead of "check failed" over an idle screen.
 - **The local proxy of the IP check asks for a password.** With the IP check
   on, the app kept a proxy open on `127.0.0.1` for the whole session, and any
   other app on the phone could find it by scanning and learn through it where

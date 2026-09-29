@@ -1,6 +1,8 @@
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -140,9 +142,46 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
   }
 
   /// Deletes the subscription, its servers and their credentials.
-  Future<void> delete(String id) {
-    return _run(() => ref.read(subscriptionRepositoryProvider).deleteById(id));
+  ///
+  /// When the selected server is one of them, the tunnel goes down first and
+  /// the selection is cleared, as deleting that one server does
+  /// (`NodeController.delete`). Otherwise the core went on running through a
+  /// server the list no longer had, and the next connect failed on a
+  /// selection that pointed at nothing.
+  Future<void> delete(String id) async {
+    // Listened to while awaited: a provider nobody listens to is paused, and
+    // its `future` would never arrive.
+    final selection = ref.listen(selectedNodeIdProvider, (_, __) {});
+    final servers = ref.listen(nodesProvider, (_, __) {});
+    try {
+      final selectedId = await ref.read(selectedNodeIdProvider.future);
+      final nodes = await ref.read(nodesProvider.future);
+      final owned = selectedId != null &&
+          nodes.any(
+            (node) => node.id == selectedId && node.subscriptionId == id,
+          );
+      if (owned) {
+        if (_isTunnelUp()) {
+          await ref.read(tunnelControllerProvider.notifier).disconnect();
+        }
+        await ref.read(selectedNodeIdProvider.notifier).select(null);
+      }
+    } on Object {
+      // A selection that cannot be read is left to the connect, which checks
+      // it against the servers there are.
+    } finally {
+      selection.close();
+      servers.close();
+    }
+    await _run(
+      () => ref.read(subscriptionRepositoryProvider).deleteById(id),
+    );
   }
+
+  bool _isTunnelUp() => switch (ref.read(coreStatusProvider).value) {
+        TunnelConnected() || TunnelChecking() || TunnelStarting() => true,
+        _ => false,
+      };
 
   /// Copies the subscription URL to the clipboard.
   ///

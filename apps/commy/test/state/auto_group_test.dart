@@ -244,6 +244,31 @@ void main() {
       expect(container.read(tunnelControllerProvider).failure, isNotNull);
     });
 
+    test('on Auto, a server the running core does not hold is where the '
+        'rebuilt core goes', () async {
+      // One imported mid-session. The document used to be rebuilt with Auto
+      // still on, so its selector defaulted to the group: the list marked the
+      // tapped server while the traffic went on through Auto's pick.
+      final nodes = <ProxyNode>[
+        testNode(),
+        testNode(id: 'node-2', name: 'Warsaw'),
+      ];
+      await start(nodes: nodes, autoSelect: true);
+      await connect(nodeId: nodes.first.id);
+      final added = testNode(id: 'node-3', name: 'Oslo');
+      await harness.nodeRepository.upsertAll(<ProxyNode>[added]);
+      await pumpEventQueue();
+
+      await tunnel().selectNode(added);
+
+      expect(harness.core.reloadCalls, 1);
+      expect(await storedAutoSelect(), isFalse);
+      final document = harness.core.lastConfig!.encode();
+      expect(document, contains('"default":"node-node-3"'));
+      expect(document, isNot(contains('"default":"auto"')));
+      expect(container.read(selectedNodeIdProvider).value, 'node-3');
+    });
+
     test('with the tunnel down it still ends Auto', () async {
       final nodes = <ProxyNode>[
         testNode(),
