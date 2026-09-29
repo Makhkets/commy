@@ -10,6 +10,10 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.11]
+
+Installs over alpha.10.
+
 - **XHTTP servers with a separate download route now use it.** A server whose
   link carries `downloadSettings` — the download through a CDN, the upload
   straight to the server — is connected the way Xray connects it: the
@@ -700,7 +704,10 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.8...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.11...main
+[0.1.0-alpha.11]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.11
+[0.1.0-alpha.10]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.10
+[0.1.0-alpha.9]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.9
 [0.1.0-alpha.8]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.8
 [0.1.0-alpha.7]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.7
 [0.1.0-alpha.6]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.6
