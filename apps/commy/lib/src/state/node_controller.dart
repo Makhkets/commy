@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
@@ -83,7 +85,8 @@ class NodeController extends Notifier<NodeActionState> {
     // instead would silently skip both steps below on a cold start and leave
     // the settings pointing at a row that no longer exists.
     final selectedId = await ref.read(selectedNodeIdProvider.future);
-    if (ref.read(autoSelectedProvider)) {
+    final onAuto = ref.read(autoSelectedProvider);
+    if (onAuto) {
       await _leaveAuto(node, selectedId);
     } else if (selectedId == node.id) {
       if (_isTunnelUp()) {
@@ -102,7 +105,49 @@ class NodeController extends Notifier<NodeActionState> {
     state = failure == null
         ? NodeActionState.idle
         : NodeActionState(failure: failure);
+    if (failure == null && onAuto && _isTunnelUp()) {
+      await _reloadWithout(node.id);
+    }
   }
+
+  /// Takes a deleted server out of the running Auto group.
+  ///
+  /// Only the server Auto is on takes the tunnel down with it; any other
+  /// stays a member of the core's urltest group, which keeps testing it and
+  /// may well switch to it — traffic through a server the user deleted, that
+  /// no row on screen can name. A reload builds the group afresh and keeps
+  /// the TUN device up (R6). It waits for the list to lose the row first:
+  /// read before that, the reload would build from the list it is fixing.
+  Future<void> _reloadWithout(String id) async {
+    final gone = Completer<void>();
+    final watch = ref.listen<AsyncValue<List<ProxyNode>>>(
+      nodesProvider,
+      (_, next) {
+        final nodes = next.value;
+        if (nodes != null &&
+            nodes.every((node) => node.id != id) &&
+            !gone.isCompleted) {
+          gone.complete();
+        }
+      },
+      fireImmediately: true,
+    );
+    try {
+      await gone.future.timeout(_listSettle);
+    } on TimeoutException {
+      ref.read(appLoggerProvider).warn(
+            'deleted server still listed; Auto group not rebuilt',
+            tag: logTag,
+          );
+      return;
+    } finally {
+      watch.close();
+    }
+    await ref.read(tunnelControllerProvider.notifier).reload();
+  }
+
+  /// How long [_reloadWithout] waits for the list to drop the deleted row.
+  static const Duration _listSettle = Duration(seconds: 5);
 
   /// Auto's half of [delete].
   ///
@@ -119,7 +164,7 @@ class NodeController extends Notifier<NodeActionState> {
   /// without one, so a routing edit on the running tunnel would silently not
   /// apply, and neither would "connect on launch" at the next start.
   Future<void> _leaveAuto(ProxyNode node, String? selectedId) async {
-    final picked = ref.read(autoNodeProvider)?.id;
+    final picked = _autoPick(selectedId);
     if (picked == node.id && _isTunnelUp()) {
       await ref.read(tunnelControllerProvider.notifier).disconnect();
     }
@@ -153,14 +198,25 @@ class NodeController extends Notifier<NodeActionState> {
   /// the menu was opened from watches it, and on Auto the core's pick — so the
   /// loading case cannot be the one on screen.
   bool isLive(ProxyNode node) {
-    final live = ref.read(autoSelectedProvider)
-        ? ref.read(autoNodeProvider)?.id
-        : ref.read(selectedNodeIdProvider).value;
+    final selectedId = ref.read(selectedNodeIdProvider).value;
+    final live =
+        ref.read(autoSelectedProvider) ? _autoPick(selectedId) : selectedId;
     if (live != node.id) {
       return false;
     }
     return _isTunnelUp();
   }
+
+  /// The server Auto is on, as far as anybody knows.
+  ///
+  /// The core's answer is not there while the tunnel is starting, nor until
+  /// the first question after a connect or a resume comes back. Read as
+  /// "none", that window gave no server the warning, and deleting the one
+  /// the start was being built from let the core come up with it in its
+  /// group. Until the core has said, the stored selection — the server the
+  /// tunnel was started from — is the one treated as live.
+  String? _autoPick(String? selectedId) =>
+      ref.read(autoNodeProvider)?.id ?? selectedId;
 
   bool _isTunnelUp() {
     return switch (ref.read(coreStatusProvider).value) {

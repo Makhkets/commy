@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/node_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
@@ -60,8 +62,7 @@ void main() {
       expect(container.read(nodeControllerProvider).failure, isNull);
     });
 
-    test('a node with no renderable link says so and copies nothing',
-        () async {
+    test('a node with no renderable link says so and copies nothing', () async {
       // WireGuard without a private key has no link form: the exporter
       // refuses rather than emitting something no other client can read.
       const node = ProxyNode(
@@ -113,8 +114,7 @@ void main() {
       expect(harness.settingsRepository.selectedNodeId, isNull);
     });
 
-    test('takes the tunnel down when it is running through the node',
-        () async {
+    test('takes the tunnel down when it is running through the node', () async {
       final node = testNode();
       start(nodes: <ProxyNode>[node]);
 
@@ -143,7 +143,9 @@ void main() {
     final picked = testNode(id: 'node-2', name: 'Warsaw 01');
     final other = testNode(id: 'node-3', name: 'Oslo 01');
 
-    Future<void> onAuto() async {
+    // [answered] false is the window before the core's first answer about
+    // its Auto group: a start in progress, or the first ask still in flight.
+    Future<void> onAuto({bool answered = true}) async {
       final members = <String>[
         for (final node in <ProxyNode>[stored, picked, other])
           SingBoxTags.forNode(node),
@@ -152,18 +154,20 @@ void main() {
         nodes: <ProxyNode>[stored, picked, other],
         settings: AppSettings.defaults.copyWith(autoSelect: true),
         coreGroups: <ProxyGroup>[
-          ProxyGroup(
-            tag: SingBoxTags.autoGroup,
-            type: 'urltest',
-            now: SingBoxTags.forNode(picked),
-            all: members,
-          ),
-          ProxyGroup(
-            tag: SingBoxTags.proxyGroup,
-            type: 'selector',
-            now: SingBoxTags.autoGroup,
-            all: <String>[SingBoxTags.autoGroup, ...members],
-          ),
+          if (answered) ...<ProxyGroup>[
+            ProxyGroup(
+              tag: SingBoxTags.autoGroup,
+              type: 'urltest',
+              now: SingBoxTags.forNode(picked),
+              all: members,
+            ),
+            ProxyGroup(
+              tag: SingBoxTags.proxyGroup,
+              type: 'selector',
+              now: SingBoxTags.autoGroup,
+              all: <String>[SingBoxTags.autoGroup, ...members],
+            ),
+          ],
         ],
       );
       container = ProviderContainer(overrides: harness.overrides());
@@ -195,8 +199,17 @@ void main() {
       final home = container.listen(proxyGroupsProvider, (_, __) {});
       addTearDown(home.close);
       await container.read(proxyGroupsProvider.future);
-      expect(container.read(autoNodeProvider)?.id, picked.id);
+      expect(
+        container.read(autoNodeProvider)?.id,
+        answered ? picked.id : isNull,
+      );
       expect(container.read(selectedNodeIdProvider).value, stored.id);
+    }
+
+    String? tagIn(CoreConfig? config, ProxyNode node) {
+      final text = jsonEncode(config?.document);
+      final tag = SingBoxTags.forNode(node);
+      return text.contains('"$tag"') ? tag : null;
     }
 
     test('warns about the server Auto is on, not the stored one', () async {
@@ -233,6 +246,38 @@ void main() {
         isNot(contains(picked.id)),
       );
       expect(container.read(selectedNodeIdProvider).value, stored.id);
+    });
+
+    test('any other server leaves the running group, the tunnel stays up',
+        () async {
+      // Left in the core's urltest group, a deleted server went on being
+      // tested and could become the one Auto sends everything through.
+      await onAuto();
+      expect(tagIn(harness.core.lastConfig, other), isNotNull);
+
+      await controllerOf().delete(other);
+
+      expect(harness.core.reloadCalls, 1);
+      expect(harness.core.stopCalls, 0);
+      expect(harness.core.isRunning, isTrue);
+      expect(tagIn(harness.core.lastConfig, other), isNull);
+      expect(tagIn(harness.core.lastConfig, picked), isNotNull);
+    });
+
+    test('before the core has answered, the stored server is the live one',
+        () async {
+      await onAuto(answered: false);
+
+      expect(controllerOf().isLive(stored), isTrue);
+      expect(controllerOf().isLive(picked), isFalse);
+
+      await controllerOf().delete(stored);
+
+      expect(harness.core.isRunning, isFalse);
+      expect(
+        harness.nodeRepository.nodes.map((node) => node.id),
+        isNot(contains(stored.id)),
+      );
     });
   });
 }
