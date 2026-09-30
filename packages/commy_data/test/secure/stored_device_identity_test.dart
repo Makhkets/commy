@@ -80,6 +80,40 @@ void main() {
       expect(headers['x-hwid'], 'hwid-1');
     });
 
+    test('a model or version a header cannot carry is cut to what it can',
+        () async {
+      // dart:io throws on a header value outside printable ASCII, and the
+      // throw read as "the server is not answering" on every refresh. What
+      // is left is sent; a value with nothing left is absent, not guessed.
+      StoredDeviceIdentity described(String? version, String? model) =>
+          StoredDeviceIdentity(
+            store: store,
+            settings: settings,
+            ids: _Ids(),
+            platformName: 'Android',
+            describeDevice: () async => DeviceDescription(
+              os: 'Android',
+              osVersion: version,
+              model: model,
+            ),
+          );
+
+      final mixed =
+          await described('15', 'Xiaomi 小米 8\n').subscriptionHeaders();
+      expect(mixed['x-device-model'], 'Xiaomi 8');
+      expect(mixed['x-ver-os'], '15');
+
+      final none = await described('十四', '小米').subscriptionHeaders();
+      expect(none.containsKey('x-device-model'), isFalse);
+      expect(none.containsKey('x-ver-os'), isFalse);
+      expect(none['x-hwid'], isNotEmpty);
+      expect(none['x-device-os'], 'Android');
+
+      for (final value in <String>[...mixed.values, ...none.values]) {
+        expect(value.codeUnits, everyElement(inInclusiveRange(0x20, 0x7E)));
+      }
+    });
+
     test('the identifier is made once and survives a new instance', () async {
       final first = await identity().subscriptionHeaders();
       final second = await identity().subscriptionHeaders();
