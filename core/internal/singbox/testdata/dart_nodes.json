@@ -362,6 +362,13 @@
             "action": "hijack-dns"
           },
           {
+            "ip_cidr": [
+              "172.19.0.1/30",
+              "fdfe:dcba:9876::1/126"
+            ],
+            "action": "reject"
+          },
+          {
             "ip_is_private": true,
             "outbound": "direct"
           },
@@ -423,6 +430,13 @@
               53
             ],
             "action": "hijack-dns"
+          },
+          {
+            "ip_cidr": [
+              "172.19.0.1/30",
+              "fdfe:dcba:9876::1/126"
+            ],
+            "action": "reject"
           },
           {
             "ip_is_private": true,

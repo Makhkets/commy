@@ -1,4 +1,5 @@
 import 'package:commy_config/src/builder/config_platform.dart';
+import 'package:commy_config/src/builder/inbound_section_builder.dart';
 import 'package:commy_config/src/builder/route_matcher.dart';
 import 'package:commy_config/src/builder/routing_warning.dart';
 import 'package:commy_config/src/builder/routing_warning_kind.dart';
@@ -13,12 +14,15 @@ import 'package:commy_domain/commy_domain.dart';
 ///
 /// 1. `sniff`, so later rules can see what the connection actually is;
 /// 2. DNS hijack, so no query escapes the policy (rule R6);
-/// 3. LAN bypass, when the user asked for it;
-/// 4. ad blocking, when the user turned it on and the list is on disk — the
+/// 3. everything else sent to the tunnel's own addresses refused
+///    ([ownAddressesReject]), so it cannot leave the device as a LAN
+///    address;
+/// 4. LAN bypass, when the user asked for it;
+/// 5. ad blocking, when the user turned it on and the list is on disk — the
 ///    connection half of it; the query itself is refused by
 ///    `DnsSectionBuilder`, one layer earlier;
-/// 5. per-app exclusions, where the platform expresses them as processes;
-/// 6. the user's own rules, in their own order — with FakeIP on, the name
+/// 6. per-app exclusions, where the platform expresses them as processes;
+/// 7. the user's own rules, in their own order — with FakeIP on, the name
 ///    resolved just ahead of the first one that matches on addresses
 ///    ([fakeIpResolve]).
 ///
@@ -47,6 +51,35 @@ abstract final class RouteSectionBuilder {
   /// where they disagree would block the connection but still resolve the
   /// name, or the other way round.
   static final String adsRuleSetTag = SingBoxTags.geosite(adsRuleSetName);
+
+  /// The rule that refuses whatever else is sent to the tunnel's own
+  /// addresses.
+  ///
+  /// The VPN gives the system the address after the tunnel's own,
+  /// `172.19.0.2`, as its DNS server (libbox, `GetDNSServerAddress`).
+  /// Plain DNS to it is hijacked by the rules ahead of this one; anything
+  /// else went on down the list, and the address is a private one. With the
+  /// LAN bypass on it was dialled directly, on Wi-Fi or mobile data; with it
+  /// off, through the proxy onto the server's own network. Android asks its
+  /// DNS server for DNS over TLS on port 853 whenever the VPN comes up, and
+  /// with Private DNS on "Automatic", the default, it checks no certificate.
+  /// Anything on the physical path that answered at `172.19.0.2:853` — a
+  /// Docker network on a home router or server, which is often
+  /// `172.19.0.0/16`, or anyone on public Wi-Fi — would have been handed
+  /// every app's queries, outside the tunnel and past the hijack,
+  /// `dns-remote` and FakeIP (rule R6). Refused, the probe fails at once and
+  /// Android stays on port 53, which is hijacked.
+  ///
+  /// The prefixes are the interface's own, host part and all: the core masks
+  /// them (`netipx.RangeOfPrefix`), so the rule covers the whole `/30` and
+  /// `/126` and cannot drift from the addresses the TUN is given.
+  static Map<String, Object?> get ownAddressesReject => <String, Object?>{
+        SingBoxKeys.ipCidr: <String>[
+          InboundSectionBuilder.tunAddressV4,
+          InboundSectionBuilder.tunAddressV6,
+        ],
+        SingBoxKeys.action: SingBoxKeys.actionReject,
+      };
 
   /// The rule that resolves a FakeIP connection's name before the rules that
   /// look at addresses.
@@ -155,6 +188,9 @@ abstract final class RouteSectionBuilder {
         SingBoxKeys.port: <int>[dnsPort],
         SingBoxKeys.action: SingBoxKeys.actionHijackDns,
       },
+      // Whether or not the LAN is bypassed: through the proxy the same
+      // address is the server's own network.
+      ownAddressesReject,
     ];
 
     if (routing.bypassLan) {
