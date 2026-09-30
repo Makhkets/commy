@@ -43,6 +43,7 @@ type fakeXray struct {
 
 type recordedRequest struct {
 	method     string
+	host       string
 	path       string
 	proto      int
 	bodyLen    int
@@ -207,6 +208,7 @@ func (s *fakeXray) record(r *http.Request, bodyLen int) {
 	defer s.mu.Unlock()
 	s.requests = append(s.requests, recordedRequest{
 		method:     r.Method,
+		host:       r.Host,
 		path:       r.URL.Path,
 		proto:      r.ProtoMajor,
 		bodyLen:    bodyLen,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/Makhkets/commy/core/xhttp/config"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
+	aTLS "github.com/sagernet/sing/common/tls"
 )
 
 func randomBytes(t testing.TB, n int) []byte {
@@ -320,6 +322,104 @@ func TestRequestsLookLikeABrowser(t *testing.T) {
 		if !strings.HasPrefix(referer, "https://cdn.example/look/?x_padding=") {
 			t.Fatalf("padding should ride in a Referer on the configured host, got %q", referer)
 		}
+	}
+}
+
+// towards takes every connection to [target], whatever address it is asked
+// for: a server can be named by an IPv6 address in a test that has no IPv6
+// to reach it over.
+type towards struct{ target M.Socksaddr }
+
+func (d towards) DialContext(ctx context.Context, network string, _ M.Socksaddr) (net.Conn, error) {
+	return N.SystemDialer.DialContext(ctx, network, d.target)
+}
+
+func (d towards) ListenPacket(ctx context.Context, _ M.Socksaddr) (net.PacketConn, error) {
+	return N.SystemDialer.ListenPacket(ctx, d.target)
+}
+
+func TestAnIPv6ServerIsNamedInBrackets(t *testing.T) {
+	// No host option and no TLS: the Host header can only come from the
+	// address. Bare, `2001:db8::abcd` is no URL host at all, and `2001:db8::1`
+	// is host `2001:db8:` on port 1 to a proxy that reads it.
+	for _, literal := range []string{"2001:db8::abcd", "2001:db8::1"} {
+		for _, route := range []string{"main", "download"} {
+			t.Run(route+" "+literal, func(t *testing.T) {
+				options := config.Options{Mode: config.ModePacketUp, Path: "/v6"}
+				e := startHTTP1(t, options)
+				named := M.ParseSocksaddrHostPort(literal, e.addr.Port)
+				server, uploadHost := named, "["+literal+"]"
+				if route == "download" {
+					server, uploadHost = e.addr, e.addr.AddrString()
+					options.Download = &config.Download{
+						Server: literal, ServerPort: e.addr.Port, Options: config.Options{Path: "/v6"},
+					}
+				}
+				transport, err := NewClient(context.Background(), towards{e.addr}, server, options, nil)
+				if err != nil {
+					t.Fatalf("NewClient: %v", err)
+				}
+				client := transport.(*Client)
+				t.Cleanup(func() { _ = client.Close() })
+				conn := dialOrFail(t, client)
+				roundTrip(t, conn, randomBytes(t, 1024))
+
+				gets, uploads := countMethods(e.server.recorded())
+				if gets == 0 || uploads == 0 {
+					t.Fatalf("want a GET and uploads, got %d GET and %d uploads", gets, uploads)
+				}
+				for _, request := range e.server.recorded() {
+					want := uploadHost
+					if request.method == http.MethodGet {
+						want = "[" + literal + "]"
+					}
+					if request.host != want {
+						t.Fatalf("%s carried Host %q, want %q", request.method, request.host, want)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestAnIPv6LiteralIsBracketedInTheRequestURL(t *testing.T) {
+	const literal = "2001:db8::abcd"
+	cases := map[string]struct {
+		host, serverName, server string
+		want                     string
+	}{
+		// The last group has a letter in it: bare, the URL does not parse.
+		"from the address":         {server: literal, want: "[" + literal + "]"},
+		"from the TLS server name": {serverName: literal, server: "192.0.2.1", want: "[" + literal + "]"},
+		"from the host option":     {host: literal, server: "192.0.2.1", want: "[" + literal + "]"},
+		"with a zone":              {server: "fe80::abcd%eth0", want: "[fe80::abcd]"},
+		"already in brackets":      {host: "[" + literal + "]", server: "192.0.2.1", want: "[" + literal + "]"},
+		"an IPv4 address":          {server: "192.0.2.1", want: "192.0.2.1"},
+		"a name":                   {host: "cdn.example", server: literal, want: "cdn.example"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			options := config.Options{Mode: config.ModePacketUp, Path: "/v6", Host: c.host}
+			resolved, err := options.Resolve()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var tlsConfig aTLS.Config
+			if c.serverName != "" {
+				tlsConfig = &stdTLS{&tls.Config{ServerName: c.serverName}}
+			}
+			r, err := newRoute(N.SystemDialer, M.ParseSocksaddrHostPort(c.server, 443), resolved, tlsConfig)
+			if err != nil {
+				t.Fatalf("newRoute: %v", err)
+			}
+			request, err := http.NewRequest(http.MethodGet, r.requestURL, nil)
+			if err != nil {
+				t.Fatalf("request URL %q: %v", r.requestURL, err)
+			}
+			if request.Host != c.want {
+				t.Fatalf("Host = %q, want %q", request.Host, c.want)
+			}
+		})
 	}
 }
 

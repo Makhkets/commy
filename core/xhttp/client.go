@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http/httptrace"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -110,6 +111,13 @@ func newRoute(
 	}
 	if host == "" {
 		host = serverAddr.AddrString()
+	}
+	// An IPv6 literal goes into the URL in brackets, as Xray writes it: bare,
+	// the text after its last colon reads as a port, and the request either
+	// cannot be made or leaves with a Host a proxy in front cuts short. The
+	// zone is dropped — a URL cannot carry it unescaped, and Xray sends none.
+	if ip, err := netip.ParseAddr(host); err == nil && ip.Is6() {
+		host = "[" + ip.WithZone("").String() + "]"
 	}
 	requestURL := baseURL(&resolved, tlsConfig != nil, host)
 
