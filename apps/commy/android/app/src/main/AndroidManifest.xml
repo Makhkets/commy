@@ -73,6 +73,16 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
+            <!-- The links below are read over the intent channel (IntentBus),
+                 which opens the import sheet. Left on, Flutter also handed
+                 each link's URI to the router as a location: a
+                 happ://add/<url> link has a path no route matches, and it
+                 opened the router's English error page instead of the
+                 sheet. -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

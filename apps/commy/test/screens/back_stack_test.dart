@@ -115,4 +115,31 @@ void main() {
 
     expect(handled, isFalse);
   });
+
+  testWidgets('a link the platform hands the router lands on home',
+      (tester) async {
+    // Flutter passes the URI that started the activity to the router. A
+    // `happ://add/<url>` link has a path, no route matches it, and the user
+    // got go_router's English error page instead of the import sheet.
+    await pumpApp(tester);
+    await go(tester, AppRoutes.settings);
+
+    await tester.binding.handlePushRoute(
+      'happ://add/https://panel.example.net/sub/secret-token',
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+    expect(find.textContaining('GoException'), findsNothing);
+    expect(find.textContaining('Page Not Found'), findsNothing);
+  });
+
+  testWidgets('an unknown location goes home', (tester) async {
+    await pumpApp(tester);
+
+    await go(tester, '/diagnostics/nothing-here');
+
+    expect(find.byType(HomeScreen), findsOneWidget);
+  });
 }
