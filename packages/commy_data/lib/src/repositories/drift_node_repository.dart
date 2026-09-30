@@ -2,6 +2,7 @@ import 'package:commy_data/src/database/commy_database.dart';
 import 'package:commy_data/src/mappers/node_group_mapper.dart';
 import 'package:commy_data/src/mappers/node_mapper.dart';
 import 'package:commy_data/src/secure/secret_vault.dart';
+import 'package:commy_data/src/util/share_latest.dart';
 import 'package:commy_data/src/util/storage_guard.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:drift/drift.dart';
@@ -29,12 +30,17 @@ class DriftNodeRepository implements NodeRepository {
   final CommyDatabase _db;
   final SecretVault _secrets;
 
+  /// The hydrated list, one keystore read per change however many watch it.
+  ///
+  /// The app watches it twice — the servers and the rows that are panel
+  /// notices — and each watcher used to hydrate on its own.
+  late final Stream<List<ProxyNode>> _all =
+      shareLatest(() => _orderedNodes().watch().asyncMap(_hydrateAll));
+
   // ── Nodes ─────────────────────────────────────────────────────────────────
 
   @override
-  Stream<List<ProxyNode>> watchAll() {
-    return _orderedNodes().watch().asyncMap(_hydrateAll);
-  }
+  Stream<List<ProxyNode>> watchAll() => _all;
 
   @override
   Future<Result<List<ProxyNode>, CommyFailure>> getAll() {
