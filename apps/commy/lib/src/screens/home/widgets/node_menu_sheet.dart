@@ -140,9 +140,15 @@ class NodeMenuSheet extends ConsumerWidget {
     final built = ref.read(qrPayloadProvider).forNode(node);
     final payload = built.valueOrNull;
     if (payload == null) {
+      // Which refusal it was is only known by asking the exporter again: the
+      // two come back as the same failure type. A VLESS link that is merely
+      // too long (an XHTTP `extra` does it) was told its protocol has no link
+      // format — right after "Copy link" had copied that very link.
+      final hasLink =
+          ref.read(nodeLinkExporterProvider).toLink(node).valueOrNull != null;
       ToastMessenger.show(
         context,
-        message: t.node.noLink,
+        message: hasLink ? t.qr.tooLong : t.node.noLink,
         tone: CommyTone.error,
         icon: CommyIcons.warning,
       );
