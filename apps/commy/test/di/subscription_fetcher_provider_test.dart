@@ -68,49 +68,6 @@ void main() {
     expect(payload.userInfo?.total, equals(before.userInfo?.total));
     expect(payload.userInfo?.expire, equals(before.userInfo?.expire));
   });
-
-  // The one way to see from outside whether the fetcher reads the body: hand
-  // it one the body reader cannot get through. A double quoted Clash scalar
-  // whose `\u` escape carries a sign makes `unescape` write char code -1,
-  // which throws. The fetcher that parsed every body reported that as
-  // "could not read response headers"; one that leaves the body to the use
-  // case does not touch it.
-  test('the fetcher does not read the body into servers', () async {
-    final unreadable = HttpTextResponse(
-      statusCode: 200,
-      body: 'proxies:\n'
-          '  - name: "\\u-001"\n'
-          '    type: ss\n'
-          '    server: 203.0.113.9\n'
-          '    port: 8388\n'
-          '    cipher: aes-128-gcm\n'
-          '    password: secret\n',
-      headers: const <String, List<String>>{
-        'profile-title': <String>['My panel'],
-      },
-      url: Uri.parse('https://panel.example/sub/token'),
-    );
-    expect(
-      () => SubscriptionResponseParser().parse(body: unreadable.body),
-      throwsA(isA<RangeError>()),
-      reason: 'the probe only works while the reader chokes on it',
-    );
-    final probe = ProviderContainer(
-      overrides: [
-        httpClientProvider.overrideWithValue(_CannedHttpClient(unreadable)),
-        deviceIdentityProvider.overrideWithValue(const NoDeviceIdentity()),
-      ],
-    );
-    addTearDown(probe.dispose);
-
-    final fetched = await probe
-        .read(subscriptionFetcherProvider)
-        .fetch(unreadable.url, throughTunnel: false);
-
-    expect(fetched.failureOrNull, isNull);
-    expect(fetched.valueOrNull!.body, same(unreadable.body));
-    expect(fetched.valueOrNull!.profileTitle, equals('My panel'));
-  });
 }
 
 /// Answers every fetch with one response.

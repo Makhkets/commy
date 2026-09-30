@@ -158,6 +158,8 @@ abstract final class ClashYamlReader {
     return text;
   }
 
+  static final RegExp _hex4 = RegExp(r'^[0-9A-Fa-f]{4}$');
+
   /// Resolves the escapes a double quoted YAML scalar may hold.
   static String unescape(String text) {
     final buffer = StringBuffer();
@@ -175,17 +177,16 @@ abstract final class ClashYamlReader {
         buffer.write('\t');
       } else if (next == 'r') {
         buffer.write('\r');
-      } else if (next == 'u' && index + 4 < text.length) {
-        final code = int.tryParse(
-          text.substring(index + 1, index + 5),
-          radix: 16,
+      } else if (next == 'u' &&
+          index + 4 < text.length &&
+          _hex4.hasMatch(text.substring(index + 1, index + 5))) {
+        // Four hex digits exactly. `int.tryParse` alone also takes a sign,
+        // and `\u-001` became char code -1, which throws: one such name
+        // and the whole subscription failed to read.
+        buffer.writeCharCode(
+          int.parse(text.substring(index + 1, index + 5), radix: 16),
         );
-        if (code == null) {
-          buffer.write(next);
-        } else {
-          buffer.writeCharCode(code);
-          index += 4;
-        }
+        index += 4;
       } else {
         buffer.write(next);
       }
