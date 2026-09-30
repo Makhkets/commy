@@ -1,5 +1,7 @@
 import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
+import 'package:drift/drift.dart' hide isNotNull, isNull;
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/test_stack.dart';
@@ -18,20 +20,20 @@ TrafficSample sample({
     );
 
 void main() {
-  late TestStack stack;
-  late DriftTrafficHistoryStore store;
-
   final day = DateTime(2026, 8, 4, 12);
 
-  setUp(() {
-    stack = TestStack.create();
-    store = stack.traffic;
-  });
-  tearDown(() async {
-    await stack.dispose();
-  });
-
   group('DriftTrafficHistoryStore', () {
+    late TestStack stack;
+    late DriftTrafficHistoryStore store;
+
+    setUp(() {
+      stack = TestStack.create();
+      store = stack.traffic;
+    });
+    tearDown(() async {
+      await stack.dispose();
+    });
+
     test('addDelta accumulates into one bucket per day', () async {
       await store.addDelta(day: day, upBytes: 100, downBytes: 200);
       await store.addDelta(day: day, upBytes: 50, downBytes: 25);
@@ -146,4 +148,121 @@ void main() {
       );
     });
   });
+
+  // The core ticks once a second, in the background too. A write per tick was
+  // a committed transaction — a WAL append and an fsync — every second the
+  // tunnel carried anything, to move two counters a day.
+  group('DriftTrafficHistoryStore batching', () {
+    late CommitCounter commits;
+    late CommyDatabase database;
+    late DriftTrafficHistoryStore batched;
+
+    // One tick a second from [start], each moving 1000 bytes up and 2000
+    // down, the counters starting from zero like a fresh session.
+    Future<void> tick(int seconds, {DateTime? start}) async {
+      final origin = start ?? day;
+      for (var second = 0; second <= seconds; second++) {
+        await batched.recordSample(
+          sample(
+            up: 1000 * second,
+            down: 2000 * second,
+            at: origin.add(Duration(seconds: second)),
+          ),
+        );
+      }
+    }
+
+    Future<List<TrafficDayRow>> rowsOnDisk() =>
+        database.select(database.trafficDailyRows).get();
+
+    setUp(() async {
+      commits = CommitCounter();
+      database = CommyDatabase(NativeDatabase.memory().interceptWith(commits));
+      batched = DriftTrafficHistoryStore(database: database);
+      // Opening runs the migration; only what the store commits counts.
+      await rowsOnDisk();
+      commits.count = 0;
+    });
+    tearDown(() async {
+      await database.close();
+    });
+
+    test('a minute of ticks commits nothing', () async {
+      // Sixty ticks with bytes in every one: sixty transactions before.
+      await tick(60);
+
+      expect(commits.count, equals(0));
+      expect(await rowsOnDisk(), isEmpty);
+    });
+
+    test('the tick a minute on writes the whole batch in one transaction',
+        () async {
+      await tick(61);
+
+      expect(commits.count, equals(1));
+      final row = (await rowsOnDisk()).single;
+      // The same bytes a write per tick would have stored: every delta since
+      // the baseline at second zero.
+      expect(row.upBytes, equals(61 * 1000));
+      expect(row.downBytes, equals(61 * 2000));
+    });
+
+    test('flush writes what is waiting, once', () async {
+      await tick(10);
+
+      await batched.flush();
+      await batched.flush();
+
+      expect(commits.count, equals(1));
+      final row = (await rowsOnDisk()).single;
+      expect(row.upBytes, equals(10 * 1000));
+      expect(row.downBytes, equals(10 * 2000));
+    });
+
+    test('a batch across midnight lands in both days', () async {
+      final evening = DateTime(2026, 8, 4, 23, 59, 50);
+      await tick(20, start: evening);
+      await batched.flush();
+
+      expect(commits.count, equals(1));
+      final rows = await rowsOnDisk();
+      final byDay = <String, TrafficDayRow>{
+        for (final row in rows) row.day: row,
+      };
+      // Seconds 1..9 are the 4th, 10..20 are the 5th.
+      expect(byDay['2026-08-04']!.upBytes, equals(9 * 1000));
+      expect(byDay['2026-08-05']!.upBytes, equals(11 * 1000));
+    });
+
+    test('reads see bytes that are still waiting', () async {
+      await tick(5);
+
+      final read = (await batched.readRange(from: day, to: day)).valueOrNull!;
+      final watched = await batched.watchRange(from: day, to: day).first;
+
+      expect(read.single.upBytes, equals(5 * 1000));
+      expect(watched.single.downBytes, equals(5 * 2000));
+    });
+
+    test('clear drops the batch with the history', () async {
+      await tick(5);
+
+      await batched.clear();
+      await batched.flush();
+
+      expect(await rowsOnDisk(), isEmpty);
+    });
+  });
+}
+
+/// Counts committed transactions: each one is a WAL append and an fsync.
+class CommitCounter extends QueryInterceptor {
+  /// Commits since the last reset.
+  int count = 0;
+
+  @override
+  Future<void> commitTransaction(TransactionExecutor inner) {
+    count++;
+    return super.commitTransaction(inner);
+  }
 }

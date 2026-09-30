@@ -510,6 +510,9 @@ class FakeTrafficHistoryRepository implements TrafficHistoryRepository {
   /// How many times the baseline was dropped.
   int resets = 0;
 
+  /// How many times a batch was asked to be written.
+  int flushes = 0;
+
   /// The stored days.
   List<TrafficDay> get days => List<TrafficDay>.unmodifiable(_days);
 
@@ -527,6 +530,12 @@ class FakeTrafficHistoryRepository implements TrafficHistoryRepository {
 
   @override
   void resetSession() => resets++;
+
+  @override
+  Future<Result<void, CommyFailure>> flush() async {
+    flushes++;
+    return const Ok<void, CommyFailure>(null);
+  }
 
   @override
   Future<Result<List<TrafficDay>, CommyFailure>> readRange({
