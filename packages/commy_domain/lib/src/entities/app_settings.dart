@@ -195,7 +195,13 @@ class AppSettings {
   /// server and Auto is on again, which is what the user asked for.
   final bool autoSelect;
 
-  /// Whether the app starts with the operating system. Desktop only.
+  /// What happens when the device starts.
+  ///
+  /// On Android it is a reminder, not a start: a notification after the
+  /// restart that connects when tapped. The tunnel cannot come up before the
+  /// app does, because the generated core config is a secret that only the
+  /// Dart side holds (rule R2). On a desktop it is the app starting with the
+  /// operating system.
   final bool startOnBoot;
 
   /// Whether nodes that timed out are hidden from the list.
