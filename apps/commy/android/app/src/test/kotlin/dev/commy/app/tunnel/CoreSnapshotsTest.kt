@@ -102,6 +102,19 @@ class CoreSnapshotsTest {
     }
 
     @Test
+    fun `the tick after a live reload carries no negative rate`() {
+        // libbox subtracts the old session's totals from the new core's,
+        // which start from zero: 850 MB and 3 MB carried before the reload.
+        val json = JSONObject(CoreSnapshots.encodeTraffic(-850_000_000, -3_000_000, 1_024, 2_048, 5))
+
+        assertEquals(0, json.getLong("up"))
+        assertEquals(0, json.getLong("down"))
+        // The totals are the new core's own and pass as they are.
+        assertEquals(1_024, json.getLong("upTotal"))
+        assertEquals(2_048, json.getLong("downTotal"))
+    }
+
+    @Test
     fun `a connection row carries every column of the connections screen`() {
         val row = ConnectionRow("id1", "example.org:443", "final", "Finland", 10, 20, 30, "tcp")
 

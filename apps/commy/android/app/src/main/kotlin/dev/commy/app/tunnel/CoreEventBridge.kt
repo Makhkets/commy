@@ -399,7 +399,7 @@ internal class CoreEventBridge(
             )
             // The same tick drives the speed line on the notification, which is
             // the only readout a user has while the app is closed.
-            onTraffic(message.uplink, message.downlink)
+            onTraffic(CoreSnapshots.rate(message.uplink), CoreSnapshots.rate(message.downlink))
         }
 
         override fun disconnected(message: String?) = reportLoss(message.orEmpty())
