@@ -17,6 +17,7 @@ import 'dart:async';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/app_visibility.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -90,6 +91,14 @@ const Duration _groupPoll = Duration(seconds: 5);
 /// With a server chosen by hand the app already knows the answer — it is the
 /// one the user tapped — and a poll that answers a question nobody asked is
 /// how a battery goes missing.
+///
+/// For the same reason it asks only while somebody can see the answer: while
+/// a screen that shows it is listening, and while the app is on screen. Home
+/// stays mounted under Settings, and the process stays alive in the
+/// background for the tunnel's sake; the poll used to go on through both,
+/// every five seconds for hours, queueing each answer behind the paused
+/// subscription until Home was shown again. When it starts again it asks at
+/// once, so the label is current without waiting out an interval.
 final proxyGroupsProvider = StreamProvider<List<ProxyGroup>>((ref) {
   final core = ref.watch(coreClientProvider);
   final isUp = switch (ref.watch(coreStatusProvider).value) {
@@ -124,12 +133,44 @@ final proxyGroupsProvider = StreamProvider<List<ProxyGroup>>((ref) {
     }
   }
 
-  final timer = Timer.periodic(_groupPoll, (_) => unawaited(ask()));
-  unawaited(ask());
-  ref.onDispose(() {
-    timer.cancel();
-    unawaited(controller.close());
-  });
+  Timer? timer;
+  var listened = true;
+  var visible = true;
+  // Reads no provider: it runs inside `onCancel` and `onResume`, where
+  // Riverpod does not allow it. Visibility comes in through the listener.
+  void poll() {
+    if (!listened || !visible || controller.isClosed) {
+      timer?.cancel();
+      timer = null;
+      return;
+    }
+    if (timer == null) {
+      timer = Timer.periodic(_groupPoll, (_) => unawaited(ask()));
+      unawaited(ask());
+    }
+  }
+
+  ref
+    ..listen<bool>(
+      appVisibleProvider,
+      (_, next) {
+        visible = next;
+        poll();
+      },
+      fireImmediately: true,
+    )
+    ..onCancel(() {
+      listened = false;
+      poll();
+    })
+    ..onResume(() {
+      listened = true;
+      poll();
+    })
+    ..onDispose(() {
+      timer?.cancel();
+      unawaited(controller.close());
+    });
   return controller.stream;
 });
 

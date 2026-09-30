@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_router.dart';
+import 'package:commy/src/state/app_visibility.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/rule_set_scheduler.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -40,6 +41,24 @@ class _CommyAppState extends ConsumerState<CommyApp> {
   /// The last language applied, so an unrelated settings write does not
   /// reload a translation bundle for nothing.
   String? _appliedLocale;
+
+  /// Tells the providers that poll only for the screen when there is none.
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(
+      onHide: () => ref.read(appVisibleProvider.notifier).hide(),
+      onShow: () => ref.read(appVisibleProvider.notifier).show(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

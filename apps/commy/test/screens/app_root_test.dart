@@ -1,5 +1,6 @@
 import 'package:commy/app.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/state/app_visibility.dart';
 import 'package:commy/src/state/system_intent_listener.dart';
 import 'package:commy/src/state/traffic_history.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
@@ -54,6 +55,46 @@ void main() {
 
     await container.read(tunnelControllerProvider.notifier).disconnect();
     await tester.pump(const Duration(milliseconds: 100));
+  });
+
+  testWidgets('the app says when it is off screen', (tester) async {
+    // What the Auto poll stops for: the process outlives the screen while the
+    // tunnel is up, and nothing else tells a provider the app went away.
+    final harness = CommyTestHarness();
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: harness.overrides(
+          extra: <Override>[
+            systemSettingsProvider.overrideWithValue(const _QuietSystem()),
+            systemIntentsProvider.overrideWithValue(const _NoIntents()),
+          ],
+        ),
+        child: const CommyApp(),
+      ),
+    );
+    await settle(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CommyApp)),
+      listen: false,
+    );
+    // One step at a time, as the engine reports them.
+    void walk(List<AppLifecycleState> states) =>
+        states.forEach(tester.binding.handleAppLifecycleStateChanged);
+
+    walk(<AppLifecycleState>[
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]);
+    expect(container.read(appVisibleProvider), isFalse);
+
+    walk(<AppLifecycleState>[
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]);
+    expect(container.read(appVisibleProvider), isTrue);
   });
 }
 
