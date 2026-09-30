@@ -121,13 +121,27 @@ abstract final class DnsSectionBuilder {
     return <String, Object?>{
       SingBoxKeys.servers: servers,
       if (rules.isNotEmpty) SingBoxKeys.rules: rules,
-      SingBoxKeys.finalTag: SingBoxTags.dnsRemote,
+      SingBoxKeys.finalTag: finalResolver(routing.mode),
       SingBoxKeys.strategy: dns.strategy.wireName,
       // FakeIP needs it, and two resolvers answering the same name differently
       // is exactly the case a shared cache gets wrong.
       SingBoxKeys.independentCache: dns.independentCache || dns.fakeIp,
     };
   }
+
+  /// The resolver for every name no DNS rule claims.
+  ///
+  /// The one for wherever unmatched traffic goes, read off
+  /// [RouteSectionBuilder.finalOutbound] so the two sections cannot drift
+  /// apart. In Direct mode nothing goes through the proxy, and a name asked
+  /// through it anyway made the mode depend on the server it bypasses: with
+  /// the server down — the moment the mode is for — no name resolved and the
+  /// phone was offline. With it up, a direct connection went to an address
+  /// picked for the proxy's exit rather than for the user.
+  static String finalResolver(RoutingMode mode) =>
+      RouteSectionBuilder.finalOutbound(mode) == SingBoxTags.direct
+          ? SingBoxTags.dnsDirect
+          : SingBoxTags.dnsRemote;
 
   /// Checks [raw] the way [parseResolver] will, without building anything.
   ///

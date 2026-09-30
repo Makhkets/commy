@@ -323,6 +323,27 @@
       }
     },
     {
+      "name": "DNS, Direct mode, the direct resolver answering the rest",
+      "kind": "dns",
+      "object": {
+        "servers": [
+          {
+            "type": "tls",
+            "tag": "dns-remote",
+            "server": "1.1.1.1",
+            "detour": "proxy"
+          },
+          {
+            "type": "local",
+            "tag": "dns-direct"
+          }
+        ],
+        "final": "dns-direct",
+        "strategy": "prefer_ipv4",
+        "independent_cache": true
+      }
+    },
+    {
       "name": "Route, rules as other clients write them",
       "kind": "route",
       "object": {

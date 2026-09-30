@@ -176,6 +176,34 @@ void main() {
       expect(section['final'], 'dns-remote');
     });
 
+    test('in Direct mode leaves unclaimed names to the direct resolver', () {
+      // Nothing goes through the proxy in this mode. Asked through it, every
+      // name failed with the server down — the moment the mode is for.
+      String? finalOf(RoutingMode mode, {bool fakeIp = false}) => _build(
+            DnsSettings(fakeIp: fakeIp),
+            routing: RoutingPolicy(mode: mode),
+          )['final'] as String?;
+
+      expect(finalOf(RoutingMode.direct), 'dns-direct');
+      expect(finalOf(RoutingMode.direct, fakeIp: true), 'dns-direct');
+      expect(finalOf(RoutingMode.rules), 'dns-remote');
+      expect(finalOf(RoutingMode.global), 'dns-remote');
+    });
+
+    test('in Direct mode keeps FakeIP when it is on', () {
+      final section = _build(
+        const DnsSettings(fakeIp: true),
+        routing: const RoutingPolicy(mode: RoutingMode.direct),
+      );
+
+      expect(section['rules'], <Object?>[
+        <String, Object?>{
+          'query_type': <String>['A', 'AAAA'],
+          'server': 'dns-fake',
+        },
+      ]);
+    });
+
     test('adds the FakeIP resolver and its rule only when asked', () {
       final off = _build(DnsSettings.defaults);
       final on = _build(const DnsSettings(fakeIp: true));

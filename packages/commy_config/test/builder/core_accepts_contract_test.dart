@@ -208,6 +208,11 @@ const List<(String, DnsSettings, RoutingPolicy)> _resolvers =
       ],
     ),
   ),
+  (
+    'DNS, Direct mode, the direct resolver answering the rest',
+    DnsSettings.defaults,
+    RoutingPolicy(mode: RoutingMode.direct),
+  ),
 ];
 
 /// Route sections, for the rules the core parses before anything connects.
