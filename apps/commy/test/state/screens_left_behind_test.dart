@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/state/app_visibility.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_core/commy_core.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -87,5 +88,74 @@ void main() {
     // Cancelled, not paused: on Android the channel's cancel is what stops
     // the native side sending the table once a second.
     expect(core.source.hasListener, isFalse);
+  });
+
+  test('the connections tab lets go while the app is hidden', () async {
+    // The tab on top of the stack is not left when the app goes into the
+    // background, so nothing paused it, and the table went on arriving once
+    // a second for a screen nobody could see.
+    final core = _WatchedCore();
+    final container = ProviderContainer(
+      overrides: <Override>[coreClientProvider.overrideWithValue(core)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await core.source.close();
+      await core.dispose();
+    });
+    final screen = container.listen(connectionsProvider, (_, __) {});
+    addTearDown(screen.close);
+    await pumpEventQueue();
+    core.source.add(const <ConnectionInfo>[]);
+    await pumpEventQueue();
+
+    container.read(appVisibleProvider.notifier).hide();
+    await pumpEventQueue();
+    expect(core.source.hasListener, isFalse);
+
+    container.read(appVisibleProvider.notifier).show();
+    await pumpEventQueue();
+    expect(core.source.hasListener, isTrue);
+    // What was on screen stays there until the table comes back.
+    expect(container.read(connectionsProvider).value, isEmpty);
+  });
+
+  test('the log screen lets go while the app is hidden', () async {
+    final harness = CommyTestHarness();
+    final container = ProviderContainer(overrides: harness.overrides());
+    addTearDown(() async {
+      container.dispose();
+      await harness.dispose();
+    });
+    final views = <int>[];
+    final screen = container.listen<AsyncValue<List<LogLine>>>(
+      logLinesProvider,
+      (_, next) {
+        if (next.hasValue && !next.isLoading) {
+          views.add(next.value!.length);
+        }
+      },
+    );
+    addTearDown(screen.close);
+    await container.read(logLinesProvider.future);
+    views.clear();
+
+    container.read(appVisibleProvider.notifier).hide();
+    await pumpEventQueue();
+    for (var i = 0; i < 20; i++) {
+      await harness.logRepository.append(
+        LogLine(
+          level: LogLevel.info,
+          message: 'outbound connection $i',
+          at: CommyTestHarness.now,
+        ),
+      );
+    }
+    await pumpEventQueue();
+    expect(views, isEmpty);
+
+    container.read(appVisibleProvider.notifier).show();
+    await pumpEventQueue();
+    expect(views, equals(<int>[20]));
   });
 }

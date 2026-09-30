@@ -49,8 +49,16 @@ final trafficProvider = StreamProvider<TrafficSample>((ref) {
 /// and a JSON encode of the table every second). The data is a snapshot, so
 /// nothing is lost by letting go: a new listener gets the current table
 /// straight away.
+///
+/// Let go of while the app is hidden too. The tab on top of the stack with
+/// the app in the background is not left, so nothing pauses it, and the
+/// tunnel keeps the process alive: the table went on arriving once a second,
+/// decoded on the UI isolate, for a screen nobody could see.
 final StreamProvider<List<ConnectionInfo>> connectionsProvider =
     StreamProvider.autoDispose((ref) {
+  if (!ref.watch(appVisibleProvider)) {
+    return const Stream<List<ConnectionInfo>>.empty();
+  }
   return ref.watch(coreClientProvider).connections;
 });
 
@@ -60,7 +68,16 @@ final StreamProvider<List<ConnectionInfo>> connectionsProvider =
 /// is paused, and a paused stream queues; the repository's stream lets go
 /// while it is paused and hands back the current view when it resumes, so a
 /// log screen visited once costs nothing while the user is elsewhere.
+///
+/// And let go of while the app is hidden, for the same reason as
+/// [connectionsProvider]: the log screen on top of the stack is not left
+/// when the whole app goes into the background, and every line the core
+/// wrote copied the whole view for it. Shown again, the watch starts afresh
+/// with the view as it is by then.
 final logLinesProvider = StreamProvider<List<LogLine>>((ref) {
+  if (!ref.watch(appVisibleProvider)) {
+    return const Stream<List<LogLine>>.empty();
+  }
   return ref.watch(logRepositoryProvider).watch();
 });
 
