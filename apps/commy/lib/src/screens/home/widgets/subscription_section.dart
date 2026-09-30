@@ -96,7 +96,10 @@ class SubscriptionSection extends ConsumerWidget {
           subscription: subscription,
         ),
       ),
-      nodes: <Widget>[
+      // Not among the servers: a collapsed card folds those away, and these
+      // rows are what the user has to see — a run of "measure all" with its
+      // only Cancel, and the panel's refusal with its one-tap fix.
+      status: <Widget>[
         // Above the servers, because when it is there they are usually not:
         // a panel that answers with a notice answers with nothing else.
         if (notices.isNotEmpty)
@@ -114,6 +117,8 @@ class SubscriptionSection extends ConsumerWidget {
         // actually known. The way out is the refresh two icons up.
         if (nodes.isEmpty && notices.isEmpty) const _NoServersRow(),
         if (isMeasuringThis) const MeasureProgressRow(),
+      ],
+      nodes: <Widget>[
         for (final node in nodes)
           NodeRow(node: node, isActive: node.id == activeId),
       ],

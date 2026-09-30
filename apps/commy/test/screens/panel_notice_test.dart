@@ -31,10 +31,13 @@ void main() {
   Future<CommyTestHarness> pumpCard(
     WidgetTester tester, {
     required bool sendDeviceId,
+    bool collapsed = false,
   }) async {
     final harness = CommyTestHarness(
       nodes: const <ProxyNode>[notice],
-      subscriptions: <Subscription>[subscription],
+      subscriptions: <Subscription>[
+        subscription.copyWith(isCollapsed: collapsed),
+      ],
       settings: AppSettings.defaults.copyWith(sendDeviceId: sendDeviceId),
     );
     addTearDown(harness.dispose);
@@ -70,6 +73,19 @@ void main() {
       reason: 'Turning it on is only half the fix; the panel has to be '
           'asked again.',
     );
+  });
+
+  // A card folded before the panel started refusing kept its explanation
+  // and its one-tap fix folded away with the servers — and the refresh
+  // itself only said "0 servers".
+  testWidgets('a collapsed card still shows what the panel said',
+      (tester) async {
+    await pumpCard(tester, sendDeviceId: false, collapsed: true);
+    final t = Translations();
+
+    expect(find.byType(PanelNoticeRow), findsOneWidget);
+    expect(find.text('App not supported'), findsOneWidget);
+    expect(find.text(t.subscription.sendDeviceId), findsOneWidget);
   });
 
   testWidgets('with the identifier on, the panel speaks for itself',
