@@ -86,6 +86,13 @@ internal object TunnelController {
     val logs: Flow<String> = logsFlow.asSharedFlow()
     val connections: Flow<String> = connectionsState.asStateFlow()
 
+    /**
+     * Whether anyone reads [connections] right now: the Connections tab,
+     * through its event channel. The core streams connections only while this
+     * is true, see [OnDemandStream].
+     */
+    val connectionsWanted: Flow<Boolean> = connectionsFlow.subscriptionCount.map { it > 0 }
+
     @Volatile
     private var service: CommyVpnService? = null
 
