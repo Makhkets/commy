@@ -598,6 +598,10 @@
       "message": "The panel refused the request: HTTP ${status}. The subscription may be expired, revoked, or over its device limit.",
       "action": "Retry"
     },
+    "subscriptionServerError": {
+      "message": "The subscription server is having trouble: HTTP ${status}. That is on its side — try again later.",
+      "action": "Retry"
+    },
     "subscriptionMalformed": {
       "message": "The subscription response could not be read",
       "action": "Open the logs"

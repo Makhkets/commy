@@ -40,10 +40,28 @@ class FailureText {
           kind: HttpTransportError.kindStatus,
           statusCode: final int status,
         ),
-      ) =>
+      )
+          when status >= 400 && status < 500 =>
         FailureText(
           message: errors.subscriptionRefused.message(status: status),
           actionLabel: errors.subscriptionRefused.action,
+          action: FailureAction.retry,
+          retryable: failure.retryable,
+        ),
+      // A 5xx is the server's own trouble — a panel being restarted, nginx in
+      // front of a backend that is down, a Cloudflare 52x. It says nothing
+      // about the subscription, and "it may be revoked" sent the user to
+      // support, or to delete and re-add it, over an outage.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindStatus,
+          statusCode: final int status,
+        ),
+      )
+          when status >= 500 =>
+        FailureText(
+          message: errors.subscriptionServerError.message(status: status),
+          actionLabel: errors.subscriptionServerError.action,
           action: FailureAction.retry,
           retryable: failure.retryable,
         ),
