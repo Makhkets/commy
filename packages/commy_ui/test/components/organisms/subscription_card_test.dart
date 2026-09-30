@@ -49,4 +49,28 @@ void main() {
     final first = tester.getTopLeft(find.text('Amsterdam 03')).dy;
     expect(status, lessThan(first));
   });
+
+  testWidgets("the panel's notice is drawn in the secondary step",
+      (tester) async {
+    // It is 11 px, and text/tertiary is for 13 px and up: on the group
+    // header it made 4.43:1 in the light theme, under AA.
+    const note = 'По вопросам пишите в поддержку: @support';
+    await pumpCommy(
+      tester,
+      theme: CommyGoldenTheme.light,
+      size: const Size(390, 400),
+      child: const SubscriptionCard(
+        name: 'MAKHKETS VPN',
+        refreshLabel: 'Обновить',
+        pingAllLabel: 'Измерить все',
+        moreLabel: 'Ещё',
+        announcement: note,
+      ),
+    );
+
+    expect(
+      tester.widget<Text>(find.text(note)).style?.color,
+      CommyColors.light.textSecondary,
+    );
+  });
 }

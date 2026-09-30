@@ -563,8 +563,12 @@ class _AnnouncementState extends State<_Announcement> {
                       maxLines: _expanded ? null : 2,
                       overflow:
                           _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
+                      // Secondary, not tertiary: this is 11 px, and the
+                      // tertiary step is for 13 px and up. It is also the
+                      // one line the panel's admin gets to say anything —
+                      // often where the support contact is.
                       style: context.typography.monoSmall
-                          .copyWith(color: colors.textTertiary),
+                          .copyWith(color: colors.textSecondary),
                     ),
                   ),
                   SizedBox(width: spacing.s2),
