@@ -109,6 +109,7 @@ abstract final class DnsSectionBuilder {
         routing: routing,
         platform: platform,
         availableRuleSets: availableRuleSets,
+        fakeIp: dns.fakeIp,
       ),
       if (dns.fakeIp)
         <String, Object?>{
@@ -297,25 +298,35 @@ abstract final class DnsSectionBuilder {
     ];
   }
 
-  /// DNS rules derived from the routing policy.
+  /// DNS rules derived from the routing policy, in the user's order.
   ///
   /// A name the user routes directly is resolved by the direct resolver, and a
   /// name the user blocks is refused outright. Without this a "direct" rule
   /// still leaks the name to the remote resolver through the tunnel, which is
   /// the opposite of what the user asked for.
+  ///
+  /// A name the user proxies gets a rule too, with the answer it would have
+  /// had from falling through: FakeIP when [fakeIp] is on, and the resolver
+  /// through the tunnel for the rest. On its own that changes nothing. What
+  /// it changes is the rules below it. Both this list and the route section
+  /// are read top down and the first match wins (`dns/router.go`,
+  /// `route/route.go`), so a Proxy exception placed above a broader Direct or
+  /// Block rule — the reason the routing screen lets rules be reordered —
+  /// has to be here as well. Left out, the connection went through the
+  /// proxy while its query fell through to the broader rule: asked of the
+  /// direct resolver, outside the tunnel (rule R6), or refused, so a site
+  /// the user proxied on purpose did not open.
   static List<Map<String, Object?>> policyRules({
     required RoutingPolicy routing,
     required ConfigPlatform platform,
     required Set<String> availableRuleSets,
+    required bool fakeIp,
   }) {
     if (routing.mode != RoutingMode.rules) {
       return const <Map<String, Object?>>[];
     }
     final rules = <Map<String, Object?>>[];
     for (final rule in routing.activeRules) {
-      if (rule.action == RuleAction.proxy) {
-        continue;
-      }
       final matcher = RouteMatcher.tryParse(rule.matcher, platform: platform);
       if (matcher == null || matcher.isEmpty || !matcher.matchesDomains) {
         continue;
@@ -323,13 +334,34 @@ abstract final class DnsSectionBuilder {
       if (!matcher.ruleSets.every(availableRuleSets.contains)) {
         continue;
       }
-      rules.add(<String, Object?>{
-        ...matcher.fields,
-        if (rule.action == RuleAction.block)
-          SingBoxKeys.action: SingBoxKeys.actionReject
-        else
-          SingBoxKeys.dnsServer: SingBoxTags.dnsDirect,
-      });
+      switch (rule.action) {
+        case RuleAction.block:
+          rules.add(<String, Object?>{
+            ...matcher.fields,
+            SingBoxKeys.action: SingBoxKeys.actionReject,
+          });
+        case RuleAction.direct:
+          rules.add(<String, Object?>{
+            ...matcher.fields,
+            SingBoxKeys.dnsServer: SingBoxTags.dnsDirect,
+          });
+        case RuleAction.proxy:
+          // Two rules under FakeIP, the same pair the section ends with: one
+          // rule sending the name to the tunnel's resolver would answer its
+          // A and AAAA queries with real addresses, which FakeIP is on to
+          // keep out of the system cache.
+          if (fakeIp) {
+            rules.add(<String, Object?>{
+              ...matcher.fields,
+              SingBoxKeys.queryType: fakeIpQueryTypes,
+              SingBoxKeys.dnsServer: SingBoxTags.dnsFake,
+            });
+          }
+          rules.add(<String, Object?>{
+            ...matcher.fields,
+            SingBoxKeys.dnsServer: SingBoxTags.dnsRemote,
+          });
+      }
     }
     return rules;
   }
