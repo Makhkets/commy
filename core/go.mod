@@ -3,7 +3,7 @@ module github.com/Makhkets/commy/core
 go 1.26.8
 
 require (
-	github.com/metacubex/utls v1.8.4
+	github.com/metacubex/utls v1.8.7
 	github.com/miekg/dns v1.1.72
 	github.com/sagernet/gomobile v0.1.13
 	github.com/sagernet/quic-go v0.59.0-sing-box-mod.4
