@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/components/molecules/segmented_control_item.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
@@ -124,51 +125,60 @@ class _Segment<T> extends StatelessWidget {
       button: true,
       selected: isSelected,
       enabled: enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: motion.instant,
-          curve: motion.instantCurve,
-          constraints: const BoxConstraints(
-            // Not `buttonHeightSmall`: a segment is the whole tap target —
-            // there is no room around it inside the track, and the track's
-            // own parents clip a hit test to their bounds, so a transparent
-            // margin like `CheckButton`'s cannot reach past it. At 36 the
-            // four diagnostics tabs and the three routing modes were the
-            // last controls under this design system's own floor. 48 is also
-            // what a text field and an icon button on the same screens are,
-            // so the row now lines up with them instead of reading denser.
-            minHeight: CommySizes.minTapTarget,
-          ),
-          padding: EdgeInsets.symmetric(horizontal: spacing.s2),
-          decoration: BoxDecoration(
-            color: isSelected ? colors.bgOverlay : CommyColors.transparent,
-            borderRadius: context.radii.xsAll,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              if (segment.icon != null) ...<Widget>[
-                Icon(
-                  segment.icon,
-                  size: CommySizes.iconInline,
-                  color: foreground,
-                ),
-                SizedBox(width: spacing.s1),
-              ],
-              Flexible(
-                child: Text(
-                  segment.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: context.typography.captionStrong.copyWith(
+      child: CommyFocusable(
+        onActivate: onTap,
+        builder: (context, {required isFocused}) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: motion.instant,
+            curve: motion.instantCurve,
+            constraints: const BoxConstraints(
+              // Not `buttonHeightSmall`: a segment is the whole tap target —
+              // there is no room around it inside the track, and the track's
+              // own parents clip a hit test to their bounds, so a transparent
+              // margin like `CheckButton`'s cannot reach past it. At 36 the
+              // four diagnostics tabs and the three routing modes were the
+              // last controls under this design system's own floor. 48 is also
+              // what a text field and an icon button on the same screens are,
+              // so the row now lines up with them instead of reading denser.
+              minHeight: CommySizes.minTapTarget,
+            ),
+            padding: EdgeInsets.symmetric(horizontal: spacing.s2),
+            decoration: BoxDecoration(
+              color: isSelected ? colors.bgOverlay : CommyColors.transparent,
+              borderRadius: context.radii.xsAll,
+            ),
+            // Inside the segment, not around it: segments touch, and the
+            // track's own parents clip anything drawn past its edge.
+            foregroundDecoration: BoxDecoration(
+              borderRadius: context.radii.xsAll,
+              border: CommyFocusable.ring(colors, isFocused: isFocused),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                if (segment.icon != null) ...<Widget>[
+                  Icon(
+                    segment.icon,
+                    size: CommySizes.iconInline,
                     color: foreground,
                   ),
+                  SizedBox(width: spacing.s1),
+                ],
+                Flexible(
+                  child: Text(
+                    segment.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: context.typography.captionStrong.copyWith(
+                      color: foreground,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

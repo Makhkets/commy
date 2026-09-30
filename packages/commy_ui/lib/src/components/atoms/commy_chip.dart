@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/components/commy_icons.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
@@ -106,12 +107,28 @@ class CommyChip extends StatelessWidget {
                     Semantics(
                       button: true,
                       label: removeSemanticLabel,
-                      child: GestureDetector(
-                        onTap: onRemove,
-                        child: Icon(
-                          CommyIcons.close,
-                          size: CommySizes.iconInline,
-                          color: foreground,
+                      child: CommyFocusable(
+                        onActivate: onRemove,
+                        builder: (context, {required isFocused}) =>
+                            GestureDetector(
+                          onTap: onRemove,
+                          // On the cross, not around it: a ring outside
+                          // would widen the chip by its own width.
+                          child: DecoratedBox(
+                            position: DecorationPosition.foreground,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: CommyFocusable.ring(
+                                colors,
+                                isFocused: isFocused,
+                              ),
+                            ),
+                            child: Icon(
+                              CommyIcons.close,
+                              size: CommySizes.iconInline,
+                              color: foreground,
+                            ),
+                          ),
                         ),
                       ),
                     ),

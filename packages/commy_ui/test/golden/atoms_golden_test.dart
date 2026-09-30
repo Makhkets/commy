@@ -174,6 +174,39 @@ void main() {
     ]),
   );
 
+  // Focus from a key, on the first control of each: the ring is drawn
+  // outside the switch, the checkbox and the radio, so it reads on a chalk
+  // fill as on an empty one.
+  goldenTest(
+    'switch_focused',
+    size: const Size(200, 100),
+    tabs: 1,
+    builder: (context) => row(<Widget>[
+      CommySwitch(value: true, onChanged: (_) {}),
+      CommySwitch(value: false, onChanged: (_) {}),
+    ]),
+  );
+
+  goldenTest(
+    'checkbox_focused',
+    size: const Size(200, 100),
+    tabs: 1,
+    builder: (context) => row(<Widget>[
+      CommyCheckbox(value: false, onChanged: (_) {}),
+      CommyCheckbox(value: true, onChanged: (_) {}),
+    ]),
+  );
+
+  goldenTest(
+    'radio_focused',
+    size: const Size(200, 100),
+    tabs: 1,
+    builder: (context) => row(<Widget>[
+      CommyRadio<int>(value: 1, groupValue: 1, onChanged: (_) {}),
+      CommyRadio<int>(value: 2, groupValue: 1, onChanged: (_) {}),
+    ]),
+  );
+
   goldenTest(
     'text_field',
     size: const Size(360, 560),

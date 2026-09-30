@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:flutter/material.dart';
@@ -48,37 +49,52 @@ class CommySwitch extends StatelessWidget {
       toggled: value,
       enabled: enabled,
       label: semanticLabel,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onChanged!(!value) : null,
-        child: SizedBox(
-          width: CommySizes.minTapTarget,
-          height: CommySizes.minTapTarget,
-          child: Center(
-            child: AnimatedContainer(
-              duration: motion.fast,
-              curve: motion.fastCurve,
-              width: CommySizes.switchWidth,
-              height: CommySizes.switchHeight,
-              padding: const EdgeInsets.all(CommySizes.switchPadding),
-              decoration: BoxDecoration(
-                color: track,
-                borderRadius: context.radii.fullAll,
-                border: value
-                    ? null
-                    : Border.all(color: colors.borderDefault),
-              ),
-              child: AnimatedAlign(
-                duration: motion.fast,
-                curve: motion.fastCurve,
-                alignment:
-                    value ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  width: CommySizes.switchThumb,
-                  height: CommySizes.switchThumb,
-                  decoration: BoxDecoration(
-                    color: thumb,
-                    shape: BoxShape.circle,
+      child: CommyFocusable(
+        onActivate: enabled ? () => onChanged!(!value) : null,
+        builder: (context, {required isFocused}) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? () => onChanged!(!value) : null,
+          child: SizedBox(
+            width: CommySizes.minTapTarget,
+            height: CommySizes.minTapTarget,
+            child: Center(
+              // The focus ring hugs the track from outside, with no gap:
+              // 44 of track and two rings of 2 are exactly the 48 there is.
+              // Outside, so it reads on the chalk fill as on the empty one.
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: context.radii.fullAll,
+                  border: CommyFocusable.ring(colors, isFocused: isFocused),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(CommySizes.borderThick),
+                  child: AnimatedContainer(
+                    duration: motion.fast,
+                    curve: motion.fastCurve,
+                    width: CommySizes.switchWidth,
+                    height: CommySizes.switchHeight,
+                    padding: const EdgeInsets.all(CommySizes.switchPadding),
+                    decoration: BoxDecoration(
+                      color: track,
+                      borderRadius: context.radii.fullAll,
+                      border: value
+                          ? null
+                          : Border.all(color: colors.borderDefault),
+                    ),
+                    child: AnimatedAlign(
+                      duration: motion.fast,
+                      curve: motion.fastCurve,
+                      alignment:
+                          value ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        width: CommySizes.switchThumb,
+                        height: CommySizes.switchThumb,
+                        decoration: BoxDecoration(
+                          color: thumb,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/components/commy_icons.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
@@ -46,32 +47,47 @@ class CommyCheckbox extends StatelessWidget {
       checked: value,
       enabled: enabled,
       label: semanticLabel,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onChanged!(!value) : null,
-        child: SizedBox(
-          width: CommySizes.minTapTarget,
-          height: CommySizes.minTapTarget,
-          child: Center(
-            child: AnimatedContainer(
-              duration: motion.fast,
-              curve: motion.fastCurve,
-              width: CommySizes.checkboxSize,
-              height: CommySizes.checkboxSize,
-              decoration: BoxDecoration(
-                color: fill,
-                borderRadius: context.radii.xsAll,
-                border: Border.all(color: border),
+      child: CommyFocusable(
+        onActivate: enabled ? () => onChanged!(!value) : null,
+        builder: (context, {required isFocused}) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? () => onChanged!(!value) : null,
+          child: SizedBox(
+            width: CommySizes.minTapTarget,
+            height: CommySizes.minTapTarget,
+            child: Center(
+              // The focus ring sits just outside the box, rounded to match.
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(
+                    context.radii.xs + CommySizes.borderThick,
+                  ),
+                  border: CommyFocusable.ring(colors, isFocused: isFocused),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(CommySizes.borderThick),
+                  child: AnimatedContainer(
+                    duration: motion.fast,
+                    curve: motion.fastCurve,
+                    width: CommySizes.checkboxSize,
+                    height: CommySizes.checkboxSize,
+                    decoration: BoxDecoration(
+                      color: fill,
+                      borderRadius: context.radii.xsAll,
+                      border: Border.all(color: border),
+                    ),
+                    child: value
+                        ? Icon(
+                            CommyIcons.check,
+                            size: CommySizes.iconInline,
+                            color: enabled
+                                ? colors.accentOnSolid
+                                : colors.textDisabled,
+                          )
+                        : null,
+                  ),
+                ),
               ),
-              child: value
-                  ? Icon(
-                      CommyIcons.check,
-                      size: CommySizes.iconInline,
-                      color: enabled
-                          ? colors.accentOnSolid
-                          : colors.textDisabled,
-                    )
-                  : null,
             ),
           ),
         ),

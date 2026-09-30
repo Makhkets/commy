@@ -1,6 +1,7 @@
 import 'package:commy_ui/src/components/atoms/commy_divider.dart';
 import 'package:commy_ui/src/components/atoms/commy_icon_button.dart';
 import 'package:commy_ui/src/components/atoms/commy_spinner.dart';
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/components/commy_icons.dart';
 import 'package:commy_ui/src/components/commy_tone.dart';
 import 'package:commy_ui/src/components/molecules/quota_bar.dart';
@@ -520,47 +521,61 @@ class _AnnouncementState extends State<_Announcement> {
     final colors = context.colors;
     final spacing = context.spacing;
 
+    void toggle() => setState(() => _expanded = !_expanded);
+
     return Semantics(
       button: true,
       expanded: _expanded,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Padding(
-          padding: EdgeInsetsDirectional.only(
-            start: spacing.s4,
-            top: spacing.s2,
-            end: spacing.s4,
-            bottom: spacing.s3,
-          ),
-          // No `minHeight` here, and not for want of the rule: two lines of
-          // `monoSmall` plus this padding clear the 48pt floor on their own,
-          // and a constraint on top of that only padded the card with air.
-          // Measured: 388x52.
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  widget.note,
-                  // Two lines collapsed, not one: it is the difference
-                  // between "Уважаемые пользователи! 24 сент…" and a
-                  // sentence a person can act on, and it costs one line of
-                  // a card that is 250pt tall.
-                  maxLines: _expanded ? null : 2,
-                  overflow:
-                      _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
-                  style: context.typography.monoSmall
-                      .copyWith(color: colors.textTertiary),
-                ),
+      child: CommyFocusable(
+        onActivate: toggle,
+        builder: (context, {required isFocused}) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: toggle,
+          // Drawn over the row, inside its bounds: the card clips anything
+          // past them.
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: context.radii.xsAll,
+              border: CommyFocusable.ring(colors, isFocused: isFocused),
+            ),
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(
+                start: spacing.s4,
+                top: spacing.s2,
+                end: spacing.s4,
+                bottom: spacing.s3,
               ),
-              SizedBox(width: spacing.s2),
-              Icon(
-                _expanded ? CommyIcons.chevronUp : CommyIcons.chevronDown,
-                size: CommySizes.iconInline,
-                color: colors.textTertiary,
+              // No `minHeight` here, and not for want of the rule: two lines
+              // of `monoSmall` plus this padding clear the 48pt floor on
+              // their own, and a constraint on top of that only padded the
+              // card with air. Measured: 388x52.
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      widget.note,
+                      // Two lines collapsed, not one: it is the difference
+                      // between "Уважаемые пользователи! 24 сент…" and a
+                      // sentence a person can act on, and it costs one line
+                      // of a card that is 250pt tall.
+                      maxLines: _expanded ? null : 2,
+                      overflow:
+                          _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
+                      style: context.typography.monoSmall
+                          .copyWith(color: colors.textTertiary),
+                    ),
+                  ),
+                  SizedBox(width: spacing.s2),
+                  Icon(
+                    _expanded ? CommyIcons.chevronUp : CommyIcons.chevronDown,
+                    size: CommySizes.iconInline,
+                    color: colors.textTertiary,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -39,7 +39,8 @@ abstract final class CommySizes {
   /// Emphasised border, and the connect ring in every state but two — 1.5.
   static const double borderMedium = 1.5;
 
-  /// The connect ring when connected or errored — 2.
+  /// The connect ring when connected or errored, and the ring around a
+  /// control that has keyboard focus — 2.
   static const double borderThick = 2;
 
   /// Switch track width — 44.
