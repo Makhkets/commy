@@ -18,6 +18,7 @@ import 'package:commy_core/commy_core.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -604,6 +605,48 @@ void main() {
       // is the control, and a chevron beside it points nowhere.
       expect(find.byType(CommySwitch), findsOneWidget);
       expect(find.byIcon(CommyIcons.chevronRight), findsNothing);
+    });
+
+    testWidgets('a choice row is one keyboard stop, not the row and its radio',
+        (tester) async {
+      var chosen = _tileTitle;
+      Widget choice(String title) => SettingsTile(
+            title: title,
+            selected: chosen == title,
+            trailing: CommyRadio<String>(
+              value: title,
+              groupValue: chosen,
+              onChanged: (value) => chosen = value,
+            ),
+            onTap: () => chosen = title,
+          );
+      await pumpScreen(
+        tester,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[choice(_tileTitle), choice(_secondTileTitle)],
+        ),
+      );
+
+      String? focusedRow() => FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<SettingsTile>()
+          ?.title;
+
+      // The radio took focus of its own, and under the row's excluded
+      // semantics it was a stop with no name: Tab went row, radio, row,
+      // radio, and a D-pad on the per-app list took two presses an app.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await settle(tester);
+      expect(focusedRow(), _tileTitle);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await settle(tester);
+      expect(focusedRow(), _secondTileTitle);
+
+      // The one stop still chooses.
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await settle(tester);
+      expect(chosen, _secondTileTitle);
     });
   });
 

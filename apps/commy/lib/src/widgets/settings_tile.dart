@@ -285,10 +285,23 @@ class SettingsTile extends StatelessWidget {
                   // A choice row announces its own state, so the radio or the
                   // tick inside it is a drawing. Anything else — a switch —
                   // still speaks.
+                  //
+                  // A drawing is not a stop either. Since the radio and the
+                  // tick box took keyboard focus of their own, every choice
+                  // row cost two Tab or D-pad presses — the row, then the
+                  // control — and the second landed on a node with nothing to
+                  // say, because its semantics are excluded right here. On
+                  // the per-app list that is two presses for each of hundreds
+                  // of apps. The row's own tap runs the same choice, so it is
+                  // the one stop; only a row without a tap leaves the control
+                  // reachable, since it is then the only way to choose.
                   if (selected == null && checked == null)
                     control
                   else
-                    ExcludeSemantics(child: control),
+                    ExcludeFocus(
+                      excluding: onTap != null,
+                      child: ExcludeSemantics(child: control),
+                    ),
                 ],
                 if (onTap != null && control == null) ...<Widget>[
                   SizedBox(width: spacing.s2),
