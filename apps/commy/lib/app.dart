@@ -47,7 +47,11 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // Long-lived subscriptions, watched from the root so they outlive every
       // screen.
       ..watch(logPumpProvider)
-      ..watch(trafficHistoryProvider)
+      // Listened to, not watched: kept awake the same way, but its value is a
+      // new window every second while connected, and a watch rebuilt the
+      // whole app shell — both themes included — on each one, for a value
+      // this widget never reads.
+      ..listen<TrafficWindow>(trafficHistoryProvider, (_, __) {})
       ..watch(trafficHistoryPumpProvider)
       // The `checking` step. It belongs to the connection, not to whichever
       // screen happens to be on top when the tunnel comes up.
