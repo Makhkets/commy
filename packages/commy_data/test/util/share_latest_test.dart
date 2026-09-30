@@ -96,4 +96,57 @@ void main() {
 
     expect(done, equals(<String>['a', 'b']));
   });
+
+  test('a paused listener gets only the newest value when it resumes',
+      () async {
+    // Riverpod pauses a provider nobody watches. Queued behind the pause,
+    // "measure all" over a hundred servers was a hundred whole lists, keys
+    // and all, replayed one after another when the screen came back.
+    final awake = shared.listen((_) {});
+    addTearDown(awake.cancel);
+    final values = <int>[];
+    final sleeper = shared.listen(values.add);
+    addTearDown(sleeper.cancel);
+    opened.single.add(1);
+    await pumpEventQueue();
+
+    sleeper.pause();
+    for (var i = 2; i <= 100; i++) {
+      opened.single.add(i);
+    }
+    await pumpEventQueue();
+    sleeper.resume();
+    await pumpEventQueue();
+
+    expect(values, equals(<int>[1, 100]));
+  });
+
+  test('the source is paused while every listener is', () async {
+    final only = shared.listen((_) {});
+    addTearDown(only.cancel);
+    await pumpEventQueue();
+
+    only.pause();
+    await pumpEventQueue();
+    expect(opened.single.isPaused, isTrue);
+
+    only.resume();
+    await pumpEventQueue();
+    expect(opened.single.isPaused, isFalse);
+  });
+
+  test('a resume with nothing new sends nothing', () async {
+    final values = <int>[];
+    final only = shared.listen(values.add);
+    addTearDown(only.cancel);
+    opened.single.add(1);
+    await pumpEventQueue();
+
+    only.pause();
+    await pumpEventQueue();
+    only.resume();
+    await pumpEventQueue();
+
+    expect(values, equals(<int>[1]));
+  });
 }
