@@ -38,6 +38,14 @@ class HttpTransportError {
   /// The body was larger than we are willing to hold in memory.
   static const String kindTooLarge = 'too_large';
 
+  /// A redirect that was not followed: a loop, no usable `Location`, or a
+  /// scheme other than http and https.
+  static const String kindRedirect = 'redirect';
+
+  /// A redirect from https to plain http. Refused, never followed: the
+  /// request path and the answer would cross the network in the clear.
+  static const String kindInsecureRedirect = 'insecure_redirect';
+
   /// One of the `kind*` constants.
   final String kind;
 

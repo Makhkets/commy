@@ -607,6 +607,10 @@
       "message": "The subscription server's certificate was not accepted: it is expired, self-signed or issued for another name. Check the date and time on this device; if they are right, it is for whoever runs the panel to fix.",
       "action": "Open the logs"
     },
+    "subscriptionInsecureRedirect": {
+      "message": "The subscription server redirected to an unencrypted (http) address. Commy does not follow it: the link and the servers would cross the network in the clear.",
+      "action": "Open the logs"
+    },
     "subscriptionMalformed": {
       "message": "The subscription response could not be read",
       "action": "Open the logs"

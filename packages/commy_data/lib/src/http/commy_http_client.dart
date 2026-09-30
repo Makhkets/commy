@@ -76,7 +76,14 @@ class CommyHttpClient {
   ///
   /// Panels redirect: `/sub/token` to a CDN, http to https, a short link to the
   /// real one. Five is plenty and stops a redirect loop from hanging the app.
+  ///
+  /// They are followed here, hop by hop, not by `dart:io`: it copies every
+  /// header but the credentials it knows about to wherever `Location` points,
+  /// and it follows https to plain http without a word.
   static const int defaultMaxRedirects = 5;
+
+  /// Statuses that send the request on to `Location`, as `dart:io` has them.
+  static const Set<int> redirectStatuses = <int>{301, 302, 303, 307, 308};
 
   /// Largest body we are willing to hold in memory.
   ///
@@ -126,6 +133,11 @@ class CommyHttpClient {
   /// [throughTunnel] has no default here for the same reason it has none on
   /// `SubscriptionFetcher`: which side of the tunnel a request leaves on is a
   /// decision worth writing down at every call site.
+  ///
+  /// [extraHeaders] go to the host of [url] and to no other. They are the
+  /// device identity (ADR-0009), promised to the subscription's host only: a
+  /// redirect to another host — a CDN, a mirror, where a short link points —
+  /// is followed without them.
   Future<Result<HttpTextResponse, CommyFailure>> fetchText(
     Uri url, {
     required bool throughTunnel,
@@ -147,8 +159,8 @@ class CommyHttpClient {
       headers: <String, String>{
         HttpHeaders.userAgentHeader: userAgentOverride ?? userAgent,
         HttpHeaders.acceptHeader: '*/*',
-        ...extraHeaders,
       },
+      hostOnlyHeaders: extraHeaders,
       cancelToken: cancelToken,
     );
     return fetched.map(
@@ -209,30 +221,34 @@ class CommyHttpClient {
     _proxied = null;
   }
 
-  /// One GET of [url], the body read under the cap, within [totalTimeout].
+  /// One GET of [url], redirects and all, the body read under the cap,
+  /// within [totalTimeout].
   ///
-  /// The request gets a token of its own, so that the deadline and the cap
-  /// can stop it without touching [cancelToken], which belongs to the caller
-  /// — and a caller that cancels still stops it.
+  /// Each hop gets a token of its own, so that the deadline and the cap can
+  /// stop it without touching [cancelToken], which belongs to the caller — and
+  /// a caller that cancels still stops it. [hostOnlyHeaders] are sent to the
+  /// host of [url] only.
   Future<Result<_Fetched, CommyFailure>> _get(
     Uri url, {
     required bool throughTunnel,
     required Map<String, String> headers,
+    Map<String, String> hostOnlyHeaders = const <String, String>{},
     CancelToken? cancelToken,
   }) {
-    final token = CancelToken();
+    final hops = _HopTokens();
     if (cancelToken != null) {
-      unawaited(cancelToken.whenCancel.then((_) => token.cancel()));
+      unawaited(cancelToken.whenCancel.then((_) => hops.abandon()));
     }
-    return _read(
+    return _follow(
       url,
       throughTunnel: throughTunnel,
       headers: headers,
-      token: token,
+      hostOnlyHeaders: hostOnlyHeaders,
+      hops: hops,
     ).timeout(
       totalTimeout,
       onTimeout: () {
-        token.cancel();
+        hops.abandon();
         return Err<_Fetched, CommyFailure>(
           NetworkFailureMapper.deadline(url, totalTimeout),
         );
@@ -240,8 +256,77 @@ class CommyHttpClient {
     );
   }
 
+  Future<Result<_Fetched, CommyFailure>> _follow(
+    Uri url, {
+    required bool throughTunnel,
+    required Map<String, String> headers,
+    required Map<String, String> hostOnlyHeaders,
+    required _HopTokens hops,
+  }) async {
+    var target = url;
+    for (var redirects = 0;; redirects++) {
+      final fetched = await _read(
+        target,
+        origin: url,
+        throughTunnel: throughTunnel,
+        headers: <String, String>{
+          ...headers,
+          if (_sameHost(target, url)) ...hostOnlyHeaders,
+        },
+        token: hops.next(),
+      );
+      final location = fetched.valueOrNull?.location;
+      if (location == null) {
+        return fetched;
+      }
+      if (redirects >= maxRedirects) {
+        return Err<_Fetched, CommyFailure>(
+          NetworkFailureMapper.redirectRefused(
+            url,
+            'more than $maxRedirects redirects',
+          ),
+        );
+      }
+      final next = Uri.tryParse(location);
+      final resolved = next == null ? null : target.resolveUri(next);
+      final scheme = resolved?.scheme.toLowerCase() ?? '';
+      if (resolved == null ||
+          !allowedSchemes.contains(scheme) ||
+          resolved.host.isEmpty) {
+        return Err<_Fetched, CommyFailure>(
+          NetworkFailureMapper.redirectRefused(
+            url,
+            'unusable Location${scheme.isEmpty ? '' : ' ($scheme)'}',
+          ),
+        );
+      }
+      // Once a fetch is encrypted it stays so. Past such a hop the request
+      // path — a subscription token — and the answer — a list of
+      // credentials — would cross the network in the clear, on the say-so of
+      // one response header. A user who wants plain http can type it.
+      if (target.scheme.toLowerCase() == 'https' && scheme == 'http') {
+        return Err<_Fetched, CommyFailure>(
+          NetworkFailureMapper.insecureRedirect(url),
+        );
+      }
+      target = resolved;
+    }
+  }
+
+  /// Whether [a] and [b] name the same host.
+  ///
+  /// Exactly the same: a subdomain is another host the user did not type,
+  /// and a port is not a host.
+  static bool _sameHost(Uri a, Uri b) =>
+      a.host.toLowerCase() == b.host.toLowerCase();
+
+  /// One request to [url], the body read under the cap unless it redirects.
+  ///
+  /// Failures name [origin], the address the caller asked for, whichever hop
+  /// they happened on.
   Future<Result<_Fetched, CommyFailure>> _read(
     Uri url, {
+    required Uri origin,
     required bool throughTunnel,
     required Map<String, String> headers,
     required CancelToken token,
@@ -255,42 +340,62 @@ class CommyHttpClient {
           // once all of it is in memory, which is exactly what the cap is
           // there to prevent.
           responseType: ResponseType.stream,
-          followRedirects: true,
-          maxRedirects: maxRedirects,
+          // Followed by [_follow], which decides what the next hop is sent.
+          followRedirects: false,
           // Repeated per request, not just on the base options, so that an
           // injected `Dio` — a test double, or a future adapter — cannot end
           // up without a deadline and hang the refresh forever.
           sendTimeout: sendTimeout,
           receiveTimeout: receiveTimeout,
           headers: headers,
-          // 3xx is followed by dio itself; anything at or above 400 is an
-          // error we want to see as one.
+          // 3xx comes back to [_follow]; anything at or above 400 is an error
+          // we want to see as one.
           validateStatus: (status) => status != null && status < 400,
         ),
         cancelToken: token,
       );
+      final status = response.statusCode ?? 0;
+      if (redirectStatuses.contains(status)) {
+        final location =
+            response.headers[HttpHeaders.locationHeader]?.firstOrNull ?? '';
+        if (location.trim().isEmpty) {
+          return Err<_Fetched, CommyFailure>(
+            NetworkFailureMapper.redirectRefused(origin, 'no Location'),
+          );
+        }
+        // The body of a redirect is never read: the `finally` below stops it.
+        return Ok<_Fetched, CommyFailure>(
+          _Fetched(
+            statusCode: status,
+            bytes: Uint8List(0),
+            headers: response.headers,
+            url: url,
+            location: location.trim(),
+          ),
+        );
+      }
       final body = response.data;
       final bytes = body == null ? Uint8List(0) : await _capped(body, token);
       if (bytes == null) {
         return Err<_Fetched, CommyFailure>(
-          NetworkFailureMapper.tooLarge(url, maxBodyBytes),
+          NetworkFailureMapper.tooLarge(origin, maxBodyBytes),
         );
       }
       return Ok<_Fetched, CommyFailure>(
         _Fetched(
-          statusCode: response.statusCode ?? 0,
+          statusCode: status,
           bytes: bytes,
           headers: response.headers,
-          url: response.realUri,
+          url: url,
         ),
       );
     } on DioException catch (error) {
       return Err<_Fetched, CommyFailure>(
-        NetworkFailureMapper.fromDio(error, url),
+        NetworkFailureMapper.fromDio(error, origin),
       );
     } on Object catch (error) {
       return Err<_Fetched, CommyFailure>(
-        NetworkFailureMapper.fromError(error, url),
+        NetworkFailureMapper.fromError(error, origin),
       );
     } finally {
       // Whatever is still arriving — the body of an error status, which dio
@@ -350,8 +455,9 @@ class CommyHttpClient {
         connectTimeout: connectTimeout,
         receiveTimeout: receiveTimeout,
         sendTimeout: sendTimeout,
-        followRedirects: true,
-        maxRedirects: maxRedirects,
+        // Every request follows its redirects by hand (see [_follow]); a
+        // default of `true` here would only wait for a call that forgot.
+        followRedirects: false,
         responseType: ResponseType.plain,
         headers: <String, String>{
           HttpHeaders.userAgentHeader: userAgent,
@@ -376,10 +482,39 @@ class _Fetched {
     required this.bytes,
     required this.headers,
     required this.url,
+    this.location,
   });
 
   final int statusCode;
   final Uint8List bytes;
   final Headers headers;
+
+  /// The address this came from, after the redirects before it.
   final Uri url;
+
+  /// Where a redirect points, as the server wrote it; `null` for an answer.
+  final String? location;
+}
+
+/// The token of the request in flight, across the hops of one fetch.
+///
+/// Each hop gets a fresh token, because the one before it was cancelled to
+/// stop its body; giving up — the deadline, or the caller's own token — has
+/// to reach whichever hop is running at the time.
+class _HopTokens {
+  CancelToken _current = CancelToken();
+  bool _abandoned = false;
+
+  CancelToken next() {
+    _current = CancelToken();
+    if (_abandoned) {
+      _current.cancel();
+    }
+    return _current;
+  }
+
+  void abandon() {
+    _abandoned = true;
+    _current.cancel();
+  }
 }

@@ -78,6 +78,21 @@ class FailureText {
           action: FailureAction.openLogs,
           retryable: failure.retryable,
         ),
+      // Refused, not failed: the panel sent the fetch from https to plain
+      // http, where the token and the servers would travel in the clear.
+      // Retrying gets the same redirect; typing the http address is the
+      // user's own call to make.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindInsecureRedirect,
+        ),
+      ) =>
+        FailureText(
+          message: errors.subscriptionInsecureRedirect.message,
+          actionLabel: errors.subscriptionInsecureRedirect.action,
+          action: FailureAction.openLogs,
+          retryable: failure.retryable,
+        ),
       SubscriptionUnreachableFailure() => FailureText(
           message: errors.subscriptionUnreachable.message,
           actionLabel: errors.subscriptionUnreachable.action,

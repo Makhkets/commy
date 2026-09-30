@@ -72,6 +72,18 @@ void main() {
     });
   });
 
+  test('a refused https-to-http redirect says what was refused', () {
+    const cause = HttpTransportError(
+      kind: HttpTransportError.kindInsecureRedirect,
+    );
+    for (final t in <Translations>[ru, en]) {
+      final text = FailureText.of(unreachable(cause), t);
+      expect(text.message, t.error.subscriptionInsecureRedirect.message);
+      expect(text.message, isNot(t.error.subscriptionUnreachable.message));
+      expect(text.action, FailureAction.openLogs);
+    }
+  });
+
   test('a refused certificate is named, not called a silent server', () {
     // A self-signed panel or an expired certificate: "the server is not
     // answering" with a retry that gives the same answer every time.

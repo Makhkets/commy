@@ -126,6 +126,28 @@ abstract final class NetworkFailureMapper {
         ),
       );
 
+  /// The failure for a redirect that is not followed: a loop, a missing or
+  /// unreadable `Location`, a scheme we do not fetch.
+  ///
+  /// [detail] never holds the address — the `Location` is not repeated.
+  static CommyFailure redirectRefused(Uri url, String detail) =>
+      CommyFailure.subscriptionUnreachable(
+        url: url,
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindRedirect,
+          detail: detail,
+        ),
+      );
+
+  /// The failure for a redirect from https to plain http, which is refused.
+  static CommyFailure insecureRedirect(Uri url) =>
+      CommyFailure.subscriptionUnreachable(
+        url: url,
+        cause: const HttpTransportError(
+          kind: HttpTransportError.kindInsecureRedirect,
+        ),
+      );
+
   /// The failure for a body we refuse to load into memory.
   static CommyFailure tooLarge(Uri url, int limitBytes) =>
       CommyFailure.subscriptionUnreachable(
