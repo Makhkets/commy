@@ -12,6 +12,19 @@ void main() {
   const publicKey = 'aGVsbG8td29ybGQtcHVibGljLWtleQ';
 
   group('Redact.link', () {
+    test('an IPv6 server with no credential keeps its address', () {
+      // `Uri.host` drops the brackets, and a long dotless host used to read
+      // as an encoded blob and be blanked.
+      expect(
+        Redact.link('socks://[2001:db8:85a3::8a2e:370:7334]:1080#Home'),
+        'socks://[2001:db8:85a3::8a2e:370:7334]:1080#Home',
+      );
+      expect(
+        Redact.isOpaqueAuthority('socks', '2001:db8:85a3::8a2e:370:7334'),
+        isFalse,
+      );
+    });
+
     test('shows the node name the way the user typed it, not escaped', () {
       const link = 'vless://$uuid@nl-03.example.net:443'
           '?security=reality&pbk=$publicKey&sid=ab12cd34#Amsterdam%2003';
