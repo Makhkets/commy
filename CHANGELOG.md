@@ -10,129 +10,38 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
-- **The network core is built with Go 1.26.8.** It was built with Go 1.24.7:
-  a release line that no longer receives security fixes, for the code that
-  carries every connection. The build no longer lays its sing-box edits over
-  the module cache (which Go 1.25 forbids) but applies them to copies of the
-  modules; what the core does is unchanged.
-- **Imports that used to fail now work:** Xray JSON subscriptions from
-  Marzban, Remnawave and 3x-ui (servers named after the panel's remarks, not
-  "proxy"); WireGuard from sing-box configs, WARP included, in both the
-  endpoint and the older outbound form; Hysteria 2 links with a port list in
-  the address or no port at all; `ss://` links whose base64 part is
-  percent-encoded, as v2rayN shares them; servers using TCP with HTTP
-  camouflage (the TLS form of it, which the core cannot run, is refused with a
-  reason). Servers using Xray's VLESS Encryption are refused at import with a
-  reason instead of importing and never connecting. XHTTP servers given by a
-  bare IPv6 address connect.
-- **Routing:** with FakeIP on, `geoip` and IP rules such as `geoip:ru` →
-  Direct match again, and sites no longer fail on servers without IPv6 when
-  DNS prefers IPv6. A rule with a typo, a bad regex or a dash port range no
-  longer stops every server from connecting; `port_range:1000-2000` works.
-  The New rule sheet refuses a condition the app cannot understand, such as a
-  whole URL. A WireGuard server whose reserved value is not three numbers
-  costs only itself.
-- **Subscriptions:** renaming, collapsing or switching auto refresh while a
-  refresh runs now sticks, and the menu no longer stops the spinner or lets a
-  second refresh start. A refresh tap turned away while another subscription
-  refreshes says so. A panel's multi-line message shows every line. A server
-  that is in two subscriptions, or also added by hand, stays in both. A
-  change made while the keystore could not be read no longer destroys the
-  subscription's link.
-- **Privacy:** exported and copied logs replace your own servers' addresses
-  with `[server]`, as the save sheet promises; the import preview and the
-  logs no longer show the encoded body of `vmess://` and old-style `ss://`
-  links, which held the password.
-- **Screens:** the QR scanner reads codes again after a retry; "Show the
-  config" after a refused connection shows what was refused and why, and
-  Diagnostics → Config no longer calls a failed switch or check a refused
-  configuration; a collapsed subscription card still shows the "Measure all"
-  progress and the panel's message; long hints and errors under fields wrap.
-- **Android:** opening or sharing a config file with Commy opens the import
-  sheet with it; reopening Commy from Recents no longer reconnects after you
-  disconnected or reopens the import sheet for a link already imported; the
-  Quick Settings tile cancels a connection that is still starting; the app
-  list in Settings → Apps loads without freezing the screen; disconnecting
-  during a connection check no longer leaves the check hanging.
-- **Tapping the button while it says "Connecting…" cancels**, as promised: it
-  used to do nothing until the core answered, up to half a minute.
-- A change made while the previous one was still being applied to the tunnel
-  is no longer lost; one more pass applies it.
-- A rule set downloaded while the tunnel is up is applied at once, not at the
-  next connect.
-- On Auto, tapping a server added mid-session really switches to it — the
-  rebuilt tunnel used to keep going through Auto's pick while the list marked
-  the tapped server.
-- Deleting the subscription the tunnel runs on stops the tunnel and clears the
-  choice, as deleting that server does; a choice that no longer exists no
-  longer fails the next connect — the first server is used instead.
-- A check that comes back after its tunnel was disconnected says nothing,
-  instead of "check failed" over an idle screen.
-- **The local proxy of the IP check asks for a password.** With the IP check
-  on, the app kept a proxy open on `127.0.0.1` for the whole session, and any
-  other app on the phone could find it by scanning and learn through it where
-  the tunnel comes out. It now accepts only the app itself.
-- **"Add to Happ" and "Import to sing-box" buttons work.** A panel's
-  subscription page links to other clients (`happ://add/…`,
-  `sing-box://import-remote-profile?url=…`, `clash://install-config?url=…`,
-  `sn://subscription?url=…`); Commy opened on the tap and then failed to read
-  the link. The subscription inside is now added, with the name the link
-  gives it. Encrypted Happ links still cannot be opened by anyone but Happ.
-- **A subscription refresh no longer loses servers that share an address.**
-  Several servers on one host and port — a WebSocket path each, a common
-  panel layout — could be merged into one when the panel reordered them or
-  added one in front, and the other server vanished with its credentials.
-- Android: **a settings change the core refuses no longer kills a running
-  tunnel.** Applying routing or DNS to a live tunnel used to stop the running
-  core before building the new one, so a refused document left no tunnel
-  while the app still said Connected. It is now checked first; the tunnel
-  keeps running on what it had, and the error is shown.
-- Android: "Only these apps" with none of the chosen apps installed any more
-  used to put **every** app in the tunnel — the platform reads an empty
-  allow list as all apps. The tunnel now refuses to start and says why.
-- **The subscription token no longer sits in the open database** on
-  Marzban-family panels. Their `profile-web-page-url` is the subscription
-  address itself, token included, and it was stored as a plain column. It now
-  lives in the encrypted store beside the subscription URL, and a copy an
-  earlier build wrote is moved there on the first start.
-- **DNS.** A direct resolver given by name (`https://dns.google/dns-query`,
-  `tls://dns.quad9.net`) no longer stops the tunnel from starting — it finds
-  its own server through the system resolver, as the core requires. And the
-  resolver through the tunnel can no longer be `local`: the system resolver
-  answers outside the tunnel, so every proxied name would have been looked up
-  in the clear. The DNS screen refuses it and says why.
-- **One server's odd setting no longer stops all of them** (the rest of the
-  class fixed for TLS in alpha.11). A VLESS flow the core does not know, a
-  Shadowsocks cipher or plugin it does not have, a Shadowsocks 2022 key of the
-  wrong length, a Hysteria 2 port hop written as a single port, obfuscation
-  without a password, a WireGuard address without its prefix — each used to
-  make the core refuse the whole configuration. What means something the core
-  knows is now written the way it reads it (Xray's `xtls-rprx-vision-udp443`
-  is vision, `simple-obfs` is `obfs-local`, `chacha20-poly1305` is
-  `chacha20-ietf-poly1305`, port `443` is `443:443`, `10.0.0.2` is
-  `10.0.0.2/32`); the rest leaves that one server out, with the reason in the
-  log.
-- **`geoip:` rules work.** The default source asked for geoip lists in the
-  repository that publishes only geosite lists, so every download of one
-  answered 404 and every `geoip:` rule stayed unapplied. The address template
-  gains a `{kind}` placeholder (`geoip` or `geosite`), the default uses it, and
-  a stored copy of the old default is read as the new one. A mirror you typed
-  yourself is left as it is.
-- **Rules that need a rule set apply from the first connect.** Right after
-  the app started, the first connect — autoconnect included — was built before
-  the list of downloaded rule sets had loaded, and went up without every
-  `geosite:`/`geoip:` rule and without the ad list, until something opened the
-  settings. A rule set downloaded in the background was likewise missed until
-  then.
-- Small things on screen: "Scan a QR code" now shows a QR code rather than a
-  magnifying glass; Settings → Routing reads "Rule-based · 3 rules" instead
-  of "Rules · Rules: 3"; the DNS row on the routing screen says "Both, IPv4
-  first" rather than the core's `prefer_ipv4`, and a value too long to sit
-  beside its title moves under it instead of being cut off; the server
-  order sheet is a choice of three rather than three rows with arrows;
-  Appearance no longer promises a text size setting it does not have; the
-  "Network silence" title no longer runs off the panel at the largest
-  system font.
+## [0.1.0-alpha.12]
+
+Installs over alpha.11.
+
+- **One odd server or rule no longer takes the tunnel down.** A VLESS flow, a
+  Shadowsocks cipher or plugin, a Hysteria 2 port, a WireGuard address, a
+  routing rule with a typo: each now costs only itself.
+  `port_range:1000-2000` works.
+- **Rules that need rule sets apply from the first connect**, and `geoip:`
+  lists download at all (they used to answer 404). With FakeIP on, `geoip` and
+  IP rules match again.
+- **More subscriptions import:** Xray JSON (Marzban, Remnawave, 3x-ui),
+  WireGuard and WARP from sing-box configs, Hysteria 2 port lists, v2rayN-style
+  `ss://`, TCP with HTTP camouflage. The "Add to Happ" and "Import to
+  sing-box" buttons on a panel's page open straight into Commy.
+- **Privacy.** The IP check's local proxy now asks for a password, so other
+  apps can no longer use it to learn where the tunnel comes out. On
+  Marzban-family panels the subscription token no longer sits in the open
+  database. Exported logs hide your servers' addresses and the passwords
+  inside `vmess://` and `ss://` links.
+- **DNS.** A direct resolver given by name works. The resolver through the
+  tunnel can no longer be the system one, which leaked every name.
+- **The tunnel.** "Cancel" while connecting works. A change applied to a live
+  tunnel is never lost, and one the core refuses no longer kills the tunnel.
+  Deleting the subscription the tunnel runs on stops it cleanly.
+- **The core is built with Go 1.26.8.** It was 1.24.7, a line without
+  security fixes. Its uTLS, DNS and x/net libraries are updated too.
+- Smaller fixes: edits made to a subscription during a refresh stick, a
+  panel's multi-line message shows in full, the QR scanner works after a
+  retry, opening a config file imports it, reopening from Recents does not
+  reconnect, the Quick Settings tile cancels a start, and a dozen small
+  screen fixes.
 
 ## [0.1.0-alpha.11]
 
@@ -828,7 +737,8 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.11...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.12...main
+[0.1.0-alpha.12]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.12
 [0.1.0-alpha.11]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.11
 [0.1.0-alpha.10]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.10
 [0.1.0-alpha.9]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.9
