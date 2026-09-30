@@ -222,7 +222,7 @@ dependencies {
     // The sing-box core. Produced by scripts/build_core.sh, not by Gradle.
     implementation(files("libs/libbox.aar"))
 
-    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // JVM unit tests of the tunnel's decisions (src/test). Test-only: none of
