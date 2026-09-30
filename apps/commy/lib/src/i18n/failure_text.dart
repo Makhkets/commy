@@ -65,6 +65,19 @@ class FailureText {
           action: FailureAction.retry,
           retryable: failure.retryable,
         ),
+      // A certificate the platform refused is not a server that is silent,
+      // and retrying the same handshake gives the same answer. The two causes
+      // the user can tell apart are the device clock and the panel itself;
+      // the logs carry the platform's own reason.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(kind: HttpTransportError.kindCertificate),
+      ) =>
+        FailureText(
+          message: errors.subscriptionCertificate.message,
+          actionLabel: errors.subscriptionCertificate.action,
+          action: FailureAction.openLogs,
+          retryable: failure.retryable,
+        ),
       SubscriptionUnreachableFailure() => FailureText(
           message: errors.subscriptionUnreachable.message,
           actionLabel: errors.subscriptionUnreachable.action,

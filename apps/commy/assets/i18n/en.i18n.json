@@ -602,6 +602,10 @@
       "message": "The subscription server is having trouble: HTTP ${status}. That is on its side — try again later.",
       "action": "Retry"
     },
+    "subscriptionCertificate": {
+      "message": "The subscription server's certificate was not accepted: it is expired, self-signed or issued for another name. Check the date and time on this device; if they are right, it is for whoever runs the panel to fix.",
+      "action": "Open the logs"
+    },
     "subscriptionMalformed": {
       "message": "The subscription response could not be read",
       "action": "Open the logs"

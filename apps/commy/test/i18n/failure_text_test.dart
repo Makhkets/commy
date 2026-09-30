@@ -71,4 +71,22 @@ void main() {
       }
     });
   });
+
+  test('a refused certificate is named, not called a silent server', () {
+    // A self-signed panel or an expired certificate: "the server is not
+    // answering" with a retry that gives the same answer every time.
+    const cause = HttpTransportError(
+      kind: HttpTransportError.kindCertificate,
+      detail: 'CERTIFICATE_VERIFY_FAILED: certificate has expired',
+    );
+    for (final t in <Translations>[ru, en]) {
+      final text = FailureText.of(unreachable(cause), t);
+      expect(text.message, isNot(t.error.subscriptionUnreachable.message));
+      expect(text.message, t.error.subscriptionCertificate.message);
+      expect(text.actionLabel, t.error.subscriptionCertificate.action);
+      // The platform's own reason is in the log line, and it is the one
+      // thing that tells an expired certificate from a wrong device clock.
+      expect(text.action, FailureAction.openLogs);
+    }
+  });
 }
