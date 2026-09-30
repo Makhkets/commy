@@ -10,6 +10,45 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **Imports that used to fail now work:** Xray JSON subscriptions from
+  Marzban, Remnawave and 3x-ui (servers named after the panel's remarks, not
+  "proxy"); WireGuard from sing-box configs, WARP included, in both the
+  endpoint and the older outbound form; Hysteria 2 links with a port list in
+  the address or no port at all; `ss://` links whose base64 part is
+  percent-encoded, as v2rayN shares them; servers using TCP with HTTP
+  camouflage (the TLS form of it, which the core cannot run, is refused with a
+  reason). Servers using Xray's VLESS Encryption are refused at import with a
+  reason instead of importing and never connecting. XHTTP servers given by a
+  bare IPv6 address connect.
+- **Routing:** with FakeIP on, `geoip` and IP rules such as `geoip:ru` →
+  Direct match again, and sites no longer fail on servers without IPv6 when
+  DNS prefers IPv6. A rule with a typo, a bad regex or a dash port range no
+  longer stops every server from connecting; `port_range:1000-2000` works.
+  The New rule sheet refuses a condition the app cannot understand, such as a
+  whole URL. A WireGuard server whose reserved value is not three numbers
+  costs only itself.
+- **Subscriptions:** renaming, collapsing or switching auto refresh while a
+  refresh runs now sticks, and the menu no longer stops the spinner or lets a
+  second refresh start. A refresh tap turned away while another subscription
+  refreshes says so. A panel's multi-line message shows every line. A server
+  that is in two subscriptions, or also added by hand, stays in both. A
+  change made while the keystore could not be read no longer destroys the
+  subscription's link.
+- **Privacy:** exported and copied logs replace your own servers' addresses
+  with `[server]`, as the save sheet promises; the import preview and the
+  logs no longer show the encoded body of `vmess://` and old-style `ss://`
+  links, which held the password.
+- **Screens:** the QR scanner reads codes again after a retry; "Show the
+  config" after a refused connection shows what was refused and why, and
+  Diagnostics → Config no longer calls a failed switch or check a refused
+  configuration; a collapsed subscription card still shows the "Measure all"
+  progress and the panel's message; long hints and errors under fields wrap.
+- **Android:** opening or sharing a config file with Commy opens the import
+  sheet with it; reopening Commy from Recents no longer reconnects after you
+  disconnected or reopens the import sheet for a link already imported; the
+  Quick Settings tile cancels a connection that is still starting; the app
+  list in Settings → Apps loads without freezing the screen; disconnecting
+  during a connection check no longer leaves the check hanging.
 - **Tapping the button while it says "Connecting…" cancels**, as promised: it
   used to do nothing until the core answered, up to half a minute.
 - A change made while the previous one was still being applied to the tunnel
