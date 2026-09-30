@@ -46,12 +46,12 @@ class HttpLinkParser implements NodeLinkParser {
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'http:// proxy link carries no server port',
       );
     }
     if (link.path.isNotEmpty && link.path != '/') {
-      throw const LinkFormatException(
+      throw const LinkFormatException.notALink(
         'Looks like a subscription address, not an HTTP proxy',
       );
     }

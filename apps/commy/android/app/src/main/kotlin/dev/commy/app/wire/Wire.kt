@@ -43,7 +43,7 @@ internal object Wire {
     }
 
     /**
-     * Method names on [Channels.METHOD]. Seven for the tunnel, and six that are not.
+     * Method names on [Channels.METHOD]. Seven for the tunnel, and seven that are not.
      *
      * [OPEN_VPN_SETTINGS] is not a tunnel command and does not belong to the
      * seven. It is here because the only honest kill switch on Android is the
@@ -55,6 +55,10 @@ internal object Wire {
      * [SET_START_ON_BOOT] is the other one. The "connect on boot" switch is a
      * stored setting on the Dart side and a manifest component on this side,
      * and this method is the only thing that keeps the two in agreement.
+     *
+     * [SET_LOCALE] is of the same kind: the language chosen in the app is a
+     * stored setting on the Dart side, and the notification and the tile,
+     * drawn without Flutter, have to read it from this side.
      *
      * [INSTALLED_APPS] is the third. Per-app routing is stored and generated
      * entirely on the Dart side, but only this side can say which apps exist.
@@ -78,6 +82,7 @@ internal object Wire {
         const val VERSION = "version"
         const val OPEN_VPN_SETTINGS = "openVpnSettings"
         const val SET_START_ON_BOOT = "setStartOnBoot"
+        const val SET_LOCALE = "setLocale"
         const val INSTALLED_APPS = "installedApps"
         const val DEVICE_INFO = "deviceInfo"
         const val PROBE_OUTBOUNDS = "probeOutbounds"

@@ -11,7 +11,7 @@
     <string name="app_name" translatable="false">Commy</string>
 
     <string name="notification_channel_tunnel">Tunnel</string>
-    <string name="notification_channel_tunnel_description">Shows the tunnel state while it is running. Turning this off stops the tunnel from staying up in the background.</string>
+    <string name="notification_channel_tunnel_description">Shows the tunnel state while it is up, with a Disconnect button. Turn these off and the tunnel keeps running, just without them.</string>
     <string name="notification_channel_core">Core messages</string>
     <string name="notification_channel_alerts">Tunnel alerts</string>
     <string name="notification_channel_alerts_description">When the tunnel is not up and should be: after a restart, or when it stopped on its own.</string>

@@ -17,12 +17,24 @@ on:
         description: Tag to build (must already exist)
         required: true
 
+# Read-only unless a job says otherwise, and only `publish` does. The android
+# job runs third-party actions, Gradle plugins and the build steps of pub
+# packages next to the release key; a token that can push to the repository
+# and edit releases has no business there. Third-party actions are pinned to
+# a commit for the same reason (docs/08, "Кто видит ключ").
 permissions:
-  contents: write
+  contents: read
 
 env:
   FLUTTER_VERSION: 3.44.8
   NDK_VERSION: 28.0.13004108
+  # The tag being released, resolved once and used for everything: what is
+  # checked out, what the files are called, which CHANGELOG section becomes
+  # the notes, and which release they go to. A manual run takes it from the
+  # input, not from the ref the run was started from: that ref is a branch
+  # whenever this file had to be fixed after the tag was pushed, and a branch
+  # name is neither a version nor something a release can hang on.
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   android:
@@ -32,10 +44,37 @@ jobs:
       signed: ${{ steps.signing.outputs.signed }}
       certificate: ${{ steps.certificate.outputs.sha256 }}
     steps:
+      # persist-credentials: false, or the token stays in .git/config for
+      # every later step to read. Nothing here fetches or pushes after this.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
+          persist-credentials: false
+
+      # Before anything is built. The file on the releases page is named after
+      # the tag, but the version inside the app — in About, in backups, in the
+      # User-Agent every panel sees — and its versionCode come from `version:`
+      # in pubspec.yaml, and the notes from CHANGELOG.md. A tag pushed one
+      # commit early would ship commy-X.apk that calls itself W, with notes
+      # that say only "see the changelog". Seconds here, not half an hour on.
+      - name: Check the tag against pubspec.yaml and CHANGELOG.md
+        run: |
+          v="${TAG#v}"
+          if [ "$v" = "$TAG" ]; then
+            echo "::error::$TAG is not a version tag (vX.Y.Z)"
+            exit 1
+          fi
+          pv="$(sed -n 's/^version: *//p' apps/commy/pubspec.yaml)"
+          if [ "${pv%%+*}" != "$v" ]; then
+            echo "::error::the tag is $TAG, but apps/commy/pubspec.yaml says version: $pv"
+            exit 1
+          fi
+          if ! awk -v ver="## [$v]" 'index($0, ver) == 1 {found=1} END {exit !found}' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no \"## [$v]\" section to take the notes from"
+            exit 1
+          fi
+          echo "ok: $TAG is version $pv, with notes"
 
       - uses: actions/setup-java@v6
         with:
@@ -43,7 +82,7 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -54,7 +93,7 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
 
       - name: Install NDK
         run: sdkmanager --install "ndk;${NDK_VERSION}"
@@ -64,6 +103,16 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
         run: scripts/build_core.sh android
 
+      - run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
+      - run: melos run gen --no-select
+
+      # Only now, with codegen done: `melos bootstrap` and build_runner run
+      # code from pub packages, and none of it needs the key. From here the
+      # key is on disk for the two Gradle builds, and is removed after them.
       - name: Set up signing
         id: signing
         env:
@@ -88,13 +137,6 @@ jobs:
           EOF
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      - run: |
-          dart pub get
-          dart pub global activate melos 6.3.3
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-      - run: melos bootstrap
-      - run: melos run gen --no-select
-
       # The bundle goes first, and the order is load-bearing. ABI splits and app
       # bundles cannot both be on: with resource shrinking enabled R8 writes one
       # shrunk-resources file per split, and `bundleRelease` then finds four
@@ -113,6 +155,13 @@ jobs:
       - name: Build the APK
         working-directory: apps/commy
         run: flutter build apk --release --target-platform android-arm,android-arm64
+
+      # Nothing after this needs the key: the certificate is read back from the
+      # APK. `always()`, so that a failed build does not leave it on disk for
+      # what still runs after it, the actions' post-steps included.
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/commy.jks" apps/commy/android/key.properties
 
       # Before anything is collected: a release that outgrew its budget should
       # fail here, with the largest entries listed, not on somebody's phone.
@@ -143,7 +192,7 @@ jobs:
       - name: Collect and checksum
         run: |
           mkdir -p dist
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           suffix=""
           [ "${{ steps.signing.outputs.signed }}" = "true" ] || suffix="-UNSIGNED"
           out=apps/commy/build/app/outputs
@@ -170,7 +219,7 @@ jobs:
       - name: Collect what is not for end users
         run: |
           mkdir -p extras
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           out=apps/commy/build/app/outputs
           [ -f "$out/bundle/release/app-release.aab" ] && \
             cp "$out/bundle/release/app-release.aab" "extras/commy-${v}.aab"
@@ -192,10 +241,19 @@ jobs:
     name: Publish release
     needs: android
     runs-on: ubuntu-latest
+    # The one job that writes: it creates the release and uploads to it. The
+    # release action gets the token as its own input, so the checkout does
+    # not need to leave it behind.
+    permissions:
+      contents: write
     steps:
+      # The tag, not the ref of the run: the notes are the CHANGELOG of the
+      # version being released.
       - uses: actions/checkout@v7
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/download-artifact@v8
         with:
@@ -205,7 +263,7 @@ jobs:
       - name: Extract the notes for this version from CHANGELOG.md
         id: notes
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           {
             if [ -f CHANGELOG.md ] && grep -q "## \[$v\]" CHANGELOG.md; then
               # A literal match, not a regex: awk turns "\\[" into "[", and
@@ -233,10 +291,13 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
-      - uses: softprops/action-gh-release@v3
+      # Named explicitly: left to itself the action takes github.ref, which on
+      # a manual run is the branch it was started from.
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
+          tag_name: ${{ env.TAG }}
           files: dist/*
           body_path: release-notes.md
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(env.TAG, '-') }}
           fail_on_unmatched_files: true

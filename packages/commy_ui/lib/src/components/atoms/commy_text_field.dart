@@ -198,19 +198,26 @@ class CommyTextField extends StatelessWidget {
     if (label == null) {
       return field;
     }
-    return Column(
-      // Without this the labelled field claims infinite height the moment it
-      // is placed in another Column, which is where a form always puts it.
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          label,
-          style: type.captionStrong.copyWith(color: colors.textSecondary),
-        ),
-        SizedBox(height: spacing.s1),
-        field,
-      ],
+    // One node for the label and the field, so the label is the field's
+    // name. Drawn as a sibling above it, the label was a node of its own, and
+    // a field without a hint was announced as a bare "edit box": the backup
+    // password and its repeat, both focused straight away, sounded the same.
+    return MergeSemantics(
+      child: Column(
+        // Without this the labelled field claims infinite height the moment
+        // it is placed in another Column, which is where a form always puts
+        // it.
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: type.captionStrong.copyWith(color: colors.textSecondary),
+          ),
+          SizedBox(height: spacing.s1),
+          field,
+        ],
+      ),
     );
   }
 }

@@ -40,7 +40,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * libbox wants one `CommandClient` per subscription, so there are four — status,
  * logs, groups, connections — each with its own handler. They also carry the
  * two commands that go the other way, `selectOutbound` and `urlTest`, because
- * both are client calls rather than server ones.
+ * both are client calls rather than server ones. The connections client is
+ * open only while the Connections tab reads it ([OnDemandStream]).
  */
 internal class CoreEventBridge(
     private val scope: CoroutineScope,
@@ -77,6 +78,12 @@ internal class CoreEventBridge(
     private var connectionsDirty = false
     private var connectionsJob: Job? = null
 
+    private val connectionsDemand = OnDemandStream(
+        open = ::openConnections,
+        close = ::closeConnections,
+    )
+    private var demandJob: Job? = null
+
     @Volatile
     private var lastGroups: List<GroupSnapshot> = emptyList()
 
@@ -99,10 +106,6 @@ internal class CoreEventBridge(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    /** The outbound the main group points at, for the notification. */
-    val selectedNode: String?
-        get() = lastGroups.firstOrNull { it.selected != null }?.selected
-
     /**
      * Subscribes to the status stream, which is the one to open before the
      * core starts: libbox serves it in any state, and its end is how a core
@@ -113,8 +116,8 @@ internal class CoreEventBridge(
     }
 
     /**
-     * Subscribes to logs, groups and connections. Only once the service has
-     * started.
+     * Subscribes to logs and groups, and to connections whenever they are
+     * read. Only once the service has started.
      *
      * libbox refuses all three while the service is idle, each in its own way
      * (`daemon/started_service.go`, v1.13.16): the log stream opens with
@@ -134,11 +137,9 @@ internal class CoreEventBridge(
     suspend fun startStreams() {
         open(Libbox.CommandLog, LogHandler())
         groupClient = open(Libbox.CommandGroup, GroupHandler(groupGeneration.incrementAndGet()))
-        connectionsClient = open(
-            Libbox.CommandConnections,
-            ConnectionHandler(connectionsGeneration.incrementAndGet()),
-        )
-        startConnectionTicker()
+        demandJob = scope.launch {
+            connectionsDemand.follow(TunnelController.connectionsWanted)
+        }
     }
 
     /** Reads the log level out of the config the core is about to run. */
@@ -148,6 +149,8 @@ internal class CoreEventBridge(
 
     fun close() {
         closing.set(true)
+        demandJob?.cancel()
+        demandJob = null
         connectionsJob?.cancel()
         connectionsJob = null
         val all = synchronized(clients) { clients.toList().also { clients.clear() } }
@@ -157,7 +160,15 @@ internal class CoreEventBridge(
         statusClient = null
         groupClient = null
         connectionsClient = null
-        synchronized(connections) { connections.clear() }
+        // A tunnel that is down has nothing open. Said out loud, or the
+        // Connections tab goes on listing the last table next to
+        // "Disconnected". Under the lock the ticker emits under, after
+        // `closing` is set: a tick that took its snapshot a moment ago cannot
+        // put the old table back over this one.
+        synchronized(connections) {
+            connections.clear()
+            TunnelController.emitConnections(CoreSnapshots.NO_CONNECTIONS)
+        }
     }
 
     /** `getStartedAt`, or null when the core has not told us. */
@@ -281,6 +292,30 @@ internal class CoreEventBridge(
         }
     }
 
+    /** Opens the connections subscription, for [connectionsDemand]. */
+    private suspend fun openConnections() {
+        connectionsClient = open(
+            Libbox.CommandConnections,
+            ConnectionHandler(connectionsGeneration.incrementAndGet()),
+        )
+        startConnectionTicker()
+    }
+
+    /** Lets the connections subscription go, for [connectionsDemand]. */
+    private fun closeConnections() {
+        // The generation moves first, so the handler let go of here does not
+        // take the end of its stream for a reason to subscribe again.
+        connectionsGeneration.incrementAndGet()
+        release(connectionsClient)
+        connectionsClient = null
+        connectionsJob?.cancel()
+        connectionsJob = null
+        synchronized(connections) {
+            connections.clear()
+            connectionsDirty = false
+        }
+    }
+
     /**
      * Publishes the connection snapshot at most once a second.
      *
@@ -300,9 +335,15 @@ internal class CoreEventBridge(
                     }
                     connectionsDirty = false
                     connections.values.toList()
-                }
-                if (snapshot != null) {
-                    TunnelController.emitConnections(CoreSnapshots.encodeConnections(snapshot))
+                } ?: continue
+                // Encoded outside the lock, which the Go thread delivering
+                // connection events waits on; emitted inside it, and only
+                // while open, so it cannot land after close() emptied the table.
+                val json = CoreSnapshots.encodeConnections(snapshot)
+                synchronized(connections) {
+                    if (!closing.get()) {
+                        TunnelController.emitConnections(json)
+                    }
                 }
             }
         }
@@ -334,9 +375,8 @@ internal class CoreEventBridge(
                     release(groupClient)
                     groupClient = open(Libbox.CommandGroup, GroupHandler(next))
                 } else {
-                    val next = connectionsGeneration.incrementAndGet()
-                    release(connectionsClient)
-                    connectionsClient = open(Libbox.CommandConnections, ConnectionHandler(next))
+                    // Nothing, if the tab stopped reading in the meantime.
+                    connectionsDemand.reopen()
                 }
             } catch (error: Exception) {
                 // The command server itself is gone; the status stream says
@@ -385,7 +425,7 @@ internal class CoreEventBridge(
             )
             // The same tick drives the speed line on the notification, which is
             // the only readout a user has while the app is closed.
-            onTraffic(message.uplink, message.downlink)
+            onTraffic(CoreSnapshots.rate(message.uplink), CoreSnapshots.rate(message.downlink))
         }
 
         override fun disconnected(message: String?) = reportLoss(message.orEmpty())
@@ -450,6 +490,11 @@ internal class CoreEventBridge(
     private inner class ConnectionHandler(private val generation: Int) : CommandClientAdapter() {
         override fun writeConnectionEvents(events: ConnectionEvents) {
             synchronized(connections) {
+                // A batch still in flight from a subscription already let go
+                // of would put its rows back into a table that was cleared.
+                if (generation != connectionsGeneration.get()) {
+                    return
+                }
                 if (events.reset) {
                     connections.clear()
                 }

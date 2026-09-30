@@ -13,8 +13,9 @@ import 'package:commy_domain/src/ports/subscription_repository.dart';
 /// Refreshes an existing subscription.
 ///
 /// Replaces its node list in one transaction, so a half-downloaded answer can
-/// never leave the user with half a list. Quota, title and interval are
-/// refreshed only where the panel actually reported them.
+/// never leave the user with half a list. Quota and title are refreshed only
+/// where the panel actually reported them; the refresh interval only while
+/// the subscription has none.
 ///
 /// The outcome it returns describes the store, not the parser: its nodes are
 /// the rows the refresh left behind, so a panel that lists one server in two of
@@ -103,9 +104,18 @@ class UpdateSubscriptionUseCase {
       // those seconds would otherwise be quietly put back — and the last one
       // means the app goes on polling a panel the user told it to leave be.
       // The panel owns only what `applyTo` changes; the rest is the user's.
-      final refreshed = payload.applyTo(
+      final applied = payload.applyTo(
         current.copyWith(lastUpdatedAt: DateTime.now()),
       );
+      // Except the interval, once there is one. The panel's suggestion is
+      // taken when the subscription is added (ADR-0008); after that the
+      // figure is whatever the menu says, and a panel sending
+      // `profile-update-interval` with every answer — Remnawave and Marzban
+      // do — put its own back on the first refresh after the user picked
+      // another.
+      final kept = current.updateIntervalHours;
+      final refreshed =
+          kept == null ? applied : applied.copyWith(updateIntervalHours: kept);
       final stored = await subscriptions.upsert(refreshed);
       final storeFailure = stored.failureOrNull;
       if (storeFailure != null) {

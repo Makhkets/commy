@@ -1,5 +1,6 @@
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/commy_test_host.dart';
@@ -38,5 +39,23 @@ void main() {
     );
 
     expect(paragraph(tester, helper).didExceedMaxLines, isFalse);
+  });
+
+  testWidgets('the label above a field is the name it is announced by', (
+    tester,
+  ) async {
+    // The backup password sheet: a label, no hint, masked, focused on open.
+    final handle = tester.ensureSemantics();
+    await pumpCommy(
+      tester,
+      size: const Size(360, 240),
+      child: const CommyTextField(labelText: 'Пароль', obscureText: true),
+    );
+
+    expect(
+      tester.getSemantics(find.byType(EditableText)),
+      isSemantics(label: 'Пароль', isTextField: true, isObscured: true),
+    );
+    handle.dispose();
   });
 }

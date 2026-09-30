@@ -115,6 +115,25 @@ void main() {
     ]),
   );
 
+  // The first segment has keyboard focus and the second is selected: the
+  // two must not look alike.
+  goldenTest(
+    'segmented_control_focused',
+    size: const Size(360, 140),
+    tabs: 1,
+    builder: (context) => column(<Widget>[
+      SegmentedControl<String>(
+        value: 'rules',
+        onChanged: (_) {},
+        segments: const <SegmentedControlItem<String>>[
+          SegmentedControlItem<String>(value: 'global', label: 'Глобально'),
+          SegmentedControlItem<String>(value: 'rules', label: 'Правила'),
+          SegmentedControlItem<String>(value: 'direct', label: 'Прямо'),
+        ],
+      ),
+    ]),
+  );
+
   goldenTest(
     'status_pill',
     size: const Size(360, 200),
@@ -148,6 +167,19 @@ void main() {
         onAction: () {},
       ),
     ]),
+  );
+
+  // The action has keyboard focus: its ring is the full height of the
+  // toast, because that is how tall its tap target is.
+  goldenTest(
+    'toast_focused',
+    size: const Size(400, 120),
+    tabs: 1,
+    builder: (context) => Toast(
+      message: 'Правило удалено',
+      actionLabel: 'Вернуть',
+      onAction: () {},
+    ),
   );
 
   goldenTest(

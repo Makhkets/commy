@@ -223,8 +223,15 @@ class _Body extends ConsumerWidget {
               title: t.routing.dns,
               // The strategy as the DNS screen words it: the row used to
               // print the core's own token, "prefer_ipv4", in both languages.
+              // And the resolver names are sent to when no rule claims them,
+              // read off the builder like the final row above: in Direct
+              // mode that is the direct one, and naming the remote one there
+              // pointed at a resolver the core never asks.
               value: t.routing.dnsValue(
-                remote: dns.remote,
+                remote: DnsSectionBuilder.finalResolver(policy.mode) ==
+                        SingBoxTags.dnsDirect
+                    ? dns.direct
+                    : dns.remote,
                 strategy: DnsScreen.strategyLabel(t, dns.strategy),
               ),
               onTap: () => context.go(AppRoutes.dns),
@@ -270,6 +277,11 @@ class _Body extends ConsumerWidget {
 /// disk. Until one is downloaded the builder drops those rules so the tunnel
 /// still comes up — correct, but invisible: the rule stays on this screen,
 /// looking applied, and does nothing. This is where that stops being silent.
+///
+/// A missing download is not the only reason, though: a rule this platform
+/// cannot express (`process:` on Android), or per-app routing the device does
+/// not have, is dropped the same way and no download brings it back. The
+/// sentence about rule sets is only said when every line is one of those.
 class _DroppedRules extends StatelessWidget {
   const _DroppedRules({required this.warnings});
 
@@ -291,6 +303,18 @@ class _DroppedRules extends StatelessWidget {
           t.routing.dropped.perAppUnavailable,
         RoutingWarningKind.perAppIncludeOnly =>
           t.routing.dropped.perAppIncludeOnly,
+      };
+
+  /// Whether downloading is what fixes [warning].
+  static bool _fixedByDownload(RoutingWarning warning) =>
+      switch (warning.kind) {
+        RoutingWarningKind.ruleSetsMissing ||
+        RoutingWarningKind.adBlockListMissing =>
+          true,
+        RoutingWarningKind.ruleNotApplicable ||
+        RoutingWarningKind.perAppUnavailable ||
+        RoutingWarningKind.perAppIncludeOnly =>
+          false,
       };
 
   @override
@@ -331,7 +355,9 @@ class _DroppedRules extends StatelessWidget {
             ),
             SizedBox(height: spacing.s2),
             Text(
-              t.routing.dropped.body,
+              warnings.every(_fixedByDownload)
+                  ? t.routing.dropped.body
+                  : t.routing.dropped.bodyGeneric,
               style: context.typography.caption.copyWith(
                 color: colors.textSecondary,
               ),

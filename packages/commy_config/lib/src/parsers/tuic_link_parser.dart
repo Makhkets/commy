@@ -40,7 +40,9 @@ class TuicLinkParser implements NodeLinkParser {
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException('tuic:// link carries no server port');
+      throw const LinkFormatException.incomplete(
+        'tuic:// link carries no server port',
+      );
     }
     final userInfo = link.userInfo;
     final colon = userInfo.indexOf(':');
@@ -51,7 +53,9 @@ class TuicLinkParser implements NodeLinkParser {
         ? link.query.first('password') ?? ''
         : Percent.decode(userInfo.substring(colon + 1));
     if (uuid.isEmpty) {
-      throw const LinkFormatException('tuic:// link carries no user id');
+      throw const LinkFormatException.incomplete(
+        'tuic:// link carries no user id',
+      );
     }
     final controller = link.query.firstOf(
       <String>['congestion_control', 'congestion-controller'],
@@ -83,7 +87,7 @@ class TuicLinkParser implements NodeLinkParser {
   String toLink(ProxyNode node) {
     final uuid = node.param(ParamKeys.uuid);
     if (uuid == null || uuid.isEmpty) {
-      throw const LinkFormatException('Node carries no user id');
+      throw const LinkFormatException.incomplete('Node carries no user id');
     }
     final password = node.param(ParamKeys.password) ?? '';
     final address = node.host.contains(':') ? '[${node.host}]' : node.host;

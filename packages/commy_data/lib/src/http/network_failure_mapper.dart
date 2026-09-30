@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:commy_data/src/http/http_transport_error.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:dio/dio.dart';
@@ -13,6 +15,10 @@ import 'package:dio/dio.dart';
 abstract final class NetworkFailureMapper {
   /// Maps a dio exception raised while fetching [url].
   static CommyFailure fromDio(DioException error, Uri url) {
+    final certificate = _certificate(error.error);
+    if (certificate != null) {
+      return CommyFailure.subscriptionUnreachable(url: url, cause: certificate);
+    }
     final transport = switch (error.type) {
       DioExceptionType.connectionTimeout => const HttpTransportError(
           kind: HttpTransportError.kindTimeout,
@@ -62,6 +68,10 @@ abstract final class NetworkFailureMapper {
     if (error is DioException) {
       return fromDio(error, url);
     }
+    final certificate = _certificate(error);
+    if (certificate != null) {
+      return CommyFailure.subscriptionUnreachable(url: url, cause: certificate);
+    }
     return CommyFailure.subscriptionUnreachable(
       url: url,
       cause: HttpTransportError(
@@ -70,6 +80,73 @@ abstract final class NetworkFailureMapper {
       ),
     );
   }
+
+  /// The certificate cause hidden in [error], or `null` when it is not one.
+  ///
+  /// dio only reports `badCertificate` when a `validateCertificate` callback
+  /// is set, and ours sets none — validation stays with the platform, where
+  /// it belongs. A certificate the platform refused therefore arrives as the
+  /// raw `HandshakeException` inside an `unknown`, and was shown as "the
+  /// server is not answering" with a retry that could never work. Only a
+  /// handshake that failed on the certificate counts: one that failed because
+  /// the other end does not speak TLS at all is still a connection problem.
+  static HttpTransportError? _certificate(Object? error) {
+    if (error is CertificateException) {
+      return HttpTransportError(
+        kind: HttpTransportError.kindCertificate,
+        detail: error.osError?.message ?? error.message,
+      );
+    }
+    if (error is HandshakeException) {
+      final reason = error.osError?.message ?? error.message;
+      if (reason.contains(_certificateVerifyFailed)) {
+        return HttpTransportError(
+          kind: HttpTransportError.kindCertificate,
+          detail: reason,
+        );
+      }
+    }
+    return null;
+  }
+
+  /// What BoringSSL, and so `dart:io` on every platform, calls a certificate
+  /// it refused — expired, self-signed, issued for another name.
+  static const String _certificateVerifyFailed = 'CERTIFICATE_VERIFY_FAILED';
+
+  /// The failure for a fetch that outlived its deadline as a whole.
+  ///
+  /// A timeout like the others, told apart by its detail: the server never
+  /// went quiet long enough for the receive timeout, it just never finished.
+  static CommyFailure deadline(Uri url, Duration limit) =>
+      CommyFailure.subscriptionUnreachable(
+        url: url,
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindTimeout,
+          detail: 'total > ${limit.inSeconds} s',
+        ),
+      );
+
+  /// The failure for a redirect that is not followed: a loop, a missing or
+  /// unreadable `Location`, a scheme we do not fetch.
+  ///
+  /// [detail] never holds the address — the `Location` is not repeated.
+  static CommyFailure redirectRefused(Uri url, String detail) =>
+      CommyFailure.subscriptionUnreachable(
+        url: url,
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindRedirect,
+          detail: detail,
+        ),
+      );
+
+  /// The failure for a redirect from https to plain http, which is refused.
+  static CommyFailure insecureRedirect(Uri url) =>
+      CommyFailure.subscriptionUnreachable(
+        url: url,
+        cause: const HttpTransportError(
+          kind: HttpTransportError.kindInsecureRedirect,
+        ),
+      );
 
   /// The failure for a body we refuse to load into memory.
   static CommyFailure tooLarge(Uri url, int limitBytes) =>

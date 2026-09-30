@@ -98,6 +98,41 @@ void main() {
     expect(stored.autoUpdate, isFalse);
     expect(stored.lastUpdatedAt, isNot(testSubscription().lastUpdatedAt));
   });
+
+  test('a rename from a menu opened before a refresh keeps the refresh',
+      () async {
+    // The menu was built from this copy; a refresh has landed since, with a
+    // quota and a title of its own. Writing the copy back with a new name
+    // put the old quota and title back.
+    final opened = testSubscription();
+    await harness.subscriptionRepository.upsert(
+      opened.copyWith(
+        profileTitle: 'Fresh title',
+        userInfo: const SubscriptionUserInfo(total: 1024),
+      ),
+    );
+
+    await controller().rename(opened, 'Work');
+    await controller().setUpdateIntervalHours(opened, 6);
+    await controller().setAutoUpdate(opened, value: false);
+
+    final stored = harness.subscriptionRepository.items.single;
+    expect(stored.name, 'Work');
+    expect(stored.updateIntervalHours, 6);
+    expect(stored.autoUpdate, isFalse);
+    expect(stored.profileTitle, 'Fresh title');
+    expect(stored.userInfo?.total, 1024);
+  });
+
+  test('a rename of a subscription deleted meanwhile does not bring it back',
+      () async {
+    final opened = testSubscription();
+    await harness.subscriptionRepository.deleteById(opened.id);
+
+    await controller().rename(opened, 'Work');
+
+    expect(harness.subscriptionRepository.items, isEmpty);
+  });
 }
 
 /// A panel that answers once [answer] completes.

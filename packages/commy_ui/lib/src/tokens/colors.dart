@@ -70,7 +70,9 @@ class CommyColors extends ThemeExtension<CommyColors> {
     borderStrong: Color(0xFF6C7178),
     textPrimary: Color(0xFFF2F3F5),
     textSecondary: Color(0xFFB3B7BD),
-    textTertiary: Color(0xFF8D9299),
+    // ink/400 (#8D9299) lifted by one in each channel: ink/400 itself made
+    // 4.46:1 on the connected wash of an active row. See the contrast table.
+    textTertiary: Color(0xFF8E939A),
     textDisabled: Color(0xFF6C7178),
     textInverse: Color(0xFF0A0B0D),
     accentSolid: Color(0xFFF2F3F5),
@@ -105,7 +107,11 @@ class CommyColors extends ThemeExtension<CommyColors> {
     borderStrong: Color(0xFF8D9299),
     textPrimary: Color(0xFF131519),
     textSecondary: Color(0xFF4E535B),
-    textTertiary: Color(0xFF6C7178),
+    // ink/500 (#6C7178) darkened by four in each channel: ink/500 itself
+    // fell under 4.5:1 on the grey and tinted grounds it is drawn on — the
+    // hint in a text field, the idle badge, an active row. See the contrast
+    // table.
+    textTertiary: Color(0xFF686D74),
     textDisabled: Color(0xFFB3B7BD),
     textInverse: Color(0xFFFFFFFF),
     accentSolid: Color(0xFF131519),
@@ -116,12 +122,12 @@ class CommyColors extends ThemeExtension<CommyColors> {
     statusConnecting: Color(0xFF93560A),
     statusError: Color(0xFFA02020),
     statusInfo: Color(0xFF1D4FD8),
-    statusIdle: Color(0xFF6C7178),
+    statusIdle: Color(0xFF686D74),
     statusConnectedWash: Color(0x1A0C7A4A),
     statusConnectingWash: Color(0x1A93560A),
     statusErrorWash: Color(0x1AA02020),
     statusInfoWash: Color(0x1A1D4FD8),
-    statusIdleWash: Color(0x1A6C7178),
+    statusIdleWash: Color(0x1A686D74),
     statusConnectedGlow: Color(0x2E0C7A4A),
     statusErrorGlow: Color(0x2EA02020),
   );
@@ -162,7 +168,8 @@ class CommyColors extends ThemeExtension<CommyColors> {
   /// Captions and metadata.
   final Color textSecondary;
 
-  /// Third level. Never used below 13 px — see the contrast table.
+  /// Third level. Never used below 13 px — see the contrast table, which
+  /// checks it against every ground it is drawn on, not only the surface.
   final Color textTertiary;
 
   /// Inactive text. Deliberately below the AA threshold (WCAG 1.4.3).

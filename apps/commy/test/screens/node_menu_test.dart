@@ -1,6 +1,7 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/widgets/node_menu_sheet.dart';
 import 'package:commy/src/widgets/qr_sheet.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -75,6 +76,31 @@ void main() {
 
     expect(find.byType(QrImageView), findsNothing);
     expect(find.text(t.node.noLink), findsOneWidget);
+  });
+
+  testWidgets('a link too long to scan is called that, not a missing format',
+      (tester) async {
+    // A VLESS server has a link format; this one's link is just past what a
+    // camera resolves. "This protocol has no share link format" contradicted
+    // the copy button one row up, which copies that same link.
+    final base = testNode();
+    await pumpMenu(
+      tester,
+      node: base.copyWith(
+        params: <String, Object?>{
+          ...base.params,
+          'type': 'ws',
+          'path': '/${'a' * (QrPayload.maxLength + 100)}',
+        },
+      ),
+    );
+
+    await tester.tap(find.text(t.node.showQr));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(QrImageView), findsNothing);
+    expect(find.text(t.qr.tooLong), findsOneWidget);
+    expect(find.text(t.node.noLink), findsNothing);
   });
 
   testWidgets('copying puts the share link on the clipboard and says so',

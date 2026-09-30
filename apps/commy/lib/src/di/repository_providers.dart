@@ -85,12 +85,17 @@ final logRepositoryProvider = Provider<LogRepository>((ref) {
 });
 
 /// Fetches subscription bodies over HTTP. Only user-entered hosts (rule R1).
+///
+/// The fetcher reads the headers and hands the body on as it came: the add
+/// and refresh use cases read it into servers themselves. It used to go
+/// through `SubscriptionResponseParser.parse`, which reads the body too —
+/// every add and every refresh parsed the whole document twice on the UI
+/// isolate and threw the first result away.
 final subscriptionFetcherProvider = Provider<SubscriptionFetcher>((ref) {
-  final parser = SubscriptionResponseParser();
   return HttpSubscriptionFetcher(
     client: ref.watch(httpClientProvider),
     payloadMapper: (body, headers) =>
-        parser.parse(body: body, headers: headers).payload,
+        SubscriptionHeaders.from(headers).toPayload(body),
     identity: ref.watch(deviceIdentityProvider),
   );
 });

@@ -545,6 +545,29 @@ void main() {
     expect(find.text(t.routing.dropped.title), findsNothing);
   });
 
+  testWidgets('a rule no download can fix is not blamed on a rule set',
+      (tester) async {
+    // A rule this device cannot express — a typo saved before the sheet
+    // checked, a `process:` rule restored from a desktop backup — is dropped
+    // like one missing its rule set. The banner used to say every such rule
+    // "names a rule set that is not on disk" and would work "once the sets
+    // are downloaded", sending the user to a screen with nothing to fetch.
+    await pumpScreen(
+      tester,
+      policy: policyWith(<RoutingRule>[rule('regex:*.example.com')]),
+    );
+    buildConfig(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.routing.dropped.title), findsOneWidget);
+    expect(
+      find.text(t.routing.dropped.notHere(rule: 'regex:*.example.com')),
+      findsOneWidget,
+    );
+    expect(find.text(t.routing.dropped.body), findsNothing);
+    expect(find.text(t.routing.dropped.bodyGeneric), findsOneWidget);
+  });
+
   testWidgets('the rows that lead deeper are live, not dead strings',
       (tester) async {
     await pumpScreen(tester);
@@ -633,6 +656,33 @@ void main() {
     );
     // The core's token is for the core; the row is for a person.
     expect(find.textContaining(DnsStrategy.ipv4Only.wireName), findsNothing);
+  });
+
+  testWidgets('in Direct mode the DNS row names the direct resolver',
+      (tester) async {
+    // Direct mode sends every unclaimed name to the direct resolver; the row
+    // used to name the remote one, which the core then never asks.
+    const dns = DnsSettings(
+      remote: 'tls://9.9.9.9',
+      direct: 'udp://77.88.8.8',
+      strategy: DnsStrategy.ipv4Only,
+    );
+    await pumpScreen(
+      tester,
+      policy: RoutingPolicy.defaults.copyWith(mode: RoutingMode.direct),
+      dns: dns,
+    );
+
+    expect(
+      find.text(
+        t.routing.dnsValue(
+          remote: 'udp://77.88.8.8',
+          strategy: t.dns.strategyIpv4Only,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('tls://9.9.9.9'), findsNothing);
   });
 
   testWidgets('the Apps row says everything while per-app routing is off',

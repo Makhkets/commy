@@ -90,7 +90,15 @@ class AddSubscriptionUseCase {
       }
       final existing = knownResult.valueOrNull;
 
-      final fetched = await fetcher.fetch(url, throughTunnel: false);
+      // A card that is already there is fetched the way its refresh is:
+      // with the User-Agent its user set for it. A panel that answers by
+      // client would otherwise send the default one's answer, and the
+      // servers stored from it would replace the right ones.
+      final fetched = await fetcher.fetch(
+        url,
+        throughTunnel: false,
+        userAgent: existing?.userAgentOverride,
+      );
       final fetchFailure = fetched.failureOrNull;
       if (fetchFailure != null) {
         return Err<SubscriptionSyncResult, CommyFailure>(fetchFailure);

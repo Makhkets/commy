@@ -19,6 +19,7 @@ export 'src/entities/core_config.dart';
 export 'src/entities/device_description.dart';
 export 'src/entities/dns_settings.dart';
 export 'src/entities/import_failure.dart';
+export 'src/entities/import_failure_kind.dart';
 export 'src/entities/ip_check_result.dart';
 export 'src/entities/log_line.dart';
 export 'src/entities/node_duplicates.dart';

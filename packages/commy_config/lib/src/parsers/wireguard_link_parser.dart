@@ -78,7 +78,7 @@ class WireguardLinkParser implements NodeLinkParser {
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'wireguard:// link carries no server port',
       );
     }
@@ -86,19 +86,19 @@ class WireguardLinkParser implements NodeLinkParser {
         ? link.decodedUserInfo.trim()
         : link.query.firstOf(privateKeyKeys);
     if (privateKey == null || privateKey.isEmpty) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'wireguard:// link carries no private key',
       );
     }
     final peerPublicKey = link.query.firstOf(publicKeyKeys);
     if (peerPublicKey == null || peerPublicKey.isEmpty) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'wireguard:// link carries no peer public key',
       );
     }
     final addresses = link.query.csvOf(addressKeys);
     if (addresses.isEmpty) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'wireguard:// link carries no local address',
       );
     }
@@ -125,10 +125,12 @@ class WireguardLinkParser implements NodeLinkParser {
     final privateKey = node.param(ParamKeys.privateKey);
     final peerPublicKey = node.param(ParamKeys.peerPublicKey);
     if (privateKey == null || privateKey.isEmpty) {
-      throw const LinkFormatException('Node carries no private key');
+      throw const LinkFormatException.incomplete('Node carries no private key');
     }
     if (peerPublicKey == null || peerPublicKey.isEmpty) {
-      throw const LinkFormatException('Node carries no peer public key');
+      throw const LinkFormatException.incomplete(
+        'Node carries no peer public key',
+      );
     }
     final address = node.host.contains(':') ? '[${node.host}]' : node.host;
     final entries = <MapEntry<String, String>>[

@@ -50,10 +50,10 @@ abstract final class SingBoxOutboundReader {
     final rawType =
         MapRead.text(outbound, <String>['type', 'protocol'])?.toLowerCase();
     if (rawType == null) {
-      throw const LinkFormatException('Outbound has no type');
+      throw const LinkFormatException.incomplete('Outbound has no type');
     }
     if (plumbingTypes.contains(rawType)) {
-      throw LinkFormatException('"$rawType" is not a server');
+      throw LinkFormatException.notALink('"$rawType" is not a server');
     }
     final isXray = outbound.containsKey('settings') ||
         outbound.containsKey('streamSettings');
@@ -75,7 +75,10 @@ abstract final class SingBoxOutboundReader {
   static ProxyNode _readNative(String rawType, Map<String, Object?> outbound) {
     final protocol = Protocol.fromWireName(rawType);
     if (protocol == null) {
-      throw LinkFormatException('Outbound type "$rawType" is not supported');
+      throw LinkFormatException.unsupported(
+        'Outbound type "$rawType" is not supported',
+        subject: rawType,
+      );
     }
     final host = MapRead.text(outbound, <String>['server']);
     final port = MapRead.integer(outbound, <String>['server_port']);
@@ -83,10 +86,14 @@ abstract final class SingBoxOutboundReader {
       return _readNativeWireguard(outbound);
     }
     if (host == null || !HostPort.isPlausibleHost(host.toLowerCase())) {
-      throw const LinkFormatException('Outbound has no server address');
+      throw const LinkFormatException.incomplete(
+        'Outbound has no server address',
+      );
     }
     if (port == null || port < 1 || port > 65535) {
-      throw const LinkFormatException('Outbound has no valid server port');
+      throw const LinkFormatException.incomplete(
+        'Outbound has no valid server port',
+      );
     }
 
     final params = <String, Object?>{
@@ -152,15 +159,21 @@ abstract final class SingBoxOutboundReader {
         'reserved': MapRead.value(outbound, <String>['reserved']),
       };
     } else {
-      throw const LinkFormatException('WireGuard endpoint has no peer');
+      throw const LinkFormatException.incomplete(
+        'WireGuard endpoint has no peer',
+      );
     }
     final host = MapRead.text(peer, <String>['address', 'server']);
     final port = MapRead.integer(peer, <String>['port', 'server_port']);
     if (host == null || !HostPort.isPlausibleHost(host.toLowerCase())) {
-      throw const LinkFormatException('WireGuard peer has no address');
+      throw const LinkFormatException.incomplete(
+        'WireGuard peer has no address',
+      );
     }
     if (port == null || port < 1 || port > 65535) {
-      throw const LinkFormatException('WireGuard peer has no valid port');
+      throw const LinkFormatException.incomplete(
+        'WireGuard peer has no valid port',
+      );
     }
     final reserved = MapRead.stringList(peer, <String>['reserved']);
     return NodeFactory.build(
@@ -233,8 +246,9 @@ abstract final class SingBoxOutboundReader {
     final rawType = MapRead.text(transport, <String>['type']) ?? 'tcp';
     final normalised = TransportParams.normaliseTransport(rawType);
     if (normalised == null || !TransportParams.supported.contains(normalised)) {
-      throw LinkFormatException(
+      throw LinkFormatException.unsupported(
         'Transport "$rawType" is not supported by the core',
+        subject: rawType,
       );
     }
     params[ParamKeys.transport] = normalised;
@@ -310,8 +324,9 @@ abstract final class SingBoxOutboundReader {
   static ProxyNode _readXray(String rawType, Map<String, Object?> outbound) {
     final protocol = _xrayProtocols[rawType];
     if (protocol == null) {
-      throw LinkFormatException(
+      throw LinkFormatException.unsupported(
         'Outbound protocol "$rawType" is not supported',
+        subject: rawType,
       );
     }
     final settings = MapRead.object(outbound, <String>['settings']) ??
@@ -320,10 +335,14 @@ abstract final class SingBoxOutboundReader {
     final host = MapRead.text(peer, <String>['address']);
     final port = MapRead.integer(peer, <String>['port']);
     if (host == null || !HostPort.isPlausibleHost(host.toLowerCase())) {
-      throw const LinkFormatException('Outbound has no server address');
+      throw const LinkFormatException.incomplete(
+        'Outbound has no server address',
+      );
     }
     if (port == null || port < 1 || port > 65535) {
-      throw const LinkFormatException('Outbound has no valid server port');
+      throw const LinkFormatException.incomplete(
+        'Outbound has no valid server port',
+      );
     }
 
     final params = <String, Object?>{};
@@ -357,8 +376,9 @@ abstract final class SingBoxOutboundReader {
       case Protocol.tuic:
       case Protocol.wireguard:
       case Protocol.shadowtls:
-        throw LinkFormatException(
+        throw LinkFormatException.unsupported(
           'Outbound protocol "$rawType" is not supported',
+          subject: rawType,
         );
     }
     XrayStreamReader.readInto(
@@ -388,7 +408,7 @@ abstract final class SingBoxOutboundReader {
     if (servers.isNotEmpty) {
       return servers.first;
     }
-    throw LinkFormatException(
+    throw LinkFormatException.incomplete(
       '${protocol.wireName} outbound has neither vnext nor servers',
     );
   }

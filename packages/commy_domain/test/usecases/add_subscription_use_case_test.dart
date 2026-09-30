@@ -192,6 +192,55 @@ void main() {
         expect(subscriptions.stored.single.name, 'Work');
       });
 
+      test('is fetched with the User-Agent that card was given', () async {
+        // Its refresh sends the override; the add sent the default, and a
+        // panel that answers by client replaced the servers with the answer
+        // meant for another one.
+        final subscriptions = FakeSubscriptionRepository()
+          ..seed(
+            Subscription(
+              id: 'sub-old',
+              name: 'Work',
+              url: _url,
+              lastUpdatedAt: DateTime.utc(2026, 8),
+              userAgentOverride: 'Happ/3.9.0',
+            ),
+          );
+        final fetcher = StubSubscriptionFetcher();
+        final useCase = _useCase(
+          parser: StubLinkParser(
+            ParseOutcome(
+              nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt 07')],
+            ),
+          ),
+          nodes: RecordingNodeRepository(),
+          subscriptions: subscriptions,
+          fetcher: fetcher,
+        );
+
+        await useCase(url: _url);
+
+        expect(fetcher.userAgents, <String?>['Happ/3.9.0']);
+        expect(subscriptions.stored.single.userAgentOverride, 'Happ/3.9.0');
+      });
+
+      test('a new card is fetched with the default one', () async {
+        final fetcher = StubSubscriptionFetcher();
+        final useCase = _useCase(
+          parser: StubLinkParser(
+            ParseOutcome(
+              nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt 07')],
+            ),
+          ),
+          nodes: RecordingNodeRepository(),
+          fetcher: fetcher,
+        );
+
+        await useCase(url: _url);
+
+        expect(fetcher.userAgents, <String?>[null]);
+      });
+
       test('a second account on the same panel is still its own card',
           () async {
         final subscriptions = FakeSubscriptionRepository()

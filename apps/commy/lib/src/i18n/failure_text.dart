@@ -40,11 +40,70 @@ class FailureText {
           kind: HttpTransportError.kindStatus,
           statusCode: final int status,
         ),
-      ) =>
+      )
+          when status >= 400 && status < 500 =>
         FailureText(
           message: errors.subscriptionRefused.message(status: status),
           actionLabel: errors.subscriptionRefused.action,
           action: FailureAction.retry,
+          retryable: failure.retryable,
+        ),
+      // A 5xx is the server's own trouble — a panel being restarted, nginx in
+      // front of a backend that is down, a Cloudflare 52x. It says nothing
+      // about the subscription, and "it may be revoked" sent the user to
+      // support, or to delete and re-add it, over an outage.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindStatus,
+          statusCode: final int status,
+        ),
+      )
+          when status >= 500 =>
+        FailureText(
+          message: errors.subscriptionServerError.message(status: status),
+          actionLabel: errors.subscriptionServerError.action,
+          action: FailureAction.retry,
+          retryable: failure.retryable,
+        ),
+      // A certificate the platform refused is not a server that is silent,
+      // and retrying the same handshake gives the same answer. The two causes
+      // the user can tell apart are the device clock and the panel itself;
+      // the logs carry the platform's own reason.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(kind: HttpTransportError.kindCertificate),
+      ) =>
+        FailureText(
+          message: errors.subscriptionCertificate.message,
+          actionLabel: errors.subscriptionCertificate.action,
+          action: FailureAction.openLogs,
+          retryable: failure.retryable,
+        ),
+      // Refused, not failed: the panel sent the fetch from https to plain
+      // http, where the token and the servers would travel in the clear.
+      // Retrying gets the same redirect; typing the http address is the
+      // user's own call to make.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindInsecureRedirect,
+        ),
+      ) =>
+        FailureText(
+          message: errors.subscriptionInsecureRedirect.message,
+          actionLabel: errors.subscriptionInsecureRedirect.action,
+          action: FailureAction.openLogs,
+          retryable: failure.retryable,
+        ),
+      // A loop past the redirect limit, a 3xx with no usable Location, or a
+      // Location in a scheme we do not fetch. The panel answered, so "not
+      // answering" with a retry was wrong twice over: the retry follows the
+      // same redirects to the same end.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(kind: HttpTransportError.kindRedirect),
+      ) =>
+        FailureText(
+          message: errors.subscriptionRedirect.message,
+          actionLabel: errors.subscriptionRedirect.action,
+          action: FailureAction.openLogs,
           retryable: failure.retryable,
         ),
       SubscriptionUnreachableFailure() => FailureText(

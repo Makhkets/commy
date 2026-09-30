@@ -138,11 +138,15 @@ class CommyTileService : TileService() {
             // abort a slow connection has nowhere else to press.
             else -> Tile.STATE_INACTIVE
         }
-        tile.label = getString(R.string.app_name)
+        // In the language chosen in the app, not the system's: the tile is
+        // drawn with Flutter nowhere near, see AppLanguage.
+        val strings = AppLanguage.localize(this, AppLanguage.tag(this))
+        tile.label = strings.getString(R.string.app_name)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            tile.subtitle = getString(subtitleFor(state))
+            tile.subtitle = strings.getString(subtitleFor(state))
         }
-        tile.contentDescription = "${getString(R.string.app_name)}: ${getString(subtitleFor(state))}"
+        tile.contentDescription =
+            "${strings.getString(R.string.app_name)}: ${strings.getString(subtitleFor(state))}"
         tile.icon = Icon.createWithResource(this, R.drawable.ic_tile)
         runCatching { tile.updateTile() }
     }

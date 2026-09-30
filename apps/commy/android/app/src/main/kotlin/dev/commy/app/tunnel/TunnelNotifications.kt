@@ -39,6 +39,27 @@ internal class TunnelNotifications(private val context: Context) {
      */
     private var posted: String? = null
 
+    /** The language [strings] was last built for, and what it built. */
+    private var localized: Pair<String?, Context>? = null
+
+    /**
+     * Where every string of this class is read from: [context] in the language
+     * chosen in the app, see [AppLanguage].
+     *
+     * Kept per language. The traffic tick formats the speed line once a second,
+     * and a configuration context is a new `Resources` each time it is made.
+     */
+    private val strings: Context
+        get() {
+            val tag = AppLanguage.tag(context)
+            localized?.let { (builtFor, built) ->
+                if (builtFor == tag) {
+                    return built
+                }
+            }
+            return AppLanguage.localize(context, tag).also { localized = tag to it }
+        }
+
     fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return
@@ -48,10 +69,10 @@ internal class TunnelNotifications(private val context: Context) {
         // a notification that gets the service killed.
         val channel = NotificationChannel(
             CHANNEL_TUNNEL,
-            context.getString(R.string.notification_channel_tunnel),
+            strings.getString(R.string.notification_channel_tunnel),
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = context.getString(R.string.notification_channel_tunnel_description)
+            description = strings.getString(R.string.notification_channel_tunnel_description)
             setShowBadge(false)
             enableVibration(false)
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
@@ -62,26 +83,21 @@ internal class TunnelNotifications(private val context: Context) {
     /**
      * Builds the ongoing notification.
      *
-     * [node] is the outbound the group currently points at. It is the tag the
-     * core knows, not a display name: the native side has no access to the
-     * user's profile, and the wire protocol carries no name for it.
+     * It names no server. The only name this side has for one is the tag the
+     * core knows, `node-3fa1c09e7b22d415` or `auto`: the user's profile and
+     * its display names live on the Dart side, and the wire protocol carries
+     * none of them. The notification used to show that tag next to the state,
+     * for the whole session and on the lock screen too.
      */
-    fun build(state: String, node: String?, up: Long, down: Long): Notification {
+    fun build(state: String, up: Long, down: Long): Notification {
         // Recorded here rather than in [update] so that the notification the
         // service posts with startForeground counts as posted too: otherwise
         // the first traffic tick after a start always repeats it.
-        posted = contentKey(state, node, up, down)
-        val text = buildString {
-            append(stateText(state))
-            if (!node.isNullOrBlank()) {
-                append(" · ")
-                append(node)
-            }
-        }
+        posted = contentKey(state, up, down)
         val builder = NotificationCompat.Builder(context, CHANNEL_TUNNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.app_name))
-            .setContentText(text)
+            .setContentTitle(strings.getString(R.string.app_name))
+            .setContentText(stateText(state))
             .setColor(ContextCompat.getColor(context, R.color.commy_connected))
             .setColorized(false)
             .setOngoing(true)
@@ -94,7 +110,7 @@ internal class TunnelNotifications(private val context: Context) {
             .addAction(
                 NotificationCompat.Action.Builder(
                     R.drawable.ic_notification,
-                    context.getString(R.string.notification_disconnect),
+                    strings.getString(R.string.notification_disconnect),
                     disconnectIntent,
                 ).build(),
             )
@@ -109,11 +125,11 @@ internal class TunnelNotifications(private val context: Context) {
      * different byte counts that format to the same "1.2 MB/s" are the same
      * notification, and a tick that moved nothing is not news.
      */
-    fun update(state: String, node: String?, up: Long, down: Long) {
-        if (contentKey(state, node, up, down) == posted) {
+    fun update(state: String, up: Long, down: Long) {
+        if (contentKey(state, up, down) == posted) {
             return
         }
-        manager?.notify(ID_TUNNEL, build(state, node, up, down))
+        manager?.notify(ID_TUNNEL, build(state, up, down))
     }
 
     fun cancel() {
@@ -131,10 +147,10 @@ internal class TunnelNotifications(private val context: Context) {
      */
     fun blocked(): Notification {
         posted = KEY_BLOCKED
-        val text = context.getString(R.string.notification_blocked_text)
+        val text = strings.getString(R.string.notification_blocked_text)
         return NotificationCompat.Builder(context, CHANNEL_TUNNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.notification_blocked_title))
+            .setContentTitle(strings.getString(R.string.notification_blocked_title))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setOngoing(true)
@@ -147,14 +163,14 @@ internal class TunnelNotifications(private val context: Context) {
             .addAction(
                 NotificationCompat.Action.Builder(
                     R.drawable.ic_notification,
-                    context.getString(R.string.notification_connect),
+                    strings.getString(R.string.notification_connect),
                     openApp(connect = true),
                 ).build(),
             )
             .addAction(
                 NotificationCompat.Action.Builder(
                     R.drawable.ic_notification,
-                    context.getString(R.string.notification_vpn_settings),
+                    strings.getString(R.string.notification_vpn_settings),
                     vpnSettings(),
                 ).build(),
             )
@@ -194,8 +210,8 @@ internal class TunnelNotifications(private val context: Context) {
         ensureAlertsChannel()
         val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.notification_open_title))
-            .setContentText(context.getString(R.string.notification_open_text))
+            .setContentTitle(strings.getString(R.string.notification_open_title))
+            .setContentText(strings.getString(R.string.notification_open_text))
             .setAutoCancel(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -217,12 +233,12 @@ internal class TunnelNotifications(private val context: Context) {
      */
     fun tunnelLost(blocked: Boolean) {
         ensureAlertsChannel()
-        val text = context.getString(
+        val text = strings.getString(
             if (blocked) R.string.notification_lost_blocked_text else R.string.notification_lost_text,
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(context.getString(R.string.notification_lost_title))
+            .setContentTitle(strings.getString(R.string.notification_lost_title))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
@@ -233,6 +249,27 @@ internal class TunnelNotifications(private val context: Context) {
         manager?.notify(ID_PROMPT, notification)
     }
 
+    /**
+     * Renames the channels after a language change.
+     *
+     * Creating a channel again under the same id updates its name and
+     * description in place. The alerts and core channels are renamed only if
+     * they exist: creating one here would add an empty section to the app's
+     * notification settings.
+     */
+    fun relabel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+        ensureChannel()
+        if (manager?.getNotificationChannel(CHANNEL_ALERTS) != null) {
+            ensureAlertsChannel()
+        }
+        if (manager?.getNotificationChannel(CHANNEL_CORE) != null) {
+            ensureCoreChannel()
+        }
+    }
+
     /** Default importance: these reach the status bar. */
     private fun ensureAlertsChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -241,10 +278,10 @@ internal class TunnelNotifications(private val context: Context) {
         manager?.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ALERTS,
-                context.getString(R.string.notification_channel_alerts),
+                strings.getString(R.string.notification_channel_alerts),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ).apply {
-                description = context.getString(R.string.notification_channel_alerts_description)
+                description = strings.getString(R.string.notification_channel_alerts_description)
                 setShowBadge(false)
             },
         )
@@ -257,15 +294,7 @@ internal class TunnelNotifications(private val context: Context) {
      * them without touching the one that keeps the service alive.
      */
     fun fromCore(identifier: String, title: String, body: String, subtitle: String?) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager?.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_CORE,
-                    context.getString(R.string.notification_channel_core),
-                    NotificationManager.IMPORTANCE_DEFAULT,
-                ),
-            )
-        }
+        ensureCoreChannel()
         val notification = NotificationCompat.Builder(context, CHANNEL_CORE)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
@@ -278,16 +307,34 @@ internal class TunnelNotifications(private val context: Context) {
         manager?.notify(identifier, ID_CORE, notification)
     }
 
-    /** Everything the ongoing notification shows, as one comparable string. */
-    private fun contentKey(state: String, node: String?, up: Long, down: Long): String =
-        "$state|${node.orEmpty()}|${speedText(up, down).orEmpty()}"
+    private fun ensureCoreChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return
+        }
+        manager?.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_CORE,
+                strings.getString(R.string.notification_channel_core),
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ),
+        )
+    }
+
+    /**
+     * Everything the ongoing notification shows, as one comparable string.
+     *
+     * The language is part of it, so that a change of language re-posts an
+     * idle notification on the next tick rather than leaving it in the old one.
+     */
+    private fun contentKey(state: String, up: Long, down: Long): String =
+        "$state|${speedText(up, down).orEmpty()}|${AppLanguage.tag(context).orEmpty()}"
 
     /** The speed line, or null while nothing is moving. */
     private fun speedText(up: Long, down: Long): String? {
         if (up <= 0 && down <= 0) {
             return null
         }
-        return context.getString(
+        return strings.getString(
             R.string.notification_speed,
             formatBytes(up),
             formatBytes(down),
@@ -295,7 +342,7 @@ internal class TunnelNotifications(private val context: Context) {
     }
 
     /**
-     * A byte count the way the app's own screens write it, in the device's
+     * A byte count the way the app's own screens write it, in the app's
      * language: `1.2 MB` in English, `1,2 МБ` in Russian.
      *
      * `Libbox.formatBytes` did this before and only speaks English, so the
@@ -304,7 +351,7 @@ internal class TunnelNotifications(private val context: Context) {
      * steps, one decimal below ten.
      */
     private fun formatBytes(value: Long): String {
-        val units = context.resources.getStringArray(R.array.byte_units)
+        val units = strings.resources.getStringArray(R.array.byte_units)
         if (value < BYTE_STEP) {
             return "$value ${units.first()}"
         }
@@ -314,12 +361,12 @@ internal class TunnelNotifications(private val context: Context) {
             amount /= BYTE_STEP
             unit++
         }
-        val locale = context.resources.configuration.locales[0]
+        val locale = strings.resources.configuration.locales[0]
         val number = String.format(locale, if (amount < 10) "%.1f" else "%.0f", amount)
         return "$number ${units[unit]}"
     }
 
-    private fun stateText(state: String): String = context.getString(
+    private fun stateText(state: String): String = strings.getString(
         when (state) {
             Wire.States.STARTING -> R.string.notification_starting
             Wire.States.CONNECTED -> R.string.notification_connected

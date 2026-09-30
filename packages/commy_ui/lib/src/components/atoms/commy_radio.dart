@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
@@ -52,31 +53,44 @@ class CommyRadio<T> extends StatelessWidget {
       checked: isSelected,
       enabled: enabled,
       label: semanticLabel,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onChanged!(value) : null,
-        child: SizedBox(
-          width: CommySizes.minTapTarget,
-          height: CommySizes.minTapTarget,
-          child: Center(
-            child: Container(
-              width: CommySizes.radioSize,
-              height: CommySizes.radioSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: border),
-              ),
-              child: Center(
-                child: AnimatedContainer(
-                  duration: motion.fast,
-                  curve: motion.fastCurve,
-                  width: isSelected ? CommySizes.radioDot : 0,
-                  height: isSelected ? CommySizes.radioDot : 0,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: enabled
-                        ? colors.accentSolid
-                        : CommyColors.transparent,
+      child: CommyFocusable(
+        onActivate: enabled ? () => onChanged!(value) : null,
+        builder: (context, {required isFocused}) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? () => onChanged!(value) : null,
+          child: SizedBox(
+            width: CommySizes.minTapTarget,
+            height: CommySizes.minTapTarget,
+            child: Center(
+              // The focus ring sits just outside the circle.
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: CommyFocusable.ring(colors, isFocused: isFocused),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(CommySizes.borderThick),
+                  child: Container(
+                    width: CommySizes.radioSize,
+                    height: CommySizes.radioSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: border),
+                    ),
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: motion.fast,
+                        curve: motion.fastCurve,
+                        width: isSelected ? CommySizes.radioDot : 0,
+                        height: isSelected ? CommySizes.radioDot : 0,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: enabled
+                              ? colors.accentSolid
+                              : CommyColors.transparent,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),

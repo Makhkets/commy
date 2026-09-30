@@ -925,6 +925,75 @@ void main() {
     });
   });
 
+  group("the tunnel's own addresses", () {
+    // The VPN's DNS server is 172.19.0.2, a private address. Android's DNS
+    // over TLS probe to it on port 853 is not DNS the hijack sees, and the
+    // LAN bypass dialled it on Wi-Fi: whatever answered there was handed
+    // every app's queries, outside the tunnel.
+    List<Object?> rulesOf(RoutingPolicy routing) {
+      final config = _build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: routing,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+      return (config.document['route']! as Map<String, Object?>)['rules']!
+          as List<Object?>;
+    }
+
+    const refused = <String, Object?>{
+      'ip_cidr': <String>['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
+      'action': 'reject',
+    };
+
+    test('are refused after the DNS hijack and before the LAN bypass', () {
+      final rules = rulesOf(RoutingPolicy.defaults);
+
+      expect(rules.sublist(1, 5), <Object?>[
+        <String, Object?>{'protocol': 'dns', 'action': 'hijack-dns'},
+        <String, Object?>{
+          'port': <int>[53],
+          'action': 'hijack-dns',
+        },
+        refused,
+        <String, Object?>{'ip_is_private': true, 'outbound': 'direct'},
+      ]);
+    });
+
+    test('are refused whatever the LAN bypass and the mode', () {
+      // Through the proxy the same address is the server's own network.
+      for (final routing in <RoutingPolicy>[
+        const RoutingPolicy(bypassLan: false),
+        const RoutingPolicy(mode: RoutingMode.global),
+        const RoutingPolicy(mode: RoutingMode.direct, bypassLan: false),
+      ]) {
+        expect(rulesOf(routing)[3], refused, reason: '$routing');
+      }
+    });
+
+    test('are the prefixes the interface is given', () {
+      final config = _build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: RoutingPolicy.defaults,
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+      final tun = (config.document['inbounds']! as List<Object?>).first!
+          as Map<String, Object?>;
+
+      expect(
+        RouteSectionBuilder.ownAddressesReject['ip_cidr'],
+        tun['address'],
+      );
+    });
+  });
+
   group('FakeIP and rules that look at addresses', () {
     // A connection to a FakeIP address reaches the router as its name, with
     // no address. An `ip_cidr` or `geoip` rule matched nothing there:
@@ -949,6 +1018,7 @@ void main() {
     List<Object?> rulesOf(
       List<RoutingRule> rules, {
       bool fakeIp = true,
+      bool allowLan = false,
       DnsStrategy strategy = DnsStrategy.preferIpv4,
       Set<String> onDisk = const <String>{'geoip-ru'},
     }) {
@@ -957,7 +1027,7 @@ void main() {
           node: _realityNode,
           routing: RoutingPolicy(rules: rules),
           dns: DnsSettings(fakeIp: fakeIp, strategy: strategy),
-          settings: AppSettings.defaults,
+          settings: AppSettings(allowLan: allowLan),
           platform: ConfigPlatform.android,
           ruleSetDirectory: '/data/rulesets',
           availableRuleSets: onDisk,
@@ -1008,6 +1078,39 @@ void main() {
         rulesOf(nameRules, onDisk: const <String>{'geosite-ru'})
             .where(isResolve),
         isEmpty,
+      );
+    });
+
+    test('resolves for a device on the LAN, FakeIP or not', () {
+      // An HTTP CONNECT or SOCKS client of the local proxy sends a name, not
+      // an address: with FakeIP off, `geoip:ru` -> Direct sent a laptop's
+      // ya.ru through the proxy, and `geoip:xx` -> Block blocked nothing.
+      final rules = rulesOf(
+        <RoutingRule>[
+          rule('domain_suffix:example.org', RuleAction.proxy, 0),
+          rule('geoip:ru', RuleAction.direct, 1),
+        ],
+        fakeIp: false,
+        allowLan: true,
+      );
+
+      expect(rules.sublist(rules.length - 3), <Object?>[
+        <String, Object?>{
+          'domain_suffix': <String>['example.org'],
+          'outbound': 'proxy',
+        },
+        resolve,
+        <String, Object?>{
+          'rule_set': <String>['geoip-ru'],
+          'outbound': 'direct',
+        },
+      ]);
+      expect(
+        rulesOf(
+          <RoutingRule>[rule('geoip:ru', RuleAction.direct, 0)],
+          allowLan: true,
+        ).where(isResolve),
+        hasLength(1),
       );
     });
 

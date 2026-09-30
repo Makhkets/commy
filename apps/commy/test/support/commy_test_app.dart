@@ -39,7 +39,9 @@ class CommyTestHarness {
     List<ProxyGroup>? coreGroups,
     List<TrafficDay> trafficDays = const <TrafficDay>[],
     List<RuleSet> ruleSets = const <RuleSet>[],
+    Stream<DateTime>? clock,
   })  : _coreGroups = coreGroups,
+        _clock = clock,
         ruleSetRepository = FakeRuleSetRepository(ruleSets),
         trafficHistory = FakeTrafficHistoryRepository(trafficDays),
         nodeRepository = FakeNodeRepository(nodes),
@@ -88,6 +90,10 @@ class CommyTestHarness {
   final FakeBackupCipher backupCipher = FakeBackupCipher();
 
   final List<ProxyGroup>? _coreGroups;
+
+  /// A clock the test drives itself, for what changes as time passes. The
+  /// pinned [now] when there is none.
+  final Stream<DateTime>? _clock;
 
   /// The tunnel. Deterministic, seeded, and never touches a device.
   ///
@@ -144,7 +150,9 @@ class CommyTestHarness {
       // In memory, so `deviceIdentityProvider` — the one reader of this store
       // a screen test can reach — builds instead of throwing "must override".
       secureStoreProvider.overrideWithValue(secureStore),
-      clockProvider.overrideWith((ref) => Stream<DateTime>.value(now)),
+      clockProvider.overrideWith(
+        (ref) => _clock ?? Stream<DateTime>.value(now),
+      ),
       backupFilesProvider.overrideWithValue(backupFiles),
       backupCipherProvider.overrideWithValue(backupCipher),
       libraryStoreProvider.overrideWithValue(

@@ -62,10 +62,13 @@ abstract final class Redact {
     }
     final credentials = parsed.userInfo.isEmpty ? '' : '$placeholder@';
     final port = parsed.hasPort ? ':${parsed.port}' : '';
+    // Back in brackets: without them an IPv6 address and its port run
+    // together.
+    final host = parsed.host.contains(':') ? '[${parsed.host}]' : parsed.host;
     final address =
         parsed.userInfo.isEmpty && isOpaqueAuthority(parsed.scheme, parsed.host)
             ? placeholder
-            : '${parsed.host}$port';
+            : '$host$port';
     final query = parsed.hasQuery ? '?$placeholder' : '';
     final fragment = parsed.hasFragment ? '#${_nodeName(parsed.fragment)}' : '';
     return '${parsed.scheme}://$credentials$address$query$fragment';
@@ -98,7 +101,9 @@ abstract final class Redact {
     if (_encodedSchemes.contains(scheme.toLowerCase())) {
       return true;
     }
-    if (authority.startsWith('[')) {
+    // An IPv6 literal: in brackets as written, or without them, as
+    // `Uri.host` hands it over. Either way it has more than one colon.
+    if (authority.startsWith('[') || ':'.allMatches(authority).length > 1) {
       return false;
     }
     final host = authority.replaceFirst(_trailingPort, '');

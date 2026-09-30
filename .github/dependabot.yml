@@ -64,6 +64,11 @@ updates:
       - dependency-name: github.com/sagernet/sing
       - dependency-name: github.com/sagernet/quic-go
       - dependency-name: golang.org/x/net
+      # And sing-tun more than any: overlaygen patches it and refuses a
+      # version it was not written against (ADR-0018), so a bump on its own
+      # cannot even build — PR #42 (0.8.15 -> 0.9.6, the sing-box 1.14 line)
+      # failed exactly there.
+      - dependency-name: github.com/sagernet/sing-tun
 
   - package-ecosystem: gradle
     directory: /apps/commy/android

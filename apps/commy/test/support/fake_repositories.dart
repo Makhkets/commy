@@ -468,6 +468,10 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
   /// The URLs asked for, in order.
   final List<Uri> requests = <Uri>[];
 
+  /// The User-Agent each request went with, in order; `null` is the app's
+  /// own.
+  final List<String?> userAgents = <String?>[];
+
   /// How many times a document was asked for.
   int get callCount => requests.length;
 
@@ -478,6 +482,7 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
     String? userAgent,
   }) async {
     requests.add(url);
+    userAgents.add(userAgent);
     await gate?.future;
     final refused = failure;
     if (refused != null) {
@@ -510,6 +515,9 @@ class FakeTrafficHistoryRepository implements TrafficHistoryRepository {
   /// How many times the baseline was dropped.
   int resets = 0;
 
+  /// How many times a batch was asked to be written.
+  int flushes = 0;
+
   /// The stored days.
   List<TrafficDay> get days => List<TrafficDay>.unmodifiable(_days);
 
@@ -527,6 +535,12 @@ class FakeTrafficHistoryRepository implements TrafficHistoryRepository {
 
   @override
   void resetSession() => resets++;
+
+  @override
+  Future<Result<void, CommyFailure>> flush() async {
+    flushes++;
+    return const Ok<void, CommyFailure>(null);
+  }
 
   @override
   Future<Result<List<TrafficDay>, CommyFailure>> readRange({

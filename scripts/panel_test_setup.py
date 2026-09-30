@@ -62,7 +62,7 @@ class PanelAPI:
             print(f"✅ User created: {user.get('id')} ({user.get('email')})")
             return user
         except httpx.HTTPStatusError as e:
-            print(f"❌ Failed to create user: {e.status_code} {e.response.text}")
+            print(f"❌ Failed to create user: {e.response.status_code} {e.response.text}")
             raise
 
     def get_user_subscription(self, user_id: str) -> str:
@@ -81,7 +81,7 @@ class PanelAPI:
 
             return sub_link
         except httpx.HTTPStatusError as e:
-            print(f"❌ Failed to get subscription: {e.status_code} {e.response.text}")
+            print(f"❌ Failed to get subscription: {e.response.status_code} {e.response.text}")
             raise
 
     def delete_user(self, user_id: str) -> None:
@@ -93,7 +93,7 @@ class PanelAPI:
             resp.raise_for_status()
             print(f"✅ User deleted: {user_id}")
         except httpx.HTTPStatusError as e:
-            print(f"❌ Failed to delete user: {e.status_code} {e.response.text}")
+            print(f"❌ Failed to delete user: {e.response.status_code} {e.response.text}")
             raise
 
     def close(self):

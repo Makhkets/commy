@@ -6,9 +6,11 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import dev.commy.app.tunnel.AppLanguage
 import dev.commy.app.tunnel.BootReceiver
 import dev.commy.app.tunnel.ServerProbes
 import dev.commy.app.tunnel.TunnelController
+import dev.commy.app.tunnel.TunnelNotifications
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.nekohasekai.libbox.Libbox
@@ -133,6 +135,15 @@ internal class CoreMethodHandler(
 
         Wire.Methods.SET_START_ON_BOOT -> {
             BootReceiver.setEnabled(context, boolArgument(call))
+            null
+        }
+
+        Wire.Methods.SET_LOCALE -> {
+            // An empty string, or no argument at all, is "follow the system".
+            AppLanguage.store(context, call.arguments as? String)
+            // The ongoing notification follows on its next tick and the tile
+            // the next time the shade opens; the channels have to be told.
+            TunnelNotifications(context).relabel()
             null
         }
 
@@ -292,6 +303,7 @@ internal class CoreMethodHandler(
             Wire.Methods.VERSION,
             Wire.Methods.OPEN_VPN_SETTINGS,
             Wire.Methods.SET_START_ON_BOOT,
+            Wire.Methods.SET_LOCALE,
             Wire.Methods.INSTALLED_APPS,
             Wire.Methods.DEVICE_INFO,
             Wire.Methods.PROBE_OUTBOUNDS,

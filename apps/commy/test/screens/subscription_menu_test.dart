@@ -1,6 +1,7 @@
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
 import 'package:commy/src/widgets/qr_sheet.dart';
+import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -135,6 +136,117 @@ void main() {
 
       expect(stored().updateIntervalHours, 1);
       expect(stored().autoUpdate, isFalse);
+    });
+  });
+
+  group('User-Agent', () {
+    // docs/06 promises the override "in the profile settings" and docs/17
+    // sends the owner to "subscription menu -> User-Agent" when servers go
+    // missing. The field went all the way to the request; nothing in the app
+    // could set it.
+    Future<void> openPicker(WidgetTester tester) async {
+      await tester.ensureVisible(find.text(t.subscription.menu.userAgent));
+      await tester.tap(find.text(t.subscription.menu.userAgent));
+      await tester.pumpAndSettle();
+      expect(find.text(t.subscription.userAgent.body), findsOneWidget);
+    }
+
+    Future<void> save(WidgetTester tester) async {
+      await tester.ensureVisible(find.text(t.common.save));
+      await tester.tap(find.text(t.common.save));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a preset is one tap, and the row names it', (tester) async {
+      await pumpMenu(tester);
+      expect(find.text(CommyUserAgent.product), findsOneWidget);
+
+      await openPicker(tester);
+      await tester.ensureVisible(find.text('v2rayNG'));
+      await tester.tap(find.text('v2rayNG'));
+      await tester.pump();
+      await save(tester);
+
+      expect(stored().userAgentOverride, CommyUserAgent.presets['v2rayNG']);
+      expect(find.text('v2rayNG'), findsOneWidget);
+    });
+
+    testWidgets('a new choice is fetched with at once', (tester) async {
+      // Picked because servers were missing: waiting for the next scheduled
+      // refresh made the choice look like it had done nothing.
+      await pumpMenu(tester);
+
+      await openPicker(tester);
+      await tester.ensureVisible(find.text('v2rayNG'));
+      await tester.tap(find.text('v2rayNG'));
+      await tester.pump();
+      await save(tester);
+
+      expect(harness.subscriptionFetcher.callCount, 1);
+      expect(
+        harness.subscriptionFetcher.userAgents.single,
+        CommyUserAgent.presets['v2rayNG'],
+      );
+    });
+
+    testWidgets('saving the choice already made fetches nothing',
+        (tester) async {
+      await pumpMenu(tester);
+
+      await openPicker(tester);
+      await save(tester);
+
+      expect(stored().userAgentOverride, isNull);
+      expect(harness.subscriptionFetcher.callCount, 0);
+    });
+
+    testWidgets("the user's own string is kept as typed", (tester) async {
+      await pumpMenu(tester);
+
+      await openPicker(tester);
+      await tester.ensureVisible(find.text(t.subscription.userAgent.custom));
+      await tester.tap(find.text(t.subscription.userAgent.custom));
+      await tester.pump();
+      await tester.enterText(find.byType(CommyTextField), '  Happ/3.9.0 ');
+      await save(tester);
+
+      expect(stored().userAgentOverride, 'Happ/3.9.0');
+    });
+
+    testWidgets('a string no header can carry is refused, not saved',
+        (tester) async {
+      // dart:io throws on a header outside printable ASCII, and every
+      // refresh would then read as a server that is not answering.
+      await pumpMenu(tester);
+
+      await openPicker(tester);
+      await tester.ensureVisible(find.text(t.subscription.userAgent.custom));
+      await tester.tap(find.text(t.subscription.userAgent.custom));
+      await tester.pump();
+      await tester.enterText(find.byType(CommyTextField), 'Хэпп/1.0');
+      await save(tester);
+
+      expect(find.text(t.subscription.userAgent.invalid), findsOneWidget);
+      expect(stored().userAgentOverride, isNull);
+    });
+
+    testWidgets('the default is a choice too, and it clears the override',
+        (tester) async {
+      await pumpMenu(
+        tester,
+        subscription: testSubscription().copyWith(
+          userAgentOverride: 'Happ/3.9.0',
+        ),
+      );
+      expect(find.text('Happ/3.9.0'), findsOneWidget);
+
+      await openPicker(tester);
+      await tester.tap(find.text(t.subscription.userAgent.honest));
+      await tester.pump();
+      await save(tester);
+
+      expect(stored().userAgentOverride, isNull);
+      expect(find.text(CommyUserAgent.product), findsOneWidget);
     });
   });
 }

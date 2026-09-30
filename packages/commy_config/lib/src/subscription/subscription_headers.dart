@@ -174,7 +174,9 @@ class SubscriptionHeaders {
     }
     if (unescaped.toLowerCase().startsWith(base64Prefix)) {
       final payload = unescaped.substring(base64Prefix.length).trim();
-      return LenientBase64.decodeToString(payload) ?? payload;
+      // No length guard: the prefix already says what this is, and a short
+      // title ('VPN' is `VlBO`) is exactly as base64 as a long one.
+      return LenientBase64.decodeToString(payload, minLength: 1) ?? payload;
     }
     if (unescaped.contains(' ') || unescaped.length % 4 != 0) {
       return unescaped;

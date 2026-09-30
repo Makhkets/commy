@@ -23,6 +23,14 @@ abstract interface class TrafficHistoryRepository {
   /// sample of the next session is not read as a change from the last one.
   void resetSession();
 
+  /// Writes what [recordSample] has counted but not stored yet.
+  ///
+  /// An implementation may hold the deltas in memory and write them in
+  /// batches rather than once a tick. Call this when the tunnel goes down and
+  /// when the app leaves the foreground, so an end of the process there takes
+  /// nothing with it.
+  Future<Result<void, CommyFailure>> flush();
+
   /// The days from [from] to [to] inclusive, oldest first, once.
   Future<Result<List<TrafficDay>, CommyFailure>> readRange({
     required DateTime from,

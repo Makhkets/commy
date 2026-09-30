@@ -92,15 +92,18 @@ class LinkParserRegistry {
   ProxyNode parse(String raw) {
     final scheme = RawLink.schemeOf(raw);
     if (scheme == null) {
-      throw const LinkFormatException('Not a proxy link');
+      throw const LinkFormatException.notALink('Not a proxy link');
     }
     final parser = _byScheme[scheme];
     if (parser == null) {
-      throw LinkFormatException('Unsupported scheme "$scheme://"');
+      throw LinkFormatException.unsupportedScheme(
+        'Unsupported scheme "$scheme://"',
+        subject: '$scheme://',
+      );
     }
     final isWebScheme = scheme == 'http' || scheme == 'https';
     if (isWebScheme && !HttpLinkParser.looksLikeProxy(raw)) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.notALink(
         'Looks like a subscription address, not a proxy',
       );
     }
@@ -138,7 +141,11 @@ class LinkParserRegistry {
       }
       if (!RawLink.hasScheme(line)) {
         failures.add(
-          ImportFailure(rawLine: line, reason: 'Line is not a proxy link'),
+          ImportFailure(
+            rawLine: line,
+            reason: 'Line is not a proxy link',
+            kind: ImportFailureKind.notALink,
+          ),
         );
         continue;
       }
@@ -153,10 +160,18 @@ class LinkParserRegistry {
         );
         index++;
       } on LinkFormatException catch (error) {
-        failures.add(ImportFailure(rawLine: line, reason: error.reason));
+        failures.add(error.toFailure(line));
       } on Object catch (error) {
+        // The type only. An exception's own text quotes its input — a
+        // `FormatException` prints the link it choked on, credentials and
+        // all — while the reason is the part of a failure that is never
+        // redacted: it is what a log line or `DriftImportFailureStore`
+        // keeps beside the redacted line.
         failures.add(
-          ImportFailure(rawLine: line, reason: 'Could not be read: $error'),
+          ImportFailure(
+            rawLine: line,
+            reason: 'Could not be read: ${error.runtimeType}',
+          ),
         );
       }
     }

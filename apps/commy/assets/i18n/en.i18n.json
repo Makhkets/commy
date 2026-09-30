@@ -144,7 +144,17 @@
       "skippedTitle": "Skipped lines",
       "nothing": "No servers found",
       "nothingBody": "Check that the text holds a vless:// style link or a base64 subscription.",
-      "alreadyThere": "You already had this subscription — it was refreshed in place."
+      "alreadyThere": "You already had this subscription — it was refreshed in place.",
+      "skippedReason": {
+        "malformed": "Could not be read",
+        "notALink": "Not a server, nor a link to one",
+        "unsupportedScheme": "$scheme is not supported",
+        "unsupported": "Not supported: $what",
+        "unsupportedUnnamed": "The server needs something Commy does not have",
+        "incomplete": "Something required is missing: the address, port, key or password",
+        "emptyBody": "The subscription came back empty",
+        "unknownFormat": "Not a link list, a Clash file or a sing-box config"
+      }
     }
   },
 
@@ -180,7 +190,16 @@
       "autoUpdate": "Auto refresh",
       "interval": "Refresh interval",
       "showQr": "Show QR code",
+      "userAgent": "User-Agent",
       "delete": "Delete"
+    },
+    "userAgent": {
+      "title": "User-Agent",
+      "body": "How the app introduces itself to the panel. Some panels answer each client differently: if servers are missing or the subscription will not load, pick a client the panel knows.",
+      "honest": "Commy — the default",
+      "custom": "Your own string",
+      "customLabel": "User-Agent",
+      "invalid": "Latin letters, digits and punctuation only"
     },
     "rename": {
       "title": "Rename subscription",
@@ -367,8 +386,8 @@
       "title": "Connection",
       "autoConnect": "Auto connect",
       "autoConnectHint": "When the app starts",
-      "startOnBoot": "Start on boot",
-      "startOnBootHint": "Needs a system permission",
+      "startOnBoot": "Remind after restart",
+      "startOnBootHint": "A notification after the phone restarts; one tap on it connects. The tunnel can't come up without the app.",
       "killSwitch": "Kill switch",
       "killSwitchHint": "Provided by Android: Always-on VPN with \"Block connections without VPN\". Tap to open it.",
       "killSwitchUnavailable": "This system has no VPN settings screen",
@@ -483,6 +502,7 @@
     "dropped": {
       "title": "Some rules are not being applied",
       "body": "They name a rule set that is not on disk. The tunnel still comes up, but these rules do nothing until the sets are downloaded.",
+      "bodyGeneric": "The tunnel still comes up, but these rules do nothing right now. Each line says why.",
       "adBlock": "Ad blocking — the $tag list is not downloaded",
       "notHere": "$rule — does nothing on this device",
       "needsSets": "$rule — needs $sets",
@@ -598,6 +618,22 @@
       "message": "The panel refused the request: HTTP ${status}. The subscription may be expired, revoked, or over its device limit.",
       "action": "Retry"
     },
+    "subscriptionServerError": {
+      "message": "The subscription server is having trouble: HTTP ${status}. That is on its side — try again later.",
+      "action": "Retry"
+    },
+    "subscriptionCertificate": {
+      "message": "The subscription server's certificate was not accepted: it is expired, self-signed or issued for another name. Check the date and time on this device; if they are right, it is for whoever runs the panel to fix.",
+      "action": "Open the logs"
+    },
+    "subscriptionInsecureRedirect": {
+      "message": "The subscription server redirected to an unencrypted (http) address. Commy does not follow it: the link and the servers would cross the network in the clear.",
+      "action": "Open the logs"
+    },
+    "subscriptionRedirect": {
+      "message": "The subscription server keeps redirecting, or redirects somewhere Commy does not go. Retrying gets the same answer — check the subscription address or ask the panel's support.",
+      "action": "Open the logs"
+    },
     "subscriptionMalformed": {
       "message": "The subscription response could not be read",
       "action": "Open the logs"
@@ -668,7 +704,9 @@
     "quota": "$used of $total used",
     "search": "Search the logs",
     "copyLogs": "Copy the logs",
-    "subscriptionHealth": "Subscription health",
+    "subscriptionOk": "Subscription is fine",
+    "subscriptionRunningOut": "Subscription is running out",
+    "subscriptionExpired": "Subscription has expired",
     "dismiss": "Dismiss"
   }
 }

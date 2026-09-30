@@ -88,7 +88,11 @@ class SubscriptionBodyReader {
     if (trimmed.isEmpty) {
       return const ParseOutcome(
         failures: <ImportFailure>[
-          ImportFailure(rawLine: '', reason: 'The body is empty'),
+          ImportFailure(
+            rawLine: '',
+            reason: 'The body is empty',
+            kind: ImportFailureKind.emptyBody,
+          ),
         ],
       );
     }
@@ -154,6 +158,7 @@ class SubscriptionBodyReader {
         ImportFailure(
           rawLine: '',
           reason: 'This is not a link list, a Clash file or a sing-box config',
+          kind: ImportFailureKind.unknownFormat,
         ),
       ],
     );
@@ -342,10 +347,7 @@ class SubscriptionBodyReader {
       ],
       failures: <ImportFailure>[
         for (final failure in outcome.failures)
-          ImportFailure(
-            rawLine: named(failure.rawLine),
-            reason: failure.reason,
-          ),
+          failure.copyWith(rawLine: named(failure.rawLine)),
       ],
     );
   }
@@ -389,14 +391,13 @@ class SubscriptionBodyReader {
         );
         index++;
       } on LinkFormatException catch (error) {
-        failures.add(
-          ImportFailure(rawLine: _describe(object), reason: error.reason),
-        );
+        failures.add(error.toFailure(_describe(object)));
       } on Object catch (error) {
+        // The type only, as for a link: an exception's text quotes its input.
         failures.add(
           ImportFailure(
             rawLine: _describe(object),
-            reason: 'Could not be read: $error',
+            reason: 'Could not be read: ${error.runtimeType}',
           ),
         );
       }

@@ -83,6 +83,21 @@ single: 'it''s'
       expect(document['single'], "it's");
     });
 
+    test(r'a \u escape without four hex digits is kept as written', () {
+      // `int.tryParse` takes a sign, so `\u-001` was char code -1, which
+      // throws: one such name and the whole subscription failed to read.
+      expect(ClashYamlReader.unescape(r'\u-001'), 'u-001');
+      expect(ClashYamlReader.unescape(r'\u+0041'), 'u+0041');
+      expect(ClashYamlReader.unescape(r'\u00zz'), 'u00zz');
+      expect(ClashYamlReader.unescape(r'\u0041B'), 'AB');
+
+      final document = ClashYamlReader.tryParseDocument(
+        'proxies:\n  - name: "\\u-001"\n    port: 443\n',
+      );
+      final proxies = document!['proxies']! as List<Object?>;
+      expect((proxies.single! as Map<String, Object?>)['name'], 'u-001');
+    });
+
     test('refuses a document with anchors rather than half reading it', () {
       final document = ClashYamlReader.tryParseDocument('''
 defaults: &base

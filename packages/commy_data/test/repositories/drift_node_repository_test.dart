@@ -66,6 +66,92 @@ void main() {
       expect(emitted.single.param('uuid'), equals(Fixtures.uuid));
     });
 
+    // Hydrating is a keystore `readAll` plus a JSON decode of every server's
+    // secrets. The app watches the list twice (the servers, and the rows that
+    // are panel notices), and "measure all" writes once per server.
+    group('watchAll hydrates once per change, however many watch', () {
+      late CountingSecureStore counting;
+      late DriftNodeRepository watched;
+
+      setUp(() async {
+        await repository.upsertAll(<ProxyNode>[
+          Fixtures.vlessNode(),
+          Fixtures.trojanNode(sortIndex: 1),
+        ]);
+        counting = CountingSecureStore(stack.store);
+        watched = DriftNodeRepository(
+          database: stack.database,
+          secrets: SecretVault(store: counting),
+        );
+      });
+
+      Future<void> settle(bool Function() done) async {
+        for (var turn = 0; turn < 200 && !done(); turn++) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        expect(done(), isTrue, reason: 'the watch never delivered');
+      }
+
+      test('two watchers, one write: one keystore read', () async {
+        final servers = <List<ProxyNode>>[];
+        final rows = <List<ProxyNode>>[];
+        final first = watched.watchAll().listen(servers.add);
+        final second = watched.watchAll().listen(rows.add);
+        addTearDown(first.cancel);
+        addTearDown(second.cancel);
+        await settle(() => servers.isNotEmpty && rows.isNotEmpty);
+        expect(counting.readAlls, equals(1));
+
+        await watched.updateLatency(
+          id: 'node-vless',
+          latency: const Duration(milliseconds: 80),
+          checkedAt: DateTime.utc(2026, 8, 4, 10),
+        );
+        await settle(() => servers.length == 2 && rows.length == 2);
+
+        expect(counting.readAlls, equals(2));
+        expect(
+          rows.last.first.latency,
+          equals(const Duration(milliseconds: 80)),
+        );
+        // Whole nodes still, credentials included, for both.
+        expect(servers.last.first.param('uuid'), equals(Fixtures.uuid));
+        expect(rows.last.first.param('uuid'), equals(Fixtures.uuid));
+      });
+
+      test('a late watcher gets the current list without a read', () async {
+        final early = watched.watchAll().listen((_) {});
+        addTearDown(early.cancel);
+        await settle(() => counting.readAlls == 1);
+
+        final joined = await watched.watchAll().first;
+
+        expect(
+          joined.map((node) => node.id),
+          equals(<String>['node-vless', 'node-trojan']),
+        );
+        expect(counting.readAlls, equals(1));
+      });
+
+      test('the last watcher leaving stops it, the next one starts over',
+          () async {
+        await watched.watchAll().first;
+        await watched.updateLatency(
+          id: 'node-trojan',
+          latency: const Duration(milliseconds: 90),
+          checkedAt: DateTime.utc(2026, 8, 4, 10),
+        );
+
+        final again = await watched.watchAll().first;
+
+        expect(
+          again.last.latency,
+          equals(const Duration(milliseconds: 90)),
+        );
+        expect(counting.readAlls, equals(2));
+      });
+    });
+
     test('deleting a node removes its credentials too', () async {
       final node = Fixtures.vlessNode();
       await repository.upsertAll(<ProxyNode>[node]);
@@ -616,4 +702,37 @@ void main() {
       );
     });
   });
+}
+
+/// Counts the keystore reads that hydrate a whole list.
+class CountingSecureStore implements SecureStore {
+  /// Wraps [inner].
+  CountingSecureStore(this.inner);
+
+  /// Where the values live.
+  final SecureStore inner;
+
+  /// How many times [readAll] ran.
+  int readAlls = 0;
+
+  @override
+  Future<Map<String, String>> readAll() {
+    readAlls++;
+    return inner.readAll();
+  }
+
+  @override
+  Future<String?> read(String key) => inner.read(key);
+
+  @override
+  Future<void> write(String key, String value) => inner.write(key, value);
+
+  @override
+  Future<void> delete(String key) => inner.delete(key);
+
+  @override
+  Future<void> deleteAll() => inner.deleteAll();
+
+  @override
+  Future<bool> contains(String key) => inner.contains(key);
 }

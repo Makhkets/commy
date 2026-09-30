@@ -36,7 +36,9 @@ class SocksLinkParser implements NodeLinkParser {
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException('socks:// link carries no server port');
+      throw const LinkFormatException.incomplete(
+        'socks:// link carries no server port',
+      );
     }
     final credentials = _readCredentials(link.userInfo);
     final declared = link.query.first('version')?.toLowerCase();

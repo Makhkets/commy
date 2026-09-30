@@ -23,9 +23,17 @@ abstract final class LenientBase64 {
   ///
   /// Accepts both alphabets, tolerates missing padding and ignores every
   /// whitespace character anywhere in the input.
-  static List<int>? decodeToBytes(String source) {
+  ///
+  /// [minLength] defaults to the [minimumLength] guard, which is only right
+  /// when the caller is guessing. A value that announced itself as base64 — a
+  /// header with the `base64:` prefix — is decoded however short it is: a
+  /// panel title of three letters is four characters of base64.
+  static List<int>? decodeToBytes(
+    String source, {
+    int minLength = minimumLength,
+  }) {
     final compact = source.replaceAll(_whitespace, '');
-    if (compact.length < minimumLength || !_alphabet.hasMatch(compact)) {
+    if (compact.length < minLength || !_alphabet.hasMatch(compact)) {
       return null;
     }
     final normalised =
@@ -49,8 +57,13 @@ abstract final class LenientBase64 {
   /// Returns `null` when the bytes are not valid UTF-8 or when the result is
   /// mostly control characters, which is what happens when a plain link list
   /// happens to consist of base64-legal characters.
-  static String? decodeToString(String source) {
-    final bytes = decodeToBytes(source);
+  ///
+  /// [minLength] is passed on to [decodeToBytes].
+  static String? decodeToString(
+    String source, {
+    int minLength = minimumLength,
+  }) {
+    final bytes = decodeToBytes(source, minLength: minLength);
     if (bytes == null) {
       return null;
     }

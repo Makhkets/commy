@@ -51,6 +51,27 @@ void main() {
       expect(headers.profileTitle, 'Мой профиль');
     });
 
+    test('decodes a prefixed title however short it is', () {
+      // Three bytes are four characters of base64, under the length guard
+      // that exists for guessing. The prefix is not a guess: a panel titled
+      // 'VPN' made a card called 'VlBO'.
+      expect(SubscriptionHeaders.decodeHeaderText('base64:VlBO'), 'VPN');
+      expect(SubscriptionHeaders.decodeHeaderText('base64:RVU='), 'EU');
+      expect(SubscriptionHeaders.decodeHeaderText('base64:0K8='), 'Я');
+      final headers = SubscriptionHeaders.from(<String, Object?>{
+        'profile-title': 'base64:VlBO',
+        'announce': 'base64:SGk=',
+      });
+      expect(headers.profileTitle, 'VPN');
+      expect(headers.announcement, 'Hi');
+    });
+
+    test('still leaves a short unprefixed title alone', () {
+      // The guard itself stays for the guess: 'VlBO' with no prefix could be
+      // anything, and is shown as it came.
+      expect(SubscriptionHeaders.decodeHeaderText('VlBO'), 'VlBO');
+    });
+
     test('decodes an unprefixed title that is unambiguously base64', () {
       final headers = SubscriptionHeaders.from(<String, Object?>{
         'profile-title': '0JzQvtC5INC/0YDQvtGE0LjQu9GM',

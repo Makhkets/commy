@@ -40,6 +40,15 @@ import 'package:go_router/go_router.dart';
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: AppRoutes.home,
+    // A location no route knows goes home, not to go_router's own error page.
+    // That page — English, "GoException: no routes for location", its only
+    // way out a button — is what a `happ://add/<url>` link opened: Flutter
+    // hands the router the URI of the intent that started the activity, and
+    // that one has a path. The link itself is read over the intent channel
+    // (IntentBus), which is where its import sheet comes from; the router
+    // has no business with it. The location is not logged: a link like that
+    // carries a subscription's token (R3).
+    onException: (context, state, router) => router.go(AppRoutes.home),
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.home,

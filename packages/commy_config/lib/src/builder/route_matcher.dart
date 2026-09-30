@@ -370,8 +370,10 @@ class RouteMatcher {
   /// until that name is resolved: `ip_cidr`, and a `geoip` country.
   ///
   /// Under FakeIP every connection whose name went through the resolver
-  /// carries that name and no address, so these match nothing on their own.
-  /// `RouteSectionBuilder` resolves the name ahead of the first of them.
+  /// carries that name and no address, and so does every connection from a
+  /// device on the LAN through the local proxy, so these match nothing on
+  /// their own. `RouteSectionBuilder` resolves the name ahead of the first
+  /// of them.
   ///
   /// `geoip:private` is not counted, for the reason the LAN bypass is not:
   /// what it is for is a private address dialled as an address, which FakeIP

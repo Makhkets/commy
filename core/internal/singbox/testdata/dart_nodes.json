@@ -259,6 +259,91 @@
       }
     },
     {
+      "name": "DNS, FakeIP on, a proxied exception above a direct and a blocked rule",
+      "kind": "dns",
+      "object": {
+        "servers": [
+          {
+            "type": "tls",
+            "tag": "dns-remote",
+            "server": "1.1.1.1",
+            "detour": "proxy"
+          },
+          {
+            "type": "local",
+            "tag": "dns-direct"
+          },
+          {
+            "type": "fakeip",
+            "tag": "dns-fake",
+            "inet4_range": "198.18.0.0/15",
+            "inet6_range": "fc00::/18"
+          }
+        ],
+        "rules": [
+          {
+            "domain": [
+              "example.com"
+            ],
+            "query_type": [
+              "A",
+              "AAAA"
+            ],
+            "server": "dns-fake"
+          },
+          {
+            "domain": [
+              "example.com"
+            ],
+            "server": "dns-remote"
+          },
+          {
+            "domain_suffix": [
+              "com"
+            ],
+            "server": "dns-direct"
+          },
+          {
+            "domain_keyword": [
+              "ads"
+            ],
+            "action": "reject"
+          },
+          {
+            "query_type": [
+              "A",
+              "AAAA"
+            ],
+            "server": "dns-fake"
+          }
+        ],
+        "final": "dns-remote",
+        "strategy": "prefer_ipv4",
+        "independent_cache": true
+      }
+    },
+    {
+      "name": "DNS, Direct mode, the direct resolver answering the rest",
+      "kind": "dns",
+      "object": {
+        "servers": [
+          {
+            "type": "tls",
+            "tag": "dns-remote",
+            "server": "1.1.1.1",
+            "detour": "proxy"
+          },
+          {
+            "type": "local",
+            "tag": "dns-direct"
+          }
+        ],
+        "final": "dns-direct",
+        "strategy": "prefer_ipv4",
+        "independent_cache": true
+      }
+    },
+    {
       "name": "Route, rules as other clients write them",
       "kind": "route",
       "object": {
@@ -275,6 +360,13 @@
               53
             ],
             "action": "hijack-dns"
+          },
+          {
+            "ip_cidr": [
+              "172.19.0.1/30",
+              "fdfe:dcba:9876::1/126"
+            ],
+            "action": "reject"
           },
           {
             "ip_is_private": true,
@@ -338,6 +430,13 @@
               53
             ],
             "action": "hijack-dns"
+          },
+          {
+            "ip_cidr": [
+              "172.19.0.1/30",
+              "fdfe:dcba:9876::1/126"
+            ],
+            "action": "reject"
           },
           {
             "ip_is_private": true,

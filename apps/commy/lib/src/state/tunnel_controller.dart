@@ -17,6 +17,7 @@ import 'dart:async';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/app_visibility.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -37,12 +38,46 @@ final trafficProvider = StreamProvider<TrafficSample>((ref) {
 });
 
 /// Open connections, refreshed by the core.
-final connectionsProvider = StreamProvider<List<ConnectionInfo>>((ref) {
+///
+/// Auto-disposed, so leaving the Connections tab cancels the subscription.
+/// Kept, it was only paused: a paused subscription to the channel's broadcast
+/// stream queues every event, and the core sends the whole table once a second
+/// while there is traffic — an hour in the background after one look at the
+/// tab was thousands of snapshots, all decoded at once on the UI isolate when
+/// the tab was opened again. On Android the core also streams connections
+/// only while this channel has a listener (a JNI crossing per connection event
+/// and a JSON encode of the table every second). The data is a snapshot, so
+/// nothing is lost by letting go: a new listener gets the current table
+/// straight away.
+///
+/// Let go of while the app is hidden too. The tab on top of the stack with
+/// the app in the background is not left, so nothing pauses it, and the
+/// tunnel keeps the process alive: the table went on arriving once a second,
+/// decoded on the UI isolate, for a screen nobody could see.
+final StreamProvider<List<ConnectionInfo>> connectionsProvider =
+    StreamProvider.autoDispose((ref) {
+  if (!ref.watch(appVisibleProvider)) {
+    return const Stream<List<ConnectionInfo>>.empty();
+  }
   return ref.watch(coreClientProvider).connections;
 });
 
 /// Everything the log screen shows: core lines and our own, merged.
+///
+/// Kept when the screen is left, so coming back shows the log at once. Kept
+/// is paused, and a paused stream queues; the repository's stream lets go
+/// while it is paused and hands back the current view when it resumes, so a
+/// log screen visited once costs nothing while the user is elsewhere.
+///
+/// And let go of while the app is hidden, for the same reason as
+/// [connectionsProvider]: the log screen on top of the stack is not left
+/// when the whole app goes into the background, and every line the core
+/// wrote copied the whole view for it. Shown again, the watch starts afresh
+/// with the view as it is by then.
 final logLinesProvider = StreamProvider<List<LogLine>>((ref) {
+  if (!ref.watch(appVisibleProvider)) {
+    return const Stream<List<LogLine>>.empty();
+  }
   return ref.watch(logRepositoryProvider).watch();
 });
 
@@ -75,6 +110,14 @@ const Duration _groupPoll = Duration(seconds: 5);
 /// With a server chosen by hand the app already knows the answer — it is the
 /// one the user tapped — and a poll that answers a question nobody asked is
 /// how a battery goes missing.
+///
+/// For the same reason it asks only while somebody can see the answer: while
+/// a screen that shows it is listening, and while the app is on screen. Home
+/// stays mounted under Settings, and the process stays alive in the
+/// background for the tunnel's sake; the poll used to go on through both,
+/// every five seconds for hours, queueing each answer behind the paused
+/// subscription until Home was shown again. When it starts again it asks at
+/// once, so the label is current without waiting out an interval.
 final proxyGroupsProvider = StreamProvider<List<ProxyGroup>>((ref) {
   final core = ref.watch(coreClientProvider);
   final isUp = switch (ref.watch(coreStatusProvider).value) {
@@ -109,12 +152,44 @@ final proxyGroupsProvider = StreamProvider<List<ProxyGroup>>((ref) {
     }
   }
 
-  final timer = Timer.periodic(_groupPoll, (_) => unawaited(ask()));
-  unawaited(ask());
-  ref.onDispose(() {
-    timer.cancel();
-    unawaited(controller.close());
-  });
+  Timer? timer;
+  var listened = true;
+  var visible = true;
+  // Reads no provider: it runs inside `onCancel` and `onResume`, where
+  // Riverpod does not allow it. Visibility comes in through the listener.
+  void poll() {
+    if (!listened || !visible || controller.isClosed) {
+      timer?.cancel();
+      timer = null;
+      return;
+    }
+    if (timer == null) {
+      timer = Timer.periodic(_groupPoll, (_) => unawaited(ask()));
+      unawaited(ask());
+    }
+  }
+
+  ref
+    ..listen<bool>(
+      appVisibleProvider,
+      (_, next) {
+        visible = next;
+        poll();
+      },
+      fireImmediately: true,
+    )
+    ..onCancel(() {
+      listened = false;
+      poll();
+    })
+    ..onResume(() {
+      listened = true;
+      poll();
+    })
+    ..onDispose(() {
+      timer?.cancel();
+      unawaited(controller.close());
+    });
   return controller.stream;
 });
 
@@ -261,13 +336,14 @@ final autoConnectProvider = Provider<void>((ref) {
       return;
     }
     decided = true;
-    final nodeId = selected.value;
-    if (!settings.autoConnect || nodeId == null) {
+    if (!settings.autoConnect || selected.value == null) {
       return;
     }
-    unawaited(
-      ref.read(tunnelControllerProvider.notifier).connect(nodeId: nodeId),
-    );
+    // No id passed: the connect then checks the selection against the
+    // servers there are, as the button does, and a selection whose
+    // subscription was deleted lands on the first server instead of
+    // failing the launch with "the selected node no longer exists".
+    unawaited(ref.read(tunnelControllerProvider.notifier).connect());
   }
 
   ref

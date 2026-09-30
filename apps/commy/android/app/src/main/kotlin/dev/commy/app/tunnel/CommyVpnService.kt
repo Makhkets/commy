@@ -420,7 +420,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
             // — the on-screen uptime hangs off it and must not jump.
             val since = events.startedAtMillis() ?: System.currentTimeMillis()
             TunnelController.onStarted(since)
-            notifications.update(Wire.States.CONNECTED, events.selectedNode, 0, 0)
+            notifications.update(Wire.States.CONNECTED, 0, 0)
             notifications.clearPrompt()
         } catch (error: Throwable) {
             val failure = error as? WireException
@@ -483,7 +483,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         if (!isCoreUp) {
             return
         }
-        notifications.update(Wire.States.CONNECTED, bridge?.selectedNode, up, down)
+        notifications.update(Wire.States.CONNECTED, up, down)
         // Rides the once-a-second tick: the kill switch can be turned on
         // mid-session, and the platform answers only while our VPN is up.
         slot.rememberLockdown(force = false)
@@ -828,7 +828,7 @@ class CommyVpnService : VpnService(), CommandServerHandler {
     // ── system UI plumbing ────────────────────────────────────────────────
 
     private fun goForeground(state: String) {
-        startForegroundCompat(notifications.build(state, bridge?.selectedNode, 0, 0))
+        startForegroundCompat(notifications.build(state, 0, 0))
     }
 
     private fun startForegroundCompat(notification: Notification) {

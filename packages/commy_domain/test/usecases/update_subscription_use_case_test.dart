@@ -276,6 +276,49 @@ void main() {
       expect(stored.sortIndex, 1);
     });
 
+    test('the interval picked in the menu outlives the next refresh', () async {
+      // The panel sends `profile-update-interval: 12` with every answer; the
+      // user picked one hour. The card went back to twelve on the refresh
+      // after, without a word.
+      final subscriptions = FakeSubscriptionRepository()
+        ..seed(original.copyWith(updateIntervalHours: 1));
+      final refresh = UpdateSubscriptionUseCase(
+        fetcher: StubSubscriptionFetcher(
+          const SubscriptionPayload(
+            body: 'vless://...',
+            updateIntervalHours: 12,
+          ),
+        ),
+        parser: StubLinkParser(ParseOutcome.empty),
+        subscriptions: subscriptions,
+        nodes: RecordingNodeRepository(),
+      );
+
+      final result = await refresh(subscriptionId: 'sub-1');
+
+      expect(subscriptions.stored.single.updateIntervalHours, 1);
+      expect(result.valueOrNull?.subscription.updateIntervalHours, 1);
+    });
+
+    test("with no interval yet, the panel's is taken", () async {
+      final subscriptions = FakeSubscriptionRepository()..seed(original);
+      final refresh = UpdateSubscriptionUseCase(
+        fetcher: StubSubscriptionFetcher(
+          const SubscriptionPayload(
+            body: 'vless://...',
+            updateIntervalHours: 12,
+          ),
+        ),
+        parser: StubLinkParser(ParseOutcome.empty),
+        subscriptions: subscriptions,
+        nodes: RecordingNodeRepository(),
+      );
+
+      await refresh(subscriptionId: 'sub-1');
+
+      expect(subscriptions.stored.single.updateIntervalHours, 12);
+    });
+
     test("the panel's half of the row is still the panel's", () async {
       final subscriptions = FakeSubscriptionRepository()..seed(original);
       final refresh = useCase(

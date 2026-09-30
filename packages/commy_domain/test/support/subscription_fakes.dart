@@ -69,13 +69,18 @@ class StubSubscriptionFetcher implements SubscriptionFetcher {
 
   final Result<SubscriptionPayload, CommyFailure> _result;
 
+  /// The User-Agent each fetch was asked to send, `null` for the default.
+  final List<String?> userAgents = <String?>[];
+
   @override
   Future<Result<SubscriptionPayload, CommyFailure>> fetch(
     Uri url, {
     required bool throughTunnel,
     String? userAgent,
-  }) async =>
-      _result;
+  }) async {
+    userAgents.add(userAgent);
+    return _result;
+  }
 }
 
 /// A panel that takes its time, during which [meanwhile] happens.

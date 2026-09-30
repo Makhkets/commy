@@ -166,7 +166,7 @@ abstract final class TransportParams {
       params[ParamKeys.security] as String?,
     );
     if (refusal != null) {
-      throw LinkFormatException(refusal);
+      throw LinkFormatException.unsupported(refusal);
     }
   }
 
@@ -217,8 +217,9 @@ abstract final class TransportParams {
     final rawTransport = query.firstOf(transportKeys);
     final transport = normaliseTransport(rawTransport);
     if (transport == null || !supported.contains(transport)) {
-      throw LinkFormatException(
+      throw LinkFormatException.unsupported(
         'Transport "$rawTransport" is not supported by the core',
+        subject: rawTransport,
       );
     }
     params[ParamKeys.transport] = transport;

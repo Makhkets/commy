@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/commy_inline_action.dart';
 import 'package:commy_ui/src/components/commy_tone.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
@@ -64,10 +65,11 @@ class Toast extends StatelessWidget {
               border: Border.all(color: colors.borderDefault),
               boxShadow: context.elevation.level2,
             ),
-            padding: EdgeInsets.symmetric(
-              horizontal: spacing.s4,
-              vertical: spacing.s3,
-            ),
+            // No vertical padding on the toast itself: the message carries
+            // it, so that the action beside it can take the toast's whole
+            // height as its tap target. A one-line toast is 48 tall instead
+            // of 46, and the action is 48 instead of the 22 of its word.
+            padding: EdgeInsets.symmetric(horizontal: spacing.s4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
@@ -76,19 +78,20 @@ class Toast extends StatelessWidget {
                   SizedBox(width: spacing.s3),
                 ],
                 Flexible(
-                  child: Text(
-                    message,
-                    style: type.body.copyWith(color: colors.textPrimary),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: spacing.s3),
+                    child: Text(
+                      message,
+                      style: type.body.copyWith(color: colors.textPrimary),
+                    ),
                   ),
                 ),
                 if (actionLabel != null) ...<Widget>[
                   SizedBox(width: spacing.s4),
-                  GestureDetector(
-                    onTap: onAction,
-                    child: Text(
-                      actionLabel!,
-                      style: type.bodyStrong.copyWith(color: accent),
-                    ),
+                  CommyInlineAction(
+                    label: actionLabel!,
+                    onPressed: onAction,
+                    color: accent,
                   ),
                 ],
               ],

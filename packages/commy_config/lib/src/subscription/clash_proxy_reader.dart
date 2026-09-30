@@ -53,19 +53,26 @@ abstract final class ClashProxyReader {
   static ProxyNode read(Map<String, Object?> proxy) {
     final rawType = MapRead.text(proxy, <String>['type']);
     if (rawType == null) {
-      throw const LinkFormatException('Clash proxy has no type');
+      throw const LinkFormatException.incomplete('Clash proxy has no type');
     }
     final protocol = types[rawType.toLowerCase()];
     if (protocol == null) {
-      throw LinkFormatException('Clash proxy type "$rawType" is not supported');
+      throw LinkFormatException.unsupported(
+        'Clash proxy type "$rawType" is not supported',
+        subject: rawType,
+      );
     }
     final host = MapRead.text(proxy, <String>['server']);
     if (host == null || !HostPort.isPlausibleHost(host.toLowerCase())) {
-      throw const LinkFormatException('Clash proxy has no server address');
+      throw const LinkFormatException.incomplete(
+        'Clash proxy has no server address',
+      );
     }
     final port = MapRead.integer(proxy, <String>['port']);
     if (port == null || port < 1 || port > 65535) {
-      throw const LinkFormatException('Clash proxy has no valid port');
+      throw const LinkFormatException.incomplete(
+        'Clash proxy has no valid port',
+      );
     }
     final name = MapRead.text(proxy, <String>['name']) ?? '$host:$port';
 
@@ -248,8 +255,9 @@ abstract final class ClashProxyReader {
     final rawNetwork = MapRead.text(proxy, <String>['network']);
     final transport = networks[(rawNetwork ?? 'tcp').toLowerCase()];
     if (transport == null || !TransportParams.supported.contains(transport)) {
-      throw LinkFormatException(
+      throw LinkFormatException.unsupported(
         'Transport "$rawNetwork" is not supported by the core',
+        subject: rawNetwork,
       );
     }
     final reality = MapRead.object(proxy, <String>['reality-opts']);
@@ -481,7 +489,7 @@ abstract final class ClashProxyReader {
   ) {
     final value = MapRead.text(proxy, keys);
     if (value == null) {
-      throw LinkFormatException('Clash proxy has no $label');
+      throw LinkFormatException.incomplete('Clash proxy has no $label');
     }
     return value;
   }

@@ -107,6 +107,30 @@ void main() {
       expect(find.bySemanticsLabel('Маршрутизация'), findsOneWidget);
     });
 
+    testWidgets('says on the tablet rail which section is open', (
+      tester,
+    ) async {
+      // The rail marks the open section with a wash at 1.1:1 and nothing a
+      // screen reader hears, unless the button carries the flag itself.
+      final handle = tester.ensureSemantics();
+      await pumpCommy(
+        tester,
+        size: const Size(820, 800),
+        padding: EdgeInsets.zero,
+        child: scaffold(),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Маршрутизация')),
+        isSemantics(isButton: true, isSelected: true),
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Серверы')),
+        isSemantics(isButton: true, isSelected: false),
+      );
+      handle.dispose();
+    });
+
     testWidgets('reports the section that was chosen', (tester) async {
       final chosen = <int>[];
       await pumpCommy(

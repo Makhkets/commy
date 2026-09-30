@@ -7,6 +7,7 @@ import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The last sixty seconds of throughput, kept in memory.
@@ -88,6 +89,11 @@ const String _tag = 'traffic';
 /// between samples, and the baseline is dropped when the tunnel goes down so
 /// the first sample of the next session is not read as a change from the
 /// last one of the previous.
+///
+/// The store writes in batches rather than once a tick, so the pump also
+/// tells it when a batch must not wait: when the tunnel goes down, and when
+/// the app leaves the foreground — after either the process may end before
+/// another tick comes.
 final trafficHistoryPumpProvider = Provider<void>((ref) {
   final repository = ref.watch(trafficHistoryRepositoryProvider);
   final logger = ref.watch(appLoggerProvider);
@@ -95,29 +101,31 @@ final trafficHistoryPumpProvider = Provider<void>((ref) {
   // the next, and the log has better things to hold.
   var warned = false;
 
+  void report(Result<void, CommyFailure> result) {
+    final failure = result.failureOrNull;
+    if (failure != null && !warned) {
+      warned = true;
+      logger.warn('traffic history write failed: ${failure.code}', tag: _tag);
+    }
+  }
+
+  void flush() => unawaited(repository.flush().then(report));
+
+  final lifecycle = AppLifecycleListener(onHide: flush);
   ref
+    ..onDispose(lifecycle.dispose)
     ..listen<AsyncValue<TrafficSample>>(trafficProvider, (previous, next) {
       final sample = next.value;
       if (sample == null) {
         return;
       }
-      unawaited(
-        repository.recordSample(sample).then((result) {
-          final failure = result.failureOrNull;
-          if (failure != null && !warned) {
-            warned = true;
-            logger.warn(
-              'traffic history write failed: ${failure.code}',
-              tag: _tag,
-            );
-          }
-        }),
-      );
+      unawaited(repository.recordSample(sample).then(report));
     })
     ..listen<AsyncValue<TunnelStatus>>(coreStatusProvider, (previous, next) {
       switch (next.value) {
         case TunnelIdle() || TunnelError():
           repository.resetSession();
+          flush();
         case TunnelStarting() ||
               TunnelConnected() ||
               TunnelChecking() ||

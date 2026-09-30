@@ -51,8 +51,8 @@ class StoredDeviceIdentity implements DeviceIdentity {
         return const <String, String>{};
       }
       final described = await _describe();
-      final version = described?.osVersion ?? '';
-      final model = described?.model ?? '';
+      final version = _headerSafe(described?.osVersion);
+      final model = _headerSafe(described?.model);
       return <String, String>{
         DeviceIdentity.hwidHeader: await _readOrCreate(),
         DeviceIdentity.osHeader: platformName,
@@ -93,6 +93,24 @@ class StoredDeviceIdentity implements DeviceIdentity {
       (Object _) => null,
     );
   }
+
+  /// [value] as an HTTP header can carry it, or empty.
+  ///
+  /// `dart:io` refuses a header value with anything outside printable ASCII
+  /// by throwing, and the throw surfaces as "the subscription server is not
+  /// answering" — on every refresh, for as long as the identifier is on. A
+  /// phone whose build names itself in Chinese, or a custom ROM with an
+  /// accented model, is enough. Only the characters a header can hold are
+  /// kept; when none are left the header is absent, as it is for a field the
+  /// platform could not answer.
+  static String _headerSafe(String? value) => (value ?? '')
+      .replaceAll(_notHeaderText, '')
+      .replaceAll(_spaces, ' ')
+      .trim();
+
+  static final RegExp _notHeaderText = RegExp(r'[^\x20-\x7E]');
+
+  static final RegExp _spaces = RegExp(' {2,}');
 
   Future<String> _readOrCreate() async {
     final stored = (await _store.read(SecretKeys.deviceId))?.trim() ?? '';

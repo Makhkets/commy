@@ -106,7 +106,8 @@ class NodeTile extends StatelessWidget {
     // owner could not tell at a glance which servers had failed their ping.
     // Still not `textDisabled`: that is for a control a tap cannot reach, it
     // is 2.0:1 against the surface in the light theme, and this row is still
-    // tappable. Tertiary is 4.9:1, past WCAG AA for a title.
+    // tappable. Tertiary clears WCAG AA here, including on the connected
+    // wash of the active row (4.5:1 in both themes, the tightest case).
     final nameColor = isReachable ? colors.textPrimary : colors.textTertiary;
     final metaColor = isReachable ? colors.textSecondary : colors.textTertiary;
     final flag = CountryFlag(countryCode: countryCode);

@@ -127,6 +127,57 @@ void main() {
       await repository.dispose();
     });
 
+    test('a paused watcher queues nothing and gets the view back on resume',
+        () async {
+      // Riverpod pauses the log screen's subscription when the user leaves
+      // the screen. Every line written after that used to queue a copy of the
+      // whole view behind the pause, for as long as the app ran.
+      final repository = RingBufferLogRepository();
+      final seen = <int>[];
+      final subscription =
+          repository.watch().listen((lines) => seen.add(lines.length));
+      await Future<void>.delayed(Duration.zero);
+
+      subscription.pause();
+      for (var i = 0; i < 100; i++) {
+        await repository.append(line('outbound connection $i'));
+      }
+      await Future<void>.delayed(Duration.zero);
+      subscription.resume();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(seen, <int>[0, 100]);
+
+      // And it follows again once it is back.
+      await repository.append(line('after'));
+      await Future<void>.delayed(Duration.zero);
+      expect(seen, <int>[0, 100, 101]);
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
+    test('a pause with nothing written sends nothing on resume', () async {
+      // A consumer that pauses once per event — `asyncMap` does — used to get
+      // its own resume back as a fresh view and spin on it, thousands of
+      // views a second with not one line written.
+      final repository = RingBufferLogRepository();
+      await repository.append(line('only'));
+      final seen = <int>[];
+      final subscription = repository.watch().asyncMap((lines) async {
+        await Future<void>.delayed(Duration.zero);
+        return lines.length;
+      }).listen(seen.add);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(seen, <int>[1]);
+
+      await repository.append(line('second'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(seen, <int>[1, 2]);
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
     test('appendAll keeps the order and notifies listeners once', () async {
       final repository = RingBufferLogRepository();
       final seen = <int>[];

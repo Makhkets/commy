@@ -4,9 +4,9 @@
 /// one means editing the Kotlin side, this list and `docs/wire-protocol.md` in
 /// the same pull request.
 ///
-/// [openVpnSettings], [setStartOnBoot], [installedApps], [deviceInfo],
-/// [probeOutbounds] and [ping] are not tunnel commands, and they are counted
-/// separately for that reason — see their own notes below.
+/// [openVpnSettings], [setStartOnBoot], [setLocale], [installedApps],
+/// [deviceInfo], [probeOutbounds] and [ping] are not tunnel commands, and they
+/// are counted separately for that reason — see their own notes below.
 abstract final class WireMethods {
   /// Brings the tunnel up. Argument: the configuration JSON, as a string.
   static const String start = 'start';
@@ -67,6 +67,17 @@ abstract final class WireMethods {
   /// boot for nothing, and one disabled while the switch is on is a promise
   /// the settings screen makes and nobody keeps.
   static const String setStartOnBoot = 'setStartOnBoot';
+
+  /// Tells the platform which language the user chose in the app. Argument: a
+  /// bare language tag, `ru` or `en`, and an empty string for "follow the
+  /// system". No result.
+  ///
+  /// Not a tunnel command. The strings Android draws without Flutter — the
+  /// tunnel notification, its channels, the Quick Settings tile — come from
+  /// the platform's own resources and followed the system language, whatever
+  /// the app was set to. The Kotlin side keeps the tag, because the tile and
+  /// the boot reminder are drawn while Flutter is not running.
+  static const String setLocale = 'setLocale';
 
   /// Measures every outbound of a configuration by a GET through it, in a
   /// core instance of its own. Argument: `{config, url, timeoutMs}`, where

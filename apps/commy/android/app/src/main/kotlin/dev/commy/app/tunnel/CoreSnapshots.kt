@@ -80,6 +80,9 @@ internal object CoreSnapshots {
     /** `proxies()` answers an empty array when the core is not running. */
     const val NO_GROUPS = "[]"
 
+    /** The connection table while no tunnel runs: there is nothing open. */
+    const val NO_CONNECTIONS = "[]"
+
     fun encodeGroups(groups: List<GroupSnapshot>): String =
         JSONArray(groups.map(GroupSnapshot::toJson)).toString()
 
@@ -92,6 +95,8 @@ internal object CoreSnapshots {
      * Only ever called when `StatusMessage.getTrafficAvailable()` was true: a
      * zero from "statistics are off" and a zero from "no traffic" are the same
      * number, and sending the first one makes a working tunnel look dead.
+     *
+     * The rates go through [rate]; the totals are passed as they are.
      */
     fun encodeTraffic(
         up: Long,
@@ -100,12 +105,24 @@ internal object CoreSnapshots {
         downTotal: Long,
         at: Long,
     ): String = JSONObject().apply {
-        put(Wire.Keys.UP, up)
-        put(Wire.Keys.DOWN, down)
+        put(Wire.Keys.UP, rate(up))
+        put(Wire.Keys.DOWN, rate(down))
         put(Wire.Keys.UP_TOTAL, upTotal)
         put(Wire.Keys.DOWN_TOTAL, downTotal)
         put(Wire.Keys.AT, at)
     }.toString()
+
+    /**
+     * A rate from a status tick, never below zero.
+     *
+     * libbox computes a tick's rate as the total now minus the total it saw on
+     * the previous tick, and keeps that baseline across a live reload. The
+     * reload builds a new core whose totals start again from zero, so the
+     * first tick after it is minus everything the session had carried: the
+     * home screen read "↑ -850 MB/s" for a second after a routing edit. Nothing
+     * moved backwards, so the honest rate is zero.
+     */
+    fun rate(delta: Long): Long = delta.coerceAtLeast(0)
 
     /**
      * A batch of `/logs` lines.

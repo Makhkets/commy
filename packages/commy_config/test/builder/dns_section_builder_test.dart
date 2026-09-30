@@ -176,6 +176,34 @@ void main() {
       expect(section['final'], 'dns-remote');
     });
 
+    test('in Direct mode leaves unclaimed names to the direct resolver', () {
+      // Nothing goes through the proxy in this mode. Asked through it, every
+      // name failed with the server down — the moment the mode is for.
+      String? finalOf(RoutingMode mode, {bool fakeIp = false}) => _build(
+            DnsSettings(fakeIp: fakeIp),
+            routing: RoutingPolicy(mode: mode),
+          )['final'] as String?;
+
+      expect(finalOf(RoutingMode.direct), 'dns-direct');
+      expect(finalOf(RoutingMode.direct, fakeIp: true), 'dns-direct');
+      expect(finalOf(RoutingMode.rules), 'dns-remote');
+      expect(finalOf(RoutingMode.global), 'dns-remote');
+    });
+
+    test('in Direct mode keeps FakeIP when it is on', () {
+      final section = _build(
+        const DnsSettings(fakeIp: true),
+        routing: const RoutingPolicy(mode: RoutingMode.direct),
+      );
+
+      expect(section['rules'], <Object?>[
+        <String, Object?>{
+          'query_type': <String>['A', 'AAAA'],
+          'server': 'dns-fake',
+        },
+      ]);
+    });
+
     test('adds the FakeIP resolver and its rule only when asked', () {
       final off = _build(DnsSettings.defaults);
       final on = _build(const DnsSettings(fakeIp: true));
@@ -239,6 +267,86 @@ void main() {
         (rules.single! as Map<String, Object?>)['action'],
         'reject',
       );
+    });
+
+    group('a proxied exception above a broader rule', () {
+      // The route section keeps a Proxy rule where the user put it, and both
+      // lists stop at the first match. Skipped here, the exception's query
+      // fell through to the rule below it while its connection went through
+      // the proxy.
+      RoutingPolicy exception(RuleAction broader) => RoutingPolicy(
+            rules: <RoutingRule>[
+              const RoutingRule(
+                id: 'r1',
+                matcher: 'domain:example.com',
+                action: RuleAction.proxy,
+              ),
+              RoutingRule(
+                id: 'r2',
+                matcher: 'domain_suffix:com',
+                action: broader,
+                sortIndex: 1,
+              ),
+            ],
+          );
+      const proxied = <String, Object?>{
+        'domain': <String>['example.com'],
+        'server': 'dns-remote',
+      };
+
+      test('is resolved through the tunnel, not by the direct resolver', () {
+        final section = _build(
+          DnsSettings.defaults,
+          routing: exception(RuleAction.direct),
+        );
+
+        expect(section['rules'], <Object?>[
+          proxied,
+          <String, Object?>{
+            'domain_suffix': <String>['com'],
+            'server': 'dns-direct',
+          },
+        ]);
+      });
+
+      test('is answered, not refused by a Block rule below it', () {
+        final section = _build(
+          DnsSettings.defaults,
+          routing: exception(RuleAction.block),
+        );
+
+        expect(section['rules'], <Object?>[
+          proxied,
+          <String, Object?>{
+            'domain_suffix': <String>['com'],
+            'action': 'reject',
+          },
+        ]);
+      });
+
+      test('gets a FakeIP address when FakeIP is on', () {
+        final section = _build(
+          const DnsSettings(fakeIp: true),
+          routing: exception(RuleAction.direct),
+        );
+
+        expect(section['rules'], <Object?>[
+          <String, Object?>{
+            'domain': <String>['example.com'],
+            'query_type': <String>['A', 'AAAA'],
+            'server': 'dns-fake',
+          },
+          proxied,
+          <String, Object?>{
+            'domain_suffix': <String>['com'],
+            'server': 'dns-direct',
+          },
+          <String, Object?>{
+            'query_type': <String>['A', 'AAAA'],
+            'server': 'dns-fake',
+          },
+        ]);
+      });
     });
 
     test('ignores an address matcher, which a query cannot match', () {

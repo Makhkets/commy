@@ -33,11 +33,15 @@ class TrojanLinkParser implements NodeLinkParser {
     }
     final password = link.decodedUserInfo.trim();
     if (password.isEmpty) {
-      throw const LinkFormatException('trojan:// link carries no password');
+      throw const LinkFormatException.incomplete(
+        'trojan:// link carries no password',
+      );
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException('trojan:// link carries no server port');
+      throw const LinkFormatException.incomplete(
+        'trojan:// link carries no server port',
+      );
     }
     final params = <String, Object?>{ParamKeys.password: password};
     TransportParams.readInto(
@@ -59,7 +63,7 @@ class TrojanLinkParser implements NodeLinkParser {
   String toLink(ProxyNode node) {
     final password = node.param(ParamKeys.password);
     if (password == null || password.isEmpty) {
-      throw const LinkFormatException('Node carries no password');
+      throw const LinkFormatException.incomplete('Node carries no password');
     }
     final address = node.host.contains(':') ? '[${node.host}]' : node.host;
     final query = TransportParams.buildQuery(TransportParams.writeQuery(node));

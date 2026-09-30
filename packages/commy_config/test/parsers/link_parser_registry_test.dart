@@ -56,6 +56,52 @@ this is not a link
       expect(outcome.failures.last.reason, 'Line is not a proxy link');
     });
 
+    test('every refusal says what kind it is, for the app to word', () {
+      // The reason is English, for the log; the import panel is read in
+      // Russian too, and used to show that English as it came.
+      final outcome = registry.parseLines('''
+this is not a link
+https://panel.example/sub/token
+ssr://whatever
+vless://@broken.example:443#Broken
+vless://uuid@a.example:443?encryption=mlkem768x25519plus.native.0rtt.SeCrEtKeY#E
+vless://uuid@a.example:443?type=kcp#K
+''');
+
+      final kinds = <(ImportFailureKind, String?)>[
+        for (final failure in outcome.failures)
+          (failure.kind, failure.subject),
+      ];
+      expect(kinds, <(ImportFailureKind, String?)>[
+        (ImportFailureKind.notALink, null),
+        (ImportFailureKind.notALink, null),
+        (ImportFailureKind.unsupportedScheme, 'ssr://'),
+        (ImportFailureKind.incomplete, null),
+        (ImportFailureKind.unsupported, 'mlkem768x25519plus'),
+        (ImportFailureKind.unsupported, 'kcp'),
+      ]);
+      // The subject is shown on screen: the key after the scheme is not.
+      for (final failure in outcome.failures) {
+        expect('${failure.subject}', isNot(contains('SeCrEtKeY')));
+      }
+    });
+
+    test('an unexpected throw is named by type, never by its text', () {
+      // An exception's own text quotes its input — a FormatException prints
+      // the link it choked on — and the reason goes to the log and to the
+      // open database.
+      final throwing = LinkParserRegistry(
+        parsers: const <NodeLinkParser>[_Throwing()],
+      );
+
+      final outcome = throwing.parseLines('boom://secret-uuid@a.example:443');
+
+      final failure = outcome.failures.single;
+      expect(failure.kind, ImportFailureKind.malformed);
+      expect(failure.reason, isNot(contains('secret-uuid')));
+      expect(failure.reason, contains('FormatException'));
+    });
+
     test('numbers the nodes in the order the panel wrote them', () {
       final outcome = registry.parseLines(
         'vless://uuid@a.example:443#One\nvless://uuid@b.example:443#Two',
@@ -117,4 +163,22 @@ this is not a link
       );
     });
   });
+}
+
+/// A parser that fails the way a bug would: with a plain exception that
+/// quotes the link.
+class _Throwing implements NodeLinkParser {
+  const _Throwing();
+
+  @override
+  Set<String> get schemes => const <String>{'boom'};
+
+  @override
+  Protocol get protocol => Protocol.vless;
+
+  @override
+  ProxyNode parse(String raw) => throw FormatException('bad port', raw);
+
+  @override
+  String toLink(ProxyNode node) => throw UnimplementedError();
 }

@@ -155,12 +155,17 @@ Future<void> pumpCommy(
 /// [builder] is a function rather than a widget so that each theme gets a
 /// freshly built tree — a widget instance reused across two pumps would keep
 /// the state of the first.
+///
+/// [tabs] presses Tab that many times before the photograph, which is how a
+/// golden shows a focus ring: focus that arrives from a key is the only kind
+/// that draws one.
 void goldenTest(
   String name, {
   required WidgetBuilder builder,
   required Size size,
   double textScale = 1,
   EdgeInsets? padding,
+  int tabs = 0,
 }) {
   for (final theme in CommyGoldenTheme.values) {
     testWidgets(
@@ -174,6 +179,12 @@ void goldenTest(
           padding: padding,
           child: Builder(builder: builder),
         );
+        if (tabs > 0) {
+          for (var i = 0; i < tabs; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          }
+          await tester.pump();
+        }
         await expectLater(
           find.byKey(goldenFrame),
           matchesGoldenFile('goldens/$name.${theme.name}.png'),

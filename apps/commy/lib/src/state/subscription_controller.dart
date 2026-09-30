@@ -1,6 +1,7 @@
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/failure_log.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -81,7 +82,7 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     final failure = result.failureOrNull;
     if (failure != null) {
       ref.read(appLoggerProvider).warn(
-            'subscription refresh failed: ${failure.code}',
+            'subscription refresh failed: ${FailureLog.describe(failure)}',
             tag: logTag,
           );
       state = SubscriptionActionState(failure: failure);
@@ -105,10 +106,9 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
 
   /// Turns automatic refreshing on or off.
   Future<void> setAutoUpdate(Subscription subscription, {required bool value}) {
-    return _run(
-      () => ref
-          .read(subscriptionRepositoryProvider)
-          .upsert(subscription.copyWith(autoUpdate: value)),
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(autoUpdate: value),
     );
   }
 
@@ -121,10 +121,23 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     if (hours <= 0) {
       return Future<void>.value();
     }
-    return _run(
-      () => ref
-          .read(subscriptionRepositoryProvider)
-          .upsert(subscription.copyWith(updateIntervalHours: hours)),
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(updateIntervalHours: hours),
+    );
+  }
+
+  /// Sets the User-Agent the subscription is fetched with; `null` or an
+  /// empty string goes back to the default.
+  ///
+  /// The next refresh uses it, and so does adding the same URL again.
+  Future<void> setUserAgent(Subscription subscription, String? userAgent) {
+    final trimmed = userAgent?.trim() ?? '';
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(
+        userAgentOverride: trimmed.isEmpty ? null : trimmed,
+      ),
     );
   }
 
@@ -134,10 +147,9 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     if (trimmed.isEmpty) {
       return Future<void>.value();
     }
-    return _run(
-      () => ref
-          .read(subscriptionRepositoryProvider)
-          .upsert(subscription.copyWith(name: trimmed)),
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(name: trimmed),
     );
   }
 
@@ -200,6 +212,31 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
 
   /// Clears the last outcome once it has been shown.
   void clear() => _settle(null);
+
+  /// Writes [change] over the subscription as it is stored now.
+  ///
+  /// Not over the copy the card or its menu was built from: a menu opened
+  /// before a refresh landed holds the old quota, title and announcement,
+  /// and writing that copy back with a new name undid the refresh. The
+  /// refresh itself reads the fresh row before it writes, for the same
+  /// reason the other way round. A subscription deleted in the meantime is
+  /// left deleted.
+  Future<void> _edit(
+    String id,
+    Subscription Function(Subscription current) change,
+  ) {
+    return _run(() async {
+      final repository = ref.read(subscriptionRepositoryProvider);
+      switch (await repository.findById(id)) {
+        case Ok(value: final Subscription current):
+          return repository.upsert(change(current));
+        case Ok():
+          return const Ok<void, CommyFailure>(null);
+        case Err(:final failure):
+          return Err<void, CommyFailure>(failure);
+      }
+    });
+  }
 
   Future<void> _run(
     Future<Result<void, CommyFailure>> Function() action,

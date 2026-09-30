@@ -88,13 +88,17 @@ void main() {
   /// Read off the rendered semantics rather than off the control's value:
   /// the mark is what tells a screen reader which tab it is on, and a
   /// segment that lost it would still hold the right value.
+  ///
+  /// The nearest `Semantics` that says anything about selection, not merely
+  /// the nearest one: a segment takes keyboard focus, and the focus node
+  /// brings a `Semantics` of its own between the label and the mark.
   bool isMarked(WidgetTester tester, String label) {
-    final semantics = tester.widget<Semantics>(
-      find
-          .ancestor(of: find.text(label), matching: find.byType(Semantics))
-          .first,
-    );
-    return semantics.properties.selected ?? false;
+    final semantics = tester
+        .widgetList<Semantics>(
+          find.ancestor(of: find.text(label), matching: find.byType(Semantics)),
+        )
+        .firstWhere((semantics) => semantics.properties.selected != null);
+    return semantics.properties.selected!;
   }
 
   testWidgets('the segments are the four tab routes, in order', (tester) async {

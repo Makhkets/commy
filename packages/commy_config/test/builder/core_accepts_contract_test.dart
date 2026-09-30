@@ -37,9 +37,10 @@ void main() {
     return OutboundBuilder.build(node: outcome!.nodes.single, tag: 'out');
   }
 
-  Map<String, Object?> dnsFrom(DnsSettings dns) => DnsSectionBuilder.build(
+  Map<String, Object?> dnsFrom(DnsSettings dns, RoutingPolicy routing) =>
+      DnsSectionBuilder.build(
         dns: dns,
-        routing: RoutingPolicy.defaults,
+        routing: routing,
         platform: ConfigPlatform.android,
         availableRuleSets: const <String>{},
       );
@@ -64,6 +65,7 @@ void main() {
         availableRuleSets: const <String>{},
         ruleSetDirectory: null,
         dns: DnsSettings(fakeIp: fakeIp),
+        allowLan: false,
         warnings: <RoutingWarning>[],
       );
 
@@ -87,11 +89,11 @@ void main() {
                   : 'outbound',
               'object': buildFrom(link),
             },
-          for (final (name, dns) in _resolvers)
+          for (final (name, dns, routing) in _resolvers)
             <String, Object?>{
               'name': name,
               'kind': 'dns',
-              'object': dnsFrom(dns),
+              'object': dnsFrom(dns, routing),
             },
           for (final (name, matchers, fakeIp) in _routes)
             <String, Object?>{
@@ -124,7 +126,7 @@ void main() {
       <String>[for (final entry in cases) '${entry['name']}'],
       <String>[
         for (final (name, _) in _links) name,
-        for (final (name, _) in _resolvers) name,
+        for (final (name, _, _) in _resolvers) name,
         for (final (name, _, _) in _routes) name,
         _loopbackProxy,
       ],
@@ -134,9 +136,10 @@ void main() {
   final links = Map<String, String>.fromEntries(
     _links.map((link) => MapEntry<String, String>(link.$1, link.$2)),
   );
-  final resolvers = Map<String, DnsSettings>.fromEntries(
-    _resolvers.map((dns) => MapEntry<String, DnsSettings>(dns.$1, dns.$2)),
-  );
+  final resolvers = <String, Map<String, Object?> Function()>{
+    for (final (name, dns, routing) in _resolvers)
+      name: () => dnsFrom(dns, routing),
+  };
   final routes = <String, Map<String, Object?> Function()>{
     for (final (name, matchers, fakeIp) in _routes)
       name: () => routeFrom(matchers, fakeIp: fakeIp),
@@ -151,7 +154,7 @@ void main() {
         link != null
             ? buildFrom(link)
             : dns != null
-                ? dnsFrom(dns)
+                ? dns()
                 : route != null
                     ? route()
                     : loopbackProxy(),
@@ -164,18 +167,52 @@ void main() {
 /// The loopback proxy of the IP check, which asks for a password.
 const String _loopbackProxy = 'The loopback proxy, with its user';
 
-/// DNS sections, for the resolvers the core has to be told how to find.
-const List<(String, DnsSettings)> _resolvers = <(String, DnsSettings)>[
+/// DNS sections, for the resolvers the core has to be told how to find and
+/// the rules a routing policy writes into the section.
+const List<(String, DnsSettings, RoutingPolicy)> _resolvers =
+    <(String, DnsSettings, RoutingPolicy)>[
   (
     'DNS, the direct resolver by name over HTTPS',
     DnsSettings(
       remote: 'https://dns.google/dns-query',
       direct: 'https://cloudflare-dns.com/dns-query',
     ),
+    RoutingPolicy.defaults,
   ),
   (
     'DNS, the direct resolver by name over TLS, FakeIP on',
     DnsSettings(direct: 'tls://dns.quad9.net', fakeIp: true),
+    RoutingPolicy.defaults,
+  ),
+  (
+    'DNS, FakeIP on, a proxied exception above a direct and a blocked rule',
+    DnsSettings(fakeIp: true),
+    RoutingPolicy(
+      rules: <RoutingRule>[
+        RoutingRule(
+          id: 'r0',
+          matcher: 'domain:example.com',
+          action: RuleAction.proxy,
+        ),
+        RoutingRule(
+          id: 'r1',
+          matcher: 'domain_suffix:com',
+          action: RuleAction.direct,
+          sortIndex: 1,
+        ),
+        RoutingRule(
+          id: 'r2',
+          matcher: 'domain_keyword:ads',
+          action: RuleAction.block,
+          sortIndex: 2,
+        ),
+      ],
+    ),
+  ),
+  (
+    'DNS, Direct mode, the direct resolver answering the rest',
+    DnsSettings.defaults,
+    RoutingPolicy(mode: RoutingMode.direct),
   ),
 ];
 

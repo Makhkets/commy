@@ -38,7 +38,7 @@ class ShadowtlsLinkParser implements NodeLinkParser {
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'shadowtls:// link carries no server port',
       );
     }
@@ -48,7 +48,7 @@ class ShadowtlsLinkParser implements NodeLinkParser {
         ? link.decodedUserInfo.trim()
         : link.query.first('password');
     if (version != '1' && (password == null || password.isEmpty)) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'shadowtls:// version 2 and 3 need a password',
       );
     }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_router.dart';
+import 'package:commy/src/state/app_visibility.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/rule_set_scheduler.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -41,13 +42,35 @@ class _CommyAppState extends ConsumerState<CommyApp> {
   /// reload a translation bundle for nothing.
   String? _appliedLocale;
 
+  /// Tells the providers that poll only for the screen when there is none.
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(
+      onHide: () => ref.read(appVisibleProvider.notifier).hide(),
+      onShow: () => ref.read(appVisibleProvider.notifier).show(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     ref
       // Long-lived subscriptions, watched from the root so they outlive every
       // screen.
       ..watch(logPumpProvider)
-      ..watch(trafficHistoryProvider)
+      // Listened to, not watched: kept awake the same way, but its value is a
+      // new window every second while connected, and a watch rebuilt the
+      // whole app shell — both themes included — on each one, for a value
+      // this widget never reads.
+      ..listen<TrafficWindow>(trafficHistoryProvider, (_, __) {})
       ..watch(trafficHistoryPumpProvider)
       // The `checking` step. It belongs to the connection, not to whichever
       // screen happens to be on top when the tunnel comes up.
@@ -60,6 +83,9 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // "Connect on boot": the receiver in the manifest is made to agree
       // with the stored switch, once, the same way.
       ..watch(startOnBootSyncProvider)
+      // The language chosen here, for the notification and the tile, which
+      // Android draws without Flutter.
+      ..watch(nativeLocaleSyncProvider)
       // The timer behind «авто 1 ч» on the subscription card. Rooted here
       // because a refresh falling due must not depend on the home screen
       // being the one on top.
