@@ -97,8 +97,14 @@ class UpdateSubscriptionUseCase {
         );
       }
 
+      // Built on the row as it is now, not as it was before the fetch. The
+      // card's menu stays open while the spinner turns, and the upsert writes
+      // every column: a rename, a collapse or auto-update switched off during
+      // those seconds would otherwise be quietly put back — and the last one
+      // means the app goes on polling a panel the user told it to leave be.
+      // The panel owns only what `applyTo` changes; the rest is the user's.
       final refreshed = payload.applyTo(
-        existing.copyWith(lastUpdatedAt: DateTime.now()),
+        current.copyWith(lastUpdatedAt: DateTime.now()),
       );
       final stored = await subscriptions.upsert(refreshed);
       final storeFailure = stored.failureOrNull;

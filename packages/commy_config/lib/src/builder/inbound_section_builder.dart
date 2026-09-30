@@ -1,4 +1,5 @@
 import 'package:commy_config/src/builder/config_platform.dart';
+import 'package:commy_config/src/builder/local_proxy_auth.dart';
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/builder/sing_box_tags.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -39,15 +40,20 @@ abstract final class InboundSectionBuilder {
   static const String loopbackListenAddress = '127.0.0.1';
 
   /// Builds the array.
+  ///
+  /// The loopback proxy of the IP check is opened only with [localAuth], and
+  /// asks for it; the LAN one is the user's to share and asks for nothing.
   static List<Map<String, Object?>> build({
     required AppSettings settings,
     required RoutingPolicy routing,
     required ConfigPlatform platform,
+    LocalProxyAuth? localAuth,
   }) {
     return <Map<String, Object?>>[
       tun(settings: settings, routing: routing, platform: platform),
-      if (settings.allowLan || settings.isIpCheckEnabled)
-        mixed(settings: settings),
+      if (settings.allowLan ||
+          (settings.isIpCheckEnabled && localAuth != null))
+        mixed(settings: settings, localAuth: localAuth),
     ];
   }
 
@@ -100,13 +106,26 @@ abstract final class InboundSectionBuilder {
   /// loopback only when it exists for the IP check (exception E-1). The
   /// app's own package is excluded from the TUN on Android, so the one way
   /// its request can go *through* the tunnel is to aim it at this port.
-  static Map<String, Object?> mixed({required AppSettings settings}) =>
+  ///
+  /// On loopback it asks for [localAuth]: see [LocalProxyAuth] for who else
+  /// would otherwise be talking to it.
+  static Map<String, Object?> mixed({
+    required AppSettings settings,
+    LocalProxyAuth? localAuth,
+  }) =>
       <String, Object?>{
         SingBoxKeys.type: SingBoxKeys.typeMixed,
         SingBoxKeys.tag: SingBoxTags.mixedInbound,
         SingBoxKeys.listen:
             settings.allowLan ? lanListenAddress : loopbackListenAddress,
         SingBoxKeys.listenPort: settings.mixedPort,
+        if (!settings.allowLan && localAuth != null)
+          SingBoxKeys.users: <Map<String, Object?>>[
+            <String, Object?>{
+              SingBoxKeys.username: localAuth.username,
+              SingBoxKeys.password: localAuth.password,
+            },
+          ],
       };
 
   static List<String> _packages(RoutingPolicy routing) => <String>[

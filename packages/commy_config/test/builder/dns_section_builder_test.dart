@@ -316,6 +316,100 @@ void main() {
     });
   });
 
+  group('DnsSectionBuilder resolvers the core has to be told about', () {
+    List<Map<String, Object?>> serversOf(DnsSettings dns) =>
+        (_build(dns)['servers']! as List<Object?>).cast<Map<String, Object?>>();
+
+    test('a direct resolver by name finds its server through the system', () {
+      // Without `domain_resolver` sing-box refuses a DNS server whose address
+      // is a name and that has no detour: "missing domain resolver for domain
+      // server address", and the tunnel does not start.
+      final servers = serversOf(
+        const DnsSettings(direct: 'https://dns.google/dns-query'),
+      );
+      final direct = servers.firstWhere((s) => s['tag'] == 'dns-direct');
+
+      expect(direct['server'], 'dns.google');
+      expect(direct['domain_resolver'], 'dns-bootstrap');
+      expect(
+        servers.where((s) => s['tag'] == 'dns-bootstrap').single,
+        <String, Object?>{'type': 'local', 'tag': 'dns-bootstrap'},
+      );
+    });
+
+    test('a direct resolver by address, or the system one, needs nothing', () {
+      for (final direct in <String>[
+        'local',
+        'tls://1.1.1.1',
+        '[2606:4700:4700::1111]:53',
+      ]) {
+        final servers = serversOf(DnsSettings(direct: direct));
+
+        expect(servers.map((s) => s['tag']), isNot(contains('dns-bootstrap')));
+        expect(
+          servers.firstWhere((s) => s['tag'] == 'dns-direct'),
+          isNot(contains('domain_resolver')),
+          reason: direct,
+        );
+      }
+    });
+
+    test('the resolver through the tunnel by name goes inside it', () {
+      // Its detour carries the name to the server; nothing resolves it here.
+      final remote = serversOf(
+        const DnsSettings(remote: 'https://dns.google/dns-query'),
+      ).first;
+
+      expect(remote['detour'], 'proxy');
+      expect(remote.containsKey('domain_resolver'), isFalse);
+    });
+
+    test('the system resolver is refused for the tunnel, in both places', () {
+      for (final remote in <String>['local', '', ' LOCAL ']) {
+        expect(
+          DnsSectionBuilder.checkResolver(remote, throughTunnel: true),
+          ResolverProblem.systemThroughTunnel,
+          reason: remote,
+        );
+        expect(
+          () => _build(DnsSettings(remote: remote)),
+          throwsA(isA<ConfigBuildException>()),
+          reason: remote,
+        );
+      }
+      expect(DnsSectionBuilder.checkResolver('local'), isNull);
+      expect(
+        DnsSectionBuilder.checkResolver('tls://1.1.1.1', throughTunnel: true),
+        isNull,
+      );
+    });
+
+    test('the probe document gets the same bootstrap', () {
+      final probe = const SingBoxConfigBuilder()
+          .buildProbe(
+            nodes: const <ProxyNode>[
+              ProxyNode(
+                id: 'n',
+                name: 'n',
+                protocol: Protocol.trojan,
+                host: 'a.example',
+                port: 443,
+                params: <String, Object?>{'password': 'p', 'security': 'tls'},
+              ),
+            ],
+            dns: const DnsSettings(direct: 'tls://dns.example'),
+          )
+          .valueOrNull!
+          .document;
+      final servers =
+          ((probe['dns']! as Map<String, Object?>)['servers']! as List<Object?>)
+              .cast<Map<String, Object?>>();
+
+      expect(servers.first['domain_resolver'], 'dns-bootstrap');
+      expect(servers.last['tag'], 'dns-bootstrap');
+    });
+  });
+
   group('DnsSectionBuilder ad blocking', () {
     const adsTag = 'geosite-category-ads-all';
     const policy = RoutingPolicy(blockAds: true);

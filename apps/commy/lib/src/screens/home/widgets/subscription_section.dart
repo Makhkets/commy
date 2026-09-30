@@ -96,7 +96,10 @@ class SubscriptionSection extends ConsumerWidget {
           subscription: subscription,
         ),
       ),
-      nodes: <Widget>[
+      // Not among the servers: a collapsed card folds those away, and these
+      // rows are what the user has to see — a run of "measure all" with its
+      // only Cancel, and the panel's refusal with its one-tap fix.
+      status: <Widget>[
         // Above the servers, because when it is there they are usually not:
         // a panel that answers with a notice answers with nothing else.
         if (notices.isNotEmpty)
@@ -114,13 +117,16 @@ class SubscriptionSection extends ConsumerWidget {
         // actually known. The way out is the refresh two icons up.
         if (nodes.isEmpty && notices.isEmpty) const _NoServersRow(),
         if (isMeasuringThis) const MeasureProgressRow(),
+      ],
+      nodes: <Widget>[
         for (final node in nodes)
           NodeRow(node: node, isActive: node.id == activeId),
       ],
     );
   }
 
-  /// Refreshes the panel, and says how it went — either way.
+  /// Refreshes the panel, and says how it went — either way, including "not
+  /// now" when another subscription is refreshing.
   ///
   /// The call used to be fired and forgotten: the spinner stopped, the card
   /// kept its old "2 hours ago", and a panel that refused — expired, revoked,
@@ -157,9 +163,23 @@ class SubscriptionSection extends ConsumerWidget {
       );
       return;
     }
-    final failure = ref.read(subscriptionControllerProvider).failure;
+    final busy = ref.read(subscriptionControllerProvider);
+    final failure = busy.failure;
     if (failure == null) {
-      // Declined because another refresh is already running. Nothing broke.
+      // Declined because another refresh is already running. Nothing broke,
+      // but nothing happened either, and saying nothing made the tap look
+      // lost: at a cold start the scheduler walks every due subscription in
+      // turn, and on a slow link a tap on another card in that window just
+      // vanished — no spinner, no toast, no refresh. The card that is itself
+      // refreshing already spins, so only a tap on a different one is news.
+      if (busy.refreshingId != subscription.id) {
+        ToastMessenger.show(
+          context,
+          message: t.subscription.refreshBusy,
+          tone: CommyTone.info,
+          icon: CommyIcons.info,
+        );
+      }
       return;
     }
     ToastMessenger.show(

@@ -10,7 +10,12 @@ enum SystemIntentKind {
   /// A protocol or subscription link the user tapped somewhere else.
   link(wireName: 'link'),
 
-  /// A configuration file opened from a file manager or a chat.
+  /// A configuration file opened from a file manager or a chat that the
+  /// platform could not read.
+  ///
+  /// One it could read arrives as [text], its contents in place of a shared
+  /// line: the address is only good on the platform side, while the grant
+  /// that came with it lasts.
   file(wireName: 'file'),
 
   /// Plain text shared into Commy.
@@ -75,8 +80,7 @@ class SystemIntent {
   /// What arrived.
   final SystemIntentKind kind;
 
-  /// The link or the file location, for [SystemIntentKind.link] and
-  /// [SystemIntentKind.file].
+  /// The link, for [SystemIntentKind.link].
   final String? uri;
 
   /// The shared text, for [SystemIntentKind.text].

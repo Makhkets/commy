@@ -122,6 +122,54 @@ abstract final class TransportParams {
   /// Query keys that may hold the TLS security mode.
   static const List<String> securityKeys = <String>['security', 'tls'];
 
+  /// The TCP header type that opens the connection with a fake HTTP request.
+  static const String httpHeader = 'http';
+
+  /// Whether [headerType] asks for Xray's HTTP header on plain TCP.
+  static bool isHttpHeader(String? headerType) =>
+      headerType?.trim().toLowerCase() == httpHeader;
+
+  /// Why the core cannot carry plain TCP with [headerType] under [security],
+  /// or `null` when it can.
+  ///
+  /// Xray's TCP has two headers: none, and `http`, which opens the connection
+  /// with a fake HTTP/1.1 request. sing-box sends exactly that through its
+  /// `http` transport, but only without TLS: with TLS the same transport
+  /// speaks HTTP/2, which such an inbound does not accept. Checked at import,
+  /// so the node is refused by name instead of connecting as bare TCP and
+  /// failing every time, and again when the config is built, for nodes
+  /// stored before the rule existed.
+  static String? tcpHeaderRefusal(String? headerType, String? security) {
+    final header = headerType?.trim().toLowerCase();
+    if (header == null || header.isEmpty || header == 'none') {
+      return null;
+    }
+    if (header != httpHeader) {
+      return 'TCP header "$headerType" is not carried by the core';
+    }
+    final mode = security?.trim().toLowerCase();
+    if (mode == ParamKeys.securityTls || mode == ParamKeys.securityReality) {
+      return 'TCP with an HTTP header cannot run over TLS or REALITY in the '
+          'core';
+    }
+    return null;
+  }
+
+  /// Throws [LinkFormatException] when [params] hold a plain TCP node the
+  /// core cannot carry (see [tcpHeaderRefusal]).
+  static void checkTcpHeader(Map<String, Object?> params) {
+    if (params[ParamKeys.transport] != 'tcp') {
+      return;
+    }
+    final refusal = tcpHeaderRefusal(
+      params[ParamKeys.headerType] as String?,
+      params[ParamKeys.security] as String?,
+    );
+    if (refusal != null) {
+      throw LinkFormatException(refusal);
+    }
+  }
+
   /// Maps a transport spelling onto ours, or returns `null` when unknown.
   ///
   /// An empty or missing value means `tcp`, which is what every panel means
@@ -198,6 +246,7 @@ abstract final class TransportParams {
     params[ParamKeys.host] = query.first('host');
     params[ParamKeys.serviceName] = serviceName;
     params[ParamKeys.headerType] = query.firstOf(headerTypeKeys);
+    checkTcpHeader(params);
     params[ParamKeys.mode] = query.first('mode');
     if (transport == xhttp) {
       readXhttpInto(

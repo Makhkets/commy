@@ -115,6 +115,45 @@ void main() {
       expect(parser.parse('vmess://$base#FromFragment').name, 'FromFragment');
     });
 
+    test('builds a tcp http header from the JSON form', () {
+      final node = parser.parse(
+        _legacy(<String, Object?>{
+          'add': 'vm.example.com',
+          'port': '80',
+          'id': 'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
+          'net': 'tcp',
+          'type': 'http',
+          'host': 'b.example',
+          'path': '/a',
+          'tls': '',
+        }),
+      );
+      final outbound = OutboundBuilder.build(node: node, tag: 'proxy-out');
+
+      expect(outbound['transport'], <String, Object?>{
+        'type': 'http',
+        'host': <String>['b.example'],
+        'path': '/a',
+        'method': 'GET',
+      });
+    });
+
+    test('rejects a tcp http header over tls in the JSON form', () {
+      expect(
+        () => parser.parse(
+          _legacy(<String, Object?>{
+            'add': 'vm.example.com',
+            'port': '443',
+            'id': 'a0b1c2d3-e4f5-6789-abcd-ef0123456789',
+            'net': 'tcp',
+            'type': 'http',
+            'tls': 'tls',
+          }),
+        ),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
     test('rejects a payload without an address', () {
       expect(
         () => parser.parse(

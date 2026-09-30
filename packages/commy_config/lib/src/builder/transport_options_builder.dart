@@ -27,12 +27,12 @@ abstract final class TransportOptionsBuilder {
   /// The `Host` header key, spelled the way an HTTP header is spelled.
   static const String hostHeader = 'Host';
 
-  /// Builds the block for [node], or returns `null` for plain TCP.
+  /// Builds the block for [node], or returns `null` for bare TCP.
   static Map<String, Object?>? build(ProxyNode node) {
     final transport = node.param(ParamKeys.transport) ?? plainTransport;
     switch (transport) {
       case plainTransport:
-        return null;
+        return _tcp(node);
       case 'ws':
         return _websocket(node);
       case 'grpc':
@@ -75,6 +75,41 @@ abstract final class TransportOptionsBuilder {
       }
     }
     return EarlyData(path.isEmpty ? '/' : path, null);
+  }
+
+  /// Bare TCP, or TCP opened with Xray's fake HTTP/1.1 request.
+  ///
+  /// The request is what sing-box's `http` transport sends when there is no
+  /// TLS (see TransportParams.tcpHeaderRefusal for why TLS is refused). The
+  /// method is spelled out because the two disagree on the default: Xray's
+  /// header sends GET, sing-box's transport PUT.
+  static Map<String, Object?>? _tcp(ProxyNode node) {
+    final headerType = node.param(ParamKeys.headerType);
+    final refusal = TransportParams.tcpHeaderRefusal(
+      headerType,
+      node.param(ParamKeys.security),
+    );
+    if (refusal != null) {
+      throw ConfigBuildException(refusal);
+    }
+    if (!TransportParams.isHttpHeader(headerType)) {
+      return null;
+    }
+    List<String> split(String? raw) => <String>[
+          for (final part in (raw ?? '').split(','))
+            if (part.trim().isNotEmpty) part.trim(),
+        ];
+    final options = <String, Object?>{SingBoxKeys.type: 'http'};
+    final hosts = split(node.param(ParamKeys.host));
+    if (hosts.isNotEmpty) {
+      options[SingBoxKeys.host] = hosts;
+    }
+    // The header may list several paths; a share link joins them with commas
+    // and Xray picks one per request. The first serves as well as any.
+    final paths = split(node.param(ParamKeys.path));
+    options[SingBoxKeys.path] = paths.isEmpty ? '/' : paths.first;
+    options[SingBoxKeys.httpMethod] = 'GET';
+    return options;
   }
 
   static Map<String, Object?> _websocket(ProxyNode node) {

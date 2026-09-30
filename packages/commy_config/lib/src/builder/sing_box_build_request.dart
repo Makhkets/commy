@@ -1,5 +1,6 @@
 import 'package:commy_config/src/builder/clash_api_options.dart';
 import 'package:commy_config/src/builder/config_platform.dart';
+import 'package:commy_config/src/builder/local_proxy_auth.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Everything `SingBoxConfigBuilder` needs to produce a configuration.
@@ -22,6 +23,7 @@ class SingBoxBuildRequest {
     this.autoSelect = false,
     this.ruleSetDirectory,
     this.availableRuleSets = const <String>{},
+    this.localProxyAuth,
   });
 
   /// Creates a request around a single node.
@@ -91,6 +93,11 @@ class SingBoxBuildRequest {
   /// dropped with a warning rather than written into a configuration the core
   /// would refuse to start.
   final Set<String> availableRuleSets;
+
+  /// What the loopback proxy asks for. Without it, the loopback proxy the IP
+  /// check needs is not opened at all: an unauthenticated one is open to
+  /// every app on the device. See [LocalProxyAuth].
+  final LocalProxyAuth? localProxyAuth;
 
   /// The node [selectedNodeId] points at, or `null`.
   ProxyNode? get selectedNode {

@@ -10,12 +10,15 @@ import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LogIterator
 import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.StatusMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
@@ -235,7 +238,7 @@ internal class CoreEventBridge(
                 throw WireException.from(Wire.Errors.CONFIG_INVALID, error)
             }
         }
-        val groups = withTimeoutOrNull(timeoutMs) { update.await() }
+        val groups = update.awaitWithin(timeoutMs)
         if (groups == null) {
             update.cancel()
             return null
@@ -512,3 +515,26 @@ internal class CoreEventBridge(
         const val DEFAULT_NETWORK = "tcp"
     }
 }
+
+/**
+ * Waits up to [timeoutMs] for a value started on another scope; null when it
+ * does not come.
+ *
+ * `withTimeoutOrNull` turns only its own timeout into null. The waiter of
+ * `urlTest` lives on the service's scope, and `onDestroy` cancels that scope —
+ * a Disconnect during "Check" does it. Awaiting a Deferred that was cancelled
+ * throws its cancellation into a caller that is still very much alive, the
+ * method handler took it for the engine going away and rethrew it, and the
+ * call ended without an answer: Dart's "Check" waited forever. To the caller a
+ * waiter that died is a probe that did not come back. The caller's own
+ * cancellation still goes through.
+ */
+internal suspend fun <T> Deferred<T>.awaitWithin(timeoutMs: Long): T? =
+    try {
+        withTimeoutOrNull(timeoutMs) { await() }
+    } catch (error: CancellationException) {
+        if (!currentCoroutineContext().isActive) {
+            throw error
+        }
+        null
+    }

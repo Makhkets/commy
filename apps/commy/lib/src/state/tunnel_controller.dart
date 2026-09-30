@@ -384,6 +384,22 @@ final liveReloadProvider = Provider<void>((ref) {
         onChange();
       }
     })
+    // A rule set downloaded or deleted while the tunnel is up: the rules
+    // that point at it were left out of the running document, or point at a
+    // file that is gone. Only the tags matter — a refreshed file keeps its
+    // path, and the core reloads it from disk by itself.
+    ..listen<AsyncValue<List<RuleSet>>>(ruleSetsProvider, (previous, next) {
+      final before = previous?.value;
+      final after = next.value;
+      if (before != null &&
+          after != null &&
+          !setEquals(
+            before.map((set) => set.tag).toSet(),
+            after.map((set) => set.tag).toSet(),
+          )) {
+        onChange();
+      }
+    })
     ..listen<AsyncValue<TunnelStatus>>(coreStatusProvider, (previous, next) {
       if (pending &&
           next.value is TunnelConnected &&
@@ -409,6 +425,8 @@ class TunnelActionState {
     this.failure,
     this.notice,
     this.lastConfig,
+    this.rejectedConfig,
+    this.configRefused = false,
   });
 
   /// Nothing has been tried yet.
@@ -436,22 +454,57 @@ class TunnelActionState {
   /// only and redacted before it reaches the screen.
   final CoreConfig? lastConfig;
 
+  /// The configuration the core refused, when that is what [failure] is.
+  ///
+  /// "Show the config" on a refused connect leads to the config tab, and the
+  /// tab read [lastConfig] alone: after a first connect it said nothing had
+  /// been built yet and pointed at the connect that had just failed, and
+  /// after an earlier session it showed the old document instead of the one
+  /// refused. Kept apart from [lastConfig] because a refused reload leaves
+  /// the tunnel running on the previous document, which that field goes on
+  /// describing. Null when the builder refused before the core saw anything:
+  /// there was no document, and the failure's own detail is all there is.
+  /// Rule R2, as for [lastConfig]: memory only, redacted before the screen.
+  final CoreConfig? rejectedConfig;
+
+  /// Whether [failure] is a connect or a reload whose document was refused,
+  /// by the builder or by the core.
+  ///
+  /// The type of the failure does not say so. [ConfigInvalidFailure] is also
+  /// what a switch comes back with when the Clash API does not know the
+  /// outbound, and what a check comes back with when the probe URL is not
+  /// one; in both the tunnel is up on [lastConfig] and nothing was refused.
+  /// The config tab headlined them as a configuration that could not be
+  /// built, above the very document that was running.
+  final bool configRefused;
+
   /// A copy with the given fields replaced.
+  ///
+  /// [rejectedConfig] and [configRefused] travel with the failure they were
+  /// refused with: a copy that clears or replaces [failure] takes whatever
+  /// is passed alongside — no document and no refusal when nothing is — so
+  /// a later failure never inherits an old one.
   TunnelActionState copyWith({
     bool? isBusy,
     bool? isChecking,
     CommyFailure? failure,
     TunnelNotice? notice,
     CoreConfig? lastConfig,
+    CoreConfig? rejectedConfig,
+    bool? configRefused,
     bool clearFailure = false,
     bool clearNotice = false,
   }) {
+    final failureChanges = clearFailure || failure != null;
     return TunnelActionState(
       isBusy: isBusy ?? this.isBusy,
       isChecking: isChecking ?? this.isChecking,
       failure: clearFailure ? null : failure ?? this.failure,
       notice: clearNotice ? null : notice ?? this.notice,
       lastConfig: lastConfig ?? this.lastConfig,
+      rejectedConfig: failureChanges ? rejectedConfig : this.rejectedConfig,
+      configRefused:
+          failureChanges ? configRefused ?? false : this.configRefused,
     );
   }
 
@@ -463,11 +516,20 @@ class TunnelActionState {
           other.isChecking == isChecking &&
           other.failure == failure &&
           other.notice == notice &&
-          other.lastConfig == lastConfig;
+          other.lastConfig == lastConfig &&
+          other.rejectedConfig == rejectedConfig &&
+          other.configRefused == configRefused;
 
   @override
-  int get hashCode =>
-      Object.hash(isBusy, isChecking, failure, notice, lastConfig);
+  int get hashCode => Object.hash(
+        isBusy,
+        isChecking,
+        failure,
+        notice,
+        lastConfig,
+        rejectedConfig,
+        configRefused,
+      );
 
   @override
   String toString() => 'TunnelActionState(busy: $isBusy, $failure)';
@@ -527,8 +589,38 @@ class TunnelNotice {
 
 /// Connect, disconnect, switch and check.
 class TunnelController extends Notifier<TunnelActionState> {
+  /// A connect is between its tap and the core's answer.
+  bool _connecting = false;
+
+  /// The connect in flight was called off by a tap on the spinning button.
+  bool _cancelRequested = false;
+
+  /// A stop is between its tap and the core's answer.
+  bool _stopping = false;
+
+  /// An edit landed while a reload was in flight, which read the stores
+  /// before it: one more reload is owed once that one is done.
+  bool _reloadAgain = false;
+
+  /// Counts checks, and connects and disconnects, so that a check that comes
+  /// back after its tunnel is gone is recognised and dropped.
+  int _checkEpoch = 0;
+
   @override
-  TunnelActionState build() => TunnelActionState.initial;
+  TunnelActionState build() {
+    // Awake for as long as this controller lives. The configuration generator
+    // reads these three without waiting, and a provider nobody listens to is
+    // paused: its value stays where the last screen that watched it left it.
+    // The rule sets were watched only by the settings screens, so a set
+    // downloaded or deleted since — by the scheduler, say — was invisible to
+    // the next connect. [_loadConfigInputs] covers the first read.
+    ref
+      ..listen(nodesProvider, (_, __) {})
+      ..listen(ruleSetsProvider, (_, __) {})
+      ..listen(ruleSetDirectoryProvider, (_, __) {})
+      ..listen(localProxyAuthProvider, (_, __) {});
+    return TunnelActionState.initial;
+  }
 
   /// Starts the tunnel on [nodeId], or on the current selection, or — when
   /// nothing was ever picked — on the first server there is.
@@ -551,43 +643,95 @@ class TunnelController extends Notifier<TunnelActionState> {
     if (state.isBusy) {
       return true;
     }
+    _connecting = true;
+    _cancelRequested = false;
+    _checkEpoch++;
     state = state.copyWith(
       isBusy: true,
+      isChecking: false,
       clearFailure: true,
       clearNotice: true,
     );
     final logger = ref.read(appLoggerProvider)
       ..info('connect requested: ${_describe(target)}', tag: _tag);
 
-    final result = await ref.read(connectUseCaseProvider)(nodeId: target);
-    final failure = result.failureOrNull;
-    if (failure != null) {
-      // The failure itself, not just its code. The code is what the screen
-      // translates; the detail inside it — which resolver, which field, which
-      // exception — is the only part that says what to change, and dropping it
-      // here is what left the log with nothing to read after a failed connect.
-      logger.error('connect failed: $failure', tag: _tag);
-      state = state.copyWith(isBusy: false, failure: failure);
+    try {
+      await _loadConfigInputs();
+      if (_cancelRequested) {
+        // Called off before anything was sent.
+        state = state.copyWith(isBusy: _stopping);
+        return true;
+      }
+      final result = await ref.read(connectUseCaseProvider)(nodeId: target);
+      if (_cancelRequested) {
+        // Called off while the core was starting. A stop that reached the
+        // service wound the start down; one that arrived before the service
+        // existed could not, and the start went ahead — so a start that
+        // came back up is stopped once more. Stopping twice is harmless.
+        logger.info('connect cancelled', tag: _tag);
+        _connecting = false;
+        state = state.copyWith(isBusy: _stopping);
+        if (result.isOk && !_stopping) {
+          await disconnect();
+        }
+        return true;
+      }
+      final failure = result.failureOrNull;
+      if (failure != null) {
+        // The failure itself, not just its code. The code is what the screen
+        // translates; the detail inside it — which resolver, which field,
+        // which exception — is the only part that says what to change, and
+        // dropping it here is what left the log with nothing to read after a
+        // failed connect.
+        logger.error('connect failed: $failure', tag: _tag);
+        state = state.copyWith(
+          isBusy: false,
+          failure: failure,
+          rejectedConfig: _rejected(failure, target),
+          configRefused: failure is ConfigInvalidFailure,
+        );
+        return true;
+      }
+      await ref.read(selectedNodeIdProvider.notifier).select(target);
+      state = state.copyWith(isBusy: false, lastConfig: _buildPreview(target));
       return true;
+    } finally {
+      _connecting = false;
     }
-    await ref.read(selectedNodeIdProvider.notifier).select(target);
-    state = state.copyWith(isBusy: false, lastConfig: _buildPreview(target));
-    return true;
   }
 
-  /// Stops the tunnel.
+  /// Stops the tunnel — or calls off a connect that has not finished.
+  ///
+  /// docs/05-ux-flows.md promises "Отмена" on the spinning button, and a
+  /// connect holds the controller busy until the core answers, which on a
+  /// slow server is up to half a minute. The stop used to wait for "not
+  /// busy" and so did nothing at all; now it goes through, and the connect in
+  /// flight sees that it was called off. A reload in flight is still waited
+  /// for: stopping in the middle of one is not what the tap asked for.
   Future<void> disconnect() async {
-    if (state.isBusy) {
+    if (_stopping || (state.isBusy && !_connecting)) {
       return;
     }
+    _stopping = true;
+    if (_connecting) {
+      _cancelRequested = true;
+    }
+    _checkEpoch++;
     state = state.copyWith(
       isBusy: true,
+      isChecking: false,
       clearFailure: true,
       clearNotice: true,
     );
-    final result = await ref.read(disconnectUseCaseProvider)();
-    final failure = result.failureOrNull;
-    state = state.copyWith(isBusy: false, failure: failure);
+    try {
+      final result = await ref.read(disconnectUseCaseProvider)();
+      state = state.copyWith(
+        isBusy: _connecting,
+        failure: result.failureOrNull,
+      );
+    } finally {
+      _stopping = false;
+    }
   }
 
   /// Connect or disconnect, whichever the current status calls for.
@@ -661,17 +805,24 @@ class TunnelController extends Notifier<TunnelActionState> {
     final tag = SingBoxTags.forNode(node);
     if (!await _runningCoreHolds(tag)) {
       final previous = ref.read(selectedNodeIdProvider).value;
+      final wasAuto = ref.read(autoSelectedProvider);
       await ref.read(selectedNodeIdProvider.notifier).select(node.id);
-      await reload();
-      if (state.failure != null) {
+      // Auto ends before the rebuild here, not after it: the document is
+      // built from the stored settings, and with Auto still on its selector
+      // defaulted to the group — the list marked the tapped server while the
+      // traffic went on through Auto's pick.
+      await _setAutoSelect(enabled: false);
+      if (!await reload()) {
         // Nothing moved: the tunnel still runs through the old server, and a
         // list that marks the new one would be lying about where traffic goes.
         if (previous != null) {
           await ref.read(selectedNodeIdProvider.notifier).select(previous);
         }
+        if (wasAuto) {
+          await _setAutoSelect(enabled: true);
+        }
         return;
       }
-      await _setAutoSelect(enabled: false);
       state = state.copyWith(
         notice: TunnelNotice(
           TunnelNoticeKind.switched,
@@ -742,13 +893,23 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// Whole, not patched: the same document a connect would send, handed to
   /// `CoreClient.reload`, which keeps the TUN device. Nothing happens unless
   /// the tunnel is up — down, the next connect builds from the same stores.
-  /// The core reports `starting` and then `connected` again, so the
-  /// reachability probe runs once more against the new configuration.
-  Future<void> reload() async {
+  ///
+  /// An edit that lands while a reload is in flight is not dropped: the one
+  /// running read the stores before it, so another pass follows. On Android
+  /// the status stays `connected` through a reload, and nothing else would
+  /// ever apply that edit.
+  ///
+  /// Returns whether a reload ran and the core took it.
+  Future<bool> reload() async {
     final nodeId = ref.read(selectedNodeIdProvider).value;
-    if (nodeId == null || state.isBusy || !_isUp) {
-      return;
+    if (nodeId == null || !_isUp) {
+      return false;
     }
+    if (state.isBusy) {
+      _reloadAgain = true;
+      return false;
+    }
+    _reloadAgain = false;
     state = state.copyWith(
       isBusy: true,
       clearFailure: true,
@@ -757,18 +918,32 @@ class TunnelController extends Notifier<TunnelActionState> {
     final logger = ref.read(appLoggerProvider)
       ..info('reload requested', tag: _tag);
 
+    await _loadConfigInputs();
     final result = await ref.read(reloadUseCaseProvider)(nodeId: nodeId);
     final failure = result.failureOrNull;
     if (failure != null) {
       logger.error('reload failed: $failure', tag: _tag);
-      state = state.copyWith(isBusy: false, failure: failure);
-      return;
+      // Not retried: the core just refused this document, and the next edit
+      // asks again anyway.
+      _reloadAgain = false;
+      state = state.copyWith(
+        isBusy: false,
+        failure: failure,
+        rejectedConfig: _rejected(failure, nodeId),
+        configRefused: failure is ConfigInvalidFailure,
+      );
+      return false;
     }
     state = state.copyWith(
       isBusy: false,
       lastConfig: _buildPreview(nodeId),
       notice: const TunnelNotice(TunnelNoticeKind.reloaded),
     );
+    if (_reloadAgain) {
+      _reloadAgain = false;
+      return reload();
+    }
+    return true;
   }
 
   /// Runs the reachability probe behind the "Проверить" button.
@@ -787,11 +962,16 @@ class TunnelController extends Notifier<TunnelActionState> {
   /// on Auto is the core's pick and not the server the user last tapped. A
   /// check that answers for a different server than the one carrying the
   /// traffic is worse than no check at all.
+  ///
+  /// A result that comes back after the tunnel it measured is gone — a
+  /// disconnect or a new connect in between — is dropped: "the check failed"
+  /// after the user has already disconnected is a report about nothing.
   Future<void> check({bool includeIp = false}) async {
     final tag = await _liveOutboundTag();
     if (tag == null) {
       return;
     }
+    final epoch = ++_checkEpoch;
     state = state.copyWith(
       isChecking: true,
       clearNotice: true,
@@ -800,6 +980,9 @@ class TunnelController extends Notifier<TunnelActionState> {
     final result = await ref.read(checkReachabilityUseCaseProvider)(
       outboundTag: tag,
     );
+    if (epoch != _checkEpoch) {
+      return;
+    }
     final logger = ref.read(appLoggerProvider);
     final failure = result.failureOrNull;
     if (failure != null) {
@@ -845,6 +1028,9 @@ class TunnelController extends Notifier<TunnelActionState> {
     // Still `isChecking`: the spinner covers both steps, and the address
     // is the second one.
     final ipResult = await ref.read(checkIpUseCaseProvider)();
+    if (epoch != _checkEpoch) {
+      return;
+    }
     final ipFailure = ipResult.failureOrNull;
     if (ipFailure != null) {
       logger.warn('ip check failed: $ipFailure', tag: _tag);
@@ -978,16 +1164,20 @@ class TunnelController extends Notifier<TunnelActionState> {
     final selection = ref.listen(selectedNodeIdProvider, (_, __) {});
     final servers = ref.listen(nodesProvider, (_, __) {});
     try {
+      final all = await ref.read(nodesProvider.future);
       try {
         final selected = await ref.read(selectedNodeIdProvider.future);
-        if (selected != null) {
+        // Only a selection that is still a server. Its subscription may have
+        // been deleted, or a refresh may have given the server a new id; a
+        // connect to it failed with "the selected node no longer exists"
+        // while the chip under the button named nothing at all.
+        if (selected != null && all.any((node) => node.id == selected)) {
           return selected;
         }
       } on Object {
         // A selection that cannot be read is no selection: fall through to
         // the first server, as a user who never picked one gets.
       }
-      final all = await ref.read(nodesProvider.future);
       return all.isEmpty ? null : all.first.id;
     } on Object {
       return null;
@@ -996,6 +1186,48 @@ class TunnelController extends Notifier<TunnelActionState> {
       servers.close();
     }
   }
+
+  /// Waits for what the configuration generator reads without waiting.
+  ///
+  /// The generator is a synchronous port: it takes the server list, the rule
+  /// sets on disk, their directory and the loopback proxy's password from
+  /// providers with `ref.read`. Until their first value has arrived that
+  /// read is "loading", and the build went ahead without them — so on a cold
+  /// start the first connect, autoconnect included, dropped every `geosite:`
+  /// and `geoip:` rule and the ad list. Once loaded the wait is free: [build]
+  /// keeps them listened to.
+  Future<void> _loadConfigInputs() async {
+    // Listened to here as well, for the same reason [_connectTarget] does:
+    // autoconnect can call before any screen listens to this controller, and
+    // an unlistened controller's own subscriptions are paused with it.
+    final handles = <ProviderSubscription<Object?>>[
+      ref.listen(nodesProvider, (_, __) {}),
+      ref.listen(ruleSetsProvider, (_, __) {}),
+      ref.listen(ruleSetDirectoryProvider, (_, __) {}),
+      ref.listen(localProxyAuthProvider, (_, __) {}),
+    ];
+    try {
+      await Future.wait<Object?>(<Future<Object?>>[
+        ref.read(nodesProvider.future),
+        ref.read(ruleSetsProvider.future),
+        ref.read(ruleSetDirectoryProvider.future),
+        ref.read(localProxyAuthProvider.future),
+      ]).timeout(_configInputsTimeout);
+    } on Object catch (error) {
+      // What did not load reads as empty, as it always has; the generator
+      // reports the rules that had nothing to point at.
+      ref
+          .read(appLoggerProvider)
+          .warn('configuration inputs not ready: $error', tag: _tag);
+    } finally {
+      for (final handle in handles) {
+        handle.close();
+      }
+    }
+  }
+
+  /// How long a connect waits for [_loadConfigInputs] before building anyway.
+  static const Duration _configInputsTimeout = Duration(seconds: 5);
 
   /// Rebuilds the configuration that was just sent, for the diagnostics tab.
   ///
@@ -1020,6 +1252,15 @@ class TunnelController extends Notifier<TunnelActionState> {
         );
     return built.valueOrNull;
   }
+
+  /// The document behind a refusal, for the config tab.
+  ///
+  /// Only for [ConfigInvalidFailure], the one failure whose way out is "show
+  /// the config". Built again from the same inputs, as [_buildPreview] does
+  /// for a success; null when it was the builder that refused, since then no
+  /// document ever existed.
+  CoreConfig? _rejected(CommyFailure failure, String nodeId) =>
+      failure is ConfigInvalidFailure ? _buildPreview(nodeId) : null;
 
   /// One line naming the server a connect is about to use.
   ///

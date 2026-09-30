@@ -299,6 +299,12 @@ class CommyVpnService : VpnService(), CommandServerHandler {
                 Wire.Errors.NOT_RUNNING,
                 "reload needs a running core",
             )
+            // Checked before the running core is touched, as bringUp does.
+            // startOrReloadService closes the old instance first and builds the
+            // new one after: a document the core refuses left no core at all,
+            // while the app went on saying Connected over a dead tunnel.
+            runCatching { Libbox.checkConfig(config) }
+                .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
             bridge?.useConfig(config)
             runCatching { server.startOrReloadService(config, noOverrides()) }
                 .getOrElse { throw WireException.from(Wire.Errors.CONFIG_INVALID, it) }
@@ -707,8 +713,21 @@ class CommyVpnService : VpnService(), CommandServerHandler {
         // NameNotFoundException. Dropping it silently is right: the
         // alternative is a tunnel that refuses to start over a stale row in a
         // picker.
+        var allowedAny = false
         for (name in plan.allowed) {
-            runCatching { builder.addAllowedApplication(name) }
+            if (runCatching { builder.addAllowedApplication(name) }.isSuccess) {
+                allowedAny = true
+            }
+        }
+        // An allow list that lost every entry is not an empty list to the
+        // platform: a Builder with no allowed app puts every app in the
+        // tunnel, which is the opposite of "only these apps". Refused, with
+        // the reason, rather than carrying the traffic the user kept out.
+        if (plan.allowed.isNotEmpty() && !allowedAny) {
+            throw IllegalStateException(
+                "none of the apps chosen for the tunnel is installed; " +
+                    "choose them again under Routing → Apps",
+            )
         }
         for (name in plan.disallowed) {
             runCatching { builder.addDisallowedApplication(name) }

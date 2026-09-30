@@ -165,8 +165,9 @@ Drift-миграции нумерованные, вперёд-только. На
 | Список ссылок, по одной на строку | Самый частый случай |
 | То же в base64 | Оборачивается почти всеми панелями |
 | Clash / Clash.Meta YAML | Ключ `proxies:` |
-| sing-box JSON | Ключ `outbounds:` |
-| Xray / v2rayN JSON | Ключ `outbounds:` с иной структурой |
+| sing-box JSON | Ключи `outbounds:` и `endpoints:` (WireGuard с 1.11 — endpoint; старый outbound `wireguard` тоже читается) |
+| Xray / v2rayN JSON | Ключ `outbounds:` с иной структурой; сервер называется по `remarks` |
+| Xray JSON-подписка (Marzban `v2ray-json`, Remnawave XRAY_JSON, 3x-ui) | Массив целых конфигов, по серверу на конфиг; имя — `remarks`, отказ тоже подписан им |
 
 ### Заголовки ответа подписки
 
@@ -192,7 +193,15 @@ profile-web-page-url: https://panel.example.com/
 Отдельная задача, дающая рост: человек уже пользуется Happ или v2rayNG и не хочет
 вбивать всё заново.
 
-- deep links `happ://`, `sing-box://`, `clash://install-config?url=…`;
+- deep links других клиентов — кнопки «Добавить в Happ», «Импорт в
+  sing-box» на странице подписки панели. Адрес подписки достаёт
+  `ForeignImportLink` (commy_config), дальше это обычное добавление подписки:
+  `happ://add/<url>`, `sing-box://import-remote-profile?url=<url>#<имя>`,
+  `clash://install-config?url=<url>&name=<имя>`,
+  `sn://subscription?url=<url>&name=<имя>`, свой `commy://import/<url>` и те
+  же формы с запросом под `commy://`. Наружу выходит только `http(s)`-адрес с
+  хостом; зашифрованные ссылки Happ (`happ://crypt…/`) открыть может только
+  Happ, и они не разворачиваются (сессия 22);
 - вставка экспортированного JSON из v2rayN / NekoBox;
 - QR-код через `mobile_scanner`;
 - файл конфига через системный пикер.

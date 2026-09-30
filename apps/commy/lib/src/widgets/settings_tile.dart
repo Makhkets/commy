@@ -204,11 +204,17 @@ class SettingsTile extends StatelessWidget {
                         ? CommySizes.iconControl + spacing.s2
                         : 0.0);
             final room = constraints.maxWidth - fixed;
+            // Also when the value alone is wider than the half it is allowed
+            // beside the title: "tls://1.1.1.1 · Оба, сначала IPv4" next to
+            // "DNS" fit the row but not its half, and came out "Оба, сначал…"
+            // with the whole width of a line free underneath.
+            final valueWidth = valueText == null
+                ? 0.0
+                : _widthOf(context, valueText, type.caption);
             final stackValue = valueText != null &&
                 control == null &&
-                _widthOf(context, title, type.body) +
-                        _widthOf(context, valueText, type.caption) >
-                    room;
+                (valueWidth > constraints.maxWidth / 2 ||
+                    _widthOf(context, title, type.body) + valueWidth > room);
 
             return Row(
               children: <Widget>[

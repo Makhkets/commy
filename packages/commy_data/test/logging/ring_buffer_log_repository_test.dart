@@ -189,6 +189,29 @@ void main() {
       await repository.dispose();
     });
 
+    test('an export asks for the server list once, not once a line', () async {
+      var asked = 0;
+      final repository = RingBufferLogRepository(
+        redactor: LogRedactor(
+          serverHosts: () {
+            asked++;
+            return <String>['de1.vpn.example.com'];
+          },
+        ),
+      );
+      for (var second = 0; second < 5; second++) {
+        await repository.append(
+          line('dial tcp de1.vpn.example.com:443', second: second),
+        );
+      }
+
+      final text = (await repository.export(redact: true)).valueOrNull!;
+
+      expect(asked, 1);
+      expect(text, isNot(contains('de1.vpn.example.com')));
+      await repository.dispose();
+    });
+
     test('an unredacted export returns the raw buffer', () async {
       final repository = RingBufferLogRepository();
       await repository.append(line('uuid=${Fixtures.uuid}'));

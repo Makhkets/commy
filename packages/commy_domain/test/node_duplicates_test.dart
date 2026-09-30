@@ -74,6 +74,72 @@ void main() {
     expect(names(panel), before);
   });
 
+  group('panel notices', () {
+    // A panel with more than one line to say sends one entry per line, all
+    // at the same nowhere address under the same placeholder credential, so
+    // every line arrives under one id and only the text tells them apart.
+    ProxyNode line(String text) => ProxyNode(
+          id: 'stub',
+          name: text,
+          protocol: Protocol.vless,
+          host: '0.0.0.0',
+          port: 1,
+        );
+
+    test('every line of a notice is kept, in the order it was sent', () {
+      final folded = NodeDuplicates.folded(<ProxyNode>[
+        line('Subscription expired'),
+        line('Contact support'),
+      ]);
+
+      expect(
+        PanelNotice.messages(folded),
+        <String>['Subscription expired', 'Contact support'],
+      );
+      expect(folded.map((node) => node.id).toSet(), hasLength(2));
+    });
+
+    test('a single line keeps the id it came with', () {
+      final folded = NodeDuplicates.folded(<ProxyNode>[
+        line('App not supported'),
+      ]);
+
+      expect(folded.single.id, 'stub');
+    });
+
+    test('the same line twice is still one row', () {
+      final folded = NodeDuplicates.folded(<ProxyNode>[
+        line('App not supported'),
+        line('App not supported'),
+      ]);
+
+      expect(folded, hasLength(1));
+    });
+
+    test('folding again changes nothing', () {
+      final once = NodeDuplicates.folded(<ProxyNode>[
+        line('Subscription expired'),
+        line('Contact support'),
+        node('server', name: 'Amsterdam 03'),
+      ]);
+
+      final twice = NodeDuplicates.folded(once);
+
+      expect(twice.map((node) => node.id), once.map((node) => node.id));
+      expect(names(twice), names(once));
+    });
+
+    test('servers are folded as before, notices or not', () {
+      final folded = NodeDuplicates.folded(<ProxyNode>[
+        line('Subscription expired'),
+        node('same', name: 'Amsterdam 03'),
+        node('same', name: 'Games · Amsterdam 03'),
+      ]);
+
+      expect(folded, hasLength(2));
+    });
+  });
+
   test('the result refuses to be changed', () {
     final folded = NodeDuplicates.folded(<ProxyNode>[
       node('a', name: 'Amsterdam 03'),

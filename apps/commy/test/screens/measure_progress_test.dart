@@ -61,8 +61,23 @@ void main() {
     expect(find.byType(CommySpinner), findsOneWidget);
   });
 
-  testWidgets("another card's run does not appear on this one",
+  // Collapsing folds the servers away. The run and its only Cancel used to
+  // go with them, so "measure all" on a folded card showed nothing at all
+  // until the summary toast, with no way to stop it.
+  testWidgets('a collapsed card still shows its run and the way out',
       (tester) async {
+    await pumpCard(
+      tester,
+      const MeasurementState(scopeId: 'sub-1', done: 8, total: 24),
+      subscription: testSubscription().copyWith(isCollapsed: true),
+    );
+
+    expect(find.text(t.home.measuring(done: 8, total: 24)), findsOneWidget);
+    expect(find.text(t.common.cancel), findsOneWidget);
+    expect(find.byType(NodeTile), findsNothing);
+  });
+
+  testWidgets("another card's run does not appear on this one", (tester) async {
     await pumpCard(
       tester,
       const MeasurementState(scopeId: 'sub-2', done: 8, total: 24),

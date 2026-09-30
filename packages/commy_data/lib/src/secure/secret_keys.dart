@@ -20,6 +20,9 @@ abstract final class SecretKeys {
   /// Suffix of the per-subscription URL entries.
   static const String subscriptionSuffix = '.url';
 
+  /// Suffix of the per-subscription profile page entries.
+  static const String subscriptionPageSuffix = '.page';
+
   /// Key of the database encryption key, when the build can use one.
   static const String databaseKey = '${prefix}db.key';
 
@@ -35,6 +38,9 @@ abstract final class SecretKeys {
   /// Key of the token the desktop UI authenticates to the helper with.
   static const String helperToken = '${prefix}core.helper_token';
 
+  /// Key of the password the loopback proxy of the IP check asks for.
+  static const String localProxySecret = '${prefix}core.local_proxy';
+
   /// The installation's identifier, sent to subscription hosts as `x-hwid`.
   ///
   /// Not a credential, and kept here anyway: it is the one value that links
@@ -48,6 +54,21 @@ abstract final class SecretKeys {
   /// Key holding the full URL of the subscription [subscriptionId].
   static String subscriptionUrl(String subscriptionId) =>
       '$subscriptionPrefix$subscriptionId$subscriptionSuffix';
+
+  /// Key holding the profile page the panel named for [subscriptionId].
+  ///
+  /// A secret like the URL itself: Marzban and its forks send
+  /// `profile-web-page-url` as the very address the subscription was fetched
+  /// from, token and all, and other panels put the user's short id in it.
+  static String subscriptionPage(String subscriptionId) =>
+      '$subscriptionPrefix$subscriptionId$subscriptionPageSuffix';
+
+  /// The subscription id a profile page [key] belongs to, or `null`.
+  static String? subscriptionPageIdOf(String key) => _idBetween(
+        key,
+        prefix: subscriptionPrefix,
+        suffix: subscriptionPageSuffix,
+      );
 
   /// The node id a [key] belongs to, or `null` when it is not a node key.
   static String? nodeIdOf(String key) => _idBetween(

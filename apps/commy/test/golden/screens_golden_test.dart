@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/screens/diagnostics/config_screen.dart';
 import 'package:commy/src/screens/diagnostics/logs_screen.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy/src/screens/settings/backup_password_sheet.dart';
@@ -218,6 +219,47 @@ void main() {
     },
   );
 
+  // Where "show the config" on a refused connect lands: the refused document
+  // under the core's own complaint. The UUID is what the redaction has to
+  // take out before the document reaches a screenshot.
+  screenGolden(
+    'config_refused',
+    screen: const ConfigScreen(),
+    status: const TunnelStatus.idle(),
+    extra: <Override>[
+      tunnelControllerProvider.overrideWith(
+        () => _PinnedTunnel(
+          const TunnelActionState(
+            failure: ConfigInvalidFailure(
+              'outbounds[0].tls.reality: public_key: '
+              'illegal base64 data at input byte 42',
+            ),
+            rejectedConfig: CoreConfig(<String, Object?>{
+              'log': <String, Object?>{'level': 'info'},
+              'outbounds': <Object?>[
+                <String, Object?>{
+                  'type': 'vless',
+                  'tag': 'proxy',
+                  'server': 'nl-03.example.net',
+                  'server_port': 443,
+                  'uuid': '11111111-2222-3333-4444-555555555555',
+                  'tls': <String, Object?>{
+                    'enabled': true,
+                    'reality': <String, Object?>{
+                      'enabled': true,
+                      'public_key': 'xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4r',
+                    },
+                  },
+                },
+              ],
+            }),
+            configRefused: true,
+          ),
+        ),
+      ),
+    ],
+  );
+
   // Taller than a phone on purpose: the silence panel is the middle of this
   // screen and the whole point of photographing it. The row that says ad
   // blocking is switched on with no list on disk is in the picture, and so
@@ -367,6 +409,17 @@ void screenGolden(
       skip: !Platform.isLinux,
     );
   }
+}
+
+/// A tunnel controller frozen at [_state]: the config tab is drawn for a
+/// refusal without a core to refuse anything.
+class _PinnedTunnel extends TunnelController {
+  _PinnedTunnel(this._state);
+
+  final TunnelActionState _state;
+
+  @override
+  TunnelActionState build() => _state;
 }
 
 /// A measurement controller the toast golden can finish a run on.

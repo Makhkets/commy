@@ -18,7 +18,9 @@ import 'package:commy_domain/commy_domain.dart';
 ///    connection half of it; the query itself is refused by
 ///    `DnsSectionBuilder`, one layer earlier;
 /// 5. per-app exclusions, where the platform expresses them as processes;
-/// 6. the user's own rules, in their own order.
+/// 6. the user's own rules, in their own order — with FakeIP on, the name
+///    resolved just ahead of the first one that matches on addresses
+///    ([fakeIpResolve]).
 ///
 /// `block` is not an outbound here. The legacy `block` outbound still exists at
 /// v1.13.16 but the supported spelling is `"action": "reject"`, and the `dns`
@@ -45,6 +47,64 @@ abstract final class RouteSectionBuilder {
   /// where they disagree would block the connection but still resolve the
   /// name, or the other way round.
   static final String adsRuleSetTag = SingBoxTags.geosite(adsRuleSetName);
+
+  /// The rule that resolves a FakeIP connection's name before the rules that
+  /// look at addresses.
+  ///
+  /// A connection to a FakeIP address reaches the router as the name it
+  /// stands for (`route/route.go`, `matchRule`), and nothing resolves that
+  /// name unless a rule says so. An `ip_cidr` or `geoip` rule then has no
+  /// address to look at and matches nothing: `geoip:ru` → Direct sent every
+  /// such connection through the proxy, and `geoip:xx` → Block blocked none.
+  /// This rule gives them the addresses, once, ahead of the first of them.
+  ///
+  /// The resolver is named, and it is the one through the tunnel. Unnamed,
+  /// the lookup would run the DNS rules and come back from FakeIP with the
+  /// same fake address; the direct resolver would ask about every name the
+  /// tunnel carries outside it (rule R6). A name the tunnel's resolver cannot
+  /// answer now fails its connection, where before it went on to the
+  /// proxy; only connections no rule above had claimed get this far.
+  ///
+  /// It changes more than which rules match. A connection that holds
+  /// addresses is dialled by address, whichever outbound the rules then pick
+  /// (`route/conn.go`, `DialSerialNetwork`). Every connection that carries a
+  /// name and gets past this rule waits for a lookup through the tunnel
+  /// before it dials, unless the answer is cached. The proxy server is handed
+  /// the address `dns-remote` returned, not the name, so routing by name on
+  /// the server works only where the server sniffs. A Direct rule below
+  /// dials the address the tunnel's resolver gave, which for a CDN may be an
+  /// edge near the proxy's exit. With `geoip:ru` → Direct as the first rule,
+  /// the common setup in Russia, that is every connection by name.
+  ///
+  /// The strategy is written here, not inherited from the DNS section
+  /// ([fakeIpResolveStrategy]).
+  static Map<String, Object?> fakeIpResolve(DnsStrategy chosen) =>
+      <String, Object?>{
+        SingBoxKeys.action: SingBoxKeys.actionResolve,
+        SingBoxKeys.dnsServer: SingBoxTags.dnsRemote,
+        SingBoxKeys.strategy: fakeIpResolveStrategy(chosen).wireName,
+      };
+
+  /// The address family [fakeIpResolve] asks for when the user chose
+  /// [chosen] on the DNS screen: A first, unless they chose IPv6 only.
+  ///
+  /// Inherited, "prefer IPv6" would put the AAAA address first. VLESS, VMess
+  /// and Trojan report success once the stream to the server is open, not
+  /// once the server has reached the target, so the core never falls back to
+  /// the A record: on a server without IPv6 every dual-stack site failed,
+  /// where the server resolving the name itself would have picked what it
+  /// can reach. "IPv4 only" is asked for both too: the AAAA answer only
+  /// matters for a name with no A record, which the server would have
+  /// reached over IPv6 by name all the same. "IPv6 only" is kept because it
+  /// is a choice the user made on purpose.
+  static DnsStrategy fakeIpResolveStrategy(DnsStrategy chosen) =>
+      switch (chosen) {
+        DnsStrategy.ipv6Only => DnsStrategy.ipv6Only,
+        DnsStrategy.preferIpv4 ||
+        DnsStrategy.preferIpv6 ||
+        DnsStrategy.ipv4Only =>
+          DnsStrategy.preferIpv4,
+      };
 
   /// Every rule set tag [routing] would need to apply in full.
   ///
@@ -73,11 +133,15 @@ abstract final class RouteSectionBuilder {
   }
 
   /// Builds the section, appending anything it had to drop to [warnings].
+  ///
+  /// [dns] is the policy the DNS section is built from: whether it answers
+  /// with FakeIP addresses, and the address family the user chose.
   static Map<String, Object?> build({
     required RoutingPolicy routing,
     required ConfigPlatform platform,
     required Set<String> availableRuleSets,
     required String? ruleSetDirectory,
+    required DnsSettings dns,
     required List<RoutingWarning> warnings,
   }) {
     final usedRuleSets = <String>{};
@@ -124,6 +188,7 @@ abstract final class RouteSectionBuilder {
     );
 
     if (routing.mode == RoutingMode.rules) {
+      var resolved = !dns.fakeIp;
       for (final rule in routing.activeRules) {
         final matcher = RouteMatcher.tryParse(rule.matcher, platform: platform);
         if (matcher == null || matcher.isEmpty) {
@@ -144,6 +209,10 @@ abstract final class RouteSectionBuilder {
           continue;
         }
         usedRuleSets.addAll(matcher.ruleSets);
+        if (!resolved && matcher.needsResolvedAddress) {
+          rules.add(fakeIpResolve(dns.strategy));
+          resolved = true;
+        }
         rules.add(<String, Object?>{
           ...matcher.fields,
           ..._action(rule.action),

@@ -196,4 +196,25 @@ void main() {
       ),
     ]),
   );
+
+  // Sentences under a field, drawn whole: Material cuts both lines to one
+  // with an ellipsis unless told otherwise.
+  goldenTest(
+    'text_field_long_messages',
+    size: const Size(360, 340),
+    builder: (context) => column(const <Widget>[
+      CommyTextField(
+        labelText: 'Резолвер',
+        hintText: 'tls://1.1.1.1',
+        helperText: 'Схемы: udp, tcp, tls, https, quic, h3, dhcp. Голый '
+            'адрес — это обычный UDP. «local» отдаёт запрос системе.',
+      ),
+      CommyTextField(
+        labelText: 'Резолвер',
+        hintText: 'local',
+        errorText: 'Системный резолвер отвечает мимо туннеля: каждое имя, '
+            'которое идёт через прокси, утекло бы. Укажите адрес резолвера',
+      ),
+    ]),
+  );
 }

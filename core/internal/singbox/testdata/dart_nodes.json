@@ -1,0 +1,388 @@
+{
+  "_comment": "Written by packages/commy_config/test/builder/core_accepts_contract_test.dart; read by core/internal/singbox/core_accepts_test.go. Every object must be one sing-box constructs.",
+  "cases": [
+    {
+      "name": "VLESS REALITY with Xray vision-udp443",
+      "link": "vless://11111111-2222-3333-4444-555555555555@example.com:443?security=reality&sni=www.example.com&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k&sid=ab12cd34&fp=chrome&flow=xtls-rprx-vision-udp443&type=tcp#vision-udp443",
+      "kind": "outbound",
+      "object": {
+        "type": "vless",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "uuid": "11111111-2222-3333-4444-555555555555",
+        "flow": "xtls-rprx-vision",
+        "tls": {
+          "enabled": true,
+          "server_name": "www.example.com",
+          "utls": {
+            "enabled": true,
+            "fingerprint": "chrome"
+          },
+          "reality": {
+            "enabled": true,
+            "public_key": "xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k",
+            "short_id": "ab12cd34"
+          }
+        }
+      }
+    },
+    {
+      "name": "VLESS with the flow written as none",
+      "link": "vless://11111111-2222-3333-4444-555555555555@example.com:443?security=tls&sni=example.com&flow=none&type=ws&path=%2Fws&host=example.com#flow-none",
+      "kind": "outbound",
+      "object": {
+        "type": "vless",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "uuid": "11111111-2222-3333-4444-555555555555",
+        "tls": {
+          "enabled": true,
+          "server_name": "example.com"
+        },
+        "transport": {
+          "type": "ws",
+          "path": "/ws",
+          "headers": {
+            "Host": "example.com"
+          }
+        }
+      }
+    },
+    {
+      "name": "Shadowsocks 2022, one key",
+      "link": "ss://MjAyMi1ibGFrZTMtYWVzLTI1Ni1nY206QUFFQ0F3UUZCZ2NJQ1FvTERBME9EeEFSRWhNVUZSWVhHQmthR3h3ZEhoOD0@example.com:8388#ss2022",
+      "kind": "outbound",
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "2022-blake3-aes-256-gcm",
+        "password": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+      }
+    },
+    {
+      "name": "Shadowsocks 2022, two keys",
+      "link": "ss://MjAyMi1ibGFrZTMtYWVzLTEyOC1nY206QUFFQ0F3UUZCZ2NJQ1FvTERBME9Edz09OkFBRUNBd1FGQmdjSUNRb0xEQTBPRHc9PQ@example.com:8388#ss2022-eih",
+      "kind": "outbound",
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "2022-blake3-aes-128-gcm",
+        "password": "AAECAwQFBgcICQoLDA0ODw==:AAECAwQFBgcICQoLDA0ODw=="
+      }
+    },
+    {
+      "name": "Shadowsocks with the plugin called simple-obfs",
+      "link": "ss://YWVzLTEyOC1nY206cGFzcy13b3Jk@example.com:8388?plugin=simple-obfs%3Bobfs%3Dhttp%3Bobfs-host%3Dexample.com#simple-obfs",
+      "kind": "outbound",
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "aes-128-gcm",
+        "password": "pass-word",
+        "plugin": "obfs-local",
+        "plugin_opts": "obfs=http;obfs-host=example.com"
+      }
+    },
+    {
+      "name": "Shadowsocks with v2ray-plugin over websocket and TLS",
+      "link": "ss://YWVzLTEyOC1nY206cGFzcy13b3Jk@example.com:443?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bhost%3Dexample.com%3Bpath%3D%2Fws%3Btls#v2ray-plugin",
+      "kind": "outbound",
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "method": "aes-128-gcm",
+        "password": "pass-word",
+        "plugin": "v2ray-plugin",
+        "plugin_opts": "mode=websocket;host=example.com;path=/ws;tls"
+      }
+    },
+    {
+      "name": "Shadowsocks with the Xray spelling of ChaCha20",
+      "link": "ss://Y2hhY2hhMjAtcG9seTEzMDU6cGFzcy13b3Jk@example.com:8388#chacha",
+      "kind": "outbound",
+      "object": {
+        "type": "shadowsocks",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 8388,
+        "method": "chacha20-ietf-poly1305",
+        "password": "pass-word"
+      }
+    },
+    {
+      "name": "Hysteria 2 hopping over a single port",
+      "link": "hysteria2://pass-word@example.com:443?sni=example.com&mport=443#hy2-single",
+      "kind": "outbound",
+      "object": {
+        "type": "hysteria2",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "password": "pass-word",
+        "server_ports": [
+          "443:443"
+        ],
+        "tls": {
+          "enabled": true,
+          "server_name": "example.com"
+        }
+      }
+    },
+    {
+      "name": "Hysteria 2 hopping over a range, with salamander",
+      "link": "hy2://pass-word@example.com:443?sni=example.com&mport=20000-30000&obfs=salamander&obfs-password=secret#hy2-range",
+      "kind": "outbound",
+      "object": {
+        "type": "hysteria2",
+        "tag": "out",
+        "server": "example.com",
+        "server_port": 443,
+        "password": "pass-word",
+        "server_ports": [
+          "20000:30000"
+        ],
+        "obfs": {
+          "type": "salamander",
+          "password": "secret"
+        },
+        "tls": {
+          "enabled": true,
+          "server_name": "example.com"
+        }
+      }
+    },
+    {
+      "name": "WireGuard with bare interface addresses",
+      "link": "wireguard://CAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHkg%3D@example.com:51820?publickey=ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1%2Bf4CBgoM%3D&address=10.0.0.2,fd00::2&mtu=1420#wg-bare",
+      "kind": "endpoint",
+      "object": {
+        "type": "wireguard",
+        "tag": "out",
+        "address": [
+          "10.0.0.2/32",
+          "fd00::2/128"
+        ],
+        "private_key": "CAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHkg=",
+        "peers": [
+          {
+            "address": "example.com",
+            "port": 51820,
+            "public_key": "ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoM=",
+            "allowed_ips": [
+              "0.0.0.0/0",
+              "::/0"
+            ]
+          }
+        ],
+        "mtu": 1420
+      }
+    },
+    {
+      "name": "DNS, the direct resolver by name over HTTPS",
+      "kind": "dns",
+      "object": {
+        "servers": [
+          {
+            "type": "https",
+            "tag": "dns-remote",
+            "server": "dns.google",
+            "path": "/dns-query",
+            "detour": "proxy"
+          },
+          {
+            "type": "https",
+            "tag": "dns-direct",
+            "server": "cloudflare-dns.com",
+            "path": "/dns-query",
+            "domain_resolver": "dns-bootstrap"
+          },
+          {
+            "type": "local",
+            "tag": "dns-bootstrap"
+          }
+        ],
+        "final": "dns-remote",
+        "strategy": "prefer_ipv4",
+        "independent_cache": true
+      }
+    },
+    {
+      "name": "DNS, the direct resolver by name over TLS, FakeIP on",
+      "kind": "dns",
+      "object": {
+        "servers": [
+          {
+            "type": "tls",
+            "tag": "dns-remote",
+            "server": "1.1.1.1",
+            "detour": "proxy"
+          },
+          {
+            "type": "tls",
+            "tag": "dns-direct",
+            "server": "dns.quad9.net",
+            "domain_resolver": "dns-bootstrap"
+          },
+          {
+            "type": "local",
+            "tag": "dns-bootstrap"
+          },
+          {
+            "type": "fakeip",
+            "tag": "dns-fake",
+            "inet4_range": "198.18.0.0/15",
+            "inet6_range": "fc00::/18"
+          }
+        ],
+        "rules": [
+          {
+            "query_type": [
+              "A",
+              "AAAA"
+            ],
+            "server": "dns-fake"
+          }
+        ],
+        "final": "dns-remote",
+        "strategy": "prefer_ipv4",
+        "independent_cache": true
+      }
+    },
+    {
+      "name": "Route, rules as other clients write them",
+      "kind": "route",
+      "object": {
+        "rules": [
+          {
+            "action": "sniff"
+          },
+          {
+            "protocol": "dns",
+            "action": "hijack-dns"
+          },
+          {
+            "port": [
+              53
+            ],
+            "action": "hijack-dns"
+          },
+          {
+            "ip_is_private": true,
+            "outbound": "direct"
+          },
+          {
+            "port_range": [
+              "1000:2000"
+            ],
+            "outbound": "proxy"
+          },
+          {
+            "port_range": [
+              "443:443",
+              "3000:65535"
+            ],
+            "outbound": "direct"
+          },
+          {
+            "domain_regex": [
+              "(?i)^ads\\."
+            ],
+            "action": "reject"
+          },
+          {
+            "ip_cidr": [
+              "10.0.0.0/8",
+              "192.0.2.1"
+            ],
+            "outbound": "proxy"
+          },
+          {
+            "port": [
+              443,
+              8443
+            ],
+            "outbound": "direct"
+          }
+        ],
+        "auto_detect_interface": true,
+        "default_domain_resolver": {
+          "server": "dns-direct"
+        },
+        "final": "proxy"
+      }
+    },
+    {
+      "name": "Route, FakeIP on, a rule on names and one on addresses",
+      "kind": "route",
+      "object": {
+        "rules": [
+          {
+            "action": "sniff"
+          },
+          {
+            "protocol": "dns",
+            "action": "hijack-dns"
+          },
+          {
+            "port": [
+              53
+            ],
+            "action": "hijack-dns"
+          },
+          {
+            "ip_is_private": true,
+            "outbound": "direct"
+          },
+          {
+            "domain_suffix": [
+              "example.org"
+            ],
+            "outbound": "proxy"
+          },
+          {
+            "action": "resolve",
+            "server": "dns-remote",
+            "strategy": "prefer_ipv4"
+          },
+          {
+            "ip_cidr": [
+              "203.0.113.0/24"
+            ],
+            "outbound": "direct"
+          }
+        ],
+        "auto_detect_interface": true,
+        "default_domain_resolver": {
+          "server": "dns-direct"
+        },
+        "final": "proxy"
+      }
+    },
+    {
+      "name": "The loopback proxy, with its user",
+      "kind": "inbound",
+      "object": {
+        "type": "mixed",
+        "tag": "mixed-in",
+        "listen": "127.0.0.1",
+        "listen_port": 2080,
+        "users": [
+          {
+            "username": "commy",
+            "password": "00112233445566778899aabb"
+          }
+        ]
+      }
+    }
+  ]
+}

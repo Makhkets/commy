@@ -31,6 +31,10 @@ abstract final class SingBoxTags {
   /// The resolver queried outside the tunnel.
   static const String dnsDirect = 'dns-direct';
 
+  /// The system resolver the direct one finds its own server with, present
+  /// only when the direct resolver is given by name.
+  static const String dnsBootstrap = 'dns-bootstrap';
+
   /// The FakeIP resolver, present only when FakeIP is on.
   static const String dnsFake = 'dns-fake';
 

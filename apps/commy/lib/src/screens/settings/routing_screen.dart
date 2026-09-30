@@ -5,6 +5,7 @@ import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
+import 'package:commy/src/screens/settings/dns_screen.dart';
 import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -66,9 +67,10 @@ class _Body extends ConsumerWidget {
     final dns = ref.watch(dnsSettingsProvider).value ?? DnsSettings.defaults;
     final settings = ref.watch(settingsProvider).value ?? AppSettings.defaults;
     final rules = policy.rules;
+    final platform = ref.watch(configPlatformProvider);
     final needed = RouteSectionBuilder.requiredRuleSets(
       routing: policy,
-      platform: ref.watch(configPlatformProvider),
+      platform: platform,
     ).toSet();
     final ruleSets = <String>{
       for (final set in ref.watch(ruleSetsProvider).value ?? const <RuleSet>[])
@@ -219,9 +221,11 @@ class _Body extends ConsumerWidget {
             SettingsTile(
               icon: CommyIcons.routing,
               title: t.routing.dns,
+              // The strategy as the DNS screen words it: the row used to
+              // print the core's own token, "prefer_ipv4", in both languages.
               value: t.routing.dnsValue(
                 remote: dns.remote,
-                strategy: dns.strategy.wireName,
+                strategy: DnsScreen.strategyLabel(t, dns.strategy),
               ),
               onTap: () => context.go(AppRoutes.dns),
             ),
@@ -431,10 +435,30 @@ class _NewRuleSheet extends StatefulWidget {
   State<_NewRuleSheet> createState() => _NewRuleSheetState();
 }
 
+/// Why the sheet refused the condition typed into it.
+enum _MatcherProblem { empty, unknown }
+
 class _NewRuleSheetState extends State<_NewRuleSheet> {
   final TextEditingController _matcher = TextEditingController();
   RuleAction _action = RuleAction.direct;
-  bool _showError = false;
+  _MatcherProblem? _problem;
+
+  /// Whether the core would understand [matcher] on some platform.
+  ///
+  /// Only an empty one used to be refused. `https://youtube.com` read as the
+  /// unknown key `https`, a typo such as `domian:` the same, and both were
+  /// saved; the builder then dropped them, the traffic went on through the
+  /// proxy, and the screen said the rule "does nothing on this device" — a
+  /// platform limit, for a rule that does nothing anywhere. The DNS sheet
+  /// next door already asks the builder before it saves; this asks the same
+  /// parser. On any platform rather than this one: `process:` means nothing
+  /// on Android and something on a desktop, a rule can travel in a backup,
+  /// and the screen already says when a rule does not apply here.
+  static bool _understood(String matcher) =>
+      ConfigPlatform.values.any((platform) {
+        final parsed = RouteMatcher.tryParse(matcher, platform: platform);
+        return parsed != null && !parsed.isEmpty;
+      });
 
   @override
   void dispose() {
@@ -457,12 +481,16 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
             controller: _matcher,
             labelText: t.routing.newRule.matcher,
             hintText: t.routing.newRule.matcherHint,
-            errorText: _showError ? t.routing.newRule.empty : null,
+            errorText: switch (_problem) {
+              _MatcherProblem.empty => t.routing.newRule.empty,
+              _MatcherProblem.unknown => t.routing.newRule.unknown,
+              null => null,
+            },
             autofocus: true,
             isMonospace: true,
             onChanged: (_) {
-              if (_showError) {
-                setState(() => _showError = false);
+              if (_problem != null) {
+                setState(() => _problem = null);
               }
             },
           ),
@@ -497,8 +525,13 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
             label: t.routing.newRule.save,
             onPressed: () {
               final matcher = _matcher.text.trim();
-              if (matcher.isEmpty) {
-                setState(() => _showError = true);
+              final problem = matcher.isEmpty
+                  ? _MatcherProblem.empty
+                  : _understood(matcher)
+                      ? null
+                      : _MatcherProblem.unknown;
+              if (problem != null) {
+                setState(() => _problem = problem);
                 return;
               }
               Navigator.of(context).pop(_RuleDraft(matcher, _action));

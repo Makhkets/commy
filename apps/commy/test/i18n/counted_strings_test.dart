@@ -27,6 +27,8 @@ void main() {
         t.subscription.nodes(count: n),
     'subscription.refreshed': (Translations t, int n) =>
         t.subscription.refreshed(count: n),
+    'settings.routingValue': (Translations t, int n) =>
+        t.settings.routingValue(count: n, mode: t.routing.mode.global),
   };
 
   late Translations ru;

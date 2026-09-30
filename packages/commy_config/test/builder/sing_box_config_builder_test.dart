@@ -758,6 +758,50 @@ void main() {
       expect(route.containsKey('rule_set'), isFalse);
     });
 
+    test('drops a rule the core could not read, and builds the rest', () {
+      // The core parses every rule when it starts and refuses the whole
+      // document over one it cannot: one typo stopped every server.
+      final result = const SingBoxConfigBuilder().build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: const RoutingPolicy(
+            rules: <RoutingRule>[
+              RoutingRule(
+                id: 'r1',
+                matcher: 'regex:*.example.com',
+                action: RuleAction.block,
+              ),
+              RoutingRule(
+                id: 'r2',
+                matcher: 'port_range:1000-2000',
+                action: RuleAction.direct,
+                sortIndex: 1,
+              ),
+            ],
+          ),
+          dns: DnsSettings.defaults,
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+        ),
+      );
+      final built = result.valueOrNull!;
+      final document = built.config.document;
+      final route = document['route']! as Map<String, Object?>;
+      final dns = document['dns']! as Map<String, Object?>;
+
+      expect(built.warnings, <RoutingWarning>[
+        const RoutingWarning(
+          RoutingWarningKind.ruleNotApplicable,
+          'regex:*.example.com',
+        ),
+      ]);
+      expect((route['rules']! as List<Object?>).last, <String, Object?>{
+        'port_range': <String>['1000:2000'],
+        'outbound': 'direct',
+      });
+      expect(dns.containsKey('rules'), isFalse);
+    });
+
     test('writes a local rule set when the file is on disk', () {
       final result = const SingBoxConfigBuilder().build(
         SingBoxBuildRequest.single(
@@ -868,6 +912,170 @@ void main() {
         'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/'
         '$adsTag.srs',
       );
+    });
+
+    test('asks for a geoip list where SagerNet publishes geoip lists', () {
+      // `sing-geosite` holds no geoip-*.srs: every `geoip:` rule used to be
+      // a download that answered 404 and a rule that never applied.
+      expect(
+        AppSettings.defaults.ruleSetUrl('geoip-ru').toString(),
+        'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/'
+        'geoip-ru.srs',
+      );
+    });
+  });
+
+  group('FakeIP and rules that look at addresses', () {
+    // A connection to a FakeIP address reaches the router as its name, with
+    // no address. An `ip_cidr` or `geoip` rule matched nothing there:
+    // `geoip:ru` -> Direct sent every such connection through the proxy.
+    const resolve = <String, Object?>{
+      'action': 'resolve',
+      'server': 'dns-remote',
+      'strategy': 'prefer_ipv4',
+    };
+
+    bool isResolve(Object? rule) =>
+        rule is Map<String, Object?> && rule['action'] == 'resolve';
+
+    RoutingRule rule(String matcher, RuleAction action, int index) =>
+        RoutingRule(
+          id: 'r$index',
+          matcher: matcher,
+          action: action,
+          sortIndex: index,
+        );
+
+    List<Object?> rulesOf(
+      List<RoutingRule> rules, {
+      bool fakeIp = true,
+      DnsStrategy strategy = DnsStrategy.preferIpv4,
+      Set<String> onDisk = const <String>{'geoip-ru'},
+    }) {
+      final config = _build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: RoutingPolicy(rules: rules),
+          dns: DnsSettings(fakeIp: fakeIp, strategy: strategy),
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          ruleSetDirectory: '/data/rulesets',
+          availableRuleSets: onDisk,
+        ),
+      );
+      final route = config.document['route']! as Map<String, Object?>;
+      return route['rules']! as List<Object?>;
+    }
+
+    test('resolves the name once, just ahead of the first of them', () {
+      final rules = rulesOf(<RoutingRule>[
+        rule('domain_suffix:example.org', RuleAction.proxy, 0),
+        rule('geoip:ru', RuleAction.direct, 1),
+        rule('ip_cidr:203.0.113.0/24', RuleAction.block, 2),
+      ]);
+
+      // A name rule ahead of it still decides without a lookup.
+      expect(rules.sublist(rules.length - 4), <Object?>[
+        <String, Object?>{
+          'domain_suffix': <String>['example.org'],
+          'outbound': 'proxy',
+        },
+        resolve,
+        <String, Object?>{
+          'rule_set': <String>['geoip-ru'],
+          'outbound': 'direct',
+        },
+        <String, Object?>{
+          'ip_cidr': <String>['203.0.113.0/24'],
+          'action': 'reject',
+        },
+      ]);
+    });
+
+    test('resolves nothing without FakeIP, or with no such rule', () {
+      final addressRules = <RoutingRule>[
+        rule('geoip:ru', RuleAction.direct, 0),
+        rule('ip_cidr:203.0.113.0/24', RuleAction.block, 1),
+      ];
+      final nameRules = <RoutingRule>[
+        rule('domain_suffix:example.org', RuleAction.direct, 0),
+        rule('geosite:ru', RuleAction.direct, 1),
+        rule('port:443', RuleAction.proxy, 2),
+      ];
+
+      expect(rulesOf(addressRules, fakeIp: false).where(isResolve), isEmpty);
+      expect(
+        rulesOf(nameRules, onDisk: const <String>{'geosite-ru'})
+            .where(isResolve),
+        isEmpty,
+      );
+    });
+
+    test('resolves nothing for the private ranges, like the LAN bypass', () {
+      // A private address is dialled as an address, which FakeIP leaves
+      // alone; resolving every name for it would spend what FakeIP is for.
+      final rules = rulesOf(<RoutingRule>[
+        rule('geoip:private', RuleAction.direct, 0),
+      ]);
+
+      expect(rules.where(isResolve), isEmpty);
+    });
+
+    test('counts only a rule that is written, not one that was left out', () {
+      final rules = rulesOf(
+        <RoutingRule>[
+          rule('geoip:ru', RuleAction.direct, 0),
+          rule('domain_suffix:example.org', RuleAction.proxy, 1),
+          rule('ip_cidr:203.0.113.0/24', RuleAction.block, 2),
+        ],
+        onDisk: const <String>{},
+      );
+
+      expect(rules.sublist(rules.length - 2), <Object?>[
+        resolve,
+        <String, Object?>{
+          'ip_cidr': <String>['203.0.113.0/24'],
+          'action': 'reject',
+        },
+      ]);
+    });
+
+    test('asks for the A record first, unless the user chose IPv6 only', () {
+      // Past the lookup the core dials the proxy by the first address, and
+      // VLESS, VMess and Trojan report success before the server has reached
+      // it. With the user's "prefer IPv6" inherited, the AAAA address came
+      // first and every dual-stack site failed on a server without IPv6.
+      Object? strategyFor(DnsStrategy chosen) => rulesOf(
+            <RoutingRule>[rule('geoip:ru', RuleAction.direct, 0)],
+            strategy: chosen,
+          ).where(isResolve).cast<Map<String, Object?>>().single['strategy'];
+
+      expect(strategyFor(DnsStrategy.preferIpv6), 'prefer_ipv4');
+      expect(strategyFor(DnsStrategy.preferIpv4), 'prefer_ipv4');
+      expect(strategyFor(DnsStrategy.ipv4Only), 'prefer_ipv4');
+      expect(strategyFor(DnsStrategy.ipv6Only), 'ipv6_only');
+    });
+
+    test('leaves the DNS section with the strategy the user chose', () {
+      final config = _build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: RoutingPolicy(
+            rules: <RoutingRule>[rule('geoip:ru', RuleAction.direct, 0)],
+          ),
+          dns: const DnsSettings(
+            fakeIp: true,
+            strategy: DnsStrategy.preferIpv6,
+          ),
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          ruleSetDirectory: '/data/rulesets',
+          availableRuleSets: const <String>{'geoip-ru'},
+        ),
+      );
+
+      final dns = config.document['dns']! as Map<String, Object?>;
+      expect(dns['strategy'], 'prefer_ipv6');
     });
   });
 }

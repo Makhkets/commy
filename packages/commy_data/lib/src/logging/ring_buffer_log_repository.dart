@@ -123,12 +123,8 @@ class RingBufferLogRepository implements LogRepository {
   @override
   Future<Result<String, CommyFailure>> export({required bool redact}) async {
     return StorageGuard.runSync(() {
-      final lines = redact
-          ? <LogLine>[
-              for (final line in _buffer)
-                _redactor.redactLine(line, forExport: true),
-            ]
-          : _buffer.toList();
+      final lines =
+          redact ? _redactor.redactLinesForExport(_buffer) : _buffer.toList();
       return lines.map(formatLine).join('\n');
     });
   }

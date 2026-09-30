@@ -6,6 +6,7 @@ import 'package:commy_config/src/internal/param_keys.dart';
 import 'package:commy_config/src/internal/xhttp_download_settings.dart';
 import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
+import 'package:commy_config/src/parsers/vless_link_parser.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Turns one entry of a Clash `proxies:` list into a node.
@@ -118,6 +119,13 @@ abstract final class ClashProxyReader {
     return plugin;
   }
 
+  /// mihomo's `encryption`, refused when it is VLESS Encryption.
+  static String? _vlessEncryption(Map<String, Object?> proxy) {
+    final encryption = MapRead.text(proxy, <String>['encryption']);
+    VlessLinkParser.requireSupportedEncryption(encryption);
+    return encryption;
+  }
+
   static Map<String, Object?> _params(
     Protocol protocol,
     Map<String, Object?> proxy,
@@ -126,6 +134,7 @@ abstract final class ClashProxyReader {
         Protocol.vless => <String, Object?>{
             ParamKeys.uuid: _require(proxy, <String>['uuid'], 'uuid'),
             ParamKeys.flow: MapRead.text(proxy, <String>['flow']),
+            ParamKeys.encryption: _vlessEncryption(proxy),
             ..._stream(proxy, defaultSecurity: ParamKeys.securityNone),
           },
         Protocol.vmess => <String, Object?>{

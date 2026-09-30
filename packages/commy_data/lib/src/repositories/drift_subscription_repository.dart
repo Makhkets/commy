@@ -46,22 +46,43 @@ class DriftSubscriptionRepository implements SubscriptionRepository {
       if (row == null) {
         return null;
       }
-      final url = await _secrets.readSubscriptionUrl(id);
-      return SubscriptionMapper.toDomain(row, url: url.valueOrNull);
+      await _legacyPagesMoved;
+      final secrets = (await _secrets.readAllSubscriptionSecrets()).valueOrNull;
+      return SubscriptionMapper.toDomain(
+        row,
+        url: secrets?.urls[id],
+        page: secrets?.pages[id],
+      );
     });
   }
 
   @override
   Future<Result<void, CommyFailure>> upsert(Subscription subscription) {
     return StorageGuard.runVoid(() async {
-      // URL first. A row whose secret never landed is a subscription that
-      // cannot be refreshed and gives no hint why.
-      _rethrowFailure(
-        await _secrets.writeSubscriptionUrl(
-          subscription.id,
-          subscription.url,
-        ),
-      );
+      // A placeholder URL means this object was built while the keystore
+      // could not be read (ADR-0008): the row came back with its redacted
+      // form in place of the secret. The card's menu writes such an object
+      // back whole on a rename or a flipped switch, and sending its URL on
+      // would overwrite the real, token-bearing one for good — every refresh
+      // after that asks the panel for `/redacted`. The page beside it came
+      // from the same failed read, and its null would erase the stored one.
+      // So only the row is written; the keystore keeps what it has.
+      if (!SubscriptionIdentity.isUnknown(subscription.url)) {
+        // URL first. A row whose secret never landed is a subscription that
+        // cannot be refreshed and gives no hint why.
+        _rethrowFailure(
+          await _secrets.writeSubscriptionUrl(
+            subscription.id,
+            subscription.url,
+          ),
+        );
+        _rethrowFailure(
+          await _secrets.writeSubscriptionPage(
+            subscription.id,
+            subscription.profileWebPageUrl,
+          ),
+        );
+      }
       await _db
           .into(_db.subscriptionRows)
           .insertOnConflictUpdate(SubscriptionMapper.toCompanion(subscription));
@@ -121,11 +142,49 @@ class DriftSubscriptionRepository implements SubscriptionRepository {
     if (rows.isEmpty) {
       return const <Subscription>[];
     }
-    final urls = await _secrets.readAllSubscriptionUrls();
-    final byId = urls.valueOrNull ?? const <String, Uri>{};
+    await _legacyPagesMoved;
+    final secrets = (await _secrets.readAllSubscriptionSecrets()).valueOrNull;
     return rows
-        .map((row) => SubscriptionMapper.toDomain(row, url: byId[row.id]))
+        .map(
+          (row) => SubscriptionMapper.toDomain(
+            row,
+            url: secrets?.urls[row.id],
+            page: secrets?.pages[row.id],
+          ),
+        )
         .toList();
+  }
+
+  /// Moves profile pages written by earlier builds out of the open database.
+  ///
+  /// They used to be a column, and on Marzban-family panels the page is the
+  /// subscription URL itself — the token in plain SQLite (rule R2). Once per
+  /// repository, before the first read; a row whose page could not be put in
+  /// the keystore keeps it where it was, rather than losing it.
+  late final Future<void> _legacyPagesMoved = _moveLegacyPages();
+
+  Future<void> _moveLegacyPages() async {
+    try {
+      final rows = await (_db.select(_db.subscriptionRows)
+            ..where((table) => table.profileWebPageUrl.isNotNull()))
+          .get();
+      for (final row in rows) {
+        final page = Uri.tryParse(row.profileWebPageUrl ?? '');
+        if (page != null &&
+            (await _secrets.writeSubscriptionPage(row.id, page)).isErr) {
+          continue;
+        }
+        await (_db.update(_db.subscriptionRows)
+              ..where((table) => table.id.equals(row.id)))
+            .write(
+          const SubscriptionRowsCompanion(
+            profileWebPageUrl: Value<String?>(null),
+          ),
+        );
+      }
+    } on Object {
+      // Left for the next start. The column still answers in the meantime.
+    }
   }
 
   Future<List<String>> _nodeIdsOf(String subscriptionId) async {

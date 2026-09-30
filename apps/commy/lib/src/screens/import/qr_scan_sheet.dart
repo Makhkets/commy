@@ -18,7 +18,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 ///
 /// The first payload that parses wins and the sheet stops scanning. Without
 /// that latch a single code sitting in frame fires the import a dozen times a
-/// second.
+/// second. A retry after a failed import opens the latch again: the scanner
+/// comes back live, and it has to read the code it is shown.
 class QrScanSheet extends ConsumerStatefulWidget {
   /// Creates the sheet body.
   const QrScanSheet({super.key});
@@ -59,6 +60,22 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
     final t = Translations.of(context);
     final spacing = context.spacing;
     final state = ref.watch(importControllerProvider);
+    // A retry clears the failure and hands the sheet its scanner back — a new
+    // MobileScanner on the same controller, which starts the camera again.
+    // The latch stayed shut, so the live preview ignored every code held up
+    // to it and the only way out was to close the sheet and open it anew.
+    // Keyed on the step from a result back to nothing rather than on
+    // "nothing": between a detection and the import marking itself busy the
+    // state is idle too, and opening the latch there would let one code in
+    // frame fire the import twice.
+    ref.listen<ImportState>(importControllerProvider, (previous, next) {
+      final hadResult = previous != null &&
+          (previous.outcome != null || previous.failure != null);
+      final idle = next.outcome == null && next.failure == null && !next.isBusy;
+      if (hadResult && idle) {
+        _handled = false;
+      }
+    });
 
     if (state.outcome != null || state.failure != null) {
       return const ImportResultPanel();
@@ -74,14 +91,28 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
             borderRadius: context.radii.lgAll,
             child: AspectRatio(
               aspectRatio: 1,
-              child: MobileScanner(
-                controller: _controller,
-                onDetect: _onDetect,
-                errorBuilder: (context, error) =>
-                    QrScanError(code: error.errorCode),
-                placeholderBuilder: (context) => const Center(
-                  child: CommySpinner(),
-                ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  MobileScanner(
+                    controller: _controller,
+                    onDetect: _onDetect,
+                    errorBuilder: (context, error) =>
+                        QrScanError(code: error.errorCode),
+                    placeholderBuilder: (context) => const Center(
+                      child: CommySpinner(),
+                    ),
+                  ),
+                  // A scanned subscription is a download of several seconds,
+                  // and all the sheet showed for them was the camera stopped
+                  // on its last frame — a preview that looked frozen rather
+                  // than busy.
+                  if (state.isBusy)
+                    ColoredBox(
+                      color: context.colors.bgScrim,
+                      child: const Center(child: CommySpinner()),
+                    ),
+                ],
               ),
             ),
           ),

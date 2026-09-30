@@ -74,7 +74,7 @@ class CommyTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        if (TunnelController.isRunning) {
+        if (tileTapStops(coreUp = TunnelController.isRunning, state = TunnelController.state)) {
             disconnect()
         } else {
             askAppToConnect()
@@ -160,3 +160,20 @@ class CommyTileService : TileService() {
         const val REQUEST_CONNECT = 3
     }
 }
+
+/**
+ * Whether a tap on the tile stops the tunnel rather than asking for one.
+ *
+ * "Connecting…" counts as up. The tile stays tappable during a start so that a
+ * slow one can be called off from the shade, but the core is not up until the
+ * start is over, and a tap there used to open the app with "connect" attached
+ * — which Dart ignored, a connect being under way already — while the start
+ * carried on. Stopping mid-start is safe: the service is in the foreground by
+ * then, and `StartLedger` makes the start in flight give way.
+ *
+ * [coreUp] still decides on its own. Should the reported state say anything
+ * else while the core is up, a tap stops the tunnel rather than asking for a
+ * second one.
+ */
+internal fun tileTapStops(coreUp: Boolean, state: String): Boolean =
+    coreUp || state == Wire.States.STARTING

@@ -147,6 +147,9 @@ abstract final class SingBoxKeys {
   /// SOCKS and HTTP user name.
   static const String username = 'username';
 
+  /// Credentials a local inbound accepts.
+  static const String users = 'users';
+
   /// VLESS sub-protocol.
   static const String flow = 'flow';
 
@@ -405,6 +408,10 @@ abstract final class SingBoxKeys {
 
   /// `action` that reads the protocol off the first packets.
   static const String actionSniff = 'sniff';
+
+  /// `action` that resolves the name a connection carries into the
+  /// addresses later rules match on.
+  static const String actionResolve = 'resolve';
 
   /// Sniffed protocol name of a DNS query.
   static const String protocolDns = 'dns';

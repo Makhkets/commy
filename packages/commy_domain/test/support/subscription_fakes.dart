@@ -78,6 +78,34 @@ class StubSubscriptionFetcher implements SubscriptionFetcher {
       _result;
 }
 
+/// A panel that takes its time, during which [meanwhile] happens.
+///
+/// That is the window the user has to change something behind the use case's
+/// back: the card's menu stays usable while its spinner turns.
+class MeanwhileFetcher implements SubscriptionFetcher {
+  /// Runs [meanwhile] before answering with [payload].
+  MeanwhileFetcher(
+    this.meanwhile, {
+    this.payload = const SubscriptionPayload(body: 'vless://...'),
+  });
+
+  /// What happens while the panel is answering.
+  final Future<void> Function() meanwhile;
+
+  /// What the panel finally answers.
+  final SubscriptionPayload payload;
+
+  @override
+  Future<Result<SubscriptionPayload, CommyFailure>> fetch(
+    Uri url, {
+    required bool throughTunnel,
+    String? userAgent,
+  }) async {
+    await meanwhile();
+    return Ok<SubscriptionPayload, CommyFailure>(payload);
+  }
+}
+
 /// An identifier source that always says the same thing.
 class FixedIdGenerator implements IdGenerator {
   /// Creates a generator returning [id].
@@ -129,12 +157,24 @@ class FakeSubscriptionRepository implements SubscriptionRepository {
   Future<Result<void, CommyFailure>> setCollapsed({
     required String id,
     required bool isCollapsed,
-  }) async =>
-      const Ok<void, CommyFailure>(null);
+  }) async {
+    final row = _rows[id];
+    if (row != null) {
+      _rows[id] = row.copyWith(isCollapsed: isCollapsed);
+    }
+    return const Ok<void, CommyFailure>(null);
+  }
 
   @override
-  Future<Result<void, CommyFailure>> reorder(List<String> orderedIds) async =>
-      const Ok<void, CommyFailure>(null);
+  Future<Result<void, CommyFailure>> reorder(List<String> orderedIds) async {
+    for (final (index, id) in orderedIds.indexed) {
+      final row = _rows[id];
+      if (row != null) {
+        _rows[id] = row.copyWith(sortIndex: index);
+      }
+    }
+    return const Ok<void, CommyFailure>(null);
+  }
 }
 
 /// A node store that remembers what a refresh asked it to write.

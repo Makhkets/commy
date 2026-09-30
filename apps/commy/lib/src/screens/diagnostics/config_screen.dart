@@ -8,6 +8,8 @@ import 'package:commy/src/screens/diagnostics/diagnostics_shell.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_config/commy_config.dart';
+import 'package:commy_data/commy_data.dart';
+import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,11 @@ import 'package:go_router/go_router.dart';
 /// entitled to see exactly what was handed to the core. It goes through
 /// `ConfigRedactor` first — the document holds a UUID and a password, and a
 /// screen you can screenshot is not a place for either (rule R2, rule R3).
+///
+/// It is also where "show the config" on a refused connect leads, so a
+/// refusal outranks the last document that worked: the tab shows what was
+/// refused and why, or — when the builder refused and there never was a
+/// document — the reason alone.
 class ConfigScreen extends ConsumerWidget {
   /// Creates the screen.
   const ConfigScreen({super.key});
@@ -28,18 +35,40 @@ class ConfigScreen extends ConsumerWidget {
     final t = Translations.of(context);
     final colors = context.colors;
     final spacing = context.spacing;
-    final config = ref.watch(tunnelControllerProvider).lastConfig;
+    final tunnel = ref.watch(tunnelControllerProvider);
+    // A refusal only when a connect or reload said so. The same failure type
+    // comes back from a switch the core did not recognise and from a probe
+    // URL that is not one; the tunnel is up on the last document that worked
+    // then, and that is what this tab owes the user, without a headline about
+    // a build that never failed.
+    final refusal = switch (tunnel.failure) {
+      final ConfigInvalidFailure failure when tunnel.configRefused => failure,
+      _ => null,
+    };
+    final rejected = refusal == null ? null : tunnel.rejectedConfig;
+    final config = rejected ?? tunnel.lastConfig;
 
     if (config == null) {
       return DiagnosticsShell(
         route: AppRoutes.diagnosticsConfig,
-        child: EmptyState(
-          icon: CommyIcons.document,
-          title: t.diagnostics.configEmpty,
-          message: t.diagnostics.configEmptyBody,
-          actionLabel: t.diagnostics.goConnect,
-          onAction: () => context.go(AppRoutes.home),
-        ),
+        // The connect-first empty state after a refused connect sent the user
+        // back to the very button that had just failed. What the builder
+        // objected to is the one thing this tab can still say.
+        child: refusal == null
+            ? EmptyState(
+                icon: CommyIcons.document,
+                title: t.diagnostics.configEmpty,
+                message: t.diagnostics.configEmptyBody,
+                actionLabel: t.diagnostics.goConnect,
+                onAction: () => context.go(AppRoutes.home),
+              )
+            : EmptyState(
+                icon: CommyIcons.warning,
+                title: t.diagnostics.configNotBuilt,
+                message: _reason(refusal, t),
+                actionLabel: t.error.openLogs,
+                onAction: () => context.go(AppRoutes.diagnosticsLogs),
+              ),
       );
     }
 
@@ -58,6 +87,25 @@ class ConfigScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          if (refusal != null)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                spacing.s4,
+                0,
+                spacing.s4,
+                spacing.s3,
+              ),
+              child: ErrorBanner(
+                // Without a refused document the one below is the last that
+                // worked — after a refused reload, still the one running —
+                // so the headline says nothing was built rather than that
+                // this document was refused.
+                title: rejected == null
+                    ? t.diagnostics.configNotBuilt
+                    : t.diagnostics.configRefused,
+                message: _reason(refusal, t),
+              ),
+            ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: spacing.s4),
             child: Text(
@@ -98,6 +146,15 @@ class ConfigScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// What was wrong with the document, in the words of whoever refused it.
+  ///
+  /// Redacted like a log line: a core's complaint can quote the field it
+  /// choked on, and that field can be the credential (rule R3).
+  static String _reason(ConfigInvalidFailure failure, Translations t) {
+    final detail = const LogRedactor().redact(failure.detail).trim();
+    return detail.isEmpty ? FailureText.of(failure, t).message : detail;
   }
 
   /// Copies the redacted document and says whether it landed.

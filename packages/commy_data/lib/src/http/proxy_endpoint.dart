@@ -10,10 +10,21 @@
 /// flag, and this is what makes the `true` branch mean something.
 class ProxyEndpoint {
   /// Creates an endpoint.
-  const ProxyEndpoint({required this.host, required this.port});
+  const ProxyEndpoint({
+    required this.host,
+    required this.port,
+    this.username,
+    this.password,
+  });
 
   /// The loopback mixed inbound at [port], which is where the core puts it.
-  const ProxyEndpoint.loopback(int port) : this(host: '127.0.0.1', port: port);
+  const ProxyEndpoint.loopback(int port, {String? username, String? password})
+      : this(
+          host: '127.0.0.1',
+          port: port,
+          username: username,
+          password: password,
+        );
 
   /// Address of the local inbound.
   final String host;
@@ -21,8 +32,24 @@ class ProxyEndpoint {
   /// Port of the local inbound.
   final int port;
 
+  /// The user name the inbound asks for, if it asks.
+  final String? username;
+
+  /// The password the inbound asks for, if it asks. Never printed.
+  final String? password;
+
   /// The value `HttpClient.findProxy` expects.
-  String get proxyDirective => 'PROXY $host:$port';
+  ///
+  /// `HttpClient` sends credentials written into the directive as
+  /// `Proxy-Authorization`, on the CONNECT of an https request too.
+  String get proxyDirective {
+    final user = username;
+    final secret = password;
+    final credentials = user == null || secret == null
+        ? ''
+        : '${Uri.encodeComponent(user)}:${Uri.encodeComponent(secret)}@';
+    return 'PROXY $credentials$host:$port';
+  }
 
   @override
   String toString() => 'ProxyEndpoint($host:$port)';

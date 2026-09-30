@@ -92,4 +92,53 @@ void main() {
       expect(noSource.isRuleSetAutoUpdateEnabled, isFalse);
     });
   });
+
+  group('AppSettings.ruleSetUrl', () {
+    test('each kind of list comes from the repository that publishes it', () {
+      const settings = AppSettings.defaults;
+
+      expect(
+        settings.ruleSetUrl('geosite-category-ads-all').toString(),
+        'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/'
+        'geosite-category-ads-all.srs',
+      );
+      expect(
+        settings.ruleSetUrl('geoip-ru').toString(),
+        'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/'
+        'geoip-ru.srs',
+      );
+    });
+
+    test('the old default, stored before it could serve geoip, is replaced',
+        () {
+      final stored = AppSettings.fromJson(<String, Object?>{
+        'ruleSetSource': AppSettings.legacyRuleSetSource,
+      });
+
+      expect(stored.ruleSetSource, AppSettings.defaultRuleSetSource);
+      expect(
+        stored.ruleSetUrl('geoip-ru').toString(),
+        contains('/SagerNet/sing-geoip/'),
+      );
+    });
+
+    test('a mirror the user typed is theirs, tokens and all', () {
+      const mirror = 'https://mirror.example/{kind}/{tag}.srs';
+      final stored = AppSettings.fromJson(<String, Object?>{
+        'ruleSetSource': mirror,
+      });
+
+      expect(stored.ruleSetSource, mirror);
+      expect(
+        stored.ruleSetUrl('geoip-ru').toString(),
+        'https://mirror.example/geoip/geoip-ru.srs',
+      );
+      expect(
+        const AppSettings(ruleSetSource: 'https://m.example/{tag}.srs')
+            .ruleSetUrl('geoip-ru')
+            .toString(),
+        'https://m.example/geoip-ru.srs',
+      );
+    });
+  });
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:commy_domain/commy_domain.dart';
 import 'package:test/test.dart';
 
@@ -140,6 +142,56 @@ void main() {
             '@jp-02.example.net:8388#Tokyo%2002'),
         'ss://${Redact.placeholder}@jp-02.example.net:8388#Tokyo 02',
       );
+    });
+
+    group('a link that is base64 where the address would be', () {
+      // With no `@`, `Uri` takes the whole blob for the host and lowercases
+      // it — and a lowercased base64 group has so few case variants that the
+      // readable one is found by hand. The body is the credential.
+      const vmessJson = '{"v":"2","ps":"Frankfurt","add":"1.2.3.4",'
+          '"port":"443","id":"$uuid","net":"ws"}';
+      final vmessBody = base64.encode(utf8.encode(vmessJson));
+      const legacySs = 'YWVzLTI1Ni1nY206U3VwZXJTZWNyZXRQYXNzQDEuMi4zLjQ6ODM4OA';
+
+      test('a legacy shadowsocks link keeps its name and nothing else', () {
+        final redacted = Redact.link('ss://$legacySs#Frankfurt');
+
+        expect(redacted, 'ss://${Redact.placeholder}#Frankfurt');
+      });
+
+      test('a vmess link loses its body, padded or not', () {
+        for (final body in <String>[vmessBody, vmessBody.replaceAll('=', '')]) {
+          final redacted = Redact.link('vmess://$body');
+
+          expect(redacted, 'vmess://${Redact.placeholder}');
+          expect(
+            redacted.toLowerCase(),
+            isNot(contains(body.substring(0, 24).toLowerCase())),
+          );
+        }
+      });
+
+      test('a vmess body cut by a slash loses both halves', () {
+        final redacted = Redact.link('vmess://eyJ2Ijoi/MiIsImlkIjoi#Oslo');
+
+        expect(redacted, 'vmess://${Redact.placeholder}#Oslo');
+      });
+
+      test('a long dotless blob under any other scheme goes too', () {
+        expect(
+          Redact.link('socks://dXNlcjpTdXBlclNlY3JldFBhc3M#Home'),
+          'socks://${Redact.placeholder}#Home',
+        );
+      });
+
+      test('an address is still an address', () {
+        expect(
+          Redact.link('https://panel.example.com/sub/token'),
+          'https://panel.example.com',
+        );
+        expect(Redact.link('http://localhost:9090'), 'http://localhost:9090');
+        expect(Redact.link('tls://[2001:db8::1]:853'), contains('2001:db8::1'));
+      });
     });
 
     test('anything that is not a link at all becomes the placeholder', () {

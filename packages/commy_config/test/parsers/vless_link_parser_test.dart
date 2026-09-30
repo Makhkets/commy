@@ -136,6 +136,76 @@ void main() {
       );
     });
 
+    test('reads a tcp http header without tls', () {
+      final node = parser.parse(
+        'vless://uuid@example.com:80?type=tcp&headerType=http'
+        '&host=b.example&path=%2F#x',
+      );
+
+      expect(node.param(ParamKeys.transport), 'tcp');
+      expect(node.param(ParamKeys.headerType), 'http');
+      expect(node.param(ParamKeys.host), 'b.example');
+    });
+
+    test('rejects a tcp http header over tls or reality, by name', () {
+      for (final security in <String>['security=tls', 'pbk=KEY&sni=a.ex']) {
+        expect(
+          () => parser.parse(
+            'vless://uuid@example.com:443?type=tcp&headerType=http&$security#x',
+          ),
+          throwsA(
+            isA<LinkFormatException>().having(
+              (error) => error.reason,
+              'reason',
+              contains('HTTP header'),
+            ),
+          ),
+          reason: security,
+        );
+      }
+    });
+
+    test('rejects a tcp header the core has no way to send', () {
+      expect(
+        () => parser.parse(
+          'vless://uuid@example.com:443?type=tcp&headerType=srtp#x',
+        ),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
+    test('rejects VLESS Encryption without naming its key', () {
+      expect(
+        () => parser.parse(
+          'vless://uuid@a.example:443?security=tls'
+          '&encryption=mlkem768x25519plus.native.0rtt.SECRETKEY#n',
+        ),
+        throwsA(
+          isA<LinkFormatException>().having(
+            (error) => error.reason,
+            'reason',
+            allOf(contains('mlkem768x25519plus'), isNot(contains('SECRET'))),
+          ),
+        ),
+      );
+    });
+
+    test('a value that is a key and no scheme is not repeated at all', () {
+      const key = 'QkFTRTY0S0VZTk9TQ0hFTUVfX19fX19fX19fX19fX19fX19fXw';
+      expect(
+        VlessLinkParser.encryptionRefusal('$key+/='),
+        allOf(isNotNull, isNot(contains(key))),
+      );
+    });
+
+    test('accepts encryption=none and a link that leaves it out', () {
+      final none = parser.parse('vless://uuid@a.example:443?encryption=none#n');
+      final missing = parser.parse('vless://uuid@a.example:443#n');
+
+      expect(none.param(ParamKeys.encryption), 'none');
+      expect(missing.param(ParamKeys.encryption), isNull);
+    });
+
     test('rejects another protocol', () {
       expect(
         () => parser.parse('trojan://pass@example.com:443#x'),

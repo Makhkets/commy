@@ -197,6 +197,7 @@
       "confirm": "Delete",
       "cancel": "Cancel"
     },
+    "refreshBusy": "Another subscription is refreshing — try this one again in a moment",
     "linkCopied": "Link copied",
     "panelSaid": "Your panel sent this instead of servers:",
     "deviceIdOff": "Sending the device identifier (HWID) is off, and a panel that limits devices answers like this without it.",
@@ -231,7 +232,7 @@
     "intro": "A rule naming geosite: or geoip: needs a compiled list on disk. Nothing is downloaded until you ask — with the button or a schedule. The address below is the one that will be asked.",
     "source": "Source",
     "sourceLabel": "Address template",
-    "sourceHelp": "$token is replaced with the tag being fetched. Clear the field to make downloading unavailable.",
+    "sourceHelp": "$token is replaced with the tag being fetched, $kind with geoip or geosite. Clear the field to make downloading unavailable.",
     "sourceOff": "No source — downloading is off",
     "sourceInvalid": "That does not look like an http or https address",
     "needed": "Needed by your rules",
@@ -307,9 +308,11 @@
       "label": "Resolver",
       "hint": "tls://1.1.1.1",
       "help": "Schemes: $schemes. A bare address means plain UDP. \"local\" hands the query to the system.",
+      "helpRemote": "Schemes: $schemes. A bare address means plain UDP.",
       "reset": "Use the default",
       "unsupportedScheme": "The core has no transport for that scheme",
-      "missingAddress": "There is no address after the scheme"
+      "missingAddress": "There is no address after the scheme",
+      "systemThroughTunnel": "The system resolver answers outside the tunnel: every name going through the proxy would leak. Give a resolver address"
     }
   },
 
@@ -327,10 +330,15 @@
     "sections": "Sections",
     "routing": "Routing",
     "routingSubtitle": "Mode, rules, apps, DNS",
+    "routingModeRules": "Rule-based",
+    "routingValue(plural, param=count)": {
+      "one": "$mode · $count rule",
+      "other": "$mode · $count rules"
+    },
     "diagnostics": "Diagnostics",
     "diagnosticsSubtitle": "Logs, connections, config, statistics",
     "appearance": "Appearance",
-    "appearanceSubtitle": "Theme, language, text size",
+    "appearanceSubtitle": "Theme and language",
     "about": "About",
     "aboutSubtitle": "Version, core, licences",
     "silence": {
@@ -504,7 +512,8 @@
       "matcherHint": "geosite:ru, domain:example.com, geoip:private",
       "action": "Action",
       "save": "Save",
-      "empty": "A match cannot be empty"
+      "empty": "A match cannot be empty",
+      "unknown": "Not a condition the app knows. Start it with domain:, suffix:, keyword:, geosite:, geoip:, ip:, port: or app:"
     },
     "emptyRules": "No rules of your own yet",
     "emptyRulesBody": "With no rules everything follows the final outcome. Add the first one to split the traffic."
@@ -535,6 +544,8 @@
     "configEmptyBody": "The configuration appears the moment you connect: it is assembled from the chosen server, the rules and DNS.",
     "configTitle": "Core configuration",
     "configRedacted": "Secrets are stripped. This is what goes to the core, minus the credentials.",
+    "configRefused": "The core refused this configuration",
+    "configNotBuilt": "The configuration could not be built",
     "statsEmpty": "No statistics yet",
     "statsEmptyBody": "The chart shows the last 60 seconds; the rows below, this session's usage and the last week by day.",
     "statsWindow": "Last 60 seconds",

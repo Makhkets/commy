@@ -51,8 +51,68 @@ internal object IntentBus {
     val events: Flow<String> =
         live.onSubscription { pending.getAndSet(null)?.let { emit(it) } }
 
+    /**
+     * Whether the intent an activity was created with still asks for anything.
+     *
+     * Not when the activity is being restored: it is handed the intent it was
+     * first launched with, and that one was published the first time round.
+     * Nor when it was relaunched from Recents. Up to Android 12L, Back on the
+     * home screen finishes the activity and leaves its task in Recents, and
+     * opening the task from there starts a new activity with the task's first
+     * intent — the tile's "connect", a notification's, a tapped link — marked
+     * as coming from history, with no saved state to tell it apart. Published
+     * again, it brought the tunnel back up after the user had disconnected
+     * from the notification, and reopened the import sheet of a link long
+     * since imported, on every visit.
+     *
+     * An intent that reaches a running activity through `onNewIntent` is
+     * always new and does not come through here.
+     */
+    fun isFreshLaunch(restored: Boolean, flags: Int): Boolean =
+        !restored && (flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0
+
     fun publish(intent: Intent?) {
-        val payload = encode(intent ?: return) ?: return
+        offer(encode(intent ?: return) ?: return)
+    }
+
+    /**
+     * Hands Dart the text of a file an intent carried, as if it had been
+     * shared as text: `{"kind":"text","text":"…"}`. See [FileIntentReader].
+     */
+    fun publishText(text: String) {
+        offer(event(Wire.Intents.TEXT) { put(Wire.Keys.TEXT, text) })
+    }
+
+    /** Says a file arrived that could not be read: `{"kind":"file"}`. */
+    fun publishUnreadableFile() {
+        offer(event(Wire.Intents.FILE))
+    }
+
+    /**
+     * The file [intent] hands over, when a file is what it carries: a VIEW of
+     * a `content:` or `file:` address, or a SEND with a stream and no text.
+     *
+     * Such an intent is not [publish]ed. Its address has to be read through
+     * the content resolver while the grant that came with it lasts, and Dart
+     * has no way to do that; the caller reads it and publishes the text.
+     */
+    fun fileOf(intent: Intent): Uri? {
+        if (intent.getBooleanExtra(EXTRA_CONNECT, false)) {
+            return null
+        }
+        return when (intent.action) {
+            Intent.ACTION_VIEW -> intent.data?.takeIf { isFile(it) }
+            Intent.ACTION_SEND ->
+                if (intent.getStringExtra(Intent.EXTRA_TEXT).isNullOrBlank()) {
+                    intent.getParcelableExtraCompat()
+                } else {
+                    null
+                }
+            else -> null
+        }
+    }
+
+    private fun offer(payload: String) {
         if (live.subscriptionCount.value > 0 && live.tryEmit(payload)) {
             return
         }
@@ -72,26 +132,28 @@ internal object IntentBus {
         return when (intent.action) {
             Intent.ACTION_VIEW -> {
                 val uri = intent.data ?: return null
-                val kind = when (uri.scheme?.lowercase()) {
-                    // A file has to be read through the content resolver, a
-                    // link does not. Dart needs to know which it is holding.
-                    "content", "file" -> Wire.Intents.FILE
-                    else -> Wire.Intents.LINK
+                // A file is read before it gets here, through [fileOf].
+                if (isFile(uri)) {
+                    return null
                 }
-                event(kind) { put(Wire.Keys.URI, uri.toString()) }
+                event(Wire.Intents.LINK) { put(Wire.Keys.URI, uri.toString()) }
             }
 
             Intent.ACTION_SEND -> {
+                // Without text, a SEND carries a file: read through [fileOf].
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf(String::isNotBlank)
-                if (text != null) {
-                    return event(Wire.Intents.TEXT) { put(Wire.Keys.TEXT, text) }
-                }
-                val stream = intent.getParcelableExtraCompat() ?: return null
-                event(Wire.Intents.FILE) { put(Wire.Keys.URI, stream.toString()) }
+                    ?: return null
+                event(Wire.Intents.TEXT) { put(Wire.Keys.TEXT, text) }
             }
 
             else -> null
         }
+    }
+
+    /** A file has to be read through the content resolver; a link does not. */
+    private fun isFile(uri: Uri): Boolean = when (uri.scheme?.lowercase()) {
+        "content", "file" -> true
+        else -> false
     }
 
     @Suppress("DEPRECATION")

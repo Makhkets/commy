@@ -190,6 +190,87 @@ void main() {
       expect(all.single.latency, equals(const Duration(milliseconds: 90)));
     });
 
+    group('several servers on one endpoint', () {
+      // host:443 with a WebSocket path per server is an ordinary panel
+      // layout. Ids come from the server's identity, path included, so the
+      // two are two ids on one endpoint — and matching on the endpoint alone
+      // gave one of them the other's id, collapsed the two rows into one and
+      // deleted the other server's credentials.
+      const subscriptionId = 'sub-1';
+
+      ProxyNode onPath(String path) => ProxyNode(
+            id: 'ws$path',
+            name: 'Frankfurt $path',
+            protocol: Protocol.vless,
+            host: 'cdn.vpn.example.com',
+            port: 443,
+            subscriptionId: subscriptionId,
+            params: <String, Object?>{
+              'uuid': 'uuid-of$path',
+              'type': 'ws',
+              'path': path,
+              'security': 'tls',
+            },
+          );
+
+      Future<Map<String, ProxyNode>> stored() async => <String, ProxyNode>{
+            for (final node in (await repository.getAll()).valueOrNull!)
+              node.id: node,
+          };
+
+      test('a reordered pair keeps both servers, each with its own id',
+          () async {
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/a'), onPath('/b')],
+        );
+        await repository.updateLatency(
+          id: 'ws/a',
+          latency: const Duration(milliseconds: 40),
+          checkedAt: DateTime.utc(2026, 9, 30),
+        );
+
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/b'), onPath('/a')],
+        );
+
+        final nodes = await stored();
+        expect(nodes.keys.toSet(), <String>{'ws/a', 'ws/b'});
+        expect(nodes['ws/a']!.param('path'), '/a');
+        expect(nodes['ws/a']!.param('uuid'), 'uuid-of/a');
+        expect(nodes['ws/b']!.param('uuid'), 'uuid-of/b');
+        expect(nodes['ws/a']!.latency, const Duration(milliseconds: 40));
+        expect(nodes['ws/b']!.latency, isNull);
+      });
+
+      test('a new server in front does not take the first one over', () async {
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/a')],
+        );
+        await repository.updateLatency(
+          id: 'ws/a',
+          latency: const Duration(milliseconds: 40),
+          checkedAt: DateTime.utc(2026, 9, 30),
+        );
+
+        await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[onPath('/new'), onPath('/a')],
+        );
+
+        final nodes = await stored();
+        expect(nodes.keys.toSet(), <String>{'ws/new', 'ws/a'});
+        expect(nodes['ws/a']!.latency, const Duration(milliseconds: 40));
+        expect(nodes['ws/new']!.param('uuid'), 'uuid-of/new');
+        expect(
+          stack.store.snapshot.containsKey(SecretKeys.nodeParams('ws/a')),
+          isTrue,
+        );
+      });
+    });
+
     test('drops servers the panel removed, with their credentials', () async {
       const subscriptionId = 'sub-1';
       await repository.replaceForSubscription(
@@ -263,6 +344,50 @@ void main() {
       expect(all.single.param('uuid'), equals(Fixtures.uuid));
     });
 
+    test('a notice of two lines keeps both lines, refresh after refresh',
+        () async {
+      // A panel with two lines to say sends two entries at the same nowhere
+      // address under one placeholder credential: one id, two texts. Folded
+      // by id, only the last line — "Contact support" — was ever stored.
+      const subscriptionId = 'sub-1';
+      ProxyNode line(String text) => ProxyNode(
+            id: 'stub',
+            name: text,
+            protocol: Protocol.vless,
+            host: '0.0.0.0',
+            port: 1,
+            subscriptionId: subscriptionId,
+            params: const <String, Object?>{
+              'uuid': '00000000-0000-0000-0000-000000000000',
+            },
+          );
+      Future<List<String>> messages() async => PanelNotice.messages(
+            (await repository.findBySubscription(subscriptionId)).valueOrNull!,
+          );
+
+      for (var refresh = 0; refresh < 2; refresh++) {
+        final result = await repository.replaceForSubscription(
+          subscriptionId: subscriptionId,
+          nodes: <ProxyNode>[
+            line('Subscription expired'),
+            line('Contact support'),
+          ],
+        );
+        expect(result.isOk, isTrue);
+        expect(
+          await messages(),
+          <String>['Subscription expired', 'Contact support'],
+        );
+      }
+
+      await repository.replaceForSubscription(
+        subscriptionId: subscriptionId,
+        nodes: <ProxyNode>[line('Device limit reached'), line('Contact us')],
+      );
+
+      expect(await messages(), <String>['Device limit reached', 'Contact us']);
+    });
+
     test('a repeated server leaves no hole in the display order', () async {
       const subscriptionId = 'sub-1';
 
@@ -325,6 +450,119 @@ void main() {
             .toList(),
         equals(<String>[SecretKeys.nodeParams('local-id')]),
       );
+    });
+
+    group('one server, two owners', () {
+      // A node's id is its server and nothing else, so the same server under
+      // two owners is the same id. The write used to take the other owner's
+      // row over: a server pasted by hand became the subscription's and went
+      // when the subscription was deleted, and two subscriptions of one
+      // account emptied each other on every refresh.
+      ProxyNode server({String? subscriptionId}) =>
+          Fixtures.vlessNode(subscriptionId: subscriptionId);
+      final heldBySub1 = DriftNodeRepository.ownedId('node-vless', 'sub-1');
+      final heldBySub2 = DriftNodeRepository.ownedId('node-vless', 'sub-2');
+      final heldByHand = DriftNodeRepository.ownedId('node-vless', null);
+
+      Future<Map<String, String?>> owners() async => <String, String?>{
+            for (final node in (await repository.getAll()).valueOrNull!)
+              node.id: node.subscriptionId,
+          };
+
+      test('a subscription does not take a server pasted by hand', () async {
+        await repository.upsertAll(<ProxyNode>[server()]);
+
+        await repository.replaceForSubscription(
+          subscriptionId: 'sub-1',
+          nodes: <ProxyNode>[server(subscriptionId: 'sub-1')],
+        );
+
+        expect(await owners(), <String, String?>{
+          'node-vless': null,
+          heldBySub1: 'sub-1',
+        });
+      });
+
+      test('deleting that subscription leaves the pasted server whole',
+          () async {
+        await repository.upsertAll(<ProxyNode>[server()]);
+        await repository.replaceForSubscription(
+          subscriptionId: 'sub-1',
+          nodes: <ProxyNode>[server(subscriptionId: 'sub-1')],
+        );
+
+        await stack.subscriptions.deleteById('sub-1');
+
+        final left = (await repository.getAll()).valueOrNull!;
+        expect(left.map((node) => node.id), <String>['node-vless']);
+        expect(left.single.param('uuid'), Fixtures.uuid);
+      });
+
+      test('two subscriptions listing one server keep a copy each', () async {
+        for (final subscriptionId in <String>['sub-1', 'sub-2', 'sub-1']) {
+          await repository.replaceForSubscription(
+            subscriptionId: subscriptionId,
+            nodes: <ProxyNode>[server(subscriptionId: subscriptionId)],
+          );
+        }
+
+        expect(await owners(), <String, String?>{
+          'node-vless': 'sub-1',
+          heldBySub2: 'sub-2',
+        });
+        for (final subscriptionId in <String>['sub-1', 'sub-2']) {
+          final nodes =
+              (await repository.findBySubscription(subscriptionId)).valueOrNull;
+          expect(nodes, hasLength(1), reason: subscriptionId);
+          expect(nodes!.single.param('uuid'), Fixtures.uuid);
+        }
+      });
+
+      test('the copy that stepped aside keeps its id and its latency',
+          () async {
+        await repository.replaceForSubscription(
+          subscriptionId: 'sub-1',
+          nodes: <ProxyNode>[server(subscriptionId: 'sub-1')],
+        );
+        await repository.replaceForSubscription(
+          subscriptionId: 'sub-2',
+          nodes: <ProxyNode>[server(subscriptionId: 'sub-2')],
+        );
+        await repository.updateLatency(
+          id: heldBySub2,
+          latency: const Duration(milliseconds: 70),
+          checkedAt: DateTime.utc(2026, 9, 30),
+        );
+        // The first owner goes; the second one's copy is no longer in the
+        // way of anything, and still must not move.
+        await stack.subscriptions.deleteById('sub-1');
+
+        await repository.replaceForSubscription(
+          subscriptionId: 'sub-2',
+          nodes: <ProxyNode>[server(subscriptionId: 'sub-2')],
+        );
+
+        final left = (await repository.getAll()).valueOrNull!;
+        expect(left.map((node) => node.id), <String>[heldBySub2]);
+        expect(left.single.latency, const Duration(milliseconds: 70));
+      });
+
+      test("a paste does not take a subscription's server off its card",
+          () async {
+        await repository.replaceForSubscription(
+          subscriptionId: 'sub-1',
+          nodes: <ProxyNode>[server(subscriptionId: 'sub-1')],
+        );
+
+        await repository.upsertAll(<ProxyNode>[server()]);
+        // Pasted again: it lands on the copy it made the first time.
+        await repository.upsertAll(<ProxyNode>[server()]);
+
+        expect(await owners(), <String, String?>{
+          'node-vless': 'sub-1',
+          heldByHand: null,
+        });
+      });
     });
 
     test('leaves nodes of another subscription alone', () async {

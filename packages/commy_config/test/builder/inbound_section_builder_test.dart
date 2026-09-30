@@ -5,11 +5,17 @@ import 'package:test/test.dart';
 /// The local inbound: absent unless something needs it, and on loopback
 /// unless the user asked for more.
 void main() {
-  List<Map<String, Object?>> build(AppSettings settings) {
+  const auth = LocalProxyAuth(password: '0123456789abcdef');
+
+  List<Map<String, Object?>> build(
+    AppSettings settings, {
+    LocalProxyAuth? localAuth = auth,
+  }) {
     return InboundSectionBuilder.build(
       settings: settings,
       routing: RoutingPolicy.defaults,
       platform: ConfigPlatform.android,
+      localAuth: localAuth,
     );
   }
 
@@ -37,10 +43,34 @@ void main() {
       expect(mixed['listen_port'], AppSettings.defaultMixedPort);
     });
 
+    test(
+        'the loopback inbound asks for credentials, and is not opened '
+        'without them', () {
+      // Unauthenticated, any app on the phone could find it by scanning
+      // localhost, and learn through it where the tunnel comes out.
+      const settings = AppSettings(ipCheckUrl: 'https://ip.example/json');
+
+      expect(build(settings).last['users'], <Map<String, Object?>>[
+        <String, Object?>{'username': 'commy', 'password': '0123456789abcdef'},
+      ]);
+      expect(
+        build(settings, localAuth: null).map((inbound) => inbound['tag']),
+        <String>[SingBoxTags.tunInbound],
+      );
+    });
+
     test('sharing with the LAN opens the same port on every interface', () {
       final mixed = build(const AppSettings(allowLan: true)).last;
 
       expect(mixed['listen'], InboundSectionBuilder.lanListenAddress);
+      // The user shares it on purpose; the devices they share it with have
+      // no way to know a password the app made up.
+      expect(mixed.containsKey('users'), isFalse);
+      expect(
+        build(const AppSettings(allowLan: true), localAuth: null)
+            .last['listen'],
+        InboundSectionBuilder.lanListenAddress,
+      );
     });
 
     test('with both on, the LAN address wins and there is still one inbound',

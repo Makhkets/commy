@@ -238,6 +238,67 @@ void main() {
     expect(stored().rules, isEmpty);
   });
 
+  // A whole URL reads as the unknown key `https`, and a typo as another
+  // unknown key. Both used to be saved; the builder dropped them, traffic
+  // went on through the proxy, and the screen blamed the device.
+  testWidgets('a condition no platform understands is refused where typed',
+      (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(EmptyState),
+        matching: find.text(t.routing.addRule),
+      ),
+    );
+    await tester.pumpAndSettle();
+    // The last one is an expression the core would not compile: the builder
+    // leaves it out now instead of failing the tunnel, so the sheet refuses
+    // it too.
+    for (final typed in <String>[
+      'https://youtube.com',
+      'domian:example.com',
+      'regex:(unclosed',
+    ]) {
+      await tester.enterText(find.byType(CommyTextField), typed);
+      await tester.tap(find.text(t.routing.newRule.save));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.routing.newRule.unknown), findsOneWidget);
+      expect(find.text(t.routing.newRule.title), findsOneWidget);
+      expect(stored().rules, isEmpty, reason: typed);
+    }
+
+    // Typing clears the complaint, and a condition the core knows is saved.
+    await tester.enterText(find.byType(CommyTextField), 'domain:youtube.com');
+    await tester.pumpAndSettle();
+    expect(find.text(t.routing.newRule.unknown), findsNothing);
+    await tester.tap(find.text(t.routing.newRule.save));
+    await tester.pumpAndSettle();
+
+    expect(stored().rules.single.matcher, 'domain:youtube.com');
+  });
+
+  // `process:` means nothing on Android and something on a desktop. It is
+  // not a typo, and the screen already says when a rule does not apply here.
+  testWidgets('a condition for another platform is still accepted',
+      (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(EmptyState),
+        matching: find.text(t.routing.addRule),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(CommyTextField), 'process:curl');
+    await tester.tap(find.text(t.routing.newRule.save));
+    await tester.pumpAndSettle();
+
+    expect(stored().rules.single.matcher, 'process:curl');
+  });
+
   testWidgets('swiping a rule away removes exactly that rule', (tester) async {
     await pumpScreen(
       tester,
@@ -565,11 +626,13 @@ void main() {
       find.text(
         t.routing.dnsValue(
           remote: 'tls://9.9.9.9',
-          strategy: DnsStrategy.ipv4Only.wireName,
+          strategy: t.dns.strategyIpv4Only,
         ),
       ),
       findsOneWidget,
     );
+    // The core's token is for the core; the row is for a person.
+    expect(find.textContaining(DnsStrategy.ipv4Only.wireName), findsNothing);
   });
 
   testWidgets('the Apps row says everything while per-app routing is off',

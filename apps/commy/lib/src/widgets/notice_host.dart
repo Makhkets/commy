@@ -6,6 +6,7 @@ import 'package:commy/src/state/auto_refresh_notice.dart';
 import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/state/unreadable_file_notice.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
@@ -21,10 +22,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// by nobody: pressing «Проверить» ran a real probe through the core and then
 /// said nothing at all.
 ///
-/// The same goes for the two other producers with no screen of their own: a
+/// The same goes for the other producers with no screen of their own: a
 /// latency measurement, whose answer used to be a figure changing somewhere
-/// down the list, and the automatic subscription refresh, which runs from the
-/// root on a timer.
+/// down the list, the automatic subscription refresh, which runs from the
+/// root on a timer, and a file handed to the app that could not be read.
 ///
 /// It sits in `MaterialApp.builder` rather than on the home screen because a
 /// node switch can be triggered from anywhere the list is shown, and a result
@@ -89,8 +90,24 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
         if (next != null && next != previous) {
           _showAutoRefresh(next);
         }
+      })
+      ..listen<bool>(unreadableFileProvider, (previous, next) {
+        if (next) {
+          _showUnreadableFile();
+        }
       });
     return widget.child;
+  }
+
+  /// A file opened with the app, or shared to it, that could not be read.
+  void _showUnreadableFile() {
+    ToastMessenger.show(
+      context,
+      message: Translations.of(context).import.file.unreadable,
+      tone: CommyTone.error,
+      icon: CommyIcons.warning,
+    );
+    ref.read(unreadableFileProvider.notifier).clear();
   }
 
   void _showFailure(CommyFailure failure) {

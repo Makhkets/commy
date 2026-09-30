@@ -196,6 +196,28 @@ void main() {
     expect(container.read(importControllerProvider).failure, isNull);
   });
 
+  // The buttons on a panel's subscription page: "Add to Happ", "Import to
+  // sing-box". Commy claims those schemes, so the tap opened it — and the
+  // import failed on a link the parser has no reason to know.
+  test("another client's import link is fetched as the subscription inside",
+      () async {
+    start();
+    harness.subscriptionFetcher.body = link;
+    const inner = 'https://panel.example.com/sub/token123';
+
+    final nodeId = await container
+        .read(importControllerProvider.notifier)
+        .importText(
+          'sing-box://import-remote-profile'
+          '?url=${Uri.encodeComponent(inner)}#Home%20panel',
+        );
+
+    expect(harness.subscriptionFetcher.requests, <Uri>[Uri.parse(inner)]);
+    expect(nodeId, isNotNull);
+    expect(harness.subscriptionRepository.items.single.name, 'Home panel');
+    expect(container.read(importControllerProvider).failure, isNull);
+  });
+
   test('an http proxy link is still a proxy, not a subscription', () {
     expect(
       ImportController.subscriptionAddress('http://user:pw@1.2.3.4:8080'),

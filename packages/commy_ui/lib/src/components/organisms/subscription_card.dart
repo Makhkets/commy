@@ -92,6 +92,7 @@ class SubscriptionCard extends StatelessWidget {
     this.quotaSemanticLabel,
     this.announcement,
     this.links = const <SubscriptionCardLink>[],
+    this.status = const <Widget>[],
     this.nodes = const <Widget>[],
     this.isCollapsed = false,
     this.isRefreshing = false,
@@ -152,12 +153,23 @@ class SubscriptionCard extends StatelessWidget {
   /// Links the panel advertises, shown as a footer panel behind a divider.
   final List<SubscriptionCardLink> links;
 
+  /// Rows saying what the subscription is doing or what its panel said — a
+  /// measurement in progress with its Cancel, the notice a panel sends in
+  /// place of servers. Drawn between the header and [nodes], separated the
+  /// same way, and drawn on a collapsed card too.
+  ///
+  /// They used to be the first of [nodes] and folded away with the servers:
+  /// "measure all" on a collapsed card showed no progress and offered no way
+  /// to stop it, and a panel's refusal with its one-tap fix was out of sight
+  /// exactly when it was the only thing to see.
+  final List<Widget> status;
+
   /// The node rows, normally `NodeTile`s. Separated by a hairline; the last
   /// one gets none, so the card ends on a clean edge.
   final List<Widget> nodes;
 
   /// Whether the node rows are folded away. Collapsing lives in the overflow
-  /// menu, so this widget only renders the result.
+  /// menu, so this widget only renders the result. [status] stays.
   final bool isCollapsed;
 
   /// Whether a refresh is running. The refresh button becomes a spinner in
@@ -177,6 +189,7 @@ class SubscriptionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final radii = context.radii;
+    final rows = <Widget>[...status, if (!isCollapsed) ...nodes];
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -209,11 +222,10 @@ class SubscriptionCard extends StatelessWidget {
             onPingAll: onPingAll,
             onMore: onMore,
           ),
-          if (!isCollapsed)
-            for (var index = 0; index < nodes.length; index++) ...<Widget>[
-              if (index > 0) const CommyDivider(),
-              nodes[index],
-            ],
+          for (var index = 0; index < rows.length; index++) ...<Widget>[
+            if (index > 0) const CommyDivider(),
+            rows[index],
+          ],
         ],
       ),
     );

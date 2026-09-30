@@ -125,6 +125,60 @@ void main() {
       expect(outcome.nodes.single.name, 'NL');
     });
 
+    test('reads WireGuard out of the endpoints of a sing-box 1.11 config', () {
+      // A WARP profile: the server is an endpoint, the outbounds are plumbing.
+      final wireguard = <String, Object?>{
+        'type': 'wireguard',
+        'tag': 'WARP',
+        'address': <String>['172.16.0.2/32'],
+        'private_key': 'PK',
+        'peers': <Map<String, Object?>>[
+          <String, Object?>{
+            'address': 'engage.example.com',
+            'port': 2408,
+            'public_key': 'PEER',
+          },
+        ],
+      };
+      final warp = reader.read(
+        jsonEncode(<String, Object?>{
+          'endpoints': <Map<String, Object?>>[wireguard],
+          'outbounds': <Map<String, Object?>>[
+            <String, Object?>{'type': 'direct', 'tag': 'direct'},
+          ],
+        }),
+      );
+
+      expect(warp.failures, isEmpty);
+      expect(warp.nodes, hasLength(1));
+      expect(warp.nodes.single.protocol, Protocol.wireguard);
+      expect(warp.nodes.single.name, 'WARP');
+
+      final mixed = reader.read(
+        jsonEncode(<String, Object?>{
+          'endpoints': <Map<String, Object?>>[
+            wireguard,
+            <String, Object?>{'type': 'tailscale', 'tag': 'ts'},
+          ],
+          'outbounds': <Map<String, Object?>>[
+            <String, Object?>{
+              'type': 'vless',
+              'tag': 'NL',
+              'server': 'nl.example.com',
+              'server_port': 443,
+              'uuid': 'the-uuid',
+            },
+          ],
+        }),
+      );
+
+      expect(mixed.failures, isEmpty);
+      expect(
+        mixed.nodes.map((node) => node.protocol),
+        <Protocol>[Protocol.vless, Protocol.wireguard],
+      );
+    });
+
     test('reads a bare JSON array of node objects', () {
       final document = jsonEncode(<Map<String, Object?>>[
         <String, Object?>{
@@ -244,6 +298,174 @@ void main() {
         'path': '/cdn',
       });
       expect(outbounds[2].containsKey('transport'), isFalse);
+    });
+  });
+
+  group('SubscriptionBodyReader with Xray JSON subscriptions', () {
+    // What Marzban's `v2ray-json`, Remnawave's XRAY_JSON and 3x-ui's JSON
+    // subscription serve: an array of whole Xray configurations, one per
+    // server, each tagging its server `proxy` and naming itself in remarks.
+    Map<String, Object?> vless(String tag, String host) => <String, Object?>{
+          'tag': tag,
+          'protocol': 'vless',
+          'settings': <String, Object?>{
+            'vnext': <Map<String, Object?>>[
+              <String, Object?>{
+                'address': host,
+                'port': 443,
+                'users': <Map<String, Object?>>[
+                  <String, Object?>{
+                    'id': '11111111-2222-3333-4444-555555555555',
+                    'flow': 'xtls-rprx-vision',
+                    'encryption': 'none',
+                  },
+                ],
+              },
+            ],
+          },
+          'streamSettings': <String, Object?>{
+            'network': 'tcp',
+            'security': 'reality',
+            'realitySettings': <String, Object?>{
+              'publicKey': _realityKey,
+              'shortId': 'ab12',
+              'serverName': 'www.example.org',
+              'fingerprint': 'chrome',
+            },
+          },
+        };
+
+    Map<String, Object?> config(
+      String remarks,
+      List<Map<String, Object?>> servers,
+    ) =>
+        <String, Object?>{
+          'remarks': remarks,
+          'log': <String, Object?>{'loglevel': 'warning'},
+          'inbounds': <Map<String, Object?>>[
+            <String, Object?>{
+              'tag': 'socks',
+              'port': 10808,
+              'protocol': 'socks',
+              'listen': '127.0.0.1',
+            },
+          ],
+          'outbounds': <Map<String, Object?>>[
+            ...servers,
+            <String, Object?>{'tag': 'direct', 'protocol': 'freedom'},
+            <String, Object?>{'tag': 'block', 'protocol': 'blackhole'},
+          ],
+          'routing': <String, Object?>{'domainStrategy': 'AsIs'},
+        };
+
+    test('reads every configuration of the array, named by its remarks', () {
+      final outcome = reader.read(
+        jsonEncode(<Map<String, Object?>>[
+          config('🇩🇪 DE', <Map<String, Object?>>[
+            vless('proxy', 'de.example.com'),
+          ]),
+          config('🇳🇱 NL', <Map<String, Object?>>[
+            vless('proxy', 'nl.example.com'),
+          ]),
+        ]),
+        subscriptionId: 'sub',
+        startIndex: 5,
+      );
+
+      expect(outcome.failures, isEmpty);
+      expect(outcome.nodes.map((node) => node.name), <String>[
+        '🇩🇪 DE',
+        '🇳🇱 NL',
+      ]);
+      expect(outcome.nodes.map((node) => node.host), <String>[
+        'de.example.com',
+        'nl.example.com',
+      ]);
+      expect(outcome.nodes.map((node) => node.sortIndex), <int>[5, 6]);
+      expect(outcome.nodes.first.subscriptionId, 'sub');
+      expect(outcome.nodes.first.param(ParamKeys.security), 'reality');
+    });
+
+    test('names a single configuration by its remarks, not by "proxy"', () {
+      final outcome = reader.read(
+        jsonEncode(
+          config('NL 1', <Map<String, Object?>>[
+            vless('proxy', 'nl.example.com'),
+          ]),
+        ),
+      );
+
+      expect(outcome.nodes.single.name, 'NL 1');
+    });
+
+    test('keeps the servers of one configuration apart by their tags', () {
+      final outcome = reader.read(
+        jsonEncode(<Map<String, Object?>>[
+          config('Balancer', <Map<String, Object?>>[
+            vless('proxy-1', 'a.example.com'),
+            vless('proxy-2', 'b.example.com'),
+          ]),
+        ]),
+      );
+
+      expect(outcome.nodes.map((node) => node.name), <String>[
+        'Balancer proxy-1',
+        'Balancer proxy-2',
+      ]);
+    });
+
+    test('reads configurations, bare nodes and links side by side, in order',
+        () {
+      final outcome = reader.read(
+        jsonEncode(<Object?>[
+          config('Xray', <Map<String, Object?>>[
+            vless('proxy', 'x.example.com'),
+          ]),
+          <String, Object?>{
+            'type': 'trojan',
+            'tag': 'Bare',
+            'server': 't.example.com',
+            'server_port': 443,
+            'password': 'pw',
+          },
+          'vless://uuid@l.example.com:443#Link',
+        ]),
+      );
+
+      expect(outcome.failures, isEmpty);
+      expect(outcome.nodes.map((node) => node.name), <String>[
+        'Xray',
+        'Bare',
+        'Link',
+      ]);
+      expect(outcome.nodes.map((node) => node.sortIndex), <int>[0, 1, 2]);
+    });
+
+    test('reports a configuration it cannot carry without losing the rest', () {
+      final outcome = reader.read(
+        jsonEncode(<Map<String, Object?>>[
+          config('Good', <Map<String, Object?>>[
+            vless('proxy', 'good.example.com'),
+          ]),
+          config('Bad', <Map<String, Object?>>[
+            <String, Object?>{
+              'tag': 'proxy',
+              'protocol': 'vless',
+              'settings': <String, Object?>{
+                'vnext': <Map<String, Object?>>[
+                  <String, Object?>{'address': 'bad.example.com', 'port': 443},
+                ],
+              },
+              'streamSettings': <String, Object?>{'network': 'kcp'},
+            },
+          ]),
+        ]),
+      );
+
+      expect(outcome.nodes.single.name, 'Good');
+      expect(outcome.failures.single.reason, contains('kcp'));
+      // Named after the server, not after the tag every template uses.
+      expect(outcome.failures.single.rawLine, 'Bad');
     });
   });
 

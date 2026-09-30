@@ -42,6 +42,42 @@ void main() {
       expect(node.name, 'Legacy');
     });
 
+    test('reads a base64 user info that arrives percent-encoded', () {
+      // v2rayN shares the standard alphabet and escapes `+`, `/` and `=`.
+      final userInfo = Uri.encodeComponent(
+        LenientBase64.encode('aes-256-gcm:p@ss+w/ord?'),
+      );
+      expect(userInfo, contains('%'));
+      final node = parser.parse('ss://$userInfo@1.2.3.4:8388/#n');
+
+      expect(node.host, '1.2.3.4');
+      expect(node.port, 8388);
+      expect(node.param(ParamKeys.method), 'aes-256-gcm');
+      expect(node.param(ParamKeys.password), 'p@ss+w/ord?');
+    });
+
+    test('reads a legacy body whose padding arrives as %3D', () {
+      final body = LenientBase64.encode('aes-128-gcm:pw@10.0.0.1:9000');
+      expect(body, endsWith('='));
+      final node = parser.parse(
+        'ss://${body.replaceAll('=', '%3D')}#Legacy',
+      );
+
+      expect(node.host, '10.0.0.1');
+      expect(node.port, 9000);
+      expect(node.param(ParamKeys.method), 'aes-128-gcm');
+      expect(node.param(ParamKeys.password), 'pw');
+    });
+
+    test('still unescapes a plain user info with an escaped password', () {
+      final node = parser.parse(
+        'ss://aes-256-gcm:pa%2Bss%40word@ss.example.com:8388#Plain',
+      );
+
+      expect(node.param(ParamKeys.method), 'aes-256-gcm');
+      expect(node.param(ParamKeys.password), 'pa+ss@word');
+    });
+
     test('reads a SIP003 plugin and its options', () {
       final userInfo = LenientBase64.encodeUrlSafe('aes-256-gcm:pw');
       final node = parser.parse(

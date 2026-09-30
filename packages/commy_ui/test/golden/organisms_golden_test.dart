@@ -229,6 +229,54 @@ void main() {
     ),
   );
 
+  // Folded away with a run of "measure all" going: the server is gone, and
+  // the progress with its way out is not.
+  goldenTest(
+    'subscription_card_collapsed_status',
+    size: const Size(390, 168),
+    builder: (context) => SubscriptionCard(
+      name: 'MAKHKETS VPN',
+      subtitle: '2 ч назад · авто 1 ч',
+      refreshLabel: 'Обновить',
+      pingAllLabel: 'Измерить все',
+      moreLabel: 'Ещё',
+      isCollapsed: true,
+      onRefresh: () {},
+      onPingAll: () {},
+      onMore: () {},
+      status: <Widget>[
+        Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: context.spacing.s4,
+            vertical: context.spacing.s2,
+          ),
+          child: Row(
+            children: <Widget>[
+              const CommySpinner(),
+              SizedBox(width: context.spacing.s3),
+              Expanded(
+                child: Text(
+                  'Замер: 8 из 24',
+                  style: context.typography.caption.copyWith(
+                    color: context.colors.textSecondary,
+                  ),
+                ),
+              ),
+              CommyButton(
+                label: 'Отмена',
+                variant: CommyButtonVariant.ghost,
+                onPressed: () {},
+              ),
+            ],
+          ),
+        ),
+      ],
+      nodes: <Widget>[
+        NodeTile(name: 'Amsterdam 03', countryCode: 'NL', onTap: () {}),
+      ],
+    ),
+  );
+
   goldenTest(
     'rule_row',
     size: const Size(390, 260),

@@ -6,6 +6,7 @@ import 'package:commy_config/src/internal/param_keys.dart';
 import 'package:commy_config/src/internal/xhttp_download_settings.dart';
 import 'package:commy_config/src/internal/xhttp_settings.dart';
 import 'package:commy_config/src/parsers/transport_params.dart';
+import 'package:commy_config/src/parsers/vless_link_parser.dart';
 import 'package:commy_config/src/parsers/xray_stream_reader.dart';
 import 'package:commy_domain/commy_domain.dart';
 
@@ -131,12 +132,28 @@ abstract final class SingBoxOutboundReader {
     );
   }
 
+  /// Reads a WireGuard endpoint (sing-box 1.11 and later) or outbound (1.10
+  /// and earlier) through its first peer.
+  ///
+  /// The outbound could leave `peers` out and carry its one peer on itself:
+  /// `server`, `server_port`, `peer_public_key`, with the interface addresses
+  /// under `local_address`, where the endpoint says `address`.
   static ProxyNode _readNativeWireguard(Map<String, Object?> outbound) {
     final peers = MapRead.objectList(outbound, <String>['peers']);
-    if (peers.isEmpty) {
+    final Map<String, Object?> peer;
+    if (peers.isNotEmpty) {
+      peer = peers.first;
+    } else if (MapRead.text(outbound, <String>['server']) != null) {
+      peer = <String, Object?>{
+        'address': MapRead.value(outbound, <String>['server']),
+        'port': MapRead.value(outbound, <String>['server_port']),
+        'public_key': MapRead.value(outbound, <String>['peer_public_key']),
+        'pre_shared_key': MapRead.value(outbound, <String>['pre_shared_key']),
+        'reserved': MapRead.value(outbound, <String>['reserved']),
+      };
+    } else {
       throw const LinkFormatException('WireGuard endpoint has no peer');
     }
-    final peer = peers.first;
     final host = MapRead.text(peer, <String>['address', 'server']);
     final port = MapRead.integer(peer, <String>['port', 'server_port']);
     if (host == null || !HostPort.isPlausibleHost(host.toLowerCase())) {
@@ -155,8 +172,10 @@ abstract final class SingBoxOutboundReader {
         ParamKeys.privateKey: MapRead.text(outbound, <String>['private_key']),
         ParamKeys.peerPublicKey: MapRead.text(peer, <String>['public_key']),
         ParamKeys.preSharedKey: MapRead.text(peer, <String>['pre_shared_key']),
-        ParamKeys.localAddress:
-            MapRead.stringList(outbound, <String>['address']).join(','),
+        ParamKeys.localAddress: MapRead.stringList(
+          outbound,
+          <String>['address', 'local_address'],
+        ).join(','),
         ParamKeys.reserved: reserved.isEmpty ? null : reserved.join(','),
         ParamKeys.mtu: MapRead.integer(outbound, <String>['mtu']),
         ParamKeys.keepAlive: MapRead.integer(
@@ -314,8 +333,9 @@ abstract final class SingBoxOutboundReader {
       case Protocol.vless:
         params[ParamKeys.uuid] = MapRead.text(user, <String>['id']);
         params[ParamKeys.flow] = MapRead.text(user, <String>['flow']);
-        params[ParamKeys.encryption] =
-            MapRead.text(user, <String>['encryption']);
+        final encryption = MapRead.text(user, <String>['encryption']);
+        VlessLinkParser.requireSupportedEncryption(encryption);
+        params[ParamKeys.encryption] = encryption;
       case Protocol.vmess:
         params[ParamKeys.uuid] = MapRead.text(user, <String>['id']);
         params[ParamKeys.vmessSecurity] =

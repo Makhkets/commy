@@ -4,7 +4,7 @@ import 'package:commy_data/src/util/json_text.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:drift/drift.dart';
 
-/// Row ⇄ `Subscription`, with the URL kept out of the row.
+/// Row ⇄ `Subscription`, with the URL and the profile page kept out of the row.
 abstract final class SubscriptionMapper {
   /// Builds a domain subscription out of a row and its secret URL.
   ///
@@ -14,7 +14,11 @@ abstract final class SubscriptionMapper {
   /// redacted URL the row carries, and a refresh will fail with a storage
   /// failure the user can read. Dropping the row instead would make a list of
   /// servers vanish with no explanation, which is worse.
-  static Subscription toDomain(SubscriptionRow row, {Uri? url}) {
+  ///
+  /// [page] is the profile page, which lives in the keystore beside the URL.
+  /// A row written before that still carries it in its column, and is read
+  /// from there until the repository has moved it.
+  static Subscription toDomain(SubscriptionRow row, {Uri? url, Uri? page}) {
     final userInfoJson = row.userInfoJson;
     return Subscription(
       id: row.id,
@@ -25,7 +29,7 @@ abstract final class SubscriptionMapper {
           : SubscriptionUserInfo.fromJson(JsonText.decodeOrEmpty(userInfoJson)),
       profileTitle: row.profileTitle,
       announcement: row.announcement,
-      profileWebPageUrl: _uriOrNull(row.profileWebPageUrl),
+      profileWebPageUrl: page ?? _uriOrNull(row.profileWebPageUrl),
       supportUrl: _uriOrNull(row.supportUrl),
       updateIntervalHours: row.updateIntervalHours,
       userAgentOverride: row.userAgentOverride,
@@ -36,7 +40,8 @@ abstract final class SubscriptionMapper {
     );
   }
 
-  /// Builds the row half of [subscription]. The URL is *not* in the result.
+  /// Builds the row half of [subscription]. The URL is *not* in the result,
+  /// and neither is the profile page: both are secrets (rule R2).
   static SubscriptionRowsCompanion toCompanion(Subscription subscription) {
     final userInfo = subscription.userInfo;
     return SubscriptionRowsCompanion(
@@ -51,9 +56,7 @@ abstract final class SubscriptionMapper {
       ),
       profileTitle: Value<String?>(subscription.profileTitle),
       announcement: Value<String?>(subscription.announcement),
-      profileWebPageUrl: Value<String?>(
-        subscription.profileWebPageUrl?.toString(),
-      ),
+      profileWebPageUrl: const Value<String?>(null),
       supportUrl: Value<String?>(subscription.supportUrl?.toString()),
       updateIntervalHours: Value<int?>(subscription.updateIntervalHours),
       userAgentOverride: Value<String?>(subscription.userAgentOverride),

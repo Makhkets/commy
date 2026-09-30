@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import dev.commy.app.tunnel.TunnelController
 import dev.commy.app.wire.CommyChannels
+import dev.commy.app.wire.IntentBus
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 
@@ -24,16 +25,20 @@ class MainActivity : FlutterActivity() {
     private var channels: CommyChannels? = null
 
     /**
-     * Whether this activity is being restored rather than launched.
+     * Whether the intent that started this activity still asks for anything.
      *
-     * A restored activity is handed the intent it was first launched with, and
-     * publishing that again would repeat whatever it asked for — a "connect"
-     * the user has since undone, an import already done.
+     * Not when the activity is restored or relaunched from Recents: either way
+     * it is handed an intent that was served before, and publishing that again
+     * would repeat whatever it asked for — a "connect" the user has since
+     * undone, an import already done. See [IntentBus.isFreshLaunch].
      */
-    private var restored = false
+    private var freshLaunch = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        restored = savedInstanceState != null
+        freshLaunch = IntentBus.isFreshLaunch(
+            restored = savedInstanceState != null,
+            flags = intent?.flags ?: 0,
+        )
         super.onCreate(savedInstanceState)
     }
 
@@ -50,7 +55,7 @@ class MainActivity : FlutterActivity() {
             // The intent that started us: a tapped vless:// link, a config
             // file, or "connect" from the tile. Published now and delivered
             // once, whenever Dart gets round to subscribing.
-            if (!restored) {
+            if (freshLaunch) {
                 it.onIntent(intent)
             }
         }

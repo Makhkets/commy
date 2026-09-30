@@ -79,6 +79,41 @@ void main() {
       expect(node.param(ParamKeys.localAddress), '10.0.0.2/32');
     });
 
+    test('reads the single-peer wireguard outbound of sing-box 1.10', () {
+      final node = SingBoxOutboundReader.read(<String, Object?>{
+        'type': 'wireguard',
+        'tag': 'wg-old',
+        'server': 'wg.example.com',
+        'server_port': 51820,
+        'local_address': <String>['10.0.0.2/32', 'fd00::2/128'],
+        'private_key': 'PK',
+        'peer_public_key': 'PEER',
+        'pre_shared_key': 'PSK',
+        'reserved': <int>[1, 2, 3],
+        'mtu': 1280,
+      });
+
+      expect(node.protocol, Protocol.wireguard);
+      expect(node.host, 'wg.example.com');
+      expect(node.port, 51820);
+      expect(node.param(ParamKeys.privateKey), 'PK');
+      expect(node.param(ParamKeys.peerPublicKey), 'PEER');
+      expect(node.param(ParamKeys.preSharedKey), 'PSK');
+      expect(node.param(ParamKeys.reserved), '1,2,3');
+      expect(node.param(ParamKeys.localAddress), '10.0.0.2/32,fd00::2/128');
+    });
+
+    test('still refuses a wireguard entry with no peer at all', () {
+      expect(
+        () => SingBoxOutboundReader.read(<String, Object?>{
+          'type': 'wireguard',
+          'tag': 'wg',
+          'private_key': 'PK',
+        }),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
     test('refuses plumbing outbounds', () {
       expect(
         SingBoxOutboundReader.looksLikeServer(<String, Object?>{
@@ -544,6 +579,86 @@ void main() {
       expect(node.param(ParamKeys.security), 'reality');
       expect(node.param(ParamKeys.publicKey), 'PUBKEY');
       expect(node.param(ParamKeys.spiderX), '/');
+    });
+
+    test('reads the http header of a tcp stream', () {
+      Map<String, Object?> outbound(String security) => <String, Object?>{
+            'tag': 'proxy',
+            'protocol': 'vless',
+            'settings': <String, Object?>{
+              'vnext': <Map<String, Object?>>[
+                <String, Object?>{
+                  'address': 'xray.example.com',
+                  'port': 80,
+                  'users': <Map<String, Object?>>[
+                    <String, Object?>{'id': 'the-uuid', 'encryption': 'none'},
+                  ],
+                },
+              ],
+            },
+            'streamSettings': <String, Object?>{
+              'network': 'raw',
+              'security': security,
+              'rawSettings': <String, Object?>{
+                'header': <String, Object?>{
+                  'type': 'http',
+                  'request': <String, Object?>{
+                    'path': <String>['/a', '/b'],
+                    'headers': <String, Object?>{
+                      'Host': <String>['b.example'],
+                    },
+                  },
+                },
+              },
+            },
+          };
+
+      final node = SingBoxOutboundReader.read(outbound('none'));
+
+      expect(node.param(ParamKeys.headerType), 'http');
+      expect(
+        OutboundBuilder.build(node: node, tag: 'proxy-out')['transport'],
+        <String, Object?>{
+          'type': 'http',
+          'host': <String>['b.example'],
+          'path': '/a',
+          'method': 'GET',
+        },
+      );
+      expect(
+        () => SingBoxOutboundReader.read(outbound('tls')),
+        throwsA(isA<LinkFormatException>()),
+      );
+    });
+
+    test('rejects a vless user with VLESS Encryption', () {
+      Map<String, Object?> outbound(String encryption) => <String, Object?>{
+            'tag': 'proxy',
+            'protocol': 'vless',
+            'settings': <String, Object?>{
+              'vnext': <Map<String, Object?>>[
+                <String, Object?>{
+                  'address': 'xray.example.com',
+                  'port': 443,
+                  'users': <Map<String, Object?>>[
+                    <String, Object?>{'id': 'u', 'encryption': encryption},
+                  ],
+                },
+              ],
+            },
+          };
+
+      expect(
+        () => SingBoxOutboundReader.read(
+          outbound('mlkem768x25519plus.native.0rtt.AAAA'),
+        ),
+        throwsA(isA<LinkFormatException>()),
+      );
+      expect(
+        SingBoxOutboundReader.read(outbound('none'))
+            .param(ParamKeys.encryption),
+        'none',
+      );
     });
 
     test('reads a trojan outbound out of servers', () {

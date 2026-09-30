@@ -109,8 +109,29 @@ class AddSubscriptionUseCase {
       }
       final outcome = parsed.valueOrNull ?? ParseOutcome.empty;
 
-      final id = existing?.id ?? ids.newId();
-      final draft = existing == null
+      // The card being re-added is asked for again after the fetch, for the
+      // reason the refresh asks: the sheet can be dismissed mid-download, and
+      // in those seconds the card may be deleted, collapsed or moved. The
+      // upsert below writes every column and creates as happily as it
+      // updates, so building on the copy read before the fetch would put a
+      // deleted card back and undo the rest.
+      Subscription? fresh;
+      if (existing != null) {
+        final reread = await subscriptions.findById(existing.id);
+        final rereadFailure = reread.failureOrNull;
+        if (rereadFailure != null) {
+          return Err<SubscriptionSyncResult, CommyFailure>(rereadFailure);
+        }
+        fresh = reread.valueOrNull;
+        if (fresh == null) {
+          return const Err<SubscriptionSyncResult, CommyFailure>(
+            SubscriptionMalformedFailure('No such subscription'),
+          );
+        }
+      }
+
+      final id = fresh?.id ?? ids.newId();
+      final draft = fresh == null
           ? Subscription(
               id: id,
               name: _pickName(name, payload, url),
@@ -118,13 +139,13 @@ class AddSubscriptionUseCase {
               autoUpdate: autoUpdate,
               lastUpdatedAt: DateTime.now(),
             )
-          : existing.copyWith(
+          : fresh.copyWith(
               // The URL is rewritten to the one just typed. It matched, so it
               // is the same account either way; keeping the stored spelling
               // would leave the card pointing at whichever of the two forms
               // happened to be saved first.
               url: url,
-              name: _renamed(name) ?? existing.name,
+              name: _renamed(name) ?? fresh.name,
               autoUpdate: autoUpdate,
               lastUpdatedAt: DateTime.now(),
             );

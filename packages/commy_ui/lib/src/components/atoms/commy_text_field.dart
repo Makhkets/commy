@@ -61,6 +61,17 @@ class CommyTextField extends StatelessWidget {
   /// Whether the content is masked.
   final bool obscureText;
 
+  /// How many lines the helper and the error line may take before they are
+  /// cut short.
+  ///
+  /// Material's default is one, with an ellipsis, and the lines that most
+  /// need reading are the long ones: the DNS sheet's warning that a system
+  /// resolver would leak every name was cut off mid-sentence on a phone, and
+  /// its list of schemes with it. A cap rather than no limit, because Material
+  /// ellipsizes to a single line when there is none; six is past the longest
+  /// sentence the app puts there.
+  static const int messageMaxLines = 6;
+
   /// Whether the field accepts input.
   final bool enabled;
 
@@ -143,8 +154,10 @@ class CommyTextField extends StatelessWidget {
         hintStyle: type.body.copyWith(color: colors.textTertiary),
         helperText: helperText,
         helperStyle: type.caption.copyWith(color: colors.textTertiary),
+        helperMaxLines: messageMaxLines,
         errorText: errorText,
         errorStyle: type.caption.copyWith(color: colors.statusError),
+        errorMaxLines: messageMaxLines,
         isDense: true,
         // `fieldHeight` exists for this and was referenced nowhere: a plain
         // field measured 46pt, two short of both it and `minTapTarget`, and

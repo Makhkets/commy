@@ -151,6 +151,7 @@ class SingBoxConfigBuilder {
       platform: request.platform,
       availableRuleSets: _usableRuleSets(request),
       ruleSetDirectory: request.ruleSetDirectory,
+      dns: request.dns,
       warnings: warnings,
     );
 
@@ -169,6 +170,7 @@ class SingBoxConfigBuilder {
         settings: request.settings,
         routing: request.routing,
         platform: request.platform,
+        localAuth: request.localProxyAuth,
       ),
       if (endpoints.isNotEmpty) SingBoxKeys.endpoints: endpoints,
       SingBoxKeys.outbounds: outbounds,
@@ -230,12 +232,7 @@ class SingBoxConfigBuilder {
         CoreConfig(<String, Object?>{
           SingBoxKeys.log: <String, Object?>{SingBoxKeys.disabled: true},
           SingBoxKeys.dns: <String, Object?>{
-            SingBoxKeys.servers: <Map<String, Object?>>[
-              DnsSectionBuilder.parseResolver(
-                dns.direct,
-                tag: SingBoxTags.dnsDirect,
-              ),
-            ],
+            SingBoxKeys.servers: DnsSectionBuilder.directResolvers(dns.direct),
             SingBoxKeys.finalTag: SingBoxTags.dnsDirect,
             SingBoxKeys.strategy: dns.strategy.wireName,
           },

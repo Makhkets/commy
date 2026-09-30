@@ -75,19 +75,50 @@ class DriftNodeRepository implements NodeRepository {
     });
   }
 
+  /// Writes [nodes], each under its own owner.
+  ///
+  /// A node whose id another owner already holds — a server pasted by hand
+  /// that a subscription lists too — is stored beside that row under an id
+  /// of its own rather than taking the row over. See [ownedId].
   @override
   Future<Result<void, CommyFailure>> upsertAll(List<ProxyNode> nodes) {
     return StorageGuard.runVoid(() async {
-      for (final node in nodes) {
+      final rows = await _rowsById(<String>{
+        for (final node in nodes) ...<String>[
+          node.id,
+          ownedId(node.id, node.subscriptionId),
+        ],
+      });
+      final owned = <ProxyNode>[
+        for (final node in nodes) _underOwnId(node, rows),
+      ];
+      for (final node in owned) {
         await _writeSecrets(node);
       }
       await _db.batch((batch) {
         batch.insertAllOnConflictUpdate(
           _db.nodeRows,
-          nodes.map(NodeMapper.toCompanion).toList(),
+          owned.map(NodeMapper.toCompanion).toList(),
         );
       });
     });
+  }
+
+  /// [node] under the id its owner stores it by.
+  ///
+  /// Its own id when that row is free or already this owner's; otherwise the
+  /// [ownedId] — which is also where a copy stored beside another owner's
+  /// row the last time is found again.
+  ProxyNode _underOwnId(ProxyNode node, Map<String, NodeRow> rows) {
+    final owner = node.subscriptionId;
+    final plain = rows[node.id];
+    if (plain == null && rows[ownedId(node.id, owner)] == null) {
+      return node;
+    }
+    if (plain != null && plain.subscriptionId == owner) {
+      return node;
+    }
+    return node.copyWith(id: ownedId(node.id, owner));
   }
 
   @override
@@ -125,12 +156,18 @@ class DriftNodeRepository implements NodeRepository {
             ..where((table) => table.subscriptionId.equals(subscriptionId)))
           .get();
 
-      // A panel renames and reorders nodes freely; what identifies a server is
-      // protocol + host + port. Matching on that keeps the local id, and with
-      // it the measured latency and the user's current selection.
-      final byEndpoint = <String, NodeRow>{};
+      // A panel renames and reorders nodes freely, and ids made before they
+      // were derived from the server's identity (or by hand) do not match
+      // what the parser makes now. So a node keeps its own row first, and
+      // failing that takes over a row on the same protocol + host + port —
+      // which keeps the local id, and with it the measured latency and the
+      // user's current selection.
+      final rowById = <String, NodeRow>{
+        for (final row in existing) row.id: row,
+      };
+      final byEndpoint = <String, List<NodeRow>>{};
       for (final row in existing) {
-        byEndpoint.putIfAbsent(NodeMapper.endpointKeyOfRow(row), () => row);
+        (byEndpoint[NodeMapper.endpointKeyOfRow(row)] ??= <NodeRow>[]).add(row);
       }
 
       // Folded before anything is written: two companions sharing a primary
@@ -140,13 +177,54 @@ class DriftNodeRepository implements NodeRepository {
       // was actually stored (R2).
       final unique = NodeDuplicates.folded(nodes);
 
+      // The ids other owners hold. A node's id is its server and nothing
+      // else, so the server a user pasted by hand, or one a second
+      // subscription of the same account lists too, arrives here under an id
+      // that is already a row — and the insert below used to take that row
+      // over: the hand-pasted server became this subscription's, went when
+      // the subscription was deleted, and two subscriptions sharing servers
+      // emptied each other on every refresh. Such a node is stored beside
+      // the other row under [ownedId] instead.
+      final heldElsewhere = <String>{
+        for (final row in (await _rowsById(unique.map((n) => n.id))).values)
+          if (row.subscriptionId != subscriptionId) row.id,
+      };
+
+      // One endpoint can carry several servers — host:443 with a WebSocket
+      // path each is an ordinary panel layout. Matching on the endpoint alone
+      // handed one of them another's id whenever the panel reordered them or
+      // put a new one in front; two rows with one key collapsed into one, and
+      // the other server's credentials were deleted. A row whose id an
+      // incoming node still owns — plain, or as this subscription's own
+      // copy — is that node's, and nobody else's.
+      final incomingIds = <String>{
+        for (final node in unique) ...<String>[
+          node.id,
+          ownedId(node.id, subscriptionId),
+        ],
+      };
       final reusedIds = <String>{};
       final incoming = <ProxyNode>[];
       for (var index = 0; index < unique.length; index++) {
         final node = unique[index];
-        final previous = byEndpoint[NodeMapper.endpointKeyOf(node)];
-        final carried = previous == null || reusedIds.contains(previous.id)
-            ? node
+        final own = <NodeRow?>[
+          rowById[node.id],
+          rowById[ownedId(node.id, subscriptionId)],
+        ]
+            .where((row) => row != null && !reusedIds.contains(row.id))
+            .firstOrNull;
+        final previous = own ??
+            (byEndpoint[NodeMapper.endpointKeyOf(node)] ?? const <NodeRow>[])
+                .where(
+                  (row) =>
+                      !reusedIds.contains(row.id) &&
+                      !incomingIds.contains(row.id),
+                )
+                .firstOrNull;
+        final carried = previous == null
+            ? (heldElsewhere.contains(node.id)
+                ? node.copyWith(id: ownedId(node.id, subscriptionId))
+                : node)
             : node.copyWith(
                 id: previous.id,
                 latency: previous.latencyMicros == null
@@ -189,7 +267,8 @@ class DriftNodeRepository implements NodeRepository {
             (table) => table.subscriptionId.equals(subscriptionId),
           )
           // Last write wins, exactly as in `upsertAll`. The delete above has
-          // already taken every row of this subscription, so the only conflict
+          // already taken every row of this subscription, and a node another
+          // owner holds was moved to its own id above, so the only conflict
           // left is one payload naming a row twice — and the fold above has
           // settled which of the two the user should end up with.
           ..insertAllOnConflictUpdate(
@@ -274,6 +353,31 @@ class DriftNodeRepository implements NodeRepository {
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────
+
+  /// The id [owner]'s copy of server [id] is stored under when another owner
+  /// already holds [id]; `null` is the hand-made list.
+  ///
+  /// Derived, not random, so the next refresh or the next paste finds the
+  /// same row again by id — and with it the measured latency and the user's
+  /// selection. A row keeps the id it was given, so a copy that once had to
+  /// step aside keeps its own id after the other one is gone.
+  static String ownedId(String id, String? owner) =>
+      '$id@${owner ?? manualOwner}';
+
+  /// What [ownedId] calls the hand-made list, which has no subscription id.
+  static const String manualOwner = 'manual';
+
+  /// The stored rows among [ids], by id.
+  Future<Map<String, NodeRow>> _rowsById(Iterable<String> ids) async {
+    final wanted = ids.toSet();
+    if (wanted.isEmpty) {
+      return const <String, NodeRow>{};
+    }
+    final rows = await (_db.select(_db.nodeRows)
+          ..where((table) => table.id.isIn(wanted)))
+        .get();
+    return <String, NodeRow>{for (final row in rows) row.id: row};
+  }
 
   SimpleSelectStatement<$NodeRowsTable, NodeRow> _orderedNodes() {
     return _db.select(_db.nodeRows)

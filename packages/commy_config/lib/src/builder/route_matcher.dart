@@ -8,6 +8,7 @@
 import 'package:commy_config/src/builder/config_platform.dart';
 import 'package:commy_config/src/builder/sing_box_keys.dart';
 import 'package:commy_config/src/builder/sing_box_tags.dart';
+import 'package:commy_config/src/internal/core_regex.dart';
 
 /// One `RoutingRule.matcher` string translated into core rule fields.
 ///
@@ -29,6 +30,13 @@ import 'package:commy_config/src/builder/sing_box_tags.dart';
 /// A bare value with no prefix is guessed: something that looks like a prefix
 /// becomes `ip_cidr`, something with a dot becomes `domain_suffix`, anything
 /// else becomes `domain_keyword`.
+///
+/// A value is written only in a form the core reads. The core parses every
+/// rule when it starts and refuses the whole document over one it cannot
+/// (`parse rule[i]`), so a typo here would not cost the rule, it would stop
+/// every server. An address, a port, a port range or an expression the core
+/// would refuse is left out instead; a matcher left with nothing is dropped
+/// with a warning, like any other rule that does not apply.
 class RouteMatcher {
   const RouteMatcher._({
     required this.fields,
@@ -74,19 +82,6 @@ class RouteMatcher {
   RouteMatcher._domains(String key, String value)
       : this._list(key, value, matchesDomains: true);
 
-  /// A single value under one key.
-  RouteMatcher._single(
-    String key,
-    String value, {
-    required bool matchesDomains,
-  }) : this._(
-          fields: <String, Object?>{
-            key: <String>[value],
-          },
-          ruleSets: const <String>{},
-          matchesDomains: matchesDomains,
-        );
-
   /// Value of `geoip:` that means the private ranges rather than a country.
   static const String privateGeoip = 'private';
 
@@ -96,6 +91,25 @@ class RouteMatcher {
   static final RegExp _cidr = RegExp(r'^[0-9a-fA-F:.]+/\d{1,3}$');
 
   static final RegExp _ipv4 = RegExp(r'^\d{1,3}(\.\d{1,3}){3}$');
+
+  /// An IPv4 address as Go's `netip` reads it: no octet with a leading zero.
+  static final RegExp _ipv4Octets =
+      RegExp(r'^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$');
+
+  /// A prefix length as `netip.ParsePrefix` reads it: no sign, no leading
+  /// zero.
+  static final RegExp _prefixBits = RegExp(r'^(0|[1-9]\d{0,2})$');
+
+  static final RegExp _portNumber = RegExp(r'^\d{1,5}$');
+
+  /// `1000:2000`, the core's spelling, where either end may be left out, or
+  /// `1000-2000`, Xray's and Clash's, where neither may: `-1` is more likely
+  /// a typo than "every port up to 1".
+  static final RegExp _portRangeForm =
+      RegExp(r'^(?:(\d{0,5}):(\d{0,5})|(\d{1,5})-(\d{1,5}))$');
+
+  /// The highest port there is.
+  static const int _maxPort = 65535;
 
   /// The rule fields, ready to be merged into a route or DNS rule.
   final Map<String, Object?> fields;
@@ -144,11 +158,16 @@ class RouteMatcher {
         return RouteMatcher._domains(SingBoxKeys.domainKeyword, value);
       case 'domain_regex':
       case 'regex':
-        return RouteMatcher._single(
-          SingBoxKeys.domainRegex,
-          value,
-          matchesDomains: true,
-        );
+        // One value, commas and all: `{1,3}` is part of an expression.
+        return CoreRegex.accepts(value)
+            ? RouteMatcher._(
+                fields: <String, Object?>{
+                  SingBoxKeys.domainRegex: <String>[value],
+                },
+                ruleSets: const <String>{},
+                matchesDomains: true,
+              )
+            : null;
       case 'geosite':
         return RouteMatcher._ruleSet(
           <String>[for (final name in _split(value)) SingBoxTags.geosite(name)],
@@ -166,11 +185,7 @@ class RouteMatcher {
       case 'port':
         return _ports(value);
       case 'port_range':
-        return RouteMatcher._single(
-          SingBoxKeys.portRange,
-          value,
-          matchesDomains: false,
-        );
+        return _portRanges(value);
       case 'process_name':
       case 'process':
         return platform.supportsProcessRules
@@ -250,20 +265,92 @@ class RouteMatcher {
     );
   }
 
-  static RouteMatcher _addresses(String value) => RouteMatcher._list(
-        SingBoxKeys.ipCidr,
-        value,
-        matchesDomains: false,
-      );
+  static RouteMatcher _addresses(String value) {
+    final prefixes = <String>[
+      for (final item in _split(value))
+        if (_isAddressOrPrefix(item)) item,
+    ];
+    return RouteMatcher._fields(<String, Object?>{
+      if (prefixes.isNotEmpty) SingBoxKeys.ipCidr: prefixes,
+    });
+  }
+
+  /// Whether the core reads [item] as an `ip_cidr` entry: a prefix for
+  /// `netip.ParsePrefix`, or one address for `netip.ParseAddr`.
+  static bool _isAddressOrPrefix(String item) {
+    final slash = item.indexOf('/');
+    final address = slash < 0 ? item : item.substring(0, slash);
+    final isV6 = address.contains(':');
+    if (!isV6 && !_ipv4Octets.hasMatch(address)) {
+      return false;
+    }
+    try {
+      isV6 ? Uri.parseIPv6Address(address) : Uri.parseIPv4Address(address);
+    } on FormatException {
+      return false;
+    }
+    if (slash < 0) {
+      return true;
+    }
+    final bits = item.substring(slash + 1);
+    return _prefixBits.hasMatch(bits) && int.parse(bits) <= (isV6 ? 128 : 32);
+  }
 
   static RouteMatcher _ports(String value) {
     final ports = <int>[
       for (final item in _split(value))
-        if (int.tryParse(item) != null) int.parse(item),
+        if (_port(item) case final port?) port,
     ];
     return RouteMatcher._fields(<String, Object?>{
       if (ports.isNotEmpty) SingBoxKeys.port: ports,
     });
+  }
+
+  /// [text] as a port, or `null`. The core decodes ports as 16-bit numbers,
+  /// so `-1` or `70000` would not cost the rule but the document.
+  static int? _port(String text) {
+    if (!_portNumber.hasMatch(text)) {
+      return null;
+    }
+    final port = int.parse(text);
+    return port <= _maxPort ? port : null;
+  }
+
+  static RouteMatcher _portRanges(String value) {
+    final ranges = <String>[
+      for (final item in _split(value))
+        if (_portRange(item) case final range?) range,
+    ];
+    return RouteMatcher._fields(<String, Object?>{
+      if (ranges.isNotEmpty) SingBoxKeys.portRange: ranges,
+    });
+  }
+
+  /// [item] as the core writes a port range, `start:end`, or `null`.
+  ///
+  /// The core takes only a colon (`route/rule/rule_item_port_range.go`) and
+  /// answers `1000-2000`, which is how Xray and Clash write the same range,
+  /// with "bad port range" for the whole document. A single port is a range
+  /// of one.
+  static String? _portRange(String item) {
+    final single = _port(item);
+    if (single != null) {
+      return '$single:$single';
+    }
+    final match = _portRangeForm.firstMatch(item);
+    if (match == null) {
+      return null;
+    }
+    final low = match[1] ?? match[3]!;
+    final high = match[2] ?? match[4]!;
+    final start = low.isEmpty ? 0 : _port(low);
+    final end = high.isEmpty ? _maxPort : _port(high);
+    // A range that ends before it starts is one the core accepts and never
+    // matches: a rule that silently does nothing.
+    if (start == null || end == null || start > end) {
+      return null;
+    }
+    return '$start:$end';
   }
 
   static Map<String, Object?> _listFields(String key, String value) {
@@ -278,6 +365,23 @@ class RouteMatcher {
 
   /// Whether the matcher produced anything the core can act on.
   bool get isEmpty => fields.isEmpty;
+
+  /// Whether the matcher says nothing about a connection that carries a name
+  /// until that name is resolved: `ip_cidr`, and a `geoip` country.
+  ///
+  /// Under FakeIP every connection whose name went through the resolver
+  /// carries that name and no address, so these match nothing on their own.
+  /// `RouteSectionBuilder` resolves the name ahead of the first of them.
+  ///
+  /// `geoip:private` is not counted, for the reason the LAN bypass is not:
+  /// what it is for is a private address dialled as an address, which FakeIP
+  /// leaves alone. Resolving every name ahead of it would give up what FakeIP
+  /// is for, a connection that does not wait for a lookup, for the sake of
+  /// names like `router.lan` that the resolver through the tunnel cannot
+  /// answer anyway.
+  bool get needsResolvedAddress =>
+      fields.containsKey(SingBoxKeys.ipCidr) ||
+      ruleSets.any((tag) => tag.startsWith(SingBoxTags.geoipPrefix));
 
   @override
   String toString() => 'RouteMatcher(${fields.keys.join(', ')})';

@@ -105,10 +105,14 @@ class ShadowsocksLinkParser implements NodeLinkParser {
   }
 
   static _Credentials _readCredentials(String rawUserInfo) {
-    final decoded = LenientBase64.decodeToString(rawUserInfo);
-    final source = decoded != null && decoded.contains(':')
-        ? decoded
-        : Percent.decode(rawUserInfo);
+    // Unescape before trying base64: v2rayN and others share the standard
+    // alphabet with `+`, `/` and `=` percent-encoded, and `%` alone would
+    // make the text fail the base64 alphabet. A plain `cipher:password`
+    // never decodes as base64, because `:` is not in the alphabet.
+    final unescaped = Percent.decode(rawUserInfo);
+    final decoded = LenientBase64.decodeToString(unescaped);
+    final source =
+        decoded != null && decoded.contains(':') ? decoded : unescaped;
     final colon = source.indexOf(':');
     if (colon <= 0 || colon == source.length - 1) {
       throw const LinkFormatException(
@@ -122,7 +126,8 @@ class ShadowsocksLinkParser implements NodeLinkParser {
   }
 
   static _Credentials _readLegacyCredentials(String payload) {
-    final decoded = LenientBase64.decodeToString(payload);
+    // Same reason as in [_readCredentials]: the padding often arrives as %3D.
+    final decoded = LenientBase64.decodeToString(Percent.decode(payload));
     if (decoded == null) {
       throw const LinkFormatException(
         'ss:// link is neither SIP002 nor valid base64',
