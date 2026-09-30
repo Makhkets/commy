@@ -14,7 +14,9 @@ import io.flutter.plugin.common.MethodChannel
 import io.nekohasekai.libbox.Libbox
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -203,8 +205,15 @@ internal class CoreMethodHandler(
      *
      * No icons. A few hundred bitmaps over a method channel, to draw a list
      * that scrolls past most of them, is not a trade worth making.
+     *
+     * On the IO pool, not the main looper this handler answers on. A label is
+     * read out of that app's own resources, which have to be opened first,
+     * and on a phone with a couple of hundred apps that adds up to a visible
+     * pause — during which Flutter's frames and every touch wait on the same
+     * thread, so the page opening the list froze mid-transition. `Result` is
+     * still answered on the main looper: the handler's scope resumes there.
      */
-    private fun installedApps(): String {
+    private suspend fun installedApps(): String = withContext(Dispatchers.IO) {
         val manager = context.packageManager
         val launchable = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LAUNCHER)
@@ -236,7 +245,7 @@ internal class CoreMethodHandler(
                     .put(Wire.Keys.IS_SYSTEM, info.isSystemImage()),
             )
         }
-        return apps.toString()
+        apps.toString()
     }
 
     private fun ApplicationInfo.isSystemImage(): Boolean =
