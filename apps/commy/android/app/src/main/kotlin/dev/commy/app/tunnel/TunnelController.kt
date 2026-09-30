@@ -91,7 +91,7 @@ internal object TunnelController {
      * through its event channel. The core streams connections only while this
      * is true, see [OnDemandStream].
      */
-    val connectionsWanted: Flow<Boolean> = connectionsFlow.subscriptionCount.map { it > 0 }
+    val connectionsWanted: Flow<Boolean> = connectionsState.subscriptionCount.map { it > 0 }
 
     @Volatile
     private var service: CommyVpnService? = null
