@@ -5,7 +5,7 @@
 /// domain nodes, and step ⑤ turns the state of the app back into a complete
 /// configuration for the core.
 ///
-/// The configuration schema is pinned to **sing-box v1.13.16**, the version in
+/// The configuration schema is pinned to **sing-box v1.13.21**, the version in
 /// docs/13-libbox-reference.md. Bumping the core is rule R8 territory: a
 /// separate change with its own matrix run, not a drive-by edit here.
 library;

@@ -25,7 +25,7 @@ readonly CORE_DIR="${REPO_ROOT}/core"
 readonly BUILD_DIR="${CORE_DIR}/build"
 
 # Pinned deliberately. Bumping it is its own PR with its own matrix run (rule R8).
-readonly SINGBOX_VERSION="v1.13.16"
+readonly SINGBOX_VERSION="v1.13.21"
 readonly LIBBOX_PKG="github.com/sagernet/sing-box/experimental/libbox"
 # Ours, bound into the same library: what Commy adds to the libbox API (today,
 # measuring servers with no tunnel up). A package of its own rather than an

@@ -31,4 +31,4 @@ import (
 // Keep in step with go.mod and with scripts/build_core.sh. A test asserts they
 // agree, because three places that must match is exactly the kind of thing that
 // silently drifts.
-const SingBoxVersion = "v1.13.16"
+const SingBoxVersion = "v1.13.21"
