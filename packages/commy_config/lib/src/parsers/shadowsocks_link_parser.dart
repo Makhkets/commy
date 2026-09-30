@@ -55,11 +55,15 @@ class ShadowsocksLinkParser implements NodeLinkParser {
         ? HostPort.tryParse(_stripPath(payload.substring(at + 1)))
         : credentials.address;
     if (address == null || !HostPort.isPlausibleHost(address.host)) {
-      throw const LinkFormatException('ss:// link carries no server address');
+      throw const LinkFormatException.incomplete(
+        'ss:// link carries no server address',
+      );
     }
     final port = address.port;
     if (port == null) {
-      throw const LinkFormatException('ss:// link carries no server port');
+      throw const LinkFormatException.incomplete(
+        'ss:// link carries no server port',
+      );
     }
     final plugin = _readPlugin(query);
     return NodeFactory.build(
@@ -81,10 +85,10 @@ class ShadowsocksLinkParser implements NodeLinkParser {
     final method = node.param(ParamKeys.method);
     final password = node.param(ParamKeys.password);
     if (method == null || method.isEmpty) {
-      throw const LinkFormatException('Node carries no cipher');
+      throw const LinkFormatException.incomplete('Node carries no cipher');
     }
     if (password == null || password.isEmpty) {
-      throw const LinkFormatException('Node carries no password');
+      throw const LinkFormatException.incomplete('Node carries no password');
     }
     final userInfo = LenientBase64.encodeUrlSafe('$method:$password');
     final address = node.host.contains(':') ? '[${node.host}]' : node.host;

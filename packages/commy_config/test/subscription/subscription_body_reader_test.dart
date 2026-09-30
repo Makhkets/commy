@@ -99,6 +99,8 @@ void main() {
       expect(outcome.nodes.last.param(ParamKeys.path), '/ray');
       expect(outcome.failures, hasLength(1));
       expect(outcome.failures.single.reason, contains('ssr'));
+      expect(outcome.failures.single.kind, ImportFailureKind.unsupported);
+      expect(outcome.failures.single.subject, 'ssr');
     });
 
     test('reads a sing-box configuration through its outbounds', () {
@@ -464,8 +466,11 @@ void main() {
 
       expect(outcome.nodes.single.name, 'Good');
       expect(outcome.failures.single.reason, contains('kcp'));
-      // Named after the server, not after the tag every template uses.
+      // Named after the server, not after the tag every template uses — and
+      // renaming it keeps what the app words it from.
       expect(outcome.failures.single.rawLine, 'Bad');
+      expect(outcome.failures.single.kind, ImportFailureKind.unsupported);
+      expect(outcome.failures.single.subject, 'kcp');
     });
   });
 
@@ -475,6 +480,7 @@ void main() {
 
       expect(outcome.nodes, isEmpty);
       expect(outcome.failures.single.reason, 'The body is empty');
+      expect(outcome.failures.single.kind, ImportFailureKind.emptyBody);
     });
 
     test('an unrecognisable body says so', () {

@@ -242,10 +242,14 @@ void main() {
 
     final failures = importState(tester).outcome!.failures;
     expect(failures, hasLength(2));
+    final reasons = <String>[
+      t.import.result.skippedReason.notALink,
+      t.import.result.skippedReason.incomplete,
+    ];
     // Collapsed to start with: the reasons are asked for, not thrown at the
     // user.
-    for (final failure in failures) {
-      expect(find.text(failure.reason), findsNothing);
+    for (final reason in reasons) {
+      expect(find.text(reason), findsNothing);
     }
 
     await tester.tap(find.text(t.import.result.showSkipped));
@@ -253,10 +257,38 @@ void main() {
 
     // Two lines were dropped for two different reasons, and a user told only
     // "2 skipped" cannot fix either of them.
-    for (final failure in failures) {
-      expect(find.text(failure.reason), findsOneWidget);
-      expect(find.text(failure.redactedLine), findsOneWidget);
+    for (final reason in reasons) {
+      expect(find.text(reason), findsOneWidget);
     }
+    for (final failure in failures) {
+      expect(find.text(failure.redactedLine), findsOneWidget);
+      // In the reader's language: the parser's English is for the log.
+      expect(find.text(failure.reason), findsNothing);
+    }
+  });
+
+  testWidgets('a scheme or a feature the core lacks is named in the reason',
+      (tester) async {
+    await pumpPanel(tester);
+    await importText(
+      tester,
+      '$amsterdam\nssr://whatever\n'
+      'vless://$brokenUuid@se-02.example.net:443?type=kcp#Kcp',
+    );
+
+    await tester.tap(find.text(t.import.result.showSkipped));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        t.import.result.skippedReason.unsupportedScheme(scheme: 'ssr://'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(t.import.result.skippedReason.unsupported(what: 'kcp')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a line that failed to parse does not show its credential',

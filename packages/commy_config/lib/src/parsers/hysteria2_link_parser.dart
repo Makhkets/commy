@@ -57,7 +57,7 @@ class Hysteria2LinkParser implements NodeLinkParser {
         ? link.query.firstOf(<String>['auth', 'password'])
         : link.decodedUserInfo.trim();
     if (password == null || password.isEmpty) {
-      throw const LinkFormatException(
+      throw const LinkFormatException.incomplete(
         'hysteria2:// link carries no authentication string',
       );
     }
@@ -141,7 +141,9 @@ class Hysteria2LinkParser implements NodeLinkParser {
   String toLink(ProxyNode node) {
     final password = node.param(ParamKeys.password);
     if (password == null || password.isEmpty) {
-      throw const LinkFormatException('Node carries no authentication string');
+      throw const LinkFormatException.incomplete(
+        'Node carries no authentication string',
+      );
     }
     final address = node.host.contains(':') ? '[${node.host}]' : node.host;
     final entries = <MapEntry<String, String>>[];

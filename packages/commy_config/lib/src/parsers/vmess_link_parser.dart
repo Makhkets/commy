@@ -82,7 +82,7 @@ class VmessLinkParser implements NodeLinkParser {
   String toLink(ProxyNode node) {
     final uuid = node.param(ParamKeys.uuid);
     if (uuid == null || uuid.isEmpty) {
-      throw const LinkFormatException('Node carries no user id');
+      throw const LinkFormatException.incomplete('Node carries no user id');
     }
     final transport = node.param(ParamKeys.transport) ?? 'tcp';
     final security = node.param(ParamKeys.security) ?? ParamKeys.securityNone;
@@ -129,21 +129,28 @@ class VmessLinkParser implements NodeLinkParser {
     }
     final host = _text(decoded['add']);
     if (host == null || !HostPort.isPlausibleHost(host.toLowerCase())) {
-      throw const LinkFormatException('vmess:// payload has no server address');
+      throw const LinkFormatException.incomplete(
+        'vmess:// payload has no server address',
+      );
     }
     final port = HostPort.parsePort(_text(decoded['port']) ?? '');
     if (port == null) {
-      throw const LinkFormatException('vmess:// payload has no valid port');
+      throw const LinkFormatException.incomplete(
+        'vmess:// payload has no valid port',
+      );
     }
     final uuid = _text(decoded['id']);
     if (uuid == null) {
-      throw const LinkFormatException('vmess:// payload has no user id');
+      throw const LinkFormatException.incomplete(
+        'vmess:// payload has no user id',
+      );
     }
     final rawTransport = _text(decoded['net']);
     final transport = TransportParams.normaliseTransport(rawTransport);
     if (transport == null || !TransportParams.supported.contains(transport)) {
-      throw LinkFormatException(
+      throw LinkFormatException.unsupported(
         'Transport "$rawTransport" is not supported by the core',
+        subject: rawTransport,
       );
     }
     final reality = _text(decoded['pbk']);
@@ -207,11 +214,15 @@ class VmessLinkParser implements NodeLinkParser {
     }
     final uuid = link.decodedUserInfo.trim();
     if (uuid.isEmpty) {
-      throw const LinkFormatException('vmess:// link carries no user id');
+      throw const LinkFormatException.incomplete(
+        'vmess:// link carries no user id',
+      );
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException('vmess:// link carries no server port');
+      throw const LinkFormatException.incomplete(
+        'vmess:// link carries no server port',
+      );
     }
     final params = <String, Object?>{
       ParamKeys.uuid: uuid,

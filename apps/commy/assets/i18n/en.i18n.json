@@ -144,7 +144,17 @@
       "skippedTitle": "Skipped lines",
       "nothing": "No servers found",
       "nothingBody": "Check that the text holds a vless:// style link or a base64 subscription.",
-      "alreadyThere": "You already had this subscription — it was refreshed in place."
+      "alreadyThere": "You already had this subscription — it was refreshed in place.",
+      "skippedReason": {
+        "malformed": "Could not be read",
+        "notALink": "Not a server, nor a link to one",
+        "unsupportedScheme": "$scheme is not supported",
+        "unsupported": "Not supported: $what",
+        "unsupportedUnnamed": "The server needs something Commy does not have",
+        "incomplete": "Something required is missing: the address, port, key or password",
+        "emptyBody": "The subscription came back empty",
+        "unknownFormat": "Not a link list, a Clash file or a sing-box config"
+      }
     }
   },
 

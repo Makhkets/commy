@@ -31,13 +31,19 @@ class VlessLinkParser implements NodeLinkParser {
     if (value == null || value.isEmpty || value.toLowerCase() == 'none') {
       return null;
     }
-    // The scheme is the first dot-separated part; the rest carries a key.
-    // Named only when it looks like a scheme name, so a value that is a key
-    // with no scheme in front of it never reaches a log (R3).
-    final scheme = value.split('.').first;
-    final named =
-        RegExp(r'^[A-Za-z0-9_-]{1,32}$').hasMatch(scheme) ? ' "$scheme"' : '';
+    final scheme = _encryptionScheme(value);
+    final named = scheme == null ? '' : ' "$scheme"';
     return 'VLESS encryption$named is not supported by the core';
+  }
+
+  /// The scheme of an encryption [value], or `null` when it cannot be named.
+  ///
+  /// The scheme is the first dot-separated part; the rest carries a key.
+  /// Named only when it looks like a scheme name, so a value that is a key
+  /// with no scheme in front of it never reaches a log (R3) or the screen.
+  static String? _encryptionScheme(String value) {
+    final scheme = value.split('.').first;
+    return RegExp(r'^[A-Za-z0-9_-]{1,32}$').hasMatch(scheme) ? scheme : null;
   }
 
   /// Throws [LinkFormatException] when [encryption] is one the core cannot
@@ -45,7 +51,10 @@ class VlessLinkParser implements NodeLinkParser {
   static void requireSupportedEncryption(String? encryption) {
     final refusal = encryptionRefusal(encryption);
     if (refusal != null) {
-      throw LinkFormatException(refusal);
+      throw LinkFormatException.unsupported(
+        refusal,
+        subject: _encryptionScheme(encryption!.trim()),
+      );
     }
   }
 
@@ -63,11 +72,15 @@ class VlessLinkParser implements NodeLinkParser {
     }
     final uuid = link.decodedUserInfo.trim();
     if (uuid.isEmpty) {
-      throw const LinkFormatException('vless:// link carries no user id');
+      throw const LinkFormatException.incomplete(
+        'vless:// link carries no user id',
+      );
     }
     final port = link.port;
     if (port == null) {
-      throw const LinkFormatException('vless:// link carries no server port');
+      throw const LinkFormatException.incomplete(
+        'vless:// link carries no server port',
+      );
     }
     final encryption = link.query.first('encryption');
     requireSupportedEncryption(encryption);
@@ -94,7 +107,7 @@ class VlessLinkParser implements NodeLinkParser {
   String toLink(ProxyNode node) {
     final uuid = node.param(ParamKeys.uuid);
     if (uuid == null || uuid.isEmpty) {
-      throw const LinkFormatException('Node carries no user id');
+      throw const LinkFormatException.incomplete('Node carries no user id');
     }
     final address = node.host.contains(':') ? '[${node.host}]' : node.host;
     final query = TransportParams.buildQuery(TransportParams.writeQuery(node));

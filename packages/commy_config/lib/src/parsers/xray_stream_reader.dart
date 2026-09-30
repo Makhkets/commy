@@ -58,8 +58,9 @@ abstract final class XrayStreamReader {
         MapRead.text(stream, <String>['method', 'network']) ?? 'tcp';
     final transport = networks[rawNetwork.toLowerCase()];
     if (transport == null || !TransportParams.supported.contains(transport)) {
-      throw LinkFormatException(
+      throw LinkFormatException.unsupported(
         'Transport "$rawNetwork" is not supported by the core',
+        subject: rawNetwork,
       );
     }
     params[ParamKeys.transport] = transport;

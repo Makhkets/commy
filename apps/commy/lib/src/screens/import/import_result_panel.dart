@@ -228,6 +228,30 @@ class _SkippedLines extends StatefulWidget {
 class _SkippedLinesState extends State<_SkippedLines> {
   bool _expanded = false;
 
+  /// Why [failure] was skipped, in the reader's language.
+  ///
+  /// The parsers hand over a kind and a subject, not a sentence: their
+  /// English — and, for an unexpected throw, a Dart exception's own text —
+  /// used to land here as written, under a Russian heading.
+  static String _reason(Translations t, ImportFailure failure) {
+    final words = t.import.result.skippedReason;
+    final subject = failure.subject;
+    return switch (failure.kind) {
+      ImportFailureKind.malformed => words.malformed,
+      ImportFailureKind.notALink => words.notALink,
+      ImportFailureKind.unsupportedScheme when subject != null =>
+        words.unsupportedScheme(scheme: subject),
+      ImportFailureKind.unsupported when subject != null =>
+        words.unsupported(what: subject),
+      ImportFailureKind.unsupportedScheme ||
+      ImportFailureKind.unsupported =>
+        words.unsupportedUnnamed,
+      ImportFailureKind.incomplete => words.incomplete,
+      ImportFailureKind.emptyBody => words.emptyBody,
+      ImportFailureKind.unknownFormat => words.unknownFormat,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
@@ -275,7 +299,7 @@ class _SkippedLinesState extends State<_SkippedLines> {
                     ),
                   ),
                   Text(
-                    failure.reason,
+                    _reason(t, failure),
                     style: context.typography.caption.copyWith(
                       color: colors.textTertiary,
                     ),
