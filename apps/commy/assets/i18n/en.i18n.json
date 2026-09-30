@@ -180,7 +180,16 @@
       "autoUpdate": "Auto refresh",
       "interval": "Refresh interval",
       "showQr": "Show QR code",
+      "userAgent": "User-Agent",
       "delete": "Delete"
+    },
+    "userAgent": {
+      "title": "User-Agent",
+      "body": "How the app introduces itself to the panel. Some panels answer each client differently: if servers are missing or the subscription will not load, pick a client the panel knows.",
+      "honest": "Commy — the default",
+      "custom": "Your own string",
+      "customLabel": "User-Agent",
+      "invalid": "Latin letters, digits and punctuation only"
     },
     "rename": {
       "title": "Rename subscription",

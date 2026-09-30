@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/i18n/relative_time.dart';
+import 'package:commy/src/screens/home/widgets/user_agent_sheet.dart';
 import 'package:commy/src/screens/import/subscription_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/subscription_controller.dart';
@@ -18,9 +19,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// The "…" menu of a subscription card.
 ///
 /// Everything rare lives here — collapse, rename, copy the link, auto refresh,
-/// the refresh interval, delete — because docs/05-ux-flows.md fixes the header
-/// at exactly three visible controls and puts the rest behind this sheet. The
-/// layout follows docs/design-refs/05-subscription-menu.png.
+/// the refresh interval, the User-Agent, delete — because docs/05-ux-flows.md
+/// fixes the header at exactly three visible controls and puts the rest behind
+/// this sheet. The layout follows docs/design-refs/05-subscription-menu.png.
 class SubscriptionMenuSheet extends ConsumerWidget {
   /// Creates the sheet body.
   const SubscriptionMenuSheet({required this.subscription, super.key});
@@ -137,6 +138,13 @@ class SubscriptionMenuSheet extends ConsumerWidget {
               icon: CommyIcons.qrCode,
               title: t.subscription.menu.showQr,
               onTap: () => unawaited(_showQr(context, ref, current)),
+            ),
+            SettingsTile(
+              icon: CommyIcons.globe,
+              title: t.subscription.menu.userAgent,
+              value: UserAgentSheet.label(current.userAgentOverride),
+              onTap: () =>
+                  unawaited(_pickUserAgent(context, controller, current)),
             ),
             SettingsTile(
               icon: CommyIcons.delete,
@@ -267,6 +275,24 @@ class SubscriptionMenuSheet extends ConsumerWidget {
       return;
     }
     await controller.setUpdateIntervalHours(current, hours);
+  }
+
+  /// Asks which User-Agent the panel should see and writes it.
+  Future<void> _pickUserAgent(
+    BuildContext context,
+    SubscriptionController controller,
+    Subscription current,
+  ) async {
+    final t = Translations.of(context);
+    final picked = await CommySheet.show<String>(
+      context: context,
+      title: t.subscription.userAgent.title,
+      builder: (context) => UserAgentSheet(current: current.userAgentOverride),
+    );
+    if (picked == null) {
+      return;
+    }
+    await controller.setUserAgent(current, picked);
   }
 
   /// Deleting takes a credential with it, so it asks first and says what goes.

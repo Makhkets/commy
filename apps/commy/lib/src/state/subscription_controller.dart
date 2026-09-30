@@ -126,6 +126,20 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     );
   }
 
+  /// Sets the User-Agent the subscription is fetched with; `null` or an
+  /// empty string goes back to the default.
+  ///
+  /// The next refresh uses it, and so does adding the same URL again.
+  Future<void> setUserAgent(Subscription subscription, String? userAgent) {
+    final trimmed = userAgent?.trim() ?? '';
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(
+        userAgentOverride: trimmed.isEmpty ? null : trimmed,
+      ),
+    );
+  }
+
   /// Renames the subscription.
   Future<void> rename(Subscription subscription, String name) {
     final trimmed = name.trim();

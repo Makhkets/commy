@@ -4,6 +4,7 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/diagnostics/config_screen.dart';
 import 'package:commy/src/screens/diagnostics/logs_screen.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
+import 'package:commy/src/screens/home/widgets/user_agent_sheet.dart';
 import 'package:commy/src/screens/settings/backup_password_sheet.dart';
 import 'package:commy/src/screens/settings/routing_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
@@ -291,6 +292,23 @@ void main() {
             submitLabel: t.settings.backup.password.save,
             onSubmit: (_) async => null,
           ),
+        ),
+      ),
+    ),
+  );
+
+  // The subscription's User-Agent: the presets with the strings they send,
+  // and the user's own one open under them — the row a subscription that a
+  // panel will not serve is fixed from.
+  screenGolden(
+    'user_agent',
+    size: const Size(390, 1100),
+    screen: Scaffold(
+      body: Align(
+        alignment: Alignment.bottomCenter,
+        child: CommySheetSurface(
+          title: t.subscription.userAgent.title,
+          child: const UserAgentSheet(current: 'Happ/3.9.0'),
         ),
       ),
     ),
