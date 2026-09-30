@@ -932,7 +932,11 @@ void main() {
     const resolve = <String, Object?>{
       'action': 'resolve',
       'server': 'dns-remote',
+      'strategy': 'prefer_ipv4',
     };
+
+    bool isResolve(Object? rule) =>
+        rule is Map<String, Object?> && rule['action'] == 'resolve';
 
     RoutingRule rule(String matcher, RuleAction action, int index) =>
         RoutingRule(
@@ -945,13 +949,14 @@ void main() {
     List<Object?> rulesOf(
       List<RoutingRule> rules, {
       bool fakeIp = true,
+      DnsStrategy strategy = DnsStrategy.preferIpv4,
       Set<String> onDisk = const <String>{'geoip-ru'},
     }) {
       final config = _build(
         SingBoxBuildRequest.single(
           node: _realityNode,
           routing: RoutingPolicy(rules: rules),
-          dns: DnsSettings(fakeIp: fakeIp),
+          dns: DnsSettings(fakeIp: fakeIp, strategy: strategy),
           settings: AppSettings.defaults,
           platform: ConfigPlatform.android,
           ruleSetDirectory: '/data/rulesets',
@@ -998,13 +1003,11 @@ void main() {
         rule('port:443', RuleAction.proxy, 2),
       ];
 
+      expect(rulesOf(addressRules, fakeIp: false).where(isResolve), isEmpty);
       expect(
-        rulesOf(addressRules, fakeIp: false),
-        isNot(contains(equals(resolve))),
-      );
-      expect(
-        rulesOf(nameRules, onDisk: const <String>{'geosite-ru'}),
-        isNot(contains(equals(resolve))),
+        rulesOf(nameRules, onDisk: const <String>{'geosite-ru'})
+            .where(isResolve),
+        isEmpty,
       );
     });
 
@@ -1015,7 +1018,7 @@ void main() {
         rule('geoip:private', RuleAction.direct, 0),
       ]);
 
-      expect(rules, isNot(contains(equals(resolve))));
+      expect(rules.where(isResolve), isEmpty);
     });
 
     test('counts only a rule that is written, not one that was left out', () {
@@ -1035,6 +1038,44 @@ void main() {
           'action': 'reject',
         },
       ]);
+    });
+
+    test('asks for the A record first, unless the user chose IPv6 only', () {
+      // Past the lookup the core dials the proxy by the first address, and
+      // VLESS, VMess and Trojan report success before the server has reached
+      // it. With the user's "prefer IPv6" inherited, the AAAA address came
+      // first and every dual-stack site failed on a server without IPv6.
+      Object? strategyFor(DnsStrategy chosen) => rulesOf(
+            <RoutingRule>[rule('geoip:ru', RuleAction.direct, 0)],
+            strategy: chosen,
+          ).where(isResolve).cast<Map<String, Object?>>().single['strategy'];
+
+      expect(strategyFor(DnsStrategy.preferIpv6), 'prefer_ipv4');
+      expect(strategyFor(DnsStrategy.preferIpv4), 'prefer_ipv4');
+      expect(strategyFor(DnsStrategy.ipv4Only), 'prefer_ipv4');
+      expect(strategyFor(DnsStrategy.ipv6Only), 'ipv6_only');
+    });
+
+    test('leaves the DNS section with the strategy the user chose', () {
+      final config = _build(
+        SingBoxBuildRequest.single(
+          node: _realityNode,
+          routing: RoutingPolicy(
+            rules: <RoutingRule>[rule('geoip:ru', RuleAction.direct, 0)],
+          ),
+          dns: const DnsSettings(
+            fakeIp: true,
+            strategy: DnsStrategy.preferIpv6,
+          ),
+          settings: AppSettings.defaults,
+          platform: ConfigPlatform.android,
+          ruleSetDirectory: '/data/rulesets',
+          availableRuleSets: const <String>{'geoip-ru'},
+        ),
+      );
+
+      final dns = config.document['dns']! as Map<String, Object?>;
+      expect(dns['strategy'], 'prefer_ipv6');
     });
   });
 }

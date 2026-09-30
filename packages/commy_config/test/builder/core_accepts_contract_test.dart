@@ -63,7 +63,7 @@ void main() {
         platform: ConfigPlatform.android,
         availableRuleSets: const <String>{},
         ruleSetDirectory: null,
-        fakeIp: fakeIp,
+        dns: DnsSettings(fakeIp: fakeIp),
         warnings: <RoutingWarning>[],
       );
 

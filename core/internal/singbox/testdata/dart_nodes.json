@@ -351,7 +351,8 @@
           },
           {
             "action": "resolve",
-            "server": "dns-remote"
+            "server": "dns-remote",
+            "strategy": "prefer_ipv4"
           },
           {
             "ip_cidr": [
