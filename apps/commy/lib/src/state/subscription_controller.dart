@@ -1,6 +1,7 @@
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/failure_log.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
@@ -81,7 +82,7 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     final failure = result.failureOrNull;
     if (failure != null) {
       ref.read(appLoggerProvider).warn(
-            'subscription refresh failed: ${failure.code}',
+            'subscription refresh failed: ${FailureLog.describe(failure)}',
             tag: logTag,
           );
       state = SubscriptionActionState(failure: failure);

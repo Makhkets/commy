@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/failure_log.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:file_picker/file_picker.dart';
@@ -297,7 +298,7 @@ class ImportController extends Notifier<ImportState> {
     final failure = result.failureOrNull;
     if (failure != null) {
       ref.read(appLoggerProvider).warn(
-            'subscription import failed: ${failure.code}',
+            'subscription import failed: ${FailureLog.describe(failure)}',
             tag: logTag,
           );
       _publish(ticket, ImportState(failure: failure));
@@ -418,7 +419,7 @@ class ImportController extends Notifier<ImportState> {
       // Logged even when the report is dropped: the import did fail, and the
       // log is the one record of it the diagnostics screen can still show.
       ref.read(appLoggerProvider).warn(
-            'import failed: ${failure.code}',
+            'import failed: ${FailureLog.describe(failure)}',
             tag: logTag,
           );
       _publish(ticket, ImportState(failure: failure));

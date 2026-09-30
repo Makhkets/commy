@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/state/auto_refresh_notice.dart';
+import 'package:commy/src/state/failure_log.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/subscription_controller.dart';
-import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -156,26 +156,11 @@ class SubscriptionScheduler {
     }
     // The id, not the URL: the URL carries the access token (rule R3).
     _ref.read(appLoggerProvider).warn(
-          'automatic refresh of ${item.id} failed: ${_describe(failure)}; '
+          'automatic refresh of ${item.id} failed: '
+          '${FailureLog.describe(failure)}; '
           'not retrying for ${retryAfterFailure.inMinutes} min',
           tag: logTag,
         );
-  }
-
-  /// The failure's code, and what the panel's HTTP exchange said when that
-  /// is what went wrong — `subscription_unreachable (status 403)`.
-  ///
-  /// The toast is a headline that sends the user here, so this line is where
-  /// the reason has to be. A status and a kind carry no token (rule R3).
-  static String _describe(CommyFailure failure) {
-    if (failure
-        case SubscriptionUnreachableFailure(
-          cause: HttpTransportError(:final kind, :final statusCode),
-        )) {
-      final status = statusCode == null ? '' : ' $statusCode';
-      return '${failure.code} ($kind$status)';
-    }
-    return failure.code;
   }
 
   /// Whether a failure of [item] is the first since it last refreshed.
