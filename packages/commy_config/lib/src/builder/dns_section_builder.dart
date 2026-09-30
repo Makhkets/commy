@@ -364,6 +364,12 @@ abstract final class DnsSectionBuilder {
           // rule sending the name to the tunnel's resolver would answer its
           // A and AAAA queries with real addresses, which FakeIP is on to
           // keep out of the system cache.
+          //
+          // The price is one more look at the matcher for a query that is
+          // neither A nor AAAA — HTTPS (type 65), which phones send for most
+          // names — and for a name no rule claims. With a rule set that is a
+          // second lookup in a prebuilt table, per query; one rule cannot
+          // send a name to two resolvers, so the pair stays.
           if (fakeIp) {
             rules.add(<String, Object?>{
               ...matcher.fields,
