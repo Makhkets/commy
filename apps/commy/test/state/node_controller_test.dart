@@ -1,6 +1,7 @@
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/node_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -132,6 +133,106 @@ void main() {
       expect(harness.core.isRunning, isFalse);
       expect(harness.nodeRepository.nodes, isEmpty);
       expect(container.read(selectedNodeIdProvider).value, isNull);
+    });
+  });
+
+  group('delete on Auto', () {
+    // The stored selection is Amsterdam, the server the list leads with; the
+    // core's Auto group is on Warsaw, and the traffic with it.
+    final stored = testNode();
+    final picked = testNode(id: 'node-2', name: 'Warsaw 01');
+    final other = testNode(id: 'node-3', name: 'Oslo 01');
+
+    Future<void> onAuto() async {
+      final members = <String>[
+        for (final node in <ProxyNode>[stored, picked, other])
+          SingBoxTags.forNode(node),
+      ];
+      harness = CommyTestHarness(
+        nodes: <ProxyNode>[stored, picked, other],
+        settings: AppSettings.defaults.copyWith(autoSelect: true),
+        coreGroups: <ProxyGroup>[
+          ProxyGroup(
+            tag: SingBoxTags.autoGroup,
+            type: 'urltest',
+            now: SingBoxTags.forNode(picked),
+            all: members,
+          ),
+          ProxyGroup(
+            tag: SingBoxTags.proxyGroup,
+            type: 'selector',
+            now: SingBoxTags.autoGroup,
+            all: <String>[SingBoxTags.autoGroup, ...members],
+          ),
+        ],
+      );
+      container = ProviderContainer(overrides: harness.overrides());
+      final subscriptions = <ProviderSubscription<Object?>>[
+        container.listen(nodesProvider, (_, __) {}),
+        container.listen(settingsProvider, (_, __) {}),
+        container.listen(coreStatusProvider, (_, __) {}),
+        container.listen(selectedNodeIdProvider, (_, __) {}),
+      ];
+      addTearDown(() async {
+        for (final subscription in subscriptions) {
+          subscription.close();
+        }
+        container.dispose();
+        await harness.dispose();
+      });
+      await container.read(nodesProvider.future);
+      await container.read(settingsProvider.future);
+      await container.read(selectedNodeIdProvider.future);
+
+      final started = await container
+          .read(tunnelControllerProvider.notifier)
+          .connect(nodeId: stored.id);
+      expect(started, isTrue);
+      await harness.core.status
+          .firstWhere((status) => status is TunnelConnected)
+          .timeout(const Duration(seconds: 5));
+      // Home's Auto row, which is what keeps the core's answer current.
+      final home = container.listen(proxyGroupsProvider, (_, __) {});
+      addTearDown(home.close);
+      await container.read(proxyGroupsProvider.future);
+      expect(container.read(autoNodeProvider)?.id, picked.id);
+      expect(container.read(selectedNodeIdProvider).value, stored.id);
+    }
+
+    test('warns about the server Auto is on, not the stored one', () async {
+      await onAuto();
+
+      expect(controllerOf().isLive(picked), isTrue);
+      expect(controllerOf().isLive(stored), isFalse);
+    });
+
+    test('the stored server goes without taking the tunnel down', () async {
+      await onAuto();
+
+      await controllerOf().delete(stored);
+
+      expect(harness.core.isRunning, isTrue);
+      expect(harness.core.stopCalls, 0);
+      expect(
+        harness.nodeRepository.nodes.map((node) => node.id),
+        isNot(contains(stored.id)),
+      );
+      // Moved on, not emptied: a reload builds from it.
+      expect(container.read(selectedNodeIdProvider).value, picked.id);
+      expect(harness.settingsRepository.selectedNodeId, picked.id);
+    });
+
+    test('the server Auto is on takes the tunnel down with it', () async {
+      await onAuto();
+
+      await controllerOf().delete(picked);
+
+      expect(harness.core.isRunning, isFalse);
+      expect(
+        harness.nodeRepository.nodes.map((node) => node.id),
+        isNot(contains(picked.id)),
+      );
+      expect(container.read(selectedNodeIdProvider).value, stored.id);
     });
   });
 }
