@@ -46,6 +46,10 @@ class DriftTrafficHistoryStore implements TrafficHistoryRepository {
   /// When the oldest byte in [_pending] was counted.
   DateTime? _pendingSince;
 
+  /// Bumped by [clear], so a write that fails after it does not put the
+  /// erased bytes back.
+  var _generation = 0;
+
   /// Adds the difference between [sample] and the previous one.
   ///
   /// [scope] is a node id, or `TrafficDay.allScope` for the unattributed total.
@@ -90,19 +94,24 @@ class DriftTrafficHistoryStore implements TrafficHistoryRepository {
   void resetSession() => _previous = null;
 
   /// Writes the bytes counted since the last write, in one transaction.
+  ///
+  /// A batch that could not be written goes back into [_pending], and the
+  /// next tick tries again. Dropped, one busy moment — a restore holding the
+  /// database, say — lost up to a minute of bytes, or a whole session's when
+  /// the write came from the tunnel going down.
   @override
-  Future<Result<void, CommyFailure>> flush() {
+  Future<Result<void, CommyFailure>> flush() async {
     if (_pending.isEmpty) {
-      return Future<Result<void, CommyFailure>>.value(
-        const Ok<void, CommyFailure>(null),
-      );
+      return const Ok<void, CommyFailure>(null);
     }
     // Taken out before the first await: a tick that lands while the
     // transaction runs starts the next batch instead of being written twice.
     final batch = Map<(String, String), (int, int)>.of(_pending);
+    final since = _pendingSince;
+    final generation = _generation;
     _pending.clear();
     _pendingSince = null;
-    return StorageGuard.runVoid(() async {
+    final written = await StorageGuard.runVoid(() async {
       await _db.transaction(() async {
         for (final MapEntry(key: (day, scope), value: (up, down))
             in batch.entries) {
@@ -110,6 +119,17 @@ class DriftTrafficHistoryStore implements TrafficHistoryRepository {
         }
       });
     });
+    if (written.failureOrNull != null && generation == _generation) {
+      for (final MapEntry(key: key, value: (up, down)) in batch.entries) {
+        final (laterUp, laterDown) = _pending[key] ?? (0, 0);
+        _pending[key] = (up + laterUp, down + laterDown);
+      }
+      final later = _pendingSince;
+      _pendingSince = later == null || (since != null && since.isBefore(later))
+          ? since
+          : later;
+    }
+    return written;
   }
 
   /// Adds [upBytes] and [downBytes] to the bucket of [day], right away.
@@ -191,6 +211,7 @@ class DriftTrafficHistoryStore implements TrafficHistoryRepository {
     // next write would put part of today back.
     _pending.clear();
     _pendingSince = null;
+    _generation++;
     return StorageGuard.runVoid(() async {
       await _db.delete(_db.trafficDailyRows).go();
     });

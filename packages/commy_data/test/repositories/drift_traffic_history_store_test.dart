@@ -244,6 +244,44 @@ void main() {
       expect(watched.single.downBytes, equals(5 * 2000));
     });
 
+    test('a batch that could not be written is written by the next flush',
+        () async {
+      // Dropped on a failed write, a busy database at the moment the tunnel
+      // went down lost the whole session's bytes.
+      await tick(10);
+      commits.failNextBegin = true;
+
+      final failed = await batched.flush();
+      expect(failed.failureOrNull, isNotNull);
+      expect(await rowsOnDisk(), isEmpty);
+
+      await batched.flush();
+      final row = (await rowsOnDisk()).single;
+      expect(row.upBytes, equals(10 * 1000));
+      expect(row.downBytes, equals(10 * 2000));
+    });
+
+    test('a failed batch joins the ticks that came after it', () async {
+      await tick(10);
+      commits.failNextBegin = true;
+      await batched.flush();
+
+      // Ten more seconds of the same session, on top of the baseline.
+      for (var second = 11; second <= 20; second++) {
+        await batched.recordSample(
+          sample(
+            up: 1000 * second,
+            down: 2000 * second,
+            at: day.add(Duration(seconds: second)),
+          ),
+        );
+      }
+      await batched.flush();
+
+      final row = (await rowsOnDisk()).single;
+      expect(row.upBytes, equals(20 * 1000));
+    });
+
     test('clear drops the batch with the history', () async {
       await tick(5);
 
@@ -259,6 +297,18 @@ void main() {
 class CommitCounter extends QueryInterceptor {
   /// Commits since the last reset.
   int count = 0;
+
+  /// Makes the next transaction fail to start, as a busy database does.
+  bool failNextBegin = false;
+
+  @override
+  TransactionExecutor beginTransaction(QueryExecutor parent) {
+    if (failNextBegin) {
+      failNextBegin = false;
+      throw StateError('database is locked');
+    }
+    return super.beginTransaction(parent);
+  }
 
   @override
   Future<void> commitTransaction(TransactionExecutor inner) {
