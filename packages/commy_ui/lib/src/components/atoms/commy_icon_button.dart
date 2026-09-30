@@ -59,6 +59,11 @@ class CommyIconButton extends StatelessWidget {
     final button = Semantics(
       button: true,
       enabled: enabled,
+      // Said, not only painted. The latched state is a wash at 1.1:1 and a
+      // change of icon colour, and the tablet rail is built from these: with
+      // the flag left out, TalkBack read all four sections alike and never
+      // which one was open — the desktop sidebar has always said it.
+      selected: isSelected,
       label: semanticLabel,
       child: Material(
         color: isSelected ? colors.accentWash : CommyColors.transparent,
