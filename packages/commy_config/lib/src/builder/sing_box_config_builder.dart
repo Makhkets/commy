@@ -152,6 +152,7 @@ class SingBoxConfigBuilder {
       availableRuleSets: _usableRuleSets(request),
       ruleSetDirectory: request.ruleSetDirectory,
       dns: request.dns,
+      allowLan: request.settings.allowLan,
       warnings: warnings,
     );
 

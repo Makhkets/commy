@@ -1018,6 +1018,7 @@ void main() {
     List<Object?> rulesOf(
       List<RoutingRule> rules, {
       bool fakeIp = true,
+      bool allowLan = false,
       DnsStrategy strategy = DnsStrategy.preferIpv4,
       Set<String> onDisk = const <String>{'geoip-ru'},
     }) {
@@ -1026,7 +1027,7 @@ void main() {
           node: _realityNode,
           routing: RoutingPolicy(rules: rules),
           dns: DnsSettings(fakeIp: fakeIp, strategy: strategy),
-          settings: AppSettings.defaults,
+          settings: AppSettings(allowLan: allowLan),
           platform: ConfigPlatform.android,
           ruleSetDirectory: '/data/rulesets',
           availableRuleSets: onDisk,
@@ -1077,6 +1078,39 @@ void main() {
         rulesOf(nameRules, onDisk: const <String>{'geosite-ru'})
             .where(isResolve),
         isEmpty,
+      );
+    });
+
+    test('resolves for a device on the LAN, FakeIP or not', () {
+      // An HTTP CONNECT or SOCKS client of the local proxy sends a name, not
+      // an address: with FakeIP off, `geoip:ru` -> Direct sent a laptop's
+      // ya.ru through the proxy, and `geoip:xx` -> Block blocked nothing.
+      final rules = rulesOf(
+        <RoutingRule>[
+          rule('domain_suffix:example.org', RuleAction.proxy, 0),
+          rule('geoip:ru', RuleAction.direct, 1),
+        ],
+        fakeIp: false,
+        allowLan: true,
+      );
+
+      expect(rules.sublist(rules.length - 3), <Object?>[
+        <String, Object?>{
+          'domain_suffix': <String>['example.org'],
+          'outbound': 'proxy',
+        },
+        resolve,
+        <String, Object?>{
+          'rule_set': <String>['geoip-ru'],
+          'outbound': 'direct',
+        },
+      ]);
+      expect(
+        rulesOf(
+          <RoutingRule>[rule('geoip:ru', RuleAction.direct, 0)],
+          allowLan: true,
+        ).where(isResolve),
+        hasLength(1),
       );
     });
 

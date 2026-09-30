@@ -22,9 +22,10 @@ import 'package:commy_domain/commy_domain.dart';
 ///    connection half of it; the query itself is refused by
 ///    `DnsSectionBuilder`, one layer earlier;
 /// 6. per-app exclusions, where the platform expresses them as processes;
-/// 7. the user's own rules, in their own order — with FakeIP on, the name
-///    resolved just ahead of the first one that matches on addresses
-///    ([fakeIpResolve]).
+/// 7. the user's own rules, in their own order — where a connection can
+///    reach them as a name, with FakeIP on or with the tunnel shared to the
+///    LAN, the name resolved just ahead of the first one that matches on
+///    addresses ([fakeIpResolve]).
 ///
 /// `block` is not an outbound here. The legacy `block` outbound still exists at
 /// v1.13.16 but the supported spelling is `"action": "reject"`, and the `dns`
@@ -81,11 +82,13 @@ abstract final class RouteSectionBuilder {
         SingBoxKeys.action: SingBoxKeys.actionReject,
       };
 
-  /// The rule that resolves a FakeIP connection's name before the rules that
-  /// look at addresses.
+  /// The rule that resolves a connection's name before the rules that look
+  /// at addresses. Named for FakeIP, which needed it first.
   ///
   /// A connection to a FakeIP address reaches the router as the name it
-  /// stands for (`route/route.go`, `matchRule`), and nothing resolves that
+  /// stands for (`route/route.go`, `matchRule`). So does one from a device on
+  /// the LAN that uses the tunnel through the local proxy: an HTTP CONNECT or
+  /// SOCKS client sends the name it was asked for. Nothing resolves that
   /// name unless a rule says so. An `ip_cidr` or `geoip` rule then has no
   /// address to look at and matches nothing: `geoip:ru` → Direct sent every
   /// such connection through the proxy, and `geoip:xx` → Block blocked none.
@@ -169,12 +172,15 @@ abstract final class RouteSectionBuilder {
   ///
   /// [dns] is the policy the DNS section is built from: whether it answers
   /// with FakeIP addresses, and the address family the user chose.
+  /// [allowLan] is whether devices on the LAN share the tunnel through the
+  /// local proxy, whose connections arrive as names.
   static Map<String, Object?> build({
     required RoutingPolicy routing,
     required ConfigPlatform platform,
     required Set<String> availableRuleSets,
     required String? ruleSetDirectory,
     required DnsSettings dns,
+    required bool allowLan,
     required List<RoutingWarning> warnings,
   }) {
     final usedRuleSets = <String>{};
@@ -224,7 +230,10 @@ abstract final class RouteSectionBuilder {
     );
 
     if (routing.mode == RoutingMode.rules) {
-      var resolved = !dns.fakeIp;
+      // Only where a connection can get this far as a name. One that
+      // already carries an address is left as it is (`actionResolve`), so
+      // the rule is not written where it could not change anything.
+      var resolved = !dns.fakeIp && !allowLan;
       for (final rule in routing.activeRules) {
         final matcher = RouteMatcher.tryParse(rule.matcher, platform: platform);
         if (matcher == null || matcher.isEmpty) {

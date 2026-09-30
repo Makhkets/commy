@@ -65,6 +65,7 @@ void main() {
         availableRuleSets: const <String>{},
         ruleSetDirectory: null,
         dns: DnsSettings(fakeIp: fakeIp),
+        allowLan: false,
         warnings: <RoutingWarning>[],
       );
 
