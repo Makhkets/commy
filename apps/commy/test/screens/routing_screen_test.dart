@@ -658,6 +658,33 @@ void main() {
     expect(find.textContaining(DnsStrategy.ipv4Only.wireName), findsNothing);
   });
 
+  testWidgets('in Direct mode the DNS row names the direct resolver',
+      (tester) async {
+    // Direct mode sends every unclaimed name to the direct resolver; the row
+    // used to name the remote one, which the core then never asks.
+    const dns = DnsSettings(
+      remote: 'tls://9.9.9.9',
+      direct: 'udp://77.88.8.8',
+      strategy: DnsStrategy.ipv4Only,
+    );
+    await pumpScreen(
+      tester,
+      policy: RoutingPolicy.defaults.copyWith(mode: RoutingMode.direct),
+      dns: dns,
+    );
+
+    expect(
+      find.text(
+        t.routing.dnsValue(
+          remote: 'udp://77.88.8.8',
+          strategy: t.dns.strategyIpv4Only,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('tls://9.9.9.9'), findsNothing);
+  });
+
   testWidgets('the Apps row says everything while per-app routing is off',
       (tester) async {
     await pumpScreen(

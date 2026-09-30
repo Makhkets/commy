@@ -223,8 +223,15 @@ class _Body extends ConsumerWidget {
               title: t.routing.dns,
               // The strategy as the DNS screen words it: the row used to
               // print the core's own token, "prefer_ipv4", in both languages.
+              // And the resolver names are sent to when no rule claims them,
+              // read off the builder like the final row above: in Direct
+              // mode that is the direct one, and naming the remote one there
+              // pointed at a resolver the core never asks.
               value: t.routing.dnsValue(
-                remote: dns.remote,
+                remote: DnsSectionBuilder.finalResolver(policy.mode) ==
+                        SingBoxTags.dnsDirect
+                    ? dns.direct
+                    : dns.remote,
                 strategy: DnsScreen.strategyLabel(t, dns.strategy),
               ),
               onTap: () => context.go(AppRoutes.dns),
