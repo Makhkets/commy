@@ -1,5 +1,6 @@
 import 'package:commy_ui/src/components/atoms/commy_icon_button.dart';
 import 'package:commy_ui/src/components/commy_icons.dart';
+import 'package:commy_ui/src/components/commy_inline_action.dart';
 import 'package:commy_ui/src/components/commy_tone.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
@@ -61,13 +62,25 @@ class ErrorBanner extends StatelessWidget {
     final type = context.typography;
     final foreground = tone.foreground(colors);
 
+    final hasAction = actionLabel != null;
+
     return Container(
       decoration: BoxDecoration(
         color: tone.wash(colors),
         borderRadius: context.radii.smAll,
         border: Border.all(color: foreground),
       ),
-      padding: EdgeInsets.all(spacing.s3),
+      // With an action, the banner's bottom padding and the gap above the
+      // action are handed to the action's own 48 pt box, which is mostly
+      // air: the word sits where it did, give or take a few points, and the
+      // banner grows by six instead of by the twenty-six a taller target
+      // would otherwise add.
+      padding: EdgeInsets.fromLTRB(
+        spacing.s3,
+        spacing.s3,
+        spacing.s3,
+        hasAction ? spacing.s0 : spacing.s3,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -88,16 +101,12 @@ class ErrorBanner extends StatelessWidget {
                   message,
                   style: type.body.copyWith(color: colors.textPrimary),
                 ),
-                if (actionLabel != null) ...<Widget>[
-                  SizedBox(height: spacing.s2),
-                  GestureDetector(
-                    onTap: onAction,
-                    child: Text(
-                      actionLabel!,
-                      style: type.bodyStrong.copyWith(color: foreground),
-                    ),
+                if (hasAction)
+                  CommyInlineAction(
+                    label: actionLabel!,
+                    onPressed: onAction,
+                    color: foreground,
                   ),
-                ],
               ],
             ),
           ),

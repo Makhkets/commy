@@ -169,6 +169,19 @@ void main() {
     ]),
   );
 
+  // The action has keyboard focus: its ring is the full height of the
+  // toast, because that is how tall its tap target is.
+  goldenTest(
+    'toast_focused',
+    size: const Size(400, 120),
+    tabs: 1,
+    builder: (context) => Toast(
+      message: 'Правило удалено',
+      actionLabel: 'Вернуть',
+      onAction: () {},
+    ),
+  );
+
   goldenTest(
     'traffic_meter',
     size: const Size(360, 200),
