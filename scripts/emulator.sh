@@ -58,6 +58,13 @@ export ANDROID_SERIAL="${SERIAL}"
 die() { printf '\n\033[31merror:\033[0m %s\n\n' "$*" >&2; exit 1; }
 say() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 
+# The emulator refuses any other console port and exits at once, and the
+# boot wait below would then watch for a serial that never appears — fifteen
+# minutes before "did not boot". adb finds emulators on its own only up to
+# 5584, the last console port of its sixteen.
+[[ "${PORT}" =~ ^[0-9]+$ ]] && (( PORT >= 5554 && PORT <= 5584 && PORT % 2 == 0 )) \
+  || die "EMULATOR_PORT must be an even number from 5554 to 5584, not '${PORT}'"
+
 adb() { "${SDK}/platform-tools/adb" "$@"; }
 
 # Whether adb knows an emulator at SERIAL, booted or not. Not `grep -q`: it
