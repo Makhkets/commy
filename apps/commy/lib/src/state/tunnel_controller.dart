@@ -261,13 +261,14 @@ final autoConnectProvider = Provider<void>((ref) {
       return;
     }
     decided = true;
-    final nodeId = selected.value;
-    if (!settings.autoConnect || nodeId == null) {
+    if (!settings.autoConnect || selected.value == null) {
       return;
     }
-    unawaited(
-      ref.read(tunnelControllerProvider.notifier).connect(nodeId: nodeId),
-    );
+    // No id passed: the connect then checks the selection against the
+    // servers there are, as the button does, and a selection whose
+    // subscription was deleted lands on the first server instead of
+    // failing the launch with "the selected node no longer exists".
+    unawaited(ref.read(tunnelControllerProvider.notifier).connect());
   }
 
   ref

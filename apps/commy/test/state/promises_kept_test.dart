@@ -411,6 +411,31 @@ void main() {
       expect(harness.core.isRunning, isTrue);
     });
 
+    test('on, a selection that is no longer a server lands on the first one',
+        () async {
+      // Its subscription was deleted since the last launch. Autoconnect used
+      // to pass the stored id straight through and fail the launch.
+      final harness = CommyTestHarness(
+        nodes: <ProxyNode>[testNode()],
+        settings: const AppSettings(autoConnect: true),
+      );
+      addTearDown(harness.dispose);
+      await harness.settingsRepository.writeSelectedNodeId('gone');
+
+      final container = ProviderContainer(overrides: harness.overrides());
+      addTearDown(container.dispose);
+
+      await container.read(selectedNodeIdProvider.future);
+      container.listen(autoConnectProvider, (_, __) {});
+      for (var tries = 0; tries < 50 && !harness.core.isRunning; tries++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+
+      expect(harness.core.isRunning, isTrue);
+      expect(container.read(tunnelControllerProvider).failure, isNull);
+      expect(harness.settingsRepository.selectedNodeId, 'node-1');
+    });
+
     test('off, nothing starts on its own', () async {
       final harness = CommyTestHarness(nodes: <ProxyNode>[testNode()]);
       addTearDown(harness.dispose);
