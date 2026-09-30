@@ -700,7 +700,9 @@
     "quota": "$used of $total used",
     "search": "Search the logs",
     "copyLogs": "Copy the logs",
-    "subscriptionHealth": "Subscription health",
+    "subscriptionOk": "Subscription is fine",
+    "subscriptionRunningOut": "Subscription is running out",
+    "subscriptionExpired": "Subscription has expired",
     "dismiss": "Dismiss"
   }
 }

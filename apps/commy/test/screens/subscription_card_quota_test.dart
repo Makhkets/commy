@@ -22,6 +22,9 @@ void main() {
     t = AppLocale.ru.buildSync();
   });
 
+  Finder said(String words) =>
+      find.bySemanticsLabel(RegExp(RegExp.escape(words)));
+
   Future<SubscriptionCard> pumpCard(
     WidgetTester tester,
     SubscriptionUserInfo info,
@@ -113,5 +116,41 @@ void main() {
     );
     expect(card.isUnlimited, isFalse);
     expect(tester.widget<QuotaBar>(find.byType(QuotaBar)).clampedRatio, 0.2);
+  });
+
+  testWidgets('a plan nearly spent is announced as running out, not by name',
+      (tester) async {
+    // The amber glyph is the card's warning, and a screen reader hears the
+    // glyph's label: one fixed word for every state said nothing at all.
+    // The header reads as one node, so the state is looked for inside it.
+    final handle = tester.ensureSemantics();
+    await pumpCard(
+      tester,
+      const SubscriptionUserInfo(
+        upload: 0,
+        download: 19 << 30,
+        total: 20 << 30,
+      ),
+    );
+
+    expect(said(t.a11y.subscriptionRunningOut), findsWidgets);
+    expect(said(t.a11y.subscriptionOk), findsNothing);
+    handle.dispose();
+  });
+
+  testWidgets('a plan with room left is announced as fine', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpCard(
+      tester,
+      const SubscriptionUserInfo(
+        upload: 1 << 30,
+        download: 1 << 30,
+        total: 10 << 30,
+      ),
+    );
+
+    expect(said(t.a11y.subscriptionOk), findsWidgets);
+    expect(said(t.a11y.subscriptionRunningOut), findsNothing);
+    handle.dispose();
   });
 }

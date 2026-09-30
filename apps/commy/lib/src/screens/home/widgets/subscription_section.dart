@@ -80,7 +80,15 @@ class SubscriptionSection extends ConsumerWidget {
       pingAllLabel: t.subscription.pingAll,
       moreLabel: t.subscription.more,
       health: timed.health,
-      healthSemanticLabel: t.a11y.subscriptionHealth,
+      // The state, not the name of the glyph. One word for all three read
+      // "subscription health" over an amber warning exactly as over a green
+      // tick, and a quota at 95% is otherwise only a pair of numbers to do
+      // the sum on.
+      healthSemanticLabel: switch (timed.health) {
+        SubscriptionHealth.ok => t.a11y.subscriptionOk,
+        SubscriptionHealth.warning => t.a11y.subscriptionRunningOut,
+        SubscriptionHealth.error => t.a11y.subscriptionExpired,
+      },
       quotaRatio: info?.ratio,
       // Only when the panel spoke: no userinfo at all is not "unlimited".
       isUnlimited: info != null && !info.hasQuota,

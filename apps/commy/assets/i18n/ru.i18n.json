@@ -726,7 +726,9 @@
     "quota": "Использовано $used из $total",
     "search": "Поиск по логам",
     "copyLogs": "Копировать логи",
-    "subscriptionHealth": "Состояние подписки",
+    "subscriptionOk": "Подписка в порядке",
+    "subscriptionRunningOut": "Подписка скоро закончится",
+    "subscriptionExpired": "Подписка истекла",
     "dismiss": "Скрыть"
   }
 }
