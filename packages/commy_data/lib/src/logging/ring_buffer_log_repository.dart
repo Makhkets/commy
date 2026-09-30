@@ -52,10 +52,16 @@ class RingBufferLogRepository implements LogRepository {
   /// log screen was even open. Redacting once per line on the way in costs the
   /// same line the same work exactly once.
   final Queue<LogLine> _view = Queue<LogLine>();
-  final StreamController<List<LogLine>> _changes =
-      StreamController<List<LogLine>>.broadcast();
+
+  /// Every change to the view, with the [_revision] it made.
+  final StreamController<(int, List<LogLine>)> _changes =
+      StreamController<(int, List<LogLine>)>.broadcast();
 
   var _closed = false;
+
+  /// Bumped by every change to the view, watched or not, so a watcher coming
+  /// back from a pause can tell whether it missed anything.
+  var _revision = 0;
 
   /// How many lines are currently buffered.
   int get length => _buffer.length;
@@ -77,10 +83,17 @@ class RingBufferLogRepository implements LogRepository {
     // whatever is added while nobody is listening. A line written in that gap
     // would silently never appear in the log view.
     return Stream<List<LogLine>>.multi((controller) {
-      StreamSubscription<List<LogLine>>? changes;
+      StreamSubscription<(int, List<LogLine>)>? changes;
+      // The revision of the last view handed to [controller]. Not the current
+      // one at the pause: a change already published but not yet delivered
+      // is dropped when [leave] cancels, and must still count as missed.
+      var seen = _revision;
       void follow() {
         changes = _changes.stream.listen(
-          controller.add,
+          (change) {
+            seen = change.$1;
+            controller.add(change.$2);
+          },
           onError: controller.addError,
           onDone: controller.close,
         );
@@ -91,11 +104,18 @@ class RingBufferLogRepository implements LogRepository {
         changes = null;
       }
 
+      // Only a view that changed during the pause is sent on resume. Sent
+      // every time, a consumer that pauses once per event — `asyncMap` does —
+      // got its own resume back as a new event and spun on it, and Riverpod's
+      // pause for a route transition rebuilt the log screen for nothing.
       controller
         ..add(_viewSnapshot())
         ..onPause = leave
         ..onResume = () {
-          controller.add(_viewSnapshot());
+          if (_revision != seen) {
+            seen = _revision;
+            controller.add(_viewSnapshot());
+          }
           follow();
         }
         ..onCancel = leave;
@@ -190,12 +210,13 @@ class RingBufferLogRepository implements LogRepository {
   List<LogLine> _viewSnapshot() => List<LogLine>.unmodifiable(_view);
 
   void _publish() {
+    _revision++;
     // Nobody watching is the usual case — the log screen is closed, and a
     // closed screen's paused subscription has let go (see [watch]) — and a
     // snapshot nobody receives is two thousand references copied for nothing.
     if (_closed || _changes.isClosed || !_changes.hasListener) {
       return;
     }
-    _changes.add(_viewSnapshot());
+    _changes.add((_revision, _viewSnapshot()));
   }
 }

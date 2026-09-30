@@ -156,6 +156,28 @@ void main() {
       await repository.dispose();
     });
 
+    test('a pause with nothing written sends nothing on resume', () async {
+      // A consumer that pauses once per event — `asyncMap` does — used to get
+      // its own resume back as a fresh view and spin on it, thousands of
+      // views a second with not one line written.
+      final repository = RingBufferLogRepository();
+      await repository.append(line('only'));
+      final seen = <int>[];
+      final subscription = repository.watch().asyncMap((lines) async {
+        await Future<void>.delayed(Duration.zero);
+        return lines.length;
+      }).listen(seen.add);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(seen, <int>[1]);
+
+      await repository.append(line('second'));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(seen, <int>[1, 2]);
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
     test('appendAll keeps the order and notifies listeners once', () async {
       final repository = RingBufferLogRepository();
       final seen = <int>[];
