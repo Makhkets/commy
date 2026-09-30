@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -66,11 +67,24 @@ internal object TunnelController {
 
     private val trafficFlow = events()
     private val logsFlow = events()
-    private val connectionsFlow = events()
+
+    /**
+     * The last connection table, `[]` while no tunnel runs.
+     *
+     * A state rather than an event stream, for the reason `/status` is one:
+     * the table is a snapshot, and a subscriber is owed the current one the
+     * moment it subscribes. As an event stream it got nothing until the table
+     * next changed. Opening the Connections tab with the tunnel down showed a
+     * skeleton for good, because no tunnel means no change; "Refresh" on a
+     * quiet tunnel did nothing; and a tunnel that went down left its last
+     * table on screen, ages still counting, next to "Disconnected". Only the
+     * latest table matters (wire-protocol.md), which is all a state keeps.
+     */
+    private val connectionsState = MutableStateFlow(CoreSnapshots.NO_CONNECTIONS)
 
     val traffic: Flow<String> = trafficFlow.asSharedFlow()
     val logs: Flow<String> = logsFlow.asSharedFlow()
-    val connections: Flow<String> = connectionsFlow.asSharedFlow()
+    val connections: Flow<String> = connectionsState.asStateFlow()
 
     @Volatile
     private var service: CommyVpnService? = null
@@ -342,7 +356,7 @@ internal object TunnelController {
     }
 
     fun emitConnections(json: String) {
-        connectionsFlow.tryEmit(json)
+        connectionsState.value = json
     }
 
     // ── internals ─────────────────────────────────────────────────────────

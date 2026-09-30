@@ -37,7 +37,17 @@ final trafficProvider = StreamProvider<TrafficSample>((ref) {
 });
 
 /// Open connections, refreshed by the core.
-final connectionsProvider = StreamProvider<List<ConnectionInfo>>((ref) {
+///
+/// Auto-disposed, so leaving the Connections tab cancels the subscription and
+/// the native side stops sending. Kept, it was only paused: a paused
+/// subscription to the channel's broadcast stream queues every event, and the
+/// core sends the whole table once a second while there is traffic. An hour
+/// in the background after one look at the tab was thousands of snapshots
+/// held in memory, all decoded at once — on the UI isolate — when the tab was
+/// opened again. The data is a snapshot, so nothing is lost by letting go:
+/// the native side hands a new listener the current table straight away.
+final StreamProvider<List<ConnectionInfo>> connectionsProvider =
+    StreamProvider.autoDispose((ref) {
   return ref.watch(coreClientProvider).connections;
 });
 

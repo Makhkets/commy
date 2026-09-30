@@ -1,9 +1,24 @@
+import 'dart:async';
+
+import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy_core/commy_core.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/commy_test_app.dart';
+
+/// A fake core whose connection stream the test holds, so it can see who is
+/// still listening.
+class _WatchedCore extends FakeCoreClient {
+  final StreamController<List<ConnectionInfo>> source =
+      StreamController<List<ConnectionInfo>>.broadcast();
+
+  @override
+  Stream<List<ConnectionInfo>> get connections => source.stream;
+}
 
 /// What a diagnostics screen costs once the user has left it.
 ///
@@ -49,5 +64,28 @@ void main() {
 
     expect(views, hasLength(lessThanOrEqualTo(2)));
     expect(container.read(logLinesProvider).value, hasLength(50));
+  });
+
+  test('leaving the connections tab lets go of the stream', () async {
+    final core = _WatchedCore();
+    final container = ProviderContainer(
+      overrides: <Override>[coreClientProvider.overrideWithValue(core)],
+    );
+    addTearDown(() async {
+      container.dispose();
+      await core.source.close();
+      await core.dispose();
+    });
+
+    final screen = container.listen(connectionsProvider, (_, __) {});
+    await pumpEventQueue();
+    expect(core.source.hasListener, isTrue);
+
+    screen.close();
+    await pumpEventQueue();
+
+    // Cancelled, not paused: on Android the channel's cancel is what stops
+    // the native side sending the table once a second.
+    expect(core.source.hasListener, isFalse);
   });
 }

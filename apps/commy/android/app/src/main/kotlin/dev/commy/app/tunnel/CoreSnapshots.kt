@@ -80,6 +80,9 @@ internal object CoreSnapshots {
     /** `proxies()` answers an empty array when the core is not running. */
     const val NO_GROUPS = "[]"
 
+    /** The connection table while no tunnel runs: there is nothing open. */
+    const val NO_CONNECTIONS = "[]"
+
     fun encodeGroups(groups: List<GroupSnapshot>): String =
         JSONArray(groups.map(GroupSnapshot::toJson)).toString()
 

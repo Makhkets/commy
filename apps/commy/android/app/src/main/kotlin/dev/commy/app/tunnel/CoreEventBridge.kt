@@ -157,7 +157,15 @@ internal class CoreEventBridge(
         statusClient = null
         groupClient = null
         connectionsClient = null
-        synchronized(connections) { connections.clear() }
+        // A tunnel that is down has nothing open. Said out loud, or the
+        // Connections tab goes on listing the last table next to
+        // "Disconnected". Under the lock the ticker emits under, after
+        // `closing` is set: a tick that took its snapshot a moment ago cannot
+        // put the old table back over this one.
+        synchronized(connections) {
+            connections.clear()
+            TunnelController.emitConnections(CoreSnapshots.NO_CONNECTIONS)
+        }
     }
 
     /** `getStartedAt`, or null when the core has not told us. */
@@ -300,9 +308,15 @@ internal class CoreEventBridge(
                     }
                     connectionsDirty = false
                     connections.values.toList()
-                }
-                if (snapshot != null) {
-                    TunnelController.emitConnections(CoreSnapshots.encodeConnections(snapshot))
+                } ?: continue
+                // Encoded outside the lock, which the Go thread delivering
+                // connection events waits on; emitted inside it, and only
+                // while open, so it cannot land after close() emptied the table.
+                val json = CoreSnapshots.encodeConnections(snapshot)
+                synchronized(connections) {
+                    if (!closing.get()) {
+                        TunnelController.emitConnections(json)
+                    }
                 }
             }
         }
