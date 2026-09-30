@@ -64,6 +64,27 @@ void main() {
     ]),
   );
 
+  // The ring is on the button's own edge, where it reads on the chalk and
+  // the ink fills alike — an overlay of either on itself did not.
+  goldenTest(
+    'button_focused',
+    size: const Size(360, 100),
+    tabs: 1,
+    builder: (context) => CommyButton(label: 'Подключиться', onPressed: () {}),
+  );
+
+  goldenTest(
+    'button_compact_focused',
+    size: const Size(360, 100),
+    tabs: 1,
+    builder: (context) => CommyButton(
+      label: 'Добавить правило',
+      onPressed: () {},
+      icon: CommyIcons.add,
+      isCompact: true,
+    ),
+  );
+
   goldenTest(
     'checkbox',
     size: const Size(280, 120),

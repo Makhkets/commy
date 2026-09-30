@@ -1,5 +1,6 @@
 import 'package:commy_ui/src/components/atoms/commy_button_variant.dart';
 import 'package:commy_ui/src/components/atoms/commy_spinner.dart';
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
@@ -87,63 +88,78 @@ class CommyButton extends StatelessWidget {
             ? colors.accentHover
             : null;
 
+    // Focus is taken here rather than by the InkWell, for the same reason
+    // as the hover fill below: the InkWell shows focus as a 12% overlay of
+    // white on dark and of black on light, which on the primary fill — a
+    // near-white, a near-black — moved by 1.02:1, and on the compact
+    // variant sits under a fill painted above it. A keyboard user tabbing
+    // onto "Add" could not see that it was there. What shows focus now is
+    // the ring every control draws, on the button's own edge.
     final button = Semantics(
       button: true,
       enabled: isEnabled,
       label: semanticLabel,
-      child: _HoverFill(
-        idle: isCompact ? CommyColors.transparent : _background(colors),
-        hovered: hoverFill,
-        builder: (context, fill) => Material(
-          // Compact draws its own fill below, inside the margin; anything
-          // else keeps painting it here.
-          color: fill,
-          borderRadius: radii.smAll,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: isEnabled ? onPressed : null,
+      child: CommyFocusable(
+        onActivate: isEnabled ? onPressed : null,
+        builder: (context, {required isFocused}) => _HoverFill(
+          idle: isCompact ? CommyColors.transparent : _background(colors),
+          hovered: hoverFill,
+          builder: (context, fill) => Material(
+            // Compact draws its own fill below, inside the margin; anything
+            // else keeps painting it here.
+            color: fill,
             borderRadius: radii.smAll,
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: tapMargin),
-              child: Container(
-                constraints: BoxConstraints(minHeight: minHeight),
-                padding: EdgeInsets.symmetric(
-                  horizontal: spacing.s4,
-                  vertical: spacing.s2,
-                ),
-                decoration: BoxDecoration(
-                  color: isCompact ? _background(colors) : null,
-                  borderRadius: radii.smAll,
-                  border: border == null ? null : Border.all(color: border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    if (isLoading)
-                      CommySpinner(
-                        size: CommySizes.iconControl,
-                        color: foreground,
-                      )
-                    else if (icon != null)
-                      Icon(
-                        icon,
-                        size: CommySizes.iconControl,
-                        color: foreground,
-                      ),
-                    if (hasLeading) SizedBox(width: spacing.s2),
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: context.typography.bodyStrong.copyWith(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: isEnabled ? onPressed : null,
+              canRequestFocus: false,
+              borderRadius: radii.smAll,
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: tapMargin),
+                child: Container(
+                  constraints: BoxConstraints(minHeight: minHeight),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: spacing.s4,
+                    vertical: spacing.s2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isCompact ? _background(colors) : null,
+                    borderRadius: radii.smAll,
+                    border: border == null ? null : Border.all(color: border),
+                  ),
+                  foregroundDecoration: BoxDecoration(
+                    borderRadius: radii.smAll,
+                    border: CommyFocusable.ring(colors, isFocused: isFocused),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      if (isLoading)
+                        CommySpinner(
+                          size: CommySizes.iconControl,
+                          color: foreground,
+                        )
+                      else if (icon != null)
+                        Icon(
+                          icon,
+                          size: CommySizes.iconControl,
                           color: foreground,
                         ),
+                      if (hasLeading) SizedBox(width: spacing.s2),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: context.typography.bodyStrong.copyWith(
+                            color: foreground,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
