@@ -10,50 +10,36 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.13]
+
+Installs over alpha.12.
+
 - **"Add to Happ" buttons on a panel's page now open the import.** In
-  alpha.12 they showed an English "Page Not Found" error, and Back closed
-  the app.
-- **The network core is updated to sing-box 1.13.21**, the last release of
-  the 1.13 line. It fixes two crashes of the core (a failed WebSocket
-  handshake, and a packet of an address family the tunnel was not set up
-  for), the Auto group hanging on a server that does not answer, needless
-  keepalive traffic that cost battery, and the network monitor getting stuck
-  when the phone starts.
-- **Android 7–11: a Wi-Fi without internet no longer stops the tunnel.** A
-  captive portal or a dead router coming into range while mobile data works
-  used to take the core with it; now it follows the network Android chose.
-- **Routing and DNS.** Direct mode looks names up without the proxy, so it
-  keeps working when the server is down. A Proxy rule above a broader Direct
-  or Block rule sends its DNS through the tunnel too. Android's private-DNS
-  probe to the tunnel's own DNS address is refused instead of going out over
-  Wi-Fi. Devices sharing the tunnel follow `geoip` and IP rules.
-- **Subscriptions.** The device ID and model are no longer sent to another
-  host a panel redirects to, and https-to-http redirects are refused. A 5xx,
-  a bad certificate and a redirect loop are each called what they are, and the
-  log says why. The subscription menu sets the User-Agent the panel sees and
-  refreshes with it. A refresh interval picked in the menu survives the next
-  refresh. Skipped import lines say why in the app's language. Phones whose
-  model name is not in Latin letters can refresh again. A huge or endless
-  response is cut off.
-- **Battery and memory.** Opening the log once no longer grows memory for as
-  long as the app runs. The Connections tab and the log stop streaming when
-  left or when the app is in the background. Traffic statistics are written
-  once a minute, not every second, and the home screen no longer redraws
-  every server once a second.
-- **Auto.** Deleting a server warns about and stops for the one the tunnel
-  actually runs through; any other deleted server leaves the Auto group.
-- **Accessibility.** Switches, checkboxes, radio buttons and mode selectors
-  work with a keyboard or D-pad and show a focus ring. Screen readers read
-  field labels, a subscription's state and the open section. Grey text meets
-  WCAG AA on every background.
-- **Android.** The notification and the tile use the app's language; the
-  notification no longer shows an internal code; no negative speed after a
-  live reload. "Start on boot" is now "Remind after restart", which is what it
-  does.
-- Smaller fixes: autoconnect with a server that is gone connects to the first
-  one; editing a subscription never overwrites a refresh; exported logs keep
-  IPv6 server addresses readable; the release workflow checks the tag against
-  the version and keeps the signing key away from steps that do not need it.
+  alpha.12 they showed an English "Page Not Found" page.
+- **Android 7–11: a Wi-Fi without internet no longer stops the tunnel** while
+  mobile data works.
+- **DNS.** Direct mode resolves names without the server, so it works when
+  the server is down. A Proxy rule above a broader Direct or Block rule sends
+  its lookups through the tunnel too. Android's private-DNS probe to the
+  tunnel's own address no longer leaves over Wi-Fi. Devices sharing the
+  tunnel follow `geoip` and IP rules.
+- **Subscriptions.** The device ID is not sent to another host a panel
+  redirects to, and https-to-http redirects are refused. A server error, a
+  bad certificate and a redirect loop are each named, and the log says why.
+  The subscription menu sets the User-Agent the panel sees. Phones whose
+  model name is not in Latin letters can refresh again.
+- **Battery and memory.** The log and the Connections tab do no work in
+  the background, the log no longer grows memory, and traffic statistics are
+  written once a minute instead of every second.
+- **Accessibility.** Switches and selectors work with a keyboard or D-pad,
+  screen readers read field labels and a subscription's state, and grey text
+  is easier to read.
+- **The core is sing-box 1.13.21**, the last of the 1.13 line: two crashes and
+  the Auto group hanging on a silent server are fixed.
+- Smaller fixes: the notification and the tile use the app's language; no
+  negative speed after a change; "Start on boot" is now "Remind after
+  restart", which is what it does; deleting a server on Auto stops only for
+  the one in use.
 
 ## [0.1.0-alpha.12]
 
@@ -782,7 +768,8 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.12...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.13...main
+[0.1.0-alpha.13]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.13
 [0.1.0-alpha.12]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.12
 [0.1.0-alpha.11]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.11
 [0.1.0-alpha.10]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.10
