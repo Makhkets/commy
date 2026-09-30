@@ -153,4 +153,22 @@ void main() {
     expect(said(t.a11y.subscriptionRunningOut), findsNothing);
     handle.dispose();
   });
+
+  testWidgets('a plan past its date is announced as expired', (tester) async {
+    final handle = tester.ensureSemantics();
+    await pumpCard(
+      tester,
+      SubscriptionUserInfo(
+        upload: 0,
+        download: 1 << 30,
+        total: 10 << 30,
+        expire: CommyTestHarness.now.subtract(const Duration(days: 1)),
+      ),
+    );
+
+    expect(said(t.a11y.subscriptionExpired), findsWidgets);
+    expect(said(t.a11y.subscriptionOk), findsNothing);
+    expect(said(t.a11y.subscriptionRunningOut), findsNothing);
+    handle.dispose();
+  });
 }
