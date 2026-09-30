@@ -106,17 +106,17 @@ Stream<T> shareLatest<T>(Stream<T> Function() open) {
           listener.add(newest.$1);
         }
         settle();
-      };
-    listener.onCancel = () {
-      listeners.remove(listener);
-      paused.remove(listener);
-      if (listeners.isNotEmpty) {
-        settle();
-        return null;
       }
-      final cancelled = source?.cancel();
-      reset();
-      return cancelled;
-    };
+      ..onCancel = () {
+        listeners.remove(listener);
+        paused.remove(listener);
+        if (listeners.isNotEmpty) {
+          settle();
+          return null;
+        }
+        final cancelled = source?.cancel();
+        reset();
+        return cancelled;
+      };
   });
 }

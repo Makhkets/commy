@@ -120,7 +120,7 @@ class DriftTrafficHistoryStore implements TrafficHistoryRepository {
       });
     });
     if (written.failureOrNull != null && generation == _generation) {
-      for (final MapEntry(key: key, value: (up, down)) in batch.entries) {
+      for (final MapEntry(:key, value: (up, down)) in batch.entries) {
         final (laterUp, laterDown) = _pending[key] ?? (0, 0);
         _pending[key] = (up + laterUp, down + laterDown);
       }
