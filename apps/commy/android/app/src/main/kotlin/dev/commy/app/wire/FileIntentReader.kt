@@ -29,7 +29,7 @@ internal object FileIntentReader {
      */
     const val MAX_BYTES = 2 * 1024 * 1024
 
-    private const val BYTE_ORDER_MARK = "﻿"
+    private const val BYTE_ORDER_MARK = "\uFEFF"
 
     /**
      * The text of the stream [open] returns, or null when there is none to
