@@ -36,8 +36,13 @@ class ConfigScreen extends ConsumerWidget {
     final colors = context.colors;
     final spacing = context.spacing;
     final tunnel = ref.watch(tunnelControllerProvider);
+    // A refusal only when a connect or reload said so. The same failure type
+    // comes back from a switch the core did not recognise and from a probe
+    // URL that is not one; the tunnel is up on the last document that worked
+    // then, and that is what this tab owes the user, without a headline about
+    // a build that never failed.
     final refusal = switch (tunnel.failure) {
-      final ConfigInvalidFailure failure => failure,
+      final ConfigInvalidFailure failure when tunnel.configRefused => failure,
       _ => null,
     };
     final rejected = refusal == null ? null : tunnel.rejectedConfig;

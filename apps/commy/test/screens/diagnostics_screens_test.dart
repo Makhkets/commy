@@ -279,6 +279,7 @@ void main() {
 
     final state = container.read(tunnelControllerProvider);
     expect(state.failure, refusal);
+    expect(state.configRefused, isTrue);
     expect(state.lastConfig, isNull, reason: 'nothing was accepted');
     expect(state.rejectedConfig, isNotNull);
     expect(find.byType(SelectableText), findsOneWidget);
@@ -330,6 +331,70 @@ void main() {
     await stopTunnel(tester, container);
   });
 
+  // ConfigInvalidFailure is also how the Clash API answers a switch to an
+  // outbound it does not know, and its way out leads here all the same. The
+  // tunnel is up on the document below and nothing refused it: a banner
+  // saying no configuration could be built was a headline about something
+  // that never happened.
+  testWidgets('config: a switch the core turned away is not a refusal',
+      (tester) async {
+    await tester.pumpWidget(harness.wrap(const ConfigScreen()));
+    await settle(tester);
+    final status = ProviderScope.containerOf(
+      tester.element(find.byType(ConfigScreen)),
+      listen: false,
+    ).listen(coreStatusProvider, (_, __) {});
+    addTearDown(status.close);
+    final container = await buildConfig(tester);
+    await tester.pump(const Duration(milliseconds: 100));
+    final running = container.read(tunnelControllerProvider).lastConfig;
+    final node = container.read(nodesProvider).requireValue.single;
+    const turnedAway = ConfigInvalidFailure('No such outbound or group');
+    harness.core.failOn(FakeCoreStep.select, turnedAway);
+
+    await container.read(tunnelControllerProvider.notifier).selectNode(node);
+    await settle(tester);
+
+    final state = container.read(tunnelControllerProvider);
+    expect(state.failure, turnedAway);
+    expect(state.configRefused, isFalse);
+    expect(state.lastConfig, same(running));
+    expect(find.byType(ErrorBanner), findsNothing);
+    expect(find.byType(SelectableText), findsOneWidget);
+
+    harness.core.clearFailures();
+    await stopTunnel(tester, container);
+  });
+
+  // The other failure of that type with the tunnel up: a check whose probe
+  // URL is not one. What runs is the document on the tab, and it is shown
+  // as it was before the check, with no word about a build.
+  testWidgets('config: a check with no probe URL leaves the running config',
+      (tester) async {
+    await pump(
+      tester,
+      const ConfigScreen(),
+      extra: <Override>[
+        tunnelControllerProvider.overrideWith(
+          () => _PinnedTunnel(
+            const TunnelActionState(
+              failure: ConfigInvalidFailure(
+                'Latency probe URL is not configured',
+              ),
+              lastConfig: CoreConfig(<String, Object?>{
+                'log': <String, Object?>{'level': 'info'},
+              }),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    expect(find.byType(ErrorBanner), findsNothing);
+    expect(find.byType(EmptyState), findsNothing);
+    expect(find.byType(SelectableText), findsOneWidget);
+  });
+
   testWidgets('config: a document the builder refused says why',
       (tester) async {
     await pump(
@@ -342,6 +407,7 @@ void main() {
               failure: ConfigInvalidFailure(
                 'REALITY public key must be 32 bytes',
               ),
+              configRefused: true,
             ),
           ),
         ),

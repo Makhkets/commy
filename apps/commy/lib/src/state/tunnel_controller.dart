@@ -426,6 +426,7 @@ class TunnelActionState {
     this.notice,
     this.lastConfig,
     this.rejectedConfig,
+    this.configRefused = false,
   });
 
   /// Nothing has been tried yet.
@@ -466,11 +467,23 @@ class TunnelActionState {
   /// Rule R2, as for [lastConfig]: memory only, redacted before the screen.
   final CoreConfig? rejectedConfig;
 
+  /// Whether [failure] is a connect or a reload whose document was refused,
+  /// by the builder or by the core.
+  ///
+  /// The type of the failure does not say so. [ConfigInvalidFailure] is also
+  /// what a switch comes back with when the Clash API does not know the
+  /// outbound, and what a check comes back with when the probe URL is not
+  /// one; in both the tunnel is up on [lastConfig] and nothing was refused.
+  /// The config tab headlined them as a configuration that could not be
+  /// built, above the very document that was running.
+  final bool configRefused;
+
   /// A copy with the given fields replaced.
   ///
-  /// [rejectedConfig] travels with the failure it was refused with: a copy
-  /// that clears or replaces [failure] takes whatever is passed alongside,
-  /// null included, so a later failure never inherits an old document.
+  /// [rejectedConfig] and [configRefused] travel with the failure they were
+  /// refused with: a copy that clears or replaces [failure] takes whatever
+  /// is passed alongside — no document and no refusal when nothing is — so
+  /// a later failure never inherits an old one.
   TunnelActionState copyWith({
     bool? isBusy,
     bool? isChecking,
@@ -478,18 +491,20 @@ class TunnelActionState {
     TunnelNotice? notice,
     CoreConfig? lastConfig,
     CoreConfig? rejectedConfig,
+    bool? configRefused,
     bool clearFailure = false,
     bool clearNotice = false,
   }) {
+    final failureChanges = clearFailure || failure != null;
     return TunnelActionState(
       isBusy: isBusy ?? this.isBusy,
       isChecking: isChecking ?? this.isChecking,
       failure: clearFailure ? null : failure ?? this.failure,
       notice: clearNotice ? null : notice ?? this.notice,
       lastConfig: lastConfig ?? this.lastConfig,
-      rejectedConfig: clearFailure || failure != null
-          ? rejectedConfig
-          : this.rejectedConfig,
+      rejectedConfig: failureChanges ? rejectedConfig : this.rejectedConfig,
+      configRefused:
+          failureChanges ? configRefused ?? false : this.configRefused,
     );
   }
 
@@ -502,7 +517,8 @@ class TunnelActionState {
           other.failure == failure &&
           other.notice == notice &&
           other.lastConfig == lastConfig &&
-          other.rejectedConfig == rejectedConfig;
+          other.rejectedConfig == rejectedConfig &&
+          other.configRefused == configRefused;
 
   @override
   int get hashCode => Object.hash(
@@ -512,6 +528,7 @@ class TunnelActionState {
         notice,
         lastConfig,
         rejectedConfig,
+        configRefused,
       );
 
   @override
@@ -671,6 +688,7 @@ class TunnelController extends Notifier<TunnelActionState> {
           isBusy: false,
           failure: failure,
           rejectedConfig: _rejected(failure, target),
+          configRefused: failure is ConfigInvalidFailure,
         );
         return true;
       }
@@ -912,6 +930,7 @@ class TunnelController extends Notifier<TunnelActionState> {
         isBusy: false,
         failure: failure,
         rejectedConfig: _rejected(failure, nodeId),
+        configRefused: failure is ConfigInvalidFailure,
       );
       return false;
     }
