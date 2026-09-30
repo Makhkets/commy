@@ -39,6 +39,11 @@ pip install python-dotenv httpx
 python scripts/panel_test_setup.py --setup
 ```
 
+Форма запросов в скрипте (`email`, `traffic_limit_gb`,
+`/api/users/{id}/subscription`) с API Remnawave не сверена, и панель может
+её отвергнуть. Тогда скрипт печатает код и ответ панели — по нему видно,
+чего она ждёт.
+
 Результат:
 ```
 ✅ User created: <user-id>
