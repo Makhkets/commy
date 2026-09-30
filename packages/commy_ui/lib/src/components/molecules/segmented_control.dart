@@ -149,11 +149,27 @@ class _Segment<T> extends StatelessWidget {
               color: isSelected ? colors.bgOverlay : CommyColors.transparent,
               borderRadius: context.radii.xsAll,
             ),
-            // Inside the segment, not around it: segments touch, and the
-            // track's own parents clip anything drawn past its edge.
+            // The outline of the chosen segment, or the focus ring in its
+            // place. Inside the segment, not around it: segments touch, and
+            // the track's own parents clip anything drawn past its edge.
+            //
+            // The outline is what says which mode is on. The fill alone is
+            // `bg/overlay` on `bg/inset` — 1.07:1 in the light theme, and
+            // the label steps from secondary to primary at 2.4:1 — so in
+            // daylight Global, Rules and Direct looked alike, and the design
+            // reference has always drawn it. `border/strong` is 3:1 against
+            // the light track and 3.9:1 against the dark one.
             foregroundDecoration: BoxDecoration(
               borderRadius: context.radii.xsAll,
-              border: CommyFocusable.ring(colors, isFocused: isFocused),
+              border: isFocused
+                  ? CommyFocusable.ring(colors, isFocused: true)
+                  : Border.all(
+                      color: isSelected
+                          ? (enabled
+                              ? colors.borderStrong
+                              : colors.borderSubtle)
+                          : CommyColors.transparent,
+                    ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
