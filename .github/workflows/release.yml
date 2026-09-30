@@ -23,6 +23,13 @@ permissions:
 env:
   FLUTTER_VERSION: 3.44.8
   NDK_VERSION: 28.0.13004108
+  # The tag being released, resolved once and used for everything: what is
+  # checked out, what the files are called, which CHANGELOG section becomes
+  # the notes, and which release they go to. A manual run takes it from the
+  # input, not from the ref the run was started from: that ref is a branch
+  # whenever this file had to be fixed after the tag was pushed, and a branch
+  # name is neither a version nor something a release can hang on.
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   android:
@@ -34,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
 
       - uses: actions/setup-java@v6
@@ -143,7 +150,7 @@ jobs:
       - name: Collect and checksum
         run: |
           mkdir -p dist
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           suffix=""
           [ "${{ steps.signing.outputs.signed }}" = "true" ] || suffix="-UNSIGNED"
           out=apps/commy/build/app/outputs
@@ -170,7 +177,7 @@ jobs:
       - name: Collect what is not for end users
         run: |
           mkdir -p extras
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           out=apps/commy/build/app/outputs
           [ -f "$out/bundle/release/app-release.aab" ] && \
             cp "$out/bundle/release/app-release.aab" "extras/commy-${v}.aab"
@@ -193,8 +200,11 @@ jobs:
     needs: android
     runs-on: ubuntu-latest
     steps:
+      # The tag, not the ref of the run: the notes are the CHANGELOG of the
+      # version being released.
       - uses: actions/checkout@v7
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
 
       - uses: actions/download-artifact@v8
@@ -205,7 +215,7 @@ jobs:
       - name: Extract the notes for this version from CHANGELOG.md
         id: notes
         run: |
-          v="${GITHUB_REF_NAME#v}"
+          v="${TAG#v}"
           {
             if [ -f CHANGELOG.md ] && grep -q "## \[$v\]" CHANGELOG.md; then
               # A literal match, not a regex: awk turns "\\[" into "[", and
@@ -233,10 +243,13 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      # Named explicitly: left to itself the action takes github.ref, which on
+      # a manual run is the branch it was started from.
       - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ env.TAG }}
           files: dist/*
           body_path: release-notes.md
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(env.TAG, '-') }}
           fail_on_unmatched_files: true
