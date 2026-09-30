@@ -51,6 +51,26 @@ internal object IntentBus {
     val events: Flow<String> =
         live.onSubscription { pending.getAndSet(null)?.let { emit(it) } }
 
+    /**
+     * Whether the intent an activity was created with still asks for anything.
+     *
+     * Not when the activity is being restored: it is handed the intent it was
+     * first launched with, and that one was published the first time round.
+     * Nor when it was relaunched from Recents. Up to Android 12L, Back on the
+     * home screen finishes the activity and leaves its task in Recents, and
+     * opening the task from there starts a new activity with the task's first
+     * intent — the tile's "connect", a notification's, a tapped link — marked
+     * as coming from history, with no saved state to tell it apart. Published
+     * again, it brought the tunnel back up after the user had disconnected
+     * from the notification, and reopened the import sheet of a link long
+     * since imported, on every visit.
+     *
+     * An intent that reaches a running activity through `onNewIntent` is
+     * always new and does not come through here.
+     */
+    fun isFreshLaunch(restored: Boolean, flags: Int): Boolean =
+        !restored && (flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0
+
     fun publish(intent: Intent?) {
         val payload = encode(intent ?: return) ?: return
         if (live.subscriptionCount.value > 0 && live.tryEmit(payload)) {
