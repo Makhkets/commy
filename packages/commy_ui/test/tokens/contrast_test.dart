@@ -7,11 +7,11 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// The contrast table in docs/04-design-system.md checked them against the
 /// surface alone, where the light #6C7178 made 4.9:1. The grounds they
-/// actually sit on are greyer or tinted, and there it fell short: 4.35:1 in
+/// actually sit on are greyer or tinted, and there it fell short: 4.33:1 in
 /// the ПРЯМО badge on its own idle wash, 4.43:1 for every text field hint on
-/// `bg/overlay`, 4.25:1 for the name of the active server when it stops
-/// answering (on the connected wash) — and 4.45:1 for that same row in the
-/// dark theme.
+/// `bg/overlay`, 4.27:1 for the name of the active server when it stops
+/// answering (on the connected wash) — and 4.46:1 for that same row in the
+/// dark theme. The same figures as the table in docs/04.
 void main() {
   /// WCAG 2.1 contrast of [foreground] drawn over [ground], which may be a
   /// wash with its own alpha laid over [base].
