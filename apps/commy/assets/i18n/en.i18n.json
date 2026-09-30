@@ -630,6 +630,10 @@
       "message": "The subscription server redirected to an unencrypted (http) address. Commy does not follow it: the link and the servers would cross the network in the clear.",
       "action": "Open the logs"
     },
+    "subscriptionRedirect": {
+      "message": "The subscription server keeps redirecting, or redirects somewhere Commy does not go. Retrying gets the same answer — check the subscription address or ask the panel's support.",
+      "action": "Open the logs"
+    },
     "subscriptionMalformed": {
       "message": "The subscription response could not be read",
       "action": "Open the logs"

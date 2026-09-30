@@ -93,6 +93,19 @@ class FailureText {
           action: FailureAction.openLogs,
           retryable: failure.retryable,
         ),
+      // A loop past the redirect limit, a 3xx with no usable Location, or a
+      // Location in a scheme we do not fetch. The panel answered, so "not
+      // answering" with a retry was wrong twice over: the retry follows the
+      // same redirects to the same end.
+      SubscriptionUnreachableFailure(
+        cause: HttpTransportError(kind: HttpTransportError.kindRedirect),
+      ) =>
+        FailureText(
+          message: errors.subscriptionRedirect.message,
+          actionLabel: errors.subscriptionRedirect.action,
+          action: FailureAction.openLogs,
+          retryable: failure.retryable,
+        ),
       SubscriptionUnreachableFailure() => FailureText(
           message: errors.subscriptionUnreachable.message,
           actionLabel: errors.subscriptionUnreachable.action,

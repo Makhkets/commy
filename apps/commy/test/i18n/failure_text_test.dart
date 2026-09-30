@@ -84,6 +84,25 @@ void main() {
     }
   });
 
+  test('a redirect that could not be followed is not a silent server', () {
+    for (final detail in <String>[
+      'more than 5 redirects',
+      'no Location',
+      'unusable Location (ftp)',
+    ]) {
+      final cause = HttpTransportError(
+        kind: HttpTransportError.kindRedirect,
+        detail: detail,
+      );
+      for (final t in <Translations>[ru, en]) {
+        final text = FailureText.of(unreachable(cause), t);
+        expect(text.message, t.error.subscriptionRedirect.message);
+        expect(text.message, isNot(t.error.subscriptionUnreachable.message));
+        expect(text.action, FailureAction.openLogs);
+      }
+    }
+  });
+
   test('a refused certificate is named, not called a silent server', () {
     // A self-signed panel or an expired certificate: "the server is not
     // answering" with a retry that gives the same answer every time.
