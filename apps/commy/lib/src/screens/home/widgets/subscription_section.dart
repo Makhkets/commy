@@ -55,21 +55,37 @@ class SubscriptionSection extends ConsumerWidget {
         ref.watch(panelNoticesProvider)[subscription.id] ?? const <String>[];
     final deviceIdOff =
         ref.watch(settingsProvider).value?.sendDeviceId == false;
-    final now = ref.watch(clockProvider).value ?? DateTime.now();
+    // What the clock changes on this card, not the clock itself. The clock
+    // ticks every second, and a rebuild here rebuilds every server row of the
+    // card — all of them, since the card lays them out in one column — to
+    // redraw a subtitle that reads "2 h ago" for an hour. Selected, the card
+    // is rebuilt when one of these three actually reads differently: every
+    // second in the first minute after a refresh, as the seconds count up,
+    // and once a minute or an hour after that.
+    final timed = ref.watch(
+      clockProvider.select((clock) {
+        final now = clock.value ?? DateTime.now();
+        return (
+          subtitle: _subtitle(t, now),
+          health: _healthOf(info, now),
+          expiry: _expiryLabel(t, info, now),
+        );
+      }),
+    );
 
     return SubscriptionCard(
       name: subscription.name,
-      subtitle: _subtitle(t, now),
+      subtitle: timed.subtitle,
       refreshLabel: t.subscription.refresh,
       pingAllLabel: t.subscription.pingAll,
       moreLabel: t.subscription.more,
-      health: _healthOf(info, now),
+      health: timed.health,
       healthSemanticLabel: t.a11y.subscriptionHealth,
       quotaRatio: info?.ratio,
       // Only when the panel spoke: no userinfo at all is not "unlimited".
       isUnlimited: info != null && !info.hasQuota,
       quotaLabel: _quotaLabel(t, info),
-      expiryLabel: _expiryLabel(t, info, now),
+      expiryLabel: timed.expiry,
       quotaSemanticLabel: _quotaSemantics(t, info),
       announcement: subscription.announcement,
       isRefreshing: busy.refreshingId == subscription.id,
