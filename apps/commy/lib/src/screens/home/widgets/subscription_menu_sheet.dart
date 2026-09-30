@@ -293,6 +293,13 @@ class SubscriptionMenuSheet extends ConsumerWidget {
       return;
     }
     await controller.setUserAgent(current, picked);
+    // Fetched with right away. The sheet is opened because servers are
+    // missing or the subscription will not load, and a choice that waited for
+    // the next scheduled refresh looked like one that did nothing.
+    final chosen = picked.trim();
+    if ((chosen.isEmpty ? null : chosen) != current.userAgentOverride) {
+      await controller.refresh(current.id);
+    }
   }
 
   /// Deleting takes a credential with it, so it asks first and says what goes.

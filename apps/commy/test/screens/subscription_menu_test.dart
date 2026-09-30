@@ -171,6 +171,35 @@ void main() {
       expect(find.text('v2rayNG'), findsOneWidget);
     });
 
+    testWidgets('a new choice is fetched with at once', (tester) async {
+      // Picked because servers were missing: waiting for the next scheduled
+      // refresh made the choice look like it had done nothing.
+      await pumpMenu(tester);
+
+      await openPicker(tester);
+      await tester.ensureVisible(find.text('v2rayNG'));
+      await tester.tap(find.text('v2rayNG'));
+      await tester.pump();
+      await save(tester);
+
+      expect(harness.subscriptionFetcher.callCount, 1);
+      expect(
+        harness.subscriptionFetcher.userAgents.single,
+        CommyUserAgent.presets['v2rayNG'],
+      );
+    });
+
+    testWidgets('saving the choice already made fetches nothing',
+        (tester) async {
+      await pumpMenu(tester);
+
+      await openPicker(tester);
+      await save(tester);
+
+      expect(stored().userAgentOverride, isNull);
+      expect(harness.subscriptionFetcher.callCount, 0);
+    });
+
     testWidgets("the user's own string is kept as typed", (tester) async {
       await pumpMenu(tester);
 

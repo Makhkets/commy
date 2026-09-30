@@ -468,6 +468,10 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
   /// The URLs asked for, in order.
   final List<Uri> requests = <Uri>[];
 
+  /// The User-Agent each request went with, in order; `null` is the app's
+  /// own.
+  final List<String?> userAgents = <String?>[];
+
   /// How many times a document was asked for.
   int get callCount => requests.length;
 
@@ -478,6 +482,7 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
     String? userAgent,
   }) async {
     requests.add(url);
+    userAgents.add(userAgent);
     await gate?.future;
     final refused = failure;
     if (refused != null) {
