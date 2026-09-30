@@ -46,6 +46,34 @@ final startOnBootSyncProvider = Provider<void>((ref) {
   consider();
 });
 
+/// Tells the platform which language the app is in, at launch and on every
+/// change.
+///
+/// Android draws the tunnel notification, its channels and the Quick Settings
+/// tile from its own resources, and they followed the system language whatever
+/// the app was set to. Sent on the first settled read as well as on a change:
+/// the tag kept on the other side may be from before a reinstall, a restored
+/// backup or a reset. An empty tag is "follow the system". Watched from the
+/// root like [startOnBootSyncProvider].
+final nativeLocaleSyncProvider = Provider<void>((ref) {
+  String? sent;
+  void consider() {
+    final settings = ref.read(settingsProvider).value;
+    if (settings == null) {
+      return;
+    }
+    final tag = settings.locale ?? '';
+    if (tag == sent) {
+      return;
+    }
+    sent = tag;
+    unawaited(ref.read(systemSettingsProvider).setLocale(tag));
+  }
+
+  ref.listen<AsyncValue<AppSettings>>(settingsProvider, (_, __) => consider());
+  consider();
+});
+
 /// The write side of the settings screens.
 class SettingsController extends Notifier<CommyFailure?> {
   /// The probe used when the user turns the IP check on.

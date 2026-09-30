@@ -69,6 +69,24 @@ class SystemSettings {
     }
   }
 
+  /// Tells the platform which language the app is in, for the strings it
+  /// draws itself: the tunnel notification and the Quick Settings tile.
+  ///
+  /// [tag] is a language tag such as `ru`; `null` or empty means "follow the
+  /// system" and is sent as an empty string, so a choice made earlier is
+  /// cleared rather than kept. Returns `false` where nothing listens — every
+  /// desktop — and never throws, for the same reason as [openVpnSettings].
+  Future<bool> setLocale(String? tag) async {
+    try {
+      await _channel.invokeMethod<void>(WireMethods.setLocale, tag ?? '');
+      return true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   /// What the device calls itself, or `null` where nothing can say.
   ///
   /// Exists so that a dependency does not. A panel that limits devices per

@@ -61,6 +61,42 @@ void main() {
     });
   });
 
+  group('setLocale', () {
+    test('sends the language as a bare tag', () async {
+      final ok = await const SystemSettings().setLocale('ru');
+
+      expect(ok, isTrue);
+      expect(calls.single.method, WireMethods.setLocale);
+      expect(calls.single.arguments, 'ru');
+    });
+
+    test('following the system is an empty tag, not an absent call', () async {
+      await const SystemSettings().setLocale(null);
+
+      expect(calls.single.method, WireMethods.setLocale);
+      expect(calls.single.arguments, '');
+    });
+
+    test('a platform without the method answers false and does not throw',
+        () async {
+      messenger.setMockMethodCallHandler(method, null);
+
+      final ok = await const SystemSettings().setLocale('en');
+
+      expect(ok, isFalse);
+    });
+
+    test('a platform error is swallowed into false', () async {
+      messenger.setMockMethodCallHandler(method, (call) async {
+        throw PlatformException(code: WireErrorCodes.unknown);
+      });
+
+      final ok = await const SystemSettings().setLocale('en');
+
+      expect(ok, isFalse);
+    });
+  });
+
   group('ping', () {
     test('sends the host and the deadline, and reads the echo back',
         () async {
@@ -161,8 +197,7 @@ void main() {
       expect(apps.map((app) => app.packageName), <String>['a.b']);
     });
 
-    test('a platform that routes no apps answers with an empty list',
-        () async {
+    test('a platform that routes no apps answers with an empty list', () async {
       messenger.setMockMethodCallHandler(method, null);
 
       expect(await const SystemSettings().installedApps(), isEmpty);

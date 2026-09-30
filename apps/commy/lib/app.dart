@@ -83,6 +83,9 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // "Connect on boot": the receiver in the manifest is made to agree
       // with the stored switch, once, the same way.
       ..watch(startOnBootSyncProvider)
+      // The language chosen here, for the notification and the tile, which
+      // Android draws without Flutter.
+      ..watch(nativeLocaleSyncProvider)
       // The timer behind «авто 1 ч» on the subscription card. Rooted here
       // because a refresh falling due must not depend on the home screen
       // being the one on top.
