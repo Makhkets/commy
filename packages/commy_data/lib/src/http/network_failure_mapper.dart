@@ -113,6 +113,19 @@ abstract final class NetworkFailureMapper {
   /// it refused — expired, self-signed, issued for another name.
   static const String _certificateVerifyFailed = 'CERTIFICATE_VERIFY_FAILED';
 
+  /// The failure for a fetch that outlived its deadline as a whole.
+  ///
+  /// A timeout like the others, told apart by its detail: the server never
+  /// went quiet long enough for the receive timeout, it just never finished.
+  static CommyFailure deadline(Uri url, Duration limit) =>
+      CommyFailure.subscriptionUnreachable(
+        url: url,
+        cause: HttpTransportError(
+          kind: HttpTransportError.kindTimeout,
+          detail: 'total > ${limit.inSeconds} s',
+        ),
+      );
+
   /// The failure for a body we refuse to load into memory.
   static CommyFailure tooLarge(Uri url, int limitBytes) =>
       CommyFailure.subscriptionUnreachable(

@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:commy_data/src/http/http_text_response.dart';
 import 'package:commy_data/src/http/network_failure_mapper.dart';
@@ -36,6 +39,7 @@ class CommyHttpClient {
     this.connectTimeout = defaultConnectTimeout,
     this.receiveTimeout = defaultReceiveTimeout,
     this.sendTimeout = defaultSendTimeout,
+    this.totalTimeout = defaultTotalTimeout,
     this.maxRedirects = defaultMaxRedirects,
     this.maxBodyBytes = defaultMaxBodyBytes,
     Dio? directClient,
@@ -46,14 +50,27 @@ class CommyHttpClient {
   /// How long a connection may take to establish.
   static const Duration defaultConnectTimeout = Duration(seconds: 15);
 
-  /// How long the whole body may take to arrive.
+  /// How long the server may go quiet: before the headers, and between two
+  /// chunks of the body.
   ///
   /// Generous: subscription panels are often small VPSes under load, and a
-  /// refresh that fails at ten seconds is a support ticket.
+  /// refresh that fails at ten seconds is a support ticket. It is not a limit
+  /// on the whole body — dio restarts it on every chunk — which is what
+  /// [defaultTotalTimeout] is for.
   static const Duration defaultReceiveTimeout = Duration(seconds: 30);
 
   /// How long sending the request may take.
   static const Duration defaultSendTimeout = Duration(seconds: 15);
+
+  /// How long one fetch may take from start to last byte.
+  ///
+  /// A server that sends a byte every twenty seconds never trips
+  /// [defaultReceiveTimeout], and a fetch that never ends is worse than one
+  /// that fails: `SubscriptionController` serves one refresh at a time and the
+  /// schedulers sweep in sequence, so it stopped every other refresh until the
+  /// app was restarted. Two minutes carries a full [defaultMaxBodyBytes] body
+  /// over a slow line and still hands the refresh back.
+  static const Duration defaultTotalTimeout = Duration(minutes: 2);
 
   /// How many redirects to follow.
   ///
@@ -66,7 +83,9 @@ class CommyHttpClient {
   /// A subscription is a text file; eight megabytes is already a hundred
   /// thousand links. The cap exists because the response comes from a server we
   /// do not control and "zero trust to the input" includes its length
-  /// (docs/06-data-model.md, "Правила парсера", rule 3).
+  /// (docs/06-data-model.md, "Правила парсера", rule 3). It is counted while the
+  /// body arrives, after `dart:io` has inflated it: a body is dropped the
+  /// moment it passes the cap, not once it is already in memory.
   static const int defaultMaxBodyBytes = 8 * 1024 * 1024;
 
   /// Schemes a fetch may use. Anything else is refused before a socket opens.
@@ -86,6 +105,9 @@ class CommyHttpClient {
 
   /// Send timeout.
   final Duration sendTimeout;
+
+  /// Deadline for one whole fetch.
+  final Duration totalTimeout;
 
   /// Redirect budget.
   final int maxRedirects;
@@ -119,55 +141,26 @@ class CommyHttpClient {
       );
     }
 
-    final client = throughTunnel ? _proxiedDio() : _directDio();
-    try {
-      final response = await client.getUri<String>(
-        url,
-        options: Options(
-          responseType: ResponseType.plain,
-          followRedirects: true,
-          maxRedirects: maxRedirects,
-          // Repeated per request, not just on the base options, so that an
-          // injected `Dio` — a test double, or a future adapter — cannot end
-          // up without a deadline and hang the refresh forever.
-          sendTimeout: sendTimeout,
-          receiveTimeout: receiveTimeout,
-          headers: <String, String>{
-            HttpHeaders.userAgentHeader: userAgentOverride ?? userAgent,
-            HttpHeaders.acceptHeader: '*/*',
-            ...extraHeaders,
-          },
-          // 3xx is followed by dio itself; anything at or above 400 is an
-          // error we want to see as one.
-          validateStatus: (status) => status != null && status < 400,
-        ),
-        cancelToken: cancelToken,
-      );
-
-      final body = response.data ?? '';
-      if (body.length > maxBodyBytes) {
-        return Err<HttpTextResponse, CommyFailure>(
-          NetworkFailureMapper.tooLarge(url, maxBodyBytes),
-        );
-      }
-
-      return Ok<HttpTextResponse, CommyFailure>(
-        HttpTextResponse(
-          statusCode: response.statusCode ?? 0,
-          body: body,
-          headers: _normaliseHeaders(response.headers),
-          url: response.realUri,
-        ),
-      );
-    } on DioException catch (error) {
-      return Err<HttpTextResponse, CommyFailure>(
-        NetworkFailureMapper.fromDio(error, url),
-      );
-    } on Object catch (error) {
-      return Err<HttpTextResponse, CommyFailure>(
-        NetworkFailureMapper.fromError(error, url),
-      );
-    }
+    final fetched = await _get(
+      url,
+      throughTunnel: throughTunnel,
+      headers: <String, String>{
+        HttpHeaders.userAgentHeader: userAgentOverride ?? userAgent,
+        HttpHeaders.acceptHeader: '*/*',
+        ...extraHeaders,
+      },
+      cancelToken: cancelToken,
+    );
+    return fetched.map(
+      (value) => HttpTextResponse(
+        statusCode: value.statusCode,
+        // What dio's own plain decoding did: a stray invalid byte in a
+        // subscription is the parser's problem, not a failed fetch.
+        body: utf8.decode(value.bytes, allowMalformed: true),
+        headers: _normaliseHeaders(value.headers),
+        url: value.url,
+      ),
+    );
   }
 
   /// Fetches [url] as bytes.
@@ -189,46 +182,23 @@ class CommyHttpClient {
       );
     }
 
-    final client = throughTunnel ? _proxiedDio() : _directDio();
-    try {
-      final response = await client.getUri<List<int>>(
-        url,
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          maxRedirects: maxRedirects,
-          sendTimeout: sendTimeout,
-          receiveTimeout: receiveTimeout,
-          headers: <String, String>{
-            HttpHeaders.userAgentHeader: userAgent,
-            HttpHeaders.acceptHeader: '*/*',
-          },
-          validateStatus: (status) => status != null && status < 400,
-        ),
-        cancelToken: cancelToken,
-      );
-
-      final body = response.data ?? const <int>[];
-      if (body.length > maxBodyBytes) {
-        return Err<List<int>, CommyFailure>(
-          NetworkFailureMapper.tooLarge(url, maxBodyBytes),
-        );
-      }
-      if (body.isEmpty) {
+    final fetched = await _get(
+      url,
+      throughTunnel: throughTunnel,
+      headers: <String, String>{
+        HttpHeaders.userAgentHeader: userAgent,
+        HttpHeaders.acceptHeader: '*/*',
+      },
+      cancelToken: cancelToken,
+    );
+    return fetched.flatMap((value) {
+      if (value.bytes.isEmpty) {
         return Err<List<int>, CommyFailure>(
           CommyFailure.subscriptionMalformed('$url answered with no body'),
         );
       }
-      return Ok<List<int>, CommyFailure>(body);
-    } on DioException catch (error) {
-      return Err<List<int>, CommyFailure>(
-        NetworkFailureMapper.fromDio(error, url),
-      );
-    } on Object catch (error) {
-      return Err<List<int>, CommyFailure>(
-        NetworkFailureMapper.fromError(error, url),
-      );
-    }
+      return Ok<List<int>, CommyFailure>(value.bytes);
+    });
   }
 
   /// Closes both underlying clients.
@@ -237,6 +207,120 @@ class CommyHttpClient {
     _proxied?.close(force: force);
     _direct = null;
     _proxied = null;
+  }
+
+  /// One GET of [url], the body read under the cap, within [totalTimeout].
+  ///
+  /// The request gets a token of its own, so that the deadline and the cap
+  /// can stop it without touching [cancelToken], which belongs to the caller
+  /// — and a caller that cancels still stops it.
+  Future<Result<_Fetched, CommyFailure>> _get(
+    Uri url, {
+    required bool throughTunnel,
+    required Map<String, String> headers,
+    CancelToken? cancelToken,
+  }) {
+    final token = CancelToken();
+    if (cancelToken != null) {
+      unawaited(cancelToken.whenCancel.then((_) => token.cancel()));
+    }
+    return _read(
+      url,
+      throughTunnel: throughTunnel,
+      headers: headers,
+      token: token,
+    ).timeout(
+      totalTimeout,
+      onTimeout: () {
+        token.cancel();
+        return Err<_Fetched, CommyFailure>(
+          NetworkFailureMapper.deadline(url, totalTimeout),
+        );
+      },
+    );
+  }
+
+  Future<Result<_Fetched, CommyFailure>> _read(
+    Uri url, {
+    required bool throughTunnel,
+    required Map<String, String> headers,
+    required CancelToken token,
+  }) async {
+    final client = throughTunnel ? _proxiedDio() : _directDio();
+    try {
+      final response = await client.getUri<ResponseBody>(
+        url,
+        options: Options(
+          // A stream, not `plain` or `bytes`: those hand the body over only
+          // once all of it is in memory, which is exactly what the cap is
+          // there to prevent.
+          responseType: ResponseType.stream,
+          followRedirects: true,
+          maxRedirects: maxRedirects,
+          // Repeated per request, not just on the base options, so that an
+          // injected `Dio` — a test double, or a future adapter — cannot end
+          // up without a deadline and hang the refresh forever.
+          sendTimeout: sendTimeout,
+          receiveTimeout: receiveTimeout,
+          headers: headers,
+          // 3xx is followed by dio itself; anything at or above 400 is an
+          // error we want to see as one.
+          validateStatus: (status) => status != null && status < 400,
+        ),
+        cancelToken: token,
+      );
+      final body = response.data;
+      final bytes = body == null ? Uint8List(0) : await _capped(body, token);
+      if (bytes == null) {
+        return Err<_Fetched, CommyFailure>(
+          NetworkFailureMapper.tooLarge(url, maxBodyBytes),
+        );
+      }
+      return Ok<_Fetched, CommyFailure>(
+        _Fetched(
+          statusCode: response.statusCode ?? 0,
+          bytes: bytes,
+          headers: response.headers,
+          url: response.realUri,
+        ),
+      );
+    } on DioException catch (error) {
+      return Err<_Fetched, CommyFailure>(
+        NetworkFailureMapper.fromDio(error, url),
+      );
+    } on Object catch (error) {
+      return Err<_Fetched, CommyFailure>(
+        NetworkFailureMapper.fromError(error, url),
+      );
+    } finally {
+      // Whatever is still arriving — the body of an error status, which dio
+      // keeps reading into a buffer nobody drains, or the rest of one over
+      // the cap — stops here. A no-op on a body that was read to the end.
+      token.cancel();
+    }
+  }
+
+  /// The body of [body], or `null` the moment it passes [maxBodyBytes].
+  ///
+  /// A `Content-Length` over the cap is refused before a byte is read; one
+  /// that lies, or is missing, is caught by the count.
+  Future<Uint8List?> _capped(ResponseBody body, CancelToken token) async {
+    final declared = int.tryParse(
+      body.headers[HttpHeaders.contentLengthHeader]?.firstOrNull ?? '',
+    );
+    if (declared != null && declared > maxBodyBytes) {
+      token.cancel();
+      return null;
+    }
+    final bytes = BytesBuilder(copy: false);
+    await for (final chunk in body.stream) {
+      if (bytes.length + chunk.length > maxBodyBytes) {
+        token.cancel();
+        return null;
+      }
+      bytes.add(chunk);
+    }
+    return bytes.takeBytes();
   }
 
   static Map<String, List<String>> _normaliseHeaders(Headers headers) {
@@ -283,4 +367,19 @@ class CommyHttpClient {
     }
     return dio;
   }
+}
+
+/// What one fetch brought back, before it is read as text or kept as bytes.
+class _Fetched {
+  const _Fetched({
+    required this.statusCode,
+    required this.bytes,
+    required this.headers,
+    required this.url,
+  });
+
+  final int statusCode;
+  final Uint8List bytes;
+  final Headers headers;
+  final Uri url;
 }
