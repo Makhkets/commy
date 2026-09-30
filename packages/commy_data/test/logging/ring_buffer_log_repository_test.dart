@@ -127,6 +127,35 @@ void main() {
       await repository.dispose();
     });
 
+    test('a paused watcher queues nothing and gets the view back on resume',
+        () async {
+      // Riverpod pauses the log screen's subscription when the user leaves
+      // the screen. Every line written after that used to queue a copy of the
+      // whole view behind the pause, for as long as the app ran.
+      final repository = RingBufferLogRepository();
+      final seen = <int>[];
+      final subscription =
+          repository.watch().listen((lines) => seen.add(lines.length));
+      await Future<void>.delayed(Duration.zero);
+
+      subscription.pause();
+      for (var i = 0; i < 100; i++) {
+        await repository.append(line('outbound connection $i'));
+      }
+      await Future<void>.delayed(Duration.zero);
+      subscription.resume();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(seen, <int>[0, 100]);
+
+      // And it follows again once it is back.
+      await repository.append(line('after'));
+      await Future<void>.delayed(Duration.zero);
+      expect(seen, <int>[0, 100, 101]);
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
     test('appendAll keeps the order and notifies listeners once', () async {
       final repository = RingBufferLogRepository();
       final seen = <int>[];

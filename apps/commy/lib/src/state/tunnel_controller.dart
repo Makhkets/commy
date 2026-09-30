@@ -42,6 +42,11 @@ final connectionsProvider = StreamProvider<List<ConnectionInfo>>((ref) {
 });
 
 /// Everything the log screen shows: core lines and our own, merged.
+///
+/// Kept when the screen is left, so coming back shows the log at once. Kept
+/// is paused, and a paused stream queues; the repository's stream lets go
+/// while it is paused and hands back the current view when it resumes, so a
+/// log screen visited once costs nothing while the user is elsewhere.
 final logLinesProvider = StreamProvider<List<LogLine>>((ref) {
   return ref.watch(logRepositoryProvider).watch();
 });

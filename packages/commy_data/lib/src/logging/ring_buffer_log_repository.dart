@@ -60,6 +60,16 @@ class RingBufferLogRepository implements LogRepository {
   /// How many lines are currently buffered.
   int get length => _buffer.length;
 
+  /// The live view: the whole of it at once, then again after every change.
+  ///
+  /// A paused listener is let go of until it resumes, and then gets the view
+  /// as it is by then. Every event is the whole view, so the ones in between
+  /// are worth nothing — and a pause is what Riverpod does to the log screen's
+  /// subscription when the user leaves it: the provider is kept, its stream is
+  /// paused, and a paused subscription queues. Followed through the pause,
+  /// every line the core wrote while the user was elsewhere queued a copy of
+  /// the whole view — two thousand references, for each line, for as long as
+  /// the app ran — and [_publish] never saw that nobody was reading.
   @override
   Stream<List<LogLine>> watch() {
     // `Stream.multi` rather than an `async*` generator: the generator would
@@ -67,13 +77,29 @@ class RingBufferLogRepository implements LogRepository {
     // whatever is added while nobody is listening. A line written in that gap
     // would silently never appear in the log view.
     return Stream<List<LogLine>>.multi((controller) {
-      controller.add(_viewSnapshot());
-      final subscription = _changes.stream.listen(
-        controller.add,
-        onError: controller.addError,
-        onDone: controller.close,
-      );
-      controller.onCancel = subscription.cancel;
+      StreamSubscription<List<LogLine>>? changes;
+      void follow() {
+        changes = _changes.stream.listen(
+          controller.add,
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+      }
+
+      void leave() {
+        unawaited(changes?.cancel());
+        changes = null;
+      }
+
+      controller
+        ..add(_viewSnapshot())
+        ..onPause = leave
+        ..onResume = () {
+          controller.add(_viewSnapshot());
+          follow();
+        }
+        ..onCancel = leave;
+      follow();
     });
   }
 
@@ -164,7 +190,8 @@ class RingBufferLogRepository implements LogRepository {
   List<LogLine> _viewSnapshot() => List<LogLine>.unmodifiable(_view);
 
   void _publish() {
-    // Nobody watching is the usual case — the log screen is closed — and a
+    // Nobody watching is the usual case — the log screen is closed, and a
+    // closed screen's paused subscription has let go (see [watch]) — and a
     // snapshot nobody receives is two thousand references copied for nothing.
     if (_closed || _changes.isClosed || !_changes.hasListener) {
       return;
