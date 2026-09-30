@@ -1,6 +1,6 @@
 module github.com/Makhkets/commy/core
 
-go 1.24.7
+go 1.26.8
 
 require (
 	github.com/metacubex/utls v1.8.4

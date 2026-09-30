@@ -15,9 +15,9 @@ import (
 	"github.com/sagernet/sing/common/json"
 )
 
-// This test needs the build overlay, for the same reason as the others here:
+// This test needs the patched modules, for the same reason as the others here:
 //
-//	GODEBUG=goindex=0 go test -overlay="$(go run ./cmd/overlaygen)" \
+//	go test -modfile="$(go run ./cmd/overlaygen)" \
 //	    -tags "<core tags>,commy_overlay" ./internal/singbox/
 //
 // With the cache file on, sing-box starts a selector on whatever was last

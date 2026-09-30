@@ -25,10 +25,10 @@ import (
 	"github.com/sagernet/sing/common/logger"
 )
 
-// This test needs the build overlay, because the version is written by
+// This test needs the patched modules, because the version is written by
 // sing-box itself:
 //
-//	GODEBUG=goindex=0 go test -overlay="$(go run ./cmd/overlaygen)" \
+//	go test -modfile="$(go run ./cmd/overlaygen)" \
 //	    -tags "<core tags>,commy_overlay" ./internal/singbox/
 //
 // Xray 26.7.28 refuses REALITY clients older than 26.3.27 unless the server's

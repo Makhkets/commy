@@ -15,42 +15,51 @@ sing-box уже поставляет `experimental/libbox` — пакет, сп�
    матрицы (правило R8);
 2. держит `libbox` в графе модулей, чтобы `gomobile bind` до него дотянулся;
 3. хранит немногое, чего в libbox нет: `internal/safe` и `cshared/`;
-4. несёт **две правки закреплённого sing-box**, которые применяются только на
-   время сборки — см. ниже.
+4. несёт **правки закреплённого sing-box и sing-tun**, которые применяются
+   только на время сборки — см. ниже.
 
 ---
 
-## Оверлей: что мы меняем в sing-box и как
+## Правки: что мы меняем в sing-box и как
 
 `go.mod` называет опубликованный `sing-box v1.13.16`, без `replace` и без форка.
 Всё, чем наше ядро отличается от апстрима, — это список точных замен в
-[`cmd/overlaygen/main.go`](cmd/overlaygen/main.go), который скрипт сборки
-превращает в `go build -overlay`:
+[`cmd/overlaygen/main.go`](cmd/overlaygen/main.go). Генератор копирует два
+затронутых модуля (sing-box и sing-tun) из кеша модулей в `build/_overlay/mod/`,
+накладывает замены на копии и пишет рядом `go.mod` с `replace` на них
+([ADR-0018](../docs/adr/0018-core-module-copies.md)):
 
 | Правка | Зачем | Где код | ADR |
 |---|---|---|---|
 | Транспорт **XHTTP** | в sing-box его нет, а серверов на нём всё больше | [`xhttp/`](xhttp) — обычный Go-пакет; в двух файлах апстрима добавлено 11 строк, чтобы имя `xhttp` до него дошло | [0010](../docs/adr/0010-xhttp-transport.md) |
 | **ClientHello REALITY** | sing-box вырезает `X25519MLKEM768`, а Xray ≥ 26.9.8 без него клиента отвергает | девять замен в `common/tls/reality_client.go` | [0011](../docs/adr/0011-reality-client-hello.md) |
+| **Версия клиента REALITY** | Xray 26.7.28 без своего диапазона отвергает клиентов старше 26.3.27 | `common/tls/reality_client.go` | [0013](../docs/adr/0013-reality-client-version.md) |
+| **`default` селектора** | с кешем селектор стартовал на прошлом узле, а не на выбранном | `protocol/group/selector.go` | [0014](../docs/adr/0014-selector-default.md) |
+| **Читатель gVisor** | закрытый стек продолжал читать старый дескриптор TUN | `stack_gvisor_filter.go` в sing-tun | [0012](../docs/adr/0012-gvisor-reader-stop.md) |
 
 Каждый файл апстрима сверяется по SHA-256. Бамп sing-box, который задел любой
-из них, останавливает сборку сообщением «перебазируй оверлей» — вкомпилировать
+из них, останавливает сборку сообщением «перебазируй правки» — вкомпилировать
 в ядро устаревшую копию чужого кода молча не получится.
 
 ```bash
 cd core
-go test -race ./...                       # транспорт и опции — без всякого оверлея
+go test -race ./...                       # транспорт и опции — без всяких правок
 
 # сквозной тест через настоящий sing-box: VLESS поверх XHTTP, все режимы
 TAGS=$(grep -oP '(?<=^readonly TAGS=")[^"]+' ../scripts/build_core.sh)
-GODEBUG=goindex=0 go test -overlay="$(go run ./cmd/overlaygen)" \
+go test -modfile="$(go run ./cmd/overlaygen)" \
   -tags "$TAGS,commy_overlay" -ldflags "-checklinkname=0" ./xhttp/
 ```
 
-`GODEBUG=goindex=0` обязателен: без него `go` берёт список импортов пакета из
-индекса модуля, про оверлей не знает, и сборка падает на `could not import`.
-Собирать ядро руками, мимо `scripts/build_core.sh`, не надо: он передаёт всё это
-сам и **проверяет готовую библиотеку**, потому что оверлей, который молча не
-применился, даёт рабочее ядро, отказывающее каждому XHTTP-серверу.
+Раньше это был `go build -overlay` поверх файлов в кеше модулей; Go 1.25
+такой оверлей запрещает, и ядро держалось на Go 1.24 без исправлений
+безопасности. Копии вне кеша сняли это ограничение и заодно
+`GODEBUG=goindex=0`. `gomobile` получает тот же `go.mod` внутри копии `core/`
+(`build/_core`): флаг `-modfile` он унёс бы в свою временную сборку.
+
+Собирать ядро руками, мимо `scripts/build_core.sh`, не надо: он делает всё это
+сам и **проверяет готовую библиотеку**, потому что правки, которые молча не
+применились, дают рабочее ядро, отказывающее каждому XHTTP-серверу.
 
 Проверка против настоящего Xray (десять минут, без панели) — рецепт в
 [../docs/17-agent-handoff.md](../docs/17-agent-handoff.md), «Сессия 13».
@@ -77,7 +86,7 @@ scripts/build_core.sh apple      # → core/build/Libbox.xcframework   (нуже
 
 ### Требования
 
-- Go 1.24+
+- Go 1.26+ (`go.mod` требует 1.26.8; `go` скачает этот тулчейн сам)
 - `ANDROID_HOME`
 - NDK. Если `ANDROID_NDK_HOME` не задан, скрипт берёт самый свежий из
   `$ANDROID_HOME/ndk`. Поставить: `sdkmanager --install 'ndk;28.0.13004108'`
@@ -146,7 +155,7 @@ GOFLAGS="-tags=$TAGS" go mod tidy
 libbox.go            блank-импорт libbox + константа версии
 xhttp/               клиент транспорта XHTTP (наш код; в sing-box его нет)
 xhttp/config/        опции блока `transport` для xhttp; sing-box не импортирует
-cmd/overlaygen/      генератор оверлея сборки: правки sing-box точной заменой
+cmd/overlaygen/      правки sing-box и sing-tun точной заменой, в копиях модулей
 internal/safe/       превращение паники в строку ошибки на границе языка
 cshared/             C ABI под dart:ffi для десктопа (M5–M7, не входит в 1.0)
 build/               артефакты и `_overlay/` — не в гите

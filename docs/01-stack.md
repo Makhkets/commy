@@ -104,7 +104,7 @@ Go или Dart, туда и уносится. Нативный код — тол
 
 | Инструмент | Роль |
 |---|---|
-| **Go 1.24+**, `gomobile`, `gofumpt`, `golangci-lint` | Сборка и качество ядра |
+| **Go 1.26+** (ADR-0018), `gomobile`, `gofumpt`, `golangci-lint` | Сборка и качество ядра |
 | **GitHub Actions** | CI-матрица ubuntu / macos / windows |
 | **fastlane** | Подпись и загрузка в App Store / Google Play |
 | **Dependabot** | Обновления зависимостей отдельными PR |

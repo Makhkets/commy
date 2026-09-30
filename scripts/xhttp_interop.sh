@@ -7,7 +7,7 @@
 #   XRAY_BIN=/path/to/xray scripts/xhttp_interop.sh reality    # names matching "reality"
 #
 # For every scenario it starts that Xray as a VLESS server over XHTTP, starts
-# the pinned core (core/cmd/devbox, built here with the build overlay) as the
+# the pinned core (core/cmd/devbox, built here from the patched modules) as the
 # client, and moves 24 MiB down and 16 MiB up through the pair, comparing
 # SHA-256 at both ends. Everything listens on 127.0.0.1.
 #
@@ -58,10 +58,10 @@ stop_all() {
 }
 trap 'stop_all; rm -rf "${WORK}"' EXIT
 
-say "building the pinned core with the overlay"
+say "building the pinned core from the patched modules"
 tags="$(grep -oP '(?<=^readonly TAGS=")[^"]+' "${REPO_ROOT}/scripts/build_core.sh")"
-overlay="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen)" || die "overlaygen failed."
-( cd "${CORE_DIR}" && GODEBUG=goindex=0 go build -overlay="${overlay}" -tags "${tags}" \
+modfile="$(cd "${CORE_DIR}" && go run ./cmd/overlaygen)" || die "overlaygen failed."
+( cd "${CORE_DIR}" && go build -modfile="${modfile}" -tags "${tags}" \
     -ldflags "-checklinkname=0" -o "${WORK}/devbox" ./cmd/devbox ) || die "the core did not build."
 
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \

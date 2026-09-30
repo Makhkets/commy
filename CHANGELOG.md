@@ -10,6 +10,11 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **The network core is built with Go 1.26.8.** It was built with Go 1.24.7:
+  a release line that no longer receives security fixes, for the code that
+  carries every connection. The build no longer lays its sing-box edits over
+  the module cache (which Go 1.25 forbids) but applies them to copies of the
+  modules; what the core does is unchanged.
 - **Imports that used to fail now work:** Xray JSON subscriptions from
   Marzban, Remnawave and 3x-ui (servers named after the panel's remarks, not
   "proxy"); WireGuard from sing-box configs, WARP included, in both the

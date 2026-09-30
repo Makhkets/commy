@@ -1,8 +1,11 @@
-// Command overlaygen writes the build overlay: the handful of edits Commy
-// makes to the pinned sing-box and its TUN library, applied at build time and
-// nowhere else.
+// Command overlaygen writes the handful of edits Commy makes to the pinned
+// sing-box and its TUN library into patched copies of those modules, applied
+// at build time and nowhere else, and a go.mod that builds against them.
 //
-//	go run ./cmd/overlaygen -out build/_overlay
+//	go test -modfile="$(go run ./cmd/overlaygen -out build/_overlay)" ...
+//
+// scripts/build_core.sh hands the same go.mod to gomobile inside a copy of
+// core/ (a -modfile flag would follow gomobile into its own temporary module).
 //
 // There are five of them, and each is here because the alternative was worse.
 //
@@ -63,7 +66,7 @@
 // emulator; upstream sing-tun has the same one-line fix, the one sing-box
 // v1.13.16 pins does not. See docs/adr/0012-gvisor-reader-stop.md.
 //
-// # Why an overlay
+// # Why patched copies
 //
 // Reaching upstream code means changing upstream files, and there are three
 // ways to do that:
@@ -72,22 +75,24 @@
 //     this ends up maintaining a fork; go.mod stops saying which core we ship.
 //   - vendor sing-box into the repository. A thousand files of somebody else's
 //     code in every diff, for a change of a few dozen lines.
-//   - leave the module exactly as published and overlay the files at build
-//     time with `go build -overlay`. go.mod keeps naming the real version, and
-//     the whole delta is the list of edits below.
+//   - leave the module exactly as published and patch it at build time. go.mod
+//     keeps naming the real version, and the whole delta is the list of edits
+//     below.
 //
 // This is the third. The edits are exact-string replacements: each anchor must
 // appear exactly once in a file whose SHA-256 is the one recorded here, in a
 // module whose version is the one recorded here. A sing-box bump that touches
 // any of these files, or brings a different sing-tun, stops the build with a
 // message saying so, instead of compiling a stale copy of upstream's code into
-// the core (rule R8: a bump is its own change, and re-basing this overlay — or
-// dropping an edit upstream no longer needs — is part of it).
+// the core (rule R8: a bump is its own change, and re-basing these edits — or
+// dropping one upstream no longer needs — is part of it).
 //
-// One sharp edge, handled by scripts/build_core.sh: the go command reads the
-// import list of a module-cache package from its module index and does not
-// look at overlays when it does. An overlaid file that adds an import — ours
-// do — fails to compile unless the index is off (GODEBUG=goindex=0).
+// Until session 22 the patched files were laid over the module cache with
+// `go build -overlay`. Go 1.25 refuses an overlay under GOMODCACHE, which
+// pinned the core to Go 1.24 and its expired security support; the copies
+// outside the cache replace that (docs/adr/0018-core-module-copies.md), and
+// with them the module-index workaround the overlay needed
+// (GODEBUG=goindex=0) is gone as well.
 package main
 
 import (
@@ -352,62 +357,146 @@ func (h *commyRealityHello) refusedWith(legacy bool) {
 `
 
 func main() {
-	// The underscore matters when the directory is inside this module: the
-	// patched files still say `package option` and `package v2ray`, and without
-	// it `go vet ./...` would find them and try to build them as ours.
-	out := flag.String("out", filepath.Join("build", "_overlay"), "directory to write the overlay into")
+	// The underscore matters: the copies still say `package option` and
+	// `package v2ray`, and without it `go vet ./...` would find them and try
+	// to build them as ours.
+	out := flag.String("out", filepath.Join("build", "_overlay"), "directory to write the patched modules into")
 	flag.Parse()
-	overlay, err := generate(*out)
+	modfile, err := generate(*out)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "overlaygen:", err)
 		os.Exit(1)
 	}
 	// The path is the program's whole output, so a script can capture it.
-	fmt.Println(overlay)
+	fmt.Println(modfile)
 }
 
-// generate writes the patched files and overlay.json, and returns the
-// absolute path of the latter.
+// generate copies every module an edit touches out of the module cache,
+// applies the edits to the copies, and writes a go.mod that replaces those
+// modules with them. It returns the absolute path of that go.mod.
+//
+// Copies, not `go build -overlay` on the cached files, which is what this used
+// to write. Go 1.25 refuses an overlay that replaces anything under
+// GOMODCACHE ("Files beneath GOMODCACHE must not be replaced"), so the
+// overlay held the core to Go 1.24 — a release line that no longer gets
+// security fixes, for the code that carries every byte of the user's traffic.
+// See docs/adr/0018-core-module-copies.md.
 func generate(out string) (string, error) {
 	outAbs, err := filepath.Abs(out)
 	if err != nil {
 		return "", err
 	}
-	roots := make(map[module]string)
-	replace := make(map[string]string, len(targets))
+	mainModfile, err := goEnv("GOMOD")
+	if err != nil {
+		return "", err
+	}
+	if mainModfile == "" || mainModfile == os.DevNull {
+		return "", fmt.Errorf("not inside a module; run it from core/")
+	}
+	// Fresh every time: a copy left behind by another version, or carrying an
+	// edit since removed, must never be what the next build compiles.
+	modules := filepath.Join(outAbs, "mod")
+	if err := os.RemoveAll(modules); err != nil {
+		return "", err
+	}
+	copies := make(map[module]string)
+	var order []module
 	for _, t := range targets {
-		root, known := roots[t.module]
+		copyRoot, known := copies[t.module]
 		if !known {
-			if root, err = moduleRoot(t.module); err != nil {
+			root, err := moduleRoot(t.module)
+			if err != nil {
 				return "", err
 			}
-			roots[t.module] = root
+			copyRoot = filepath.Join(modules, filepath.FromSlash(t.module.path)+"@"+t.module.version)
+			if err := copyTree(root, copyRoot); err != nil {
+				return "", fmt.Errorf("copy %s: %w", t.module.path, err)
+			}
+			copies[t.module] = copyRoot
+			order = append(order, t.module)
 		}
-		upstream := filepath.Join(root, filepath.FromSlash(t.path))
-		patched, err := patch(upstream, t)
+		// The copy is the upstream file byte for byte until this point, so the
+		// hash is checked on it: the published file, as the module cache holds it.
+		destination := filepath.Join(copyRoot, filepath.FromSlash(t.path))
+		patched, err := patch(destination, t)
 		if err != nil {
-			return "", err
-		}
-		// Under the module path, so that two modules' files of the same name
-		// cannot land on each other.
-		destination := filepath.Join(outAbs, filepath.FromSlash(t.module.path), filepath.FromSlash(t.path))
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 			return "", err
 		}
 		if err := os.WriteFile(destination, patched, 0o644); err != nil {
 			return "", err
 		}
-		replace[upstream] = destination
 	}
-	document, err := json.MarshalIndent(map[string]any{"Replace": replace}, "", "  ")
+	return writeModfile(outAbs, mainModfile, copies, order)
+}
+
+// writeModfile writes core's go.mod with a replace for each patched module,
+// and core's go.sum beside it. It returns the absolute path of the go.mod.
+//
+// The replacements are absolute paths: a go.mod given with -modfile resolves
+// relative ones against the module root, not against its own directory, and
+// gomobile copies them into a go.mod of its own in a temporary directory.
+func writeModfile(outAbs, mainModfile string, copies map[module]string, order []module) (string, error) {
+	content, err := os.ReadFile(mainModfile)
 	if err != nil {
 		return "", err
 	}
-	overlay := filepath.Join(outAbs, "overlay.json")
-	if err := os.WriteFile(overlay, append(document, '\n'), 0o644); err != nil {
+	var text strings.Builder
+	text.Write(content)
+	text.WriteString("\n// Written by core/cmd/overlaygen: the patched copies of upstream modules.\n")
+	for _, m := range order {
+		fmt.Fprintf(&text, "replace %s %s => %s\n", m.path, m.version, filepath.ToSlash(copies[m]))
+	}
+	modfile := filepath.Join(outAbs, "go.mod")
+	if err := os.WriteFile(modfile, []byte(text.String()), 0o644); err != nil {
 		return "", err
 	}
-	return overlay, nil
+	sum, err := os.ReadFile(strings.TrimSuffix(mainModfile, ".mod") + ".sum")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(outAbs, "go.sum"), sum, 0o644); err != nil {
+		return "", err
+	}
+	return modfile, nil
+}
+
+// copyTree copies the module at [from] to [to]. The module cache hands out
+// read-only files; the copies are writable, so the edits can land and the
+// next run can remove them.
+func copyTree(from, to string) error {
+	return filepath.WalkDir(from, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(from, path)
+		if err != nil {
+			return err
+		}
+		destination := filepath.Join(to, relative)
+		if entry.IsDir() {
+			return os.MkdirAll(destination, 0o755)
+		}
+		if !entry.Type().IsRegular() {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(destination, content, 0o644)
+	})
+}
+
+// goEnv asks the go command for one of its settings, with no GOFLAGS: an
+// inherited one may already name a go.mod this program has not written yet.
+func goEnv(name string) (string, error) {
+	command := exec.Command("go", "env", name)
+	command.Env = append(os.Environ(), "GOFLAGS=")
+	output, err := command.Output()
+	if err != nil {
+		return "", fmt.Errorf("go env %s: %w", name, err)
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 // patch applies the edits of [t] to the upstream file and returns the result.
@@ -441,9 +530,10 @@ func patch(upstream string, t target) ([]byte, error) {
 // go on if the build selects another version or replaces the module.
 func moduleRoot(m module) (string, error) {
 	command := exec.Command("go", "list", "-m", "-json", m.path)
-	// An inherited GOFLAGS may already name the overlay — a file this program
-	// has not written yet — so the query runs with none. Emptied, not set to
-	// -mod=mod: a program that only reads must not be able to rewrite go.mod.
+	// An inherited GOFLAGS may already name the go.mod this program writes —
+	// which replaces the very module asked about — so the query runs with
+	// none. Emptied, not set to -mod=mod: a program that only reads must not
+	// be able to rewrite go.mod.
 	command.Env = append(os.Environ(), "GOFLAGS=")
 	output, err := command.Output()
 	if err != nil {
@@ -458,11 +548,11 @@ func moduleRoot(m module) (string, error) {
 		return "", err
 	}
 	if listed.Replace != nil {
-		return "", fmt.Errorf("%s is replaced by %s: the overlay is written against the published module",
+		return "", fmt.Errorf("%s is replaced by %s: the edits are written against the published module",
 			m.path, listed.Replace.Path)
 	}
 	if listed.Version != m.version {
-		return "", fmt.Errorf("the build selects %s %s, the overlay is written against %s",
+		return "", fmt.Errorf("the build selects %s %s, the edits are written against %s",
 			m.path, listed.Version, m.version)
 	}
 	if listed.Dir == "" {
