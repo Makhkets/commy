@@ -86,14 +86,15 @@ internal class DefaultNetworkMonitor(context: Context) {
     private var callback: ConnectivityManager.NetworkCallback? = null
 
     /**
-     * Networks matching [WATCHED], newest last.
-     *
-     * Needed only below API 31, where the platform reports every matching
-     * network rather than the best one and picking between them is ours to do.
-     * Guarded by its own monitor because the callbacks arrive on a platform
-     * thread and [close] runs on ours.
+     * Decides what each callback means. Below API 31 the platform reports
+     * every matching network, not the one it chose, and following the newest
+     * of them put the core on a Wi-Fi Android itself had declined — see
+     * [UnderlyingNetworkPicker].
      */
-    private val available = LinkedHashSet<Network>()
+    private val picker = UnderlyingNetworkPicker(
+        platform = PlatformView(),
+        platformPicks = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+    )
 
     /** Attached once the core is up, so a change can reach `resetNetwork()`. */
     fun attach(server: CommandServer) {
@@ -129,34 +130,7 @@ internal class DefaultNetworkMonitor(context: Context) {
         if (current != ABSENT) {
             return
         }
-        val manager = connectivity ?: return
-        val candidate = usableNetworks(manager).lastOrNull() ?: return
-        synchronized(available) {
-            available.remove(candidate)
-            available.add(candidate)
-        }
-        refresh(candidate)
-    }
-
-    /**
-     * Every network that would satisfy [WATCHED], the active one last.
-     *
-     * Ordered that way so the caller can take the last and get the one the
-     * platform would have chosen, with the others as a fallback for the moment
-     * right after a handover when `activeNetwork` is briefly nothing.
-     */
-    @Suppress("DEPRECATION")
-    private fun usableNetworks(manager: ConnectivityManager): List<Network> {
-        val active = manager.activeNetwork?.takeIf { isUsable(manager, it) }
-        val others = runCatching { manager.allNetworks.toList() }.getOrDefault(emptyList())
-            .filter { it != active && isUsable(manager, it) }
-        return others + listOfNotNull(active)
-    }
-
-    private fun isUsable(manager: ConnectivityManager, network: Network): Boolean {
-        val capabilities = manager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+        picker.seed()?.let(::refresh)
     }
 
     fun unregister(listener: InterfaceUpdateListener) {
@@ -178,44 +152,25 @@ internal class DefaultNetworkMonitor(context: Context) {
         val manager = connectivity ?: return
         val watcher = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                synchronized(available) {
-                    // Re-inserted rather than kept in place: "newest last" is
-                    // the whole ordering, and a set does not reorder on add.
-                    available.remove(network)
-                    available.add(network)
-                }
-                refresh(network)
+                follow(picker.onAvailable(network, defaultNetwork))
             }
 
+            // Below API 31 a change on any network counts, not only on the
+            // current one: a Wi-Fi failing its internet check, and the platform
+            // moving off it, arrive here and nowhere else.
             override fun onCapabilitiesChanged(
                 network: Network,
                 capabilities: NetworkCapabilities,
             ) {
-                if (defaultNetwork == network) {
-                    refresh(network)
-                }
+                follow(picker.onChanged(network, defaultNetwork))
             }
 
             override fun onLinkPropertiesChanged(network: Network, properties: LinkProperties) {
-                if (defaultNetwork == network) {
-                    refresh(network)
-                }
+                follow(picker.onChanged(network, defaultNetwork))
             }
 
             override fun onLost(network: Network) {
-                val next = synchronized(available) {
-                    available.remove(network)
-                    available.lastOrNull()
-                }
-                if (defaultNetwork != network) {
-                    return
-                }
-                if (next == null) {
-                    setDefaultNetwork(null)
-                    publish(ABSENT)
-                } else {
-                    refresh(next)
-                }
+                follow(picker.onLost(network, defaultNetwork))
             }
         }
         callback = watcher
@@ -231,7 +186,8 @@ internal class DefaultNetworkMonitor(context: Context) {
      *
      * From API 31 the platform will pick the best matching network itself,
      * which is the same answer the default-network callback gives minus the
-     * VPN. Below that every match is reported and [available] does the picking.
+     * VPN. Below that every match is reported, and each report only makes
+     * [picker] ask the platform again which network it chose.
      */
     private fun register(
         manager: ConnectivityManager,
@@ -251,8 +207,19 @@ internal class DefaultNetworkMonitor(context: Context) {
     private fun stopWatching() {
         val watcher = callback ?: return
         callback = null
-        synchronized(available) { available.clear() }
+        picker.forget()
         runCatching { connectivity?.unregisterNetworkCallback(watcher) }
+    }
+
+    private fun follow(move: UnderlyingNetworkPicker.Move<Network>) {
+        when (move) {
+            UnderlyingNetworkPicker.Move.Stay -> Unit
+            is UnderlyingNetworkPicker.Move.To -> refresh(move.network)
+            UnderlyingNetworkPicker.Move.Nowhere -> {
+                setDefaultNetwork(null)
+                publish(ABSENT)
+            }
+        }
     }
 
     private fun refresh(network: Network) {
@@ -401,6 +368,28 @@ internal class DefaultNetworkMonitor(context: Context) {
 
     private fun indexOf(name: String): Int =
         runCatching { NetworkInterface.getByName(name)?.index ?: -1 }.getOrDefault(-1)
+
+    /** What [picker] asks, answered by `ConnectivityManager`. */
+    private inner class PlatformView : UnderlyingNetworkPicker.Platform<Network> {
+        override fun active(): Network? = connectivity?.activeNetwork
+
+        @Suppress("DEPRECATION")
+        override fun all(): List<Network> =
+            runCatching { connectivity?.allNetworks?.toList() }.getOrNull().orEmpty()
+
+        override fun grade(network: Network): UnderlyingNetworkPicker.Grade {
+            val capabilities = connectivity?.getNetworkCapabilities(network)
+                ?: return UnderlyingNetworkPicker.Grade.UNUSABLE
+            return when {
+                !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
+                    !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) ->
+                    UnderlyingNetworkPicker.Grade.UNUSABLE
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ->
+                    UnderlyingNetworkPicker.Grade.VALIDATED
+                else -> UnderlyingNetworkPicker.Grade.UNPROVEN
+            }
+        }
+    }
 
     private data class DefaultInterface(val name: String, val index: Int, val expensive: Boolean)
 
