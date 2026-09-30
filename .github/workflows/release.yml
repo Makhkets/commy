@@ -44,6 +44,30 @@ jobs:
           ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
 
+      # Before anything is built. The file on the releases page is named after
+      # the tag, but the version inside the app — in About, in backups, in the
+      # User-Agent every panel sees — and its versionCode come from `version:`
+      # in pubspec.yaml, and the notes from CHANGELOG.md. A tag pushed one
+      # commit early would ship commy-X.apk that calls itself W, with notes
+      # that say only "see the changelog". Seconds here, not half an hour on.
+      - name: Check the tag against pubspec.yaml and CHANGELOG.md
+        run: |
+          v="${TAG#v}"
+          if [ "$v" = "$TAG" ]; then
+            echo "::error::$TAG is not a version tag (vX.Y.Z)"
+            exit 1
+          fi
+          pv="$(sed -n 's/^version: *//p' apps/commy/pubspec.yaml)"
+          if [ "${pv%%+*}" != "$v" ]; then
+            echo "::error::the tag is $TAG, but apps/commy/pubspec.yaml says version: $pv"
+            exit 1
+          fi
+          if ! awk -v ver="## [$v]" 'index($0, ver) == 1 {found=1} END {exit !found}' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no \"## [$v]\" section to take the notes from"
+            exit 1
+          fi
+          echo "ok: $TAG is version $pv, with notes"
+
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
