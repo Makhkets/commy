@@ -239,7 +239,7 @@ dependencies {
     // package as stubs that throw; this is the reference implementation the
     // platform's copy was taken from, so the wire JSON is checked for real.
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20250517")
+    testImplementation("org.json:json:20260814")
 }
 
 kotlin {
