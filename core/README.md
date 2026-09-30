@@ -22,7 +22,7 @@ sing-box уже поставляет `experimental/libbox` — пакет, сп�
 
 ## Правки: что мы меняем в sing-box и как
 
-`go.mod` называет опубликованный `sing-box v1.13.16`, без `replace` и без форка.
+`go.mod` называет опубликованный `sing-box v1.13.21`, без `replace` и без форка.
 Всё, чем наше ядро отличается от апстрима, — это список точных замен в
 [`cmd/overlaygen/main.go`](cmd/overlaygen/main.go). Генератор копирует два
 затронутых модуля (sing-box и sing-tun) из кеша модулей в `build/_overlay/mod/`,
@@ -79,7 +79,7 @@ scripts/build_core.sh apple      # → core/build/Libbox.xcframework   (нуже
 
 | Что | Значение |
 |---|---|
-| sing-box | `v1.13.16` |
+| sing-box | `v1.13.21` |
 | Java-пакет AAR | `io.nekohasekai.libbox` |
 | NDK | `28.0.13004108` |
 | `-androidapi` | 24 |

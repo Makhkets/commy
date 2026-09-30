@@ -11,7 +11,7 @@ Android · iOS · Windows · macOS · Linux
 [![Core](https://github.com/Makhkets/commy/actions/workflows/core.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/core.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)](docs/07-roadmap.md)
-[![sing-box](https://img.shields.io/badge/sing--box-v1.13.16-2FD98A.svg)](https://github.com/SagerNet/sing-box)
+[![sing-box](https://img.shields.io/badge/sing--box-v1.13.21-2FD98A.svg)](https://github.com/SagerNet/sing-box)
 [![Flutter](https://img.shields.io/badge/Flutter-3.44.8-0468D7.svg)](https://flutter.dev)
 
 </div>

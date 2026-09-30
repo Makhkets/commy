@@ -57,7 +57,7 @@ updates:
     ignore:
       - dependency-name: github.com/sagernet/sing-box
       # Same rule, same reason. These three are not dependencies of ours in any
-      # sense that matters: they are the versions sing-box v1.13.16 was built
+      # sense that matters: they are the versions the pinned sing-box was built
       # and tested with, and go.mod lists them as direct only because core/xhttp
       # imports the packages by name. Moved on their own they would put the core
       # on a combination nobody upstream ever ran. They move with sing-box.

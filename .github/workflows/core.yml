@@ -29,7 +29,7 @@ permissions:
 env:
   # Keep in step with core/go.mod, scripts/build_core.sh and
   # docs/13-libbox-reference.md. A test asserts they agree.
-  SINGBOX_VERSION: v1.13.16
+  SINGBOX_VERSION: v1.13.21
   NDK_VERSION: 28.0.13004108
 
 jobs:

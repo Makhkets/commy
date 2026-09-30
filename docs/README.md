@@ -20,7 +20,7 @@
 | [03-platform-tunnel.md](03-platform-tunnel.md) | Как поднимается туннель на каждой из 5 платформ |
 | [06-data-model.md](06-data-model.md) | Схема БД, парсеры ссылок, генератор конфига. ⚠️ Раздел про SQLCipher устарел — см. [ADR-0007](adr/0007-database-encryption.md) |
 | [10-testing.md](10-testing.md) | Пирамида тестов, golden-тесты, ручные сценарии |
-| [13-libbox-reference.md](13-libbox-reference.md) | Точный API sing-box v1.13.16, прочитанный из исходников: `PlatformInterface`, `TunOptions`, `CommandClient`, build-теги, схема конфига |
+| [13-libbox-reference.md](13-libbox-reference.md) | Точный API sing-box v1.13.21 (вычитан на v1.13.16, API тот же), прочитанный из исходников: `PlatformInterface`, `TunOptions`, `CommandClient`, build-теги, схема конфига |
 | [16-local-testing.md](16-local-testing.md) | Тест против живой подписки Remnawave |
 | [18-emulator-testing.md](18-emulator-testing.md) | Лёгкий эмулятор на слабой машине, стенд с живыми узлами всех протоколов и панелью, датчики утечек, сценарии чек‑листа |
 

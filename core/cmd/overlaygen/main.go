@@ -63,8 +63,9 @@
 // ppoll on the old descriptor number: the TUN interface outlives the tunnel,
 // one more per reconnect, and a reader that wakes up reads whatever file now
 // owns that number — a socket of the new core, or the new TUN. Seen on the
-// emulator; upstream sing-tun has the same one-line fix, the one sing-box
-// v1.13.16 pins does not. See docs/adr/0012-gvisor-reader-stop.md.
+// emulator; upstream sing-tun has the same one-line fix on its main branch,
+// but no tag sing-box pins does — v0.8.15, which v1.13.21 requires, carries
+// the file unchanged. See docs/adr/0012-gvisor-reader-stop.md.
 //
 // # Why patched copies
 //
@@ -116,10 +117,10 @@ type module struct {
 }
 
 var (
-	singBox = module{"github.com/sagernet/sing-box", "v1.13.16"}
-	// singTun is whatever sing-box v1.13.16 requires. It moves only when
+	singBox = module{"github.com/sagernet/sing-box", "v1.13.21"}
+	// singTun is whatever sing-box v1.13.21 requires. It moves only when
 	// sing-box does, so a bump meets this check as well as the hashes.
-	singTun = module{"github.com/sagernet/sing-tun", "v0.8.12-0.20260727151122-3a09076491df"}
+	singTun = module{"github.com/sagernet/sing-tun", "v0.8.15"}
 )
 
 type edit struct {

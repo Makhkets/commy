@@ -187,7 +187,7 @@ class AppInfo {
   ///
   /// Rule R8: bumping the core is its own change, so this constant moves with
   /// `core/go.mod` and with nothing else.
-  static const String singBoxVersion = '1.13.16';
+  static const String singBoxVersion = '1.13.21';
 
   /// Public source of this build.
   static final Uri repository = Uri.parse('https://github.com/Makhkets/commy');

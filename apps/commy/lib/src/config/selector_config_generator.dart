@@ -54,7 +54,7 @@ class SelectorConfigGenerator implements ConfigGenerator {
 
   static Set<String> _noRuleSets() => const <String>{};
 
-  /// The underlying builder, pinned to sing-box v1.13.16.
+  /// The underlying builder, pinned to sing-box v1.13.21.
   final SingBoxConfigBuilder builder;
 
   /// Receives everything the builder had to drop to produce a valid document.
