@@ -238,8 +238,10 @@ void main() {
     expect(stored().rules, isEmpty);
   });
 
-  testWidgets(
-      'a match the builder would leave out is refused where it is typed',
+  // A whole URL reads as the unknown key `https`, and a typo as another
+  // unknown key. Both used to be saved; the builder dropped them, traffic
+  // went on through the proxy, and the screen blamed the device.
+  testWidgets('a condition no platform understands is refused where typed',
       (tester) async {
     await pumpScreen(tester);
 
@@ -250,24 +252,51 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(CommyTextField), 'regex:*.example.com');
+    // The last one is an expression the core would not compile: the builder
+    // leaves it out now instead of failing the tunnel, so the sheet refuses
+    // it too.
+    for (final typed in <String>[
+      'https://youtube.com',
+      'domian:example.com',
+      'regex:(unclosed',
+    ]) {
+      await tester.enterText(find.byType(CommyTextField), typed);
+      await tester.tap(find.text(t.routing.newRule.save));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.routing.newRule.unknown), findsOneWidget);
+      expect(find.text(t.routing.newRule.title), findsOneWidget);
+      expect(stored().rules, isEmpty, reason: typed);
+    }
+
+    // Typing clears the complaint, and a condition the core knows is saved.
+    await tester.enterText(find.byType(CommyTextField), 'domain:youtube.com');
+    await tester.pumpAndSettle();
+    expect(find.text(t.routing.newRule.unknown), findsNothing);
     await tester.tap(find.text(t.routing.newRule.save));
     await tester.pumpAndSettle();
 
-    // Saved, it would only have turned up later as a line in the banner:
-    // the builder leaves out an expression the core cannot compile.
-    expect(find.text(t.routing.newRule.unreadable), findsOneWidget);
-    expect(find.text(t.routing.newRule.title), findsOneWidget);
-    expect(stored().rules, isEmpty);
+    expect(stored().rules.single.matcher, 'domain:youtube.com');
+  });
 
-    // Xray's spelling of a range is one the builder rewrites, so it stays.
-    await tester.enterText(find.byType(CommyTextField), 'port_range:1000-2000');
+  // `process:` means nothing on Android and something on a desktop. It is
+  // not a typo, and the screen already says when a rule does not apply here.
+  testWidgets('a condition for another platform is still accepted',
+      (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(EmptyState),
+        matching: find.text(t.routing.addRule),
+      ),
+    );
     await tester.pumpAndSettle();
-    expect(find.text(t.routing.newRule.unreadable), findsNothing);
+    await tester.enterText(find.byType(CommyTextField), 'process:curl');
     await tester.tap(find.text(t.routing.newRule.save));
     await tester.pumpAndSettle();
 
-    expect(storedMatchers(), <String>['port_range:1000-2000']);
+    expect(stored().rules.single.matcher, 'process:curl');
   });
 
   testWidgets('swiping a rule away removes exactly that rule', (tester) async {

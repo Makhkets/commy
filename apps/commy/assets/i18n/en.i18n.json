@@ -513,7 +513,7 @@
       "action": "Action",
       "save": "Save",
       "empty": "A match cannot be empty",
-      "unreadable": "This match does nothing here — check how it is written"
+      "unknown": "Not a condition the app knows. Start it with domain:, suffix:, keyword:, geosite:, geoip:, ip:, port: or app:"
     },
     "emptyRules": "No rules of your own yet",
     "emptyRulesBody": "With no rules everything follows the final outcome. Add the first one to split the traffic."
