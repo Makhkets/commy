@@ -17,8 +17,13 @@ on:
         description: Tag to build (must already exist)
         required: true
 
+# Read-only unless a job says otherwise, and only `publish` does. The android
+# job runs third-party actions, Gradle plugins and the build steps of pub
+# packages next to the release key; a token that can push to the repository
+# and edit releases has no business there. Third-party actions are pinned to
+# a commit for the same reason (docs/08, "Кто видит ключ").
 permissions:
-  contents: write
+  contents: read
 
 env:
   FLUTTER_VERSION: 3.44.8
@@ -39,10 +44,13 @@ jobs:
       signed: ${{ steps.signing.outputs.signed }}
       certificate: ${{ steps.certificate.outputs.sha256 }}
     steps:
+      # persist-credentials: false, or the token stays in .git/config for
+      # every later step to read. Nothing here fetches or pushes after this.
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
+          persist-credentials: false
 
       # Before anything is built. The file on the releases page is named after
       # the tag, but the version inside the app — in About, in backups, in the
@@ -74,7 +82,7 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -85,7 +93,7 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
 
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
 
       - name: Install NDK
         run: sdkmanager --install "ndk;${NDK_VERSION}"
@@ -95,6 +103,16 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.NDK_VERSION }}
         run: scripts/build_core.sh android
 
+      - run: |
+          dart pub get
+          dart pub global activate melos 6.3.3
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+      - run: melos bootstrap
+      - run: melos run gen --no-select
+
+      # Only now, with codegen done: `melos bootstrap` and build_runner run
+      # code from pub packages, and none of it needs the key. From here the
+      # key is on disk for the two Gradle builds, and is removed after them.
       - name: Set up signing
         id: signing
         env:
@@ -119,13 +137,6 @@ jobs:
           EOF
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      - run: |
-          dart pub get
-          dart pub global activate melos 6.3.3
-          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
-      - run: melos bootstrap
-      - run: melos run gen --no-select
-
       # The bundle goes first, and the order is load-bearing. ABI splits and app
       # bundles cannot both be on: with resource shrinking enabled R8 writes one
       # shrunk-resources file per split, and `bundleRelease` then finds four
@@ -144,6 +155,13 @@ jobs:
       - name: Build the APK
         working-directory: apps/commy
         run: flutter build apk --release --target-platform android-arm,android-arm64
+
+      # Nothing after this needs the key: the certificate is read back from the
+      # APK. `always()`, so that a failed build does not leave it on disk for
+      # what still runs after it, the actions' post-steps included.
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/commy.jks" apps/commy/android/key.properties
 
       # Before anything is collected: a release that outgrew its budget should
       # fail here, with the largest entries listed, not on somebody's phone.
@@ -223,6 +241,11 @@ jobs:
     name: Publish release
     needs: android
     runs-on: ubuntu-latest
+    # The one job that writes: it creates the release and uploads to it. The
+    # release action gets the token as its own input, so the checkout does
+    # not need to leave it behind.
+    permissions:
+      contents: write
     steps:
       # The tag, not the ref of the run: the notes are the CHANGELOG of the
       # version being released.
@@ -230,6 +253,7 @@ jobs:
         with:
           ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/download-artifact@v8
         with:
@@ -269,7 +293,7 @@ jobs:
 
       # Named explicitly: left to itself the action takes github.ref, which on
       # a manual run is the branch it was started from.
-      - uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ env.TAG }}
           files: dist/*
