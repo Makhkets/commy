@@ -165,8 +165,9 @@ Drift-миграции нумерованные, вперёд-только. На
 | Список ссылок, по одной на строку | Самый частый случай |
 | То же в base64 | Оборачивается почти всеми панелями |
 | Clash / Clash.Meta YAML | Ключ `proxies:` |
-| sing-box JSON | Ключ `outbounds:` |
-| Xray / v2rayN JSON | Ключ `outbounds:` с иной структурой |
+| sing-box JSON | Ключи `outbounds:` и `endpoints:` (WireGuard с 1.11 — endpoint; старый outbound `wireguard` тоже читается) |
+| Xray / v2rayN JSON | Ключ `outbounds:` с иной структурой; сервер называется по `remarks` |
+| Xray JSON-подписка (Marzban `v2ray-json`, Remnawave XRAY_JSON, 3x-ui) | Массив целых конфигов, по серверу на конфиг; имя — `remarks`, отказ тоже подписан им |
 
 ### Заголовки ответа подписки
 

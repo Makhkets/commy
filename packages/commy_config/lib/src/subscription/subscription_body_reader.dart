@@ -318,22 +318,34 @@ class SubscriptionBodyReader {
     if (outbounds.isEmpty) {
       return null;
     }
+    final servers =
+        outbounds.where(SingBoxOutboundReader.looksLikeServer).toList();
     final outcome = _readEntries(
-      outbounds.where(SingBoxOutboundReader.looksLikeServer).toList(),
+      servers,
       const <String>[],
       subscriptionId: subscriptionId,
       groupId: groupId,
       startIndex: startIndex,
     );
     final remarks = MapRead.text(document, <String>['remarks']);
-    if (remarks == null || !outcome.hasNodes) {
+    if (remarks == null) {
       return outcome;
     }
-    final single = outcome.nodes.length == 1;
+    // The failures are named the same way. Every panel template tags its
+    // outbound `proxy`, so a list of refusals read "proxy: …" once per
+    // server, and nobody could tell which of them had been left out.
+    final single = servers.length == 1;
+    String named(String own) => single ? remarks : '$remarks $own';
     return outcome.copyWith(
       nodes: <ProxyNode>[
-        for (final node in outcome.nodes)
-          node.copyWith(name: single ? remarks : '$remarks ${node.name}'),
+        for (final node in outcome.nodes) node.copyWith(name: named(node.name)),
+      ],
+      failures: <ImportFailure>[
+        for (final failure in outcome.failures)
+          ImportFailure(
+            rawLine: named(failure.rawLine),
+            reason: failure.reason,
+          ),
       ],
     );
   }

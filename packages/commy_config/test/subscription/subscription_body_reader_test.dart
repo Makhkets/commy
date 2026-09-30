@@ -464,6 +464,8 @@ void main() {
 
       expect(outcome.nodes.single.name, 'Good');
       expect(outcome.failures.single.reason, contains('kcp'));
+      // Named after the server, not after the tag every template uses.
+      expect(outcome.failures.single.rawLine, 'Bad');
     });
   });
 

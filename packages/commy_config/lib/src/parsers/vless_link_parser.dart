@@ -31,8 +31,13 @@ class VlessLinkParser implements NodeLinkParser {
     if (value == null || value.isEmpty || value.toLowerCase() == 'none') {
       return null;
     }
+    // The scheme is the first dot-separated part; the rest carries a key.
+    // Named only when it looks like a scheme name, so a value that is a key
+    // with no scheme in front of it never reaches a log (R3).
     final scheme = value.split('.').first;
-    return 'VLESS encryption "$scheme" is not supported by the core';
+    final named =
+        RegExp(r'^[A-Za-z0-9_-]{1,32}$').hasMatch(scheme) ? ' "$scheme"' : '';
+    return 'VLESS encryption$named is not supported by the core';
   }
 
   /// Throws [LinkFormatException] when [encryption] is one the core cannot

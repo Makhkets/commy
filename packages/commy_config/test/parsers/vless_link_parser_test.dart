@@ -190,6 +190,14 @@ void main() {
       );
     });
 
+    test('a value that is a key and no scheme is not repeated at all', () {
+      const key = 'QkFTRTY0S0VZTk9TQ0hFTUVfX19fX19fX19fX19fX19fX19fXw';
+      expect(
+        VlessLinkParser.encryptionRefusal('$key+/='),
+        allOf(isNotNull, isNot(contains(key))),
+      );
+    });
+
     test('accepts encryption=none and a link that leaves it out', () {
       final none = parser.parse('vless://uuid@a.example:443?encryption=none#n');
       final missing = parser.parse('vless://uuid@a.example:443#n');
