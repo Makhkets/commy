@@ -10,6 +10,12 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **The network core is updated to sing-box 1.13.21**, the last release of
+  the 1.13 line. It fixes two crashes of the core (a failed WebSocket
+  handshake, and a packet of an address family the tunnel was not set up
+  for), the Auto group hanging on a server that does not answer, needless
+  keepalive traffic that cost battery, and the network monitor getting stuck
+  when the phone starts.
 ## [0.1.0-alpha.12]
 
 Installs over alpha.11.
