@@ -7,6 +7,10 @@
 #   scripts/emulator.sh start  [avd]           # boots headless, waits for it, tunes it
 #   scripts/emulator.sh stop
 #
+# start and stop address one emulator by its serial: emulator-5554, or
+# emulator-$EMULATOR_PORT when that is set (an even port, 5554-5584), which is
+# also how a second AVD runs next to the first.
+#
 # Built for the owner's machine — a two-core Pentium with 32 GB — where the
 # stock AVD (1080p, 4 cores' worth of rendering in a window) left nothing for a
 # build. The savings are in what the emulator draws, not in memory: the host
@@ -40,10 +44,26 @@ readonly SDK="${ANDROID_HOME:-${HOME}/Android/Sdk}"
 readonly AVD_HOME="${ANDROID_AVD_HOME:-${HOME}/.android/avd}"
 readonly LOG_DIR="${TMPDIR:-/tmp}"
 
+# Every adb call below goes to this serial and nowhere else. Without one, adb
+# takes "the" device, and there often is another: the owner's phone on USB or
+# wireless debugging, or the other AVD. `wait-for-device` then returned at once
+# for the phone, the phone got its animations switched off and its screen held
+# on, and "up:" reported the phone's Android version while the emulator was
+# still booting. The console port fixes the serial, and adb and
+# `adb wait-for-device` both read ANDROID_SERIAL.
+readonly PORT="${EMULATOR_PORT:-5554}"
+readonly SERIAL="emulator-${PORT}"
+export ANDROID_SERIAL="${SERIAL}"
+
 die() { printf '\n\033[31merror:\033[0m %s\n\n' "$*" >&2; exit 1; }
 say() { printf '\033[36m==>\033[0m %s\n' "$*"; }
 
 adb() { "${SDK}/platform-tools/adb" "$@"; }
+
+# Whether adb knows an emulator at SERIAL, booted or not. Not `grep -q`: it
+# stops reading at the match, and under pipefail adb's SIGPIPE would then
+# read as "not listed".
+listed() { adb devices 2>/dev/null | grep "^${SERIAL}[[:space:]]" > /dev/null; }
 
 create() {
   local name="${1:-commy_lite}"
@@ -90,13 +110,19 @@ start() {
   local name="${1:-commy_lite}"
   [[ -d "${AVD_HOME}/${name}.avd" ]] || die "no AVD called ${name}; scripts/emulator.sh create ${name}"
   local log="${LOG_DIR}/emulator-${name}.log"
+  adb start-server > /dev/null 2>&1
+  # Whatever answers at SERIAL now is not the emulator about to start, and
+  # the tuning below would go to it.
+  if listed; then
+    die "${SERIAL} is already running; scripts/emulator.sh stop, or pick another port:
+   EMULATOR_PORT=5556 scripts/emulator.sh start ${name}"
+  fi
   # setsid and a log file: the emulator must outlive this shell, and adb's
   # server must not inherit its stdout.
   setsid "${SDK}/emulator/emulator" -avd "${name}" -no-window -no-audio -no-boot-anim \
-    -gpu swiftshader_indirect -cores 2 -netdelay none -netspeed full \
+    -port "${PORT}" -gpu swiftshader_indirect -cores 2 -netdelay none -netspeed full \
     > "${log}" 2>&1 < /dev/null &
-  adb start-server > /dev/null 2>&1
-  say "booting ${name} headless (log: ${log})"
+  say "booting ${name} headless at ${SERIAL} (log: ${log})"
   timeout 900 "${SDK}/platform-tools/adb" wait-for-device shell \
     'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 2; done' \
     || die "the emulator did not boot in 15 minutes; see ${log}"
@@ -109,8 +135,16 @@ start() {
 }
 
 stop() {
-  adb emu kill > /dev/null 2>&1 || true
-  say "stopped"
+  # This used to be `adb emu kill || true` and then "stopped" whatever adb
+  # had said, including that it did not know which of two emulators to kill.
+  # The check comes first because adb, asked to kill a serial it does not
+  # know, waits for it instead of failing.
+  if ! listed; then
+    say "${SERIAL} is not running"
+    return
+  fi
+  adb emu kill > /dev/null || die "adb did not stop ${SERIAL}"
+  say "stopped ${SERIAL}"
 }
 
 case "${1:-}" in
