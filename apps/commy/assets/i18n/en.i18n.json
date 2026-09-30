@@ -544,6 +544,8 @@
     "configEmptyBody": "The configuration appears the moment you connect: it is assembled from the chosen server, the rules and DNS.",
     "configTitle": "Core configuration",
     "configRedacted": "Secrets are stripped. This is what goes to the core, minus the credentials.",
+    "configRefused": "The core refused this configuration",
+    "configNotBuilt": "The configuration could not be built",
     "statsEmpty": "No statistics yet",
     "statsEmptyBody": "The chart shows the last 60 seconds; the rows below, this session's usage and the last week by day.",
     "statsWindow": "Last 60 seconds",

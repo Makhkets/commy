@@ -7,8 +7,10 @@ import 'package:commy/src/screens/diagnostics/logs_screen.dart';
 import 'package:commy/src/screens/diagnostics/stats_screen.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/settings_controller.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
+import 'package:commy_core/commy_core.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -210,12 +212,12 @@ void main() {
     expect(empty.onAction, isNotNull);
   });
 
-  /// Gets a real document onto the config tab: import a link, connect.
+  /// Imports a link and connects through it, whatever the core makes of it.
   ///
   /// The listener is not optional. Nothing on this screen watches the node
   /// list, and a provider nobody listens to is disposed between reads, so the
   /// preview the controller builds after a connect came back null without it.
-  Future<ProviderContainer> buildConfig(WidgetTester tester) async {
+  Future<ProviderContainer> connectOnce(WidgetTester tester) async {
     const link = 'vless://11111111-2222-3333-4444-555555555555'
         '@nl-03.example.net:443?security=reality&type=tcp'
         '&pbk=xJ7bV3nQmR0cTfKzL2sYd8HqPwE1oUiA5gN6vB4rC9k'
@@ -234,6 +236,12 @@ void main() {
         .read(tunnelControllerProvider.notifier)
         .connect(nodeId: nodeId);
     await settle(tester);
+    return container;
+  }
+
+  /// Gets a real document onto the config tab: import a link, connect.
+  Future<ProviderContainer> buildConfig(WidgetTester tester) async {
+    final container = await connectOnce(tester);
     expect(find.byType(SelectableText), findsOneWidget);
     return container;
   }
@@ -248,6 +256,104 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
   }
+
+  /// What the core says when it will not take a document. The UUID stands
+  /// for any credential a complaint may quote, and must not reach the screen.
+  const refusal = ConfigInvalidFailure(
+    'outbounds[0]: uuid 11111111-2222-3333-4444-555555555555 is not allowed',
+  );
+
+  ErrorBanner banner(WidgetTester tester) =>
+      tester.widget<ErrorBanner>(find.byType(ErrorBanner));
+
+  // "Show the config" on a refused connect lands on this tab, which read the
+  // last document that worked and nothing else. After a first connect it
+  // said nothing had been built and pointed at the connect that had just
+  // failed.
+  testWidgets('config: a connect the core refused shows what it refused',
+      (tester) async {
+    await pump(tester, const ConfigScreen());
+    harness.core.failOn(FakeCoreStep.start, refusal);
+
+    final container = await connectOnce(tester);
+
+    final state = container.read(tunnelControllerProvider);
+    expect(state.failure, refusal);
+    expect(state.lastConfig, isNull, reason: 'nothing was accepted');
+    expect(state.rejectedConfig, isNotNull);
+    expect(find.byType(SelectableText), findsOneWidget);
+    expect(banner(tester).title, t.diagnostics.configRefused);
+    expect(banner(tester).message, contains('outbounds[0]'));
+    expect(
+      banner(tester).message,
+      isNot(contains('11111111-2222-3333-4444-555555555555')),
+    );
+    expect(find.text(t.diagnostics.configEmpty), findsNothing);
+  });
+
+  // After a refused reload the tunnel runs on, on the previous document. The
+  // tab showed that one as if it were the answer to "show the config".
+  testWidgets('config: a reload the core refused shows the refused document',
+      (tester) async {
+    // The status the fake core reports, not a pinned one: a reload only runs
+    // on a tunnel that is up.
+    await tester.pumpWidget(harness.wrap(const ConfigScreen()));
+    await settle(tester);
+    final status = ProviderScope.containerOf(
+      tester.element(find.byType(ConfigScreen)),
+      listen: false,
+    ).listen(coreStatusProvider, (_, __) {});
+    addTearDown(status.close);
+    final container = await buildConfig(tester);
+    await tester.pump(const Duration(milliseconds: 100));
+    final running = container.read(tunnelControllerProvider).lastConfig;
+    harness.core.failOn(FakeCoreStep.reload, refusal);
+    // A different document from the one running, so the test can tell
+    // which of the two the tab shows.
+    await container
+        .read(settingsControllerProvider.notifier)
+        .setLogLevel(LogLevel.debug);
+    await settle(tester);
+
+    final reloaded =
+        await container.read(tunnelControllerProvider.notifier).reload();
+    await settle(tester);
+
+    expect(reloaded, isFalse);
+    final state = container.read(tunnelControllerProvider);
+    expect(state.lastConfig, same(running), reason: 'still the one running');
+    expect(state.rejectedConfig, isNotNull);
+    expect(state.rejectedConfig, isNot(running));
+    expect(banner(tester).title, t.diagnostics.configRefused);
+
+    harness.core.clearFailures();
+    await stopTunnel(tester, container);
+  });
+
+  testWidgets('config: a document the builder refused says why',
+      (tester) async {
+    await pump(
+      tester,
+      const ConfigScreen(),
+      extra: <Override>[
+        tunnelControllerProvider.overrideWith(
+          () => _PinnedTunnel(
+            const TunnelActionState(
+              failure: ConfigInvalidFailure(
+                'REALITY public key must be 32 bytes',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final empty = emptyState(tester);
+    expect(empty.title, t.diagnostics.configNotBuilt);
+    expect(empty.message, 'REALITY public key must be 32 bytes');
+    expect(empty.actionLabel, t.error.openLogs);
+    expect(empty.onAction, isNotNull);
+  });
 
   testWidgets('config: copying says it happened, and copies the redacted text',
       (tester) async {
@@ -344,4 +450,15 @@ class _DeadClipboard implements ClipboardPort {
       const Err<void, CommyFailure>(
         StorageFailure('clipboard channel unavailable'),
       );
+}
+
+/// A tunnel controller frozen at [_state], so the tab can be drawn for a
+/// failure no fake core produces.
+class _PinnedTunnel extends TunnelController {
+  _PinnedTunnel(this._state);
+
+  final TunnelActionState _state;
+
+  @override
+  TunnelActionState build() => _state;
 }

@@ -425,6 +425,7 @@ class TunnelActionState {
     this.failure,
     this.notice,
     this.lastConfig,
+    this.rejectedConfig,
   });
 
   /// Nothing has been tried yet.
@@ -452,13 +453,31 @@ class TunnelActionState {
   /// only and redacted before it reaches the screen.
   final CoreConfig? lastConfig;
 
+  /// The configuration the core refused, when that is what [failure] is.
+  ///
+  /// "Show the config" on a refused connect leads to the config tab, and the
+  /// tab read [lastConfig] alone: after a first connect it said nothing had
+  /// been built yet and pointed at the connect that had just failed, and
+  /// after an earlier session it showed the old document instead of the one
+  /// refused. Kept apart from [lastConfig] because a refused reload leaves
+  /// the tunnel running on the previous document, which that field goes on
+  /// describing. Null when the builder refused before the core saw anything:
+  /// there was no document, and the failure's own detail is all there is.
+  /// Rule R2, as for [lastConfig]: memory only, redacted before the screen.
+  final CoreConfig? rejectedConfig;
+
   /// A copy with the given fields replaced.
+  ///
+  /// [rejectedConfig] travels with the failure it was refused with: a copy
+  /// that clears or replaces [failure] takes whatever is passed alongside,
+  /// null included, so a later failure never inherits an old document.
   TunnelActionState copyWith({
     bool? isBusy,
     bool? isChecking,
     CommyFailure? failure,
     TunnelNotice? notice,
     CoreConfig? lastConfig,
+    CoreConfig? rejectedConfig,
     bool clearFailure = false,
     bool clearNotice = false,
   }) {
@@ -468,6 +487,9 @@ class TunnelActionState {
       failure: clearFailure ? null : failure ?? this.failure,
       notice: clearNotice ? null : notice ?? this.notice,
       lastConfig: lastConfig ?? this.lastConfig,
+      rejectedConfig: clearFailure || failure != null
+          ? rejectedConfig
+          : this.rejectedConfig,
     );
   }
 
@@ -479,11 +501,18 @@ class TunnelActionState {
           other.isChecking == isChecking &&
           other.failure == failure &&
           other.notice == notice &&
-          other.lastConfig == lastConfig;
+          other.lastConfig == lastConfig &&
+          other.rejectedConfig == rejectedConfig;
 
   @override
-  int get hashCode =>
-      Object.hash(isBusy, isChecking, failure, notice, lastConfig);
+  int get hashCode => Object.hash(
+        isBusy,
+        isChecking,
+        failure,
+        notice,
+        lastConfig,
+        rejectedConfig,
+      );
 
   @override
   String toString() => 'TunnelActionState(busy: $isBusy, $failure)';
@@ -638,7 +667,11 @@ class TunnelController extends Notifier<TunnelActionState> {
         // dropping it here is what left the log with nothing to read after a
         // failed connect.
         logger.error('connect failed: $failure', tag: _tag);
-        state = state.copyWith(isBusy: false, failure: failure);
+        state = state.copyWith(
+          isBusy: false,
+          failure: failure,
+          rejectedConfig: _rejected(failure, target),
+        );
         return true;
       }
       await ref.read(selectedNodeIdProvider.notifier).select(target);
@@ -875,7 +908,11 @@ class TunnelController extends Notifier<TunnelActionState> {
       // Not retried: the core just refused this document, and the next edit
       // asks again anyway.
       _reloadAgain = false;
-      state = state.copyWith(isBusy: false, failure: failure);
+      state = state.copyWith(
+        isBusy: false,
+        failure: failure,
+        rejectedConfig: _rejected(failure, nodeId),
+      );
       return false;
     }
     state = state.copyWith(
@@ -1196,6 +1233,15 @@ class TunnelController extends Notifier<TunnelActionState> {
         );
     return built.valueOrNull;
   }
+
+  /// The document behind a refusal, for the config tab.
+  ///
+  /// Only for [ConfigInvalidFailure], the one failure whose way out is "show
+  /// the config". Built again from the same inputs, as [_buildPreview] does
+  /// for a success; null when it was the builder that refused, since then no
+  /// document ever existed.
+  CoreConfig? _rejected(CommyFailure failure, String nodeId) =>
+      failure is ConfigInvalidFailure ? _buildPreview(nodeId) : null;
 
   /// One line naming the server a connect is about to use.
   ///
