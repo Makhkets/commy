@@ -105,10 +105,9 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
 
   /// Turns automatic refreshing on or off.
   Future<void> setAutoUpdate(Subscription subscription, {required bool value}) {
-    return _run(
-      () => ref
-          .read(subscriptionRepositoryProvider)
-          .upsert(subscription.copyWith(autoUpdate: value)),
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(autoUpdate: value),
     );
   }
 
@@ -121,10 +120,9 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     if (hours <= 0) {
       return Future<void>.value();
     }
-    return _run(
-      () => ref
-          .read(subscriptionRepositoryProvider)
-          .upsert(subscription.copyWith(updateIntervalHours: hours)),
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(updateIntervalHours: hours),
     );
   }
 
@@ -134,10 +132,9 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
     if (trimmed.isEmpty) {
       return Future<void>.value();
     }
-    return _run(
-      () => ref
-          .read(subscriptionRepositoryProvider)
-          .upsert(subscription.copyWith(name: trimmed)),
+    return _edit(
+      subscription.id,
+      (current) => current.copyWith(name: trimmed),
     );
   }
 
@@ -200,6 +197,31 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
 
   /// Clears the last outcome once it has been shown.
   void clear() => _settle(null);
+
+  /// Writes [change] over the subscription as it is stored now.
+  ///
+  /// Not over the copy the card or its menu was built from: a menu opened
+  /// before a refresh landed holds the old quota, title and announcement,
+  /// and writing that copy back with a new name undid the refresh. The
+  /// refresh itself reads the fresh row before it writes, for the same
+  /// reason the other way round. A subscription deleted in the meantime is
+  /// left deleted.
+  Future<void> _edit(
+    String id,
+    Subscription Function(Subscription current) change,
+  ) {
+    return _run(() async {
+      final repository = ref.read(subscriptionRepositoryProvider);
+      switch (await repository.findById(id)) {
+        case Ok(value: final Subscription current):
+          return repository.upsert(change(current));
+        case Ok():
+          return const Ok<void, CommyFailure>(null);
+        case Err(:final failure):
+          return Err<void, CommyFailure>(failure);
+      }
+    });
+  }
 
   Future<void> _run(
     Future<Result<void, CommyFailure>> Function() action,
