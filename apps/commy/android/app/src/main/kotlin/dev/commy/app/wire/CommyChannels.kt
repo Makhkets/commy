@@ -12,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * All five channels of the wire protocol, plus the intent channel, in one place.
@@ -30,6 +32,8 @@ internal class CommyChannels(
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val resolver = context.applicationContext.contentResolver
 
     private val permission = VpnPermission()
 
@@ -62,8 +66,30 @@ internal class CommyChannels(
     fun onActivityResult(requestCode: Int, resultCode: Int): Boolean =
         permission.onActivityResult(requestCode, resultCode)
 
+    /**
+     * Hands an intent to Dart, reading the file first when it carries one.
+     *
+     * Read now, while this activity — and with it the read grant that came
+     * with the intent — is alive, and off the main thread, since a provider
+     * may take its time. See [FileIntentReader] for why Dart gets the text
+     * rather than the address.
+     */
     fun onIntent(intent: Intent?) {
-        IntentBus.publish(intent)
+        val file = intent?.let(IntentBus::fileOf)
+        if (file == null) {
+            IntentBus.publish(intent)
+            return
+        }
+        scope.launch {
+            val text = withContext(Dispatchers.IO) {
+                FileIntentReader.read { resolver.openInputStream(file) }
+            }
+            if (text == null) {
+                IntentBus.publishUnreadableFile()
+            } else {
+                IntentBus.publishText(text)
+            }
+        }
     }
 
     fun dispose() {

@@ -164,7 +164,12 @@ internal object Wire {
         /** A protocol or subscription link: `{"kind":"link","uri":"vless://…"}`. */
         const val LINK = "link"
 
-        /** A config file: `{"kind":"file","uri":"content://…"}`. */
+        /**
+         * A config file the app was handed and could not read: `{"kind":"file"}`.
+         *
+         * One that could be read goes out as [TEXT], its contents in place of
+         * a shared line — the address itself is no use to Dart.
+         */
         const val FILE = "file"
 
         /** Shared plain text: `{"kind":"text","text":"…"}`. */

@@ -11,6 +11,7 @@ import 'dart:async';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/state/unreadable_file_notice.dart';
 import 'package:commy_core/commy_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,11 +60,12 @@ final systemIntentProvider = Provider<void>((ref) {
             ref.read(pendingImportProvider.notifier).offer(payload);
           }
         case SystemIntentKind.file:
-          // A content:// URI has to be read through the platform resolver,
-          // which `ImportController.importFile` does through the picker. There
-          // is no path from a bare URI to bytes here yet, so the honest thing
-          // is to say so rather than drop it silently.
-          logger.warn('opening a file by intent is not wired yet', tag: _tag);
+          // A file the platform could read came in as `text` above, its
+          // contents in place of a shared line. This one it could not open,
+          // and the app has just come to the front for it: said on screen,
+          // not only here.
+          logger.warn('a file handed to the app could not be read', tag: _tag);
+          ref.read(unreadableFileProvider.notifier).raise();
         case SystemIntentKind.connect:
           unawaited(ref.read(tunnelControllerProvider.notifier).connect());
       }
