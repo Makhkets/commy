@@ -483,6 +483,7 @@
     "dropped": {
       "title": "Some rules are not being applied",
       "body": "They name a rule set that is not on disk. The tunnel still comes up, but these rules do nothing until the sets are downloaded.",
+      "bodyGeneric": "The tunnel still comes up, but these rules do nothing right now. Each line says why.",
       "adBlock": "Ad blocking — the $tag list is not downloaded",
       "notHere": "$rule — does nothing on this device",
       "needsSets": "$rule — needs $sets",

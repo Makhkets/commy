@@ -270,6 +270,11 @@ class _Body extends ConsumerWidget {
 /// disk. Until one is downloaded the builder drops those rules so the tunnel
 /// still comes up — correct, but invisible: the rule stays on this screen,
 /// looking applied, and does nothing. This is where that stops being silent.
+///
+/// A missing download is not the only reason, though: a rule this platform
+/// cannot express (`process:` on Android), or per-app routing the device does
+/// not have, is dropped the same way and no download brings it back. The
+/// sentence about rule sets is only said when every line is one of those.
 class _DroppedRules extends StatelessWidget {
   const _DroppedRules({required this.warnings});
 
@@ -291,6 +296,18 @@ class _DroppedRules extends StatelessWidget {
           t.routing.dropped.perAppUnavailable,
         RoutingWarningKind.perAppIncludeOnly =>
           t.routing.dropped.perAppIncludeOnly,
+      };
+
+  /// Whether downloading is what fixes [warning].
+  static bool _fixedByDownload(RoutingWarning warning) =>
+      switch (warning.kind) {
+        RoutingWarningKind.ruleSetsMissing ||
+        RoutingWarningKind.adBlockListMissing =>
+          true,
+        RoutingWarningKind.ruleNotApplicable ||
+        RoutingWarningKind.perAppUnavailable ||
+        RoutingWarningKind.perAppIncludeOnly =>
+          false,
       };
 
   @override
@@ -331,7 +348,9 @@ class _DroppedRules extends StatelessWidget {
             ),
             SizedBox(height: spacing.s2),
             Text(
-              t.routing.dropped.body,
+              warnings.every(_fixedByDownload)
+                  ? t.routing.dropped.body
+                  : t.routing.dropped.bodyGeneric,
               style: context.typography.caption.copyWith(
                 color: colors.textSecondary,
               ),

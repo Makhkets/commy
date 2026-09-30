@@ -545,6 +545,29 @@ void main() {
     expect(find.text(t.routing.dropped.title), findsNothing);
   });
 
+  testWidgets('a rule no download can fix is not blamed on a rule set',
+      (tester) async {
+    // A rule this device cannot express — a typo saved before the sheet
+    // checked, a `process:` rule restored from a desktop backup — is dropped
+    // like one missing its rule set. The banner used to say every such rule
+    // "names a rule set that is not on disk" and would work "once the sets
+    // are downloaded", sending the user to a screen with nothing to fetch.
+    await pumpScreen(
+      tester,
+      policy: policyWith(<RoutingRule>[rule('regex:*.example.com')]),
+    );
+    buildConfig(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.routing.dropped.title), findsOneWidget);
+    expect(
+      find.text(t.routing.dropped.notHere(rule: 'regex:*.example.com')),
+      findsOneWidget,
+    );
+    expect(find.text(t.routing.dropped.body), findsNothing);
+    expect(find.text(t.routing.dropped.bodyGeneric), findsOneWidget);
+  });
+
   testWidgets('the rows that lead deeper are live, not dead strings',
       (tester) async {
     await pumpScreen(tester);
