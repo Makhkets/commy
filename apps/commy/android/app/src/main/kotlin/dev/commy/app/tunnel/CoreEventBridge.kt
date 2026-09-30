@@ -99,10 +99,6 @@ internal class CoreEventBridge(
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
-    /** The outbound the main group points at, for the notification. */
-    val selectedNode: String?
-        get() = lastGroups.firstOrNull { it.selected != null }?.selected
-
     /**
      * Subscribes to the status stream, which is the one to open before the
      * core starts: libbox serves it in any state, and its end is how a core

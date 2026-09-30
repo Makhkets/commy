@@ -62,26 +62,21 @@ internal class TunnelNotifications(private val context: Context) {
     /**
      * Builds the ongoing notification.
      *
-     * [node] is the outbound the group currently points at. It is the tag the
-     * core knows, not a display name: the native side has no access to the
-     * user's profile, and the wire protocol carries no name for it.
+     * It names no server. The only name this side has for one is the tag the
+     * core knows, `node-3fa1c09e7b22d415` or `auto`: the user's profile and
+     * its display names live on the Dart side, and the wire protocol carries
+     * none of them. The notification used to show that tag next to the state,
+     * for the whole session and on the lock screen too.
      */
-    fun build(state: String, node: String?, up: Long, down: Long): Notification {
+    fun build(state: String, up: Long, down: Long): Notification {
         // Recorded here rather than in [update] so that the notification the
         // service posts with startForeground counts as posted too: otherwise
         // the first traffic tick after a start always repeats it.
-        posted = contentKey(state, node, up, down)
-        val text = buildString {
-            append(stateText(state))
-            if (!node.isNullOrBlank()) {
-                append(" · ")
-                append(node)
-            }
-        }
+        posted = contentKey(state, up, down)
         val builder = NotificationCompat.Builder(context, CHANNEL_TUNNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.app_name))
-            .setContentText(text)
+            .setContentText(stateText(state))
             .setColor(ContextCompat.getColor(context, R.color.commy_connected))
             .setColorized(false)
             .setOngoing(true)
@@ -109,11 +104,11 @@ internal class TunnelNotifications(private val context: Context) {
      * different byte counts that format to the same "1.2 MB/s" are the same
      * notification, and a tick that moved nothing is not news.
      */
-    fun update(state: String, node: String?, up: Long, down: Long) {
-        if (contentKey(state, node, up, down) == posted) {
+    fun update(state: String, up: Long, down: Long) {
+        if (contentKey(state, up, down) == posted) {
             return
         }
-        manager?.notify(ID_TUNNEL, build(state, node, up, down))
+        manager?.notify(ID_TUNNEL, build(state, up, down))
     }
 
     fun cancel() {
@@ -279,8 +274,8 @@ internal class TunnelNotifications(private val context: Context) {
     }
 
     /** Everything the ongoing notification shows, as one comparable string. */
-    private fun contentKey(state: String, node: String?, up: Long, down: Long): String =
-        "$state|${node.orEmpty()}|${speedText(up, down).orEmpty()}"
+    private fun contentKey(state: String, up: Long, down: Long): String =
+        "$state|${speedText(up, down).orEmpty()}"
 
     /** The speed line, or null while nothing is moving. */
     private fun speedText(up: Long, down: Long): String? {
