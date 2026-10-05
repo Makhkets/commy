@@ -2,6 +2,7 @@ import 'package:commy_domain/src/core/json_map.dart';
 import 'package:commy_domain/src/core/json_read.dart';
 import 'package:commy_domain/src/core/redaction.dart';
 import 'package:commy_domain/src/core/sentinel.dart';
+import 'package:commy_domain/src/entities/subscription_recovery.dart';
 
 /// Quota and expiry a panel reported in the `subscription-userinfo` header.
 ///
@@ -124,15 +125,13 @@ class SubscriptionUserInfo {
     Object? expire = Sentinel.unset,
   }) {
     return SubscriptionUserInfo(
-      upload:
-          identical(upload, Sentinel.unset) ? this.upload : upload as int?,
+      upload: identical(upload, Sentinel.unset) ? this.upload : upload as int?,
       download: identical(download, Sentinel.unset)
           ? this.download
           : download as int?,
       total: identical(total, Sentinel.unset) ? this.total : total as int?,
-      expire: identical(expire, Sentinel.unset)
-          ? this.expire
-          : expire as DateTime?,
+      expire:
+          identical(expire, Sentinel.unset) ? this.expire : expire as DateTime?,
     );
   }
 
@@ -157,8 +156,7 @@ class SubscriptionUserInfo {
   int get hashCode => Object.hash(upload, download, total, expire);
 
   @override
-  String toString() =>
-      'SubscriptionUserInfo(up: $upload, down: $download, '
+  String toString() => 'SubscriptionUserInfo(up: $upload, down: $download, '
       'total: $total, expire: $expire)';
 }
 
@@ -184,6 +182,7 @@ class Subscription {
     this.lastUpdatedAt,
     this.sortIndex = 0,
     this.isCollapsed = false,
+    this.recovery,
   });
 
   /// Restores a subscription from the map produced by [toJson].
@@ -209,7 +208,21 @@ class Subscription {
         lastUpdatedAt: JsonRead.dateTimeOrNull(json, 'lastUpdatedAt'),
         sortIndex: JsonRead.integerOr(json, 'sortIndex', orElse: 0),
         isCollapsed: JsonRead.boolean(json, 'isCollapsed', orElse: false),
+        recovery: _recoveryOf(json['recovery']),
       );
+
+  /// A stored recovery state, or `null` when there is none or it does not
+  /// read: losing it costs a fresh trust-on-first-use, never the card.
+  static SubscriptionRecovery? _recoveryOf(Object? raw) {
+    if (raw is! Map<Object?, Object?>) {
+      return null;
+    }
+    try {
+      return SubscriptionRecovery.fromJson(Map<String, Object?>.from(raw));
+    } on Object {
+      return null;
+    }
+  }
 
   /// Stable identifier.
   final String id;
@@ -262,6 +275,11 @@ class Subscription {
   /// Whether its node group is folded away in the UI.
   final bool isCollapsed;
 
+  /// What the provider's signed recovery manifests established, when it
+  /// sends them (docs/adr/0019-subscription-domain-recovery.md); `null` for
+  /// every subscription whose provider does not.
+  final SubscriptionRecovery? recovery;
+
   /// Effective refresh interval, honouring the panel's own suggestion.
   Duration get updateInterval =>
       Duration(hours: updateIntervalHours ?? defaultUpdateIntervalHours);
@@ -304,6 +322,7 @@ class Subscription {
     Object? lastUpdatedAt = Sentinel.unset,
     int? sortIndex,
     bool? isCollapsed,
+    Object? recovery = Sentinel.unset,
   }) {
     return Subscription(
       id: id ?? this.id,
@@ -336,6 +355,9 @@ class Subscription {
           : lastUpdatedAt as DateTime?,
       sortIndex: sortIndex ?? this.sortIndex,
       isCollapsed: isCollapsed ?? this.isCollapsed,
+      recovery: identical(recovery, Sentinel.unset)
+          ? this.recovery
+          : recovery as SubscriptionRecovery?,
     );
   }
 
@@ -355,6 +377,7 @@ class Subscription {
         'lastUpdatedAt': lastUpdatedAt?.toIso8601String(),
         'sortIndex': sortIndex,
         'isCollapsed': isCollapsed,
+        if (recovery != null) 'recovery': recovery!.toJson(),
       };
 
   @override
@@ -374,7 +397,8 @@ class Subscription {
           other.autoUpdate == autoUpdate &&
           other.lastUpdatedAt == lastUpdatedAt &&
           other.sortIndex == sortIndex &&
-          other.isCollapsed == isCollapsed;
+          other.isCollapsed == isCollapsed &&
+          other.recovery == recovery;
 
   @override
   int get hashCode => Object.hash(
@@ -392,6 +416,7 @@ class Subscription {
         lastUpdatedAt,
         sortIndex,
         isCollapsed,
+        recovery,
       );
 
   /// Never prints [url] in full.

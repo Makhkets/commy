@@ -24,6 +24,10 @@ class LinkFormatException implements Exception {
   const LinkFormatException.unsupportedScheme(this.reason, {this.subject})
       : kind = ImportFailureKind.unsupportedScheme;
 
+  /// A link another client encrypted for itself; [subject] names the client.
+  const LinkFormatException.encrypted(this.reason, {this.subject})
+      : kind = ImportFailureKind.encrypted;
+
   /// Something that is not a link to a server at all.
   const LinkFormatException.notALink(this.reason)
       : kind = ImportFailureKind.notALink,

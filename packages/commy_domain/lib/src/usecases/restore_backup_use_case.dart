@@ -2,6 +2,7 @@ import 'package:commy_domain/src/core/failure.dart';
 import 'package:commy_domain/src/core/result.dart';
 import 'package:commy_domain/src/entities/backup_snapshot.dart';
 import 'package:commy_domain/src/entities/routing.dart';
+import 'package:commy_domain/src/entities/routing_profile.dart';
 import 'package:commy_domain/src/entities/rule_set.dart';
 import 'package:commy_domain/src/ports/library_store.dart';
 import 'package:commy_domain/src/ports/routing_repository.dart';
@@ -105,6 +106,17 @@ class RestoreBackupUseCase {
         return Err(failure);
       }
     }
+    // Replaced with the routing they belong to, including by "none":
+    // profiles left from the phone being restored over would name rules that
+    // are gone. A routing section that did not parse leaves both alone.
+    if (policy != null) {
+      final written = await routing.writeProfiles(
+        _withoutForeignApps(snapshot, perAppDropped),
+      );
+      if (written case Err(:final failure)) {
+        return Err(failure);
+      }
+    }
     final dns = snapshot.dns;
     if (dns != null) {
       final written = await routing.writeDns(dns);
@@ -140,5 +152,29 @@ class RestoreBackupUseCase {
       ];
     }
     return Ok((missingRuleSets: missing, perAppDropped: perAppDropped));
+  }
+
+  /// The backup's profiles, with per-app lists dropped when the routing's
+  /// were: package names from another platform mean nothing here.
+  static RoutingProfiles _withoutForeignApps(
+    BackupSnapshot snapshot,
+    bool dropped,
+  ) {
+    final profiles = snapshot.routingProfiles;
+    if (!dropped) {
+      return profiles;
+    }
+    return RoutingProfiles(
+      activeId: profiles.activeId,
+      profiles: <RoutingProfile>[
+        for (final profile in profiles.profiles)
+          profile.copyWith(
+            policy: profile.policy.copyWith(
+              perAppMode: PerAppMode.disabled,
+              perAppPackages: const <String>[],
+            ),
+          ),
+      ],
+    );
   }
 }

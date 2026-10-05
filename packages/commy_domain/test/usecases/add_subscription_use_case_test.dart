@@ -446,6 +446,74 @@ void main() {
       expect(nodes.stored, isEmpty);
     });
 
+    group('the name of a new card', () {
+      ParseOutcome one() => ParseOutcome(
+            nodes: <ProxyNode>[buildNode(id: 'de', name: 'Frankfurt 07')],
+          );
+
+      test("a link's hint gives way to the panel's own title", () async {
+        // Remnawave's stock page writes name=Remnawave into its Clash and
+        // v2rayNG buttons; ranked as the user's own name it replaced the
+        // panel's real title on every card added that way.
+        final subscriptions = FakeSubscriptionRepository();
+        final useCase = _useCase(
+          parser: StubLinkParser(one()),
+          nodes: RecordingNodeRepository(),
+          subscriptions: subscriptions,
+          fetcher: StubSubscriptionFetcher(
+            const SubscriptionPayload(body: 'x', profileTitle: 'AXM VPN'),
+          ),
+        );
+
+        await useCase(url: _url, nameHint: 'Remnawave');
+
+        expect(subscriptions.stored.single.name, 'AXM VPN');
+      });
+
+      test('with no title, the hint beats the bare host', () async {
+        final subscriptions = FakeSubscriptionRepository();
+        final useCase = _useCase(
+          parser: StubLinkParser(one()),
+          nodes: RecordingNodeRepository(),
+          subscriptions: subscriptions,
+        );
+
+        await useCase(url: _url, nameHint: '  Home panel ');
+
+        expect(subscriptions.stored.single.name, 'Home panel');
+      });
+
+      test("the user's own name still wins over both", () async {
+        final subscriptions = FakeSubscriptionRepository();
+        final useCase = _useCase(
+          parser: StubLinkParser(one()),
+          nodes: RecordingNodeRepository(),
+          subscriptions: subscriptions,
+          fetcher: StubSubscriptionFetcher(
+            const SubscriptionPayload(body: 'x', profileTitle: 'AXM VPN'),
+          ),
+        );
+
+        await useCase(url: _url, name: 'Mine', nameHint: 'Remnawave');
+
+        expect(subscriptions.stored.single.name, 'Mine');
+      });
+
+      test('a hint never renames a card that is already there', () async {
+        final subscriptions = FakeSubscriptionRepository();
+        final first = _useCase(
+          parser: StubLinkParser(one()),
+          nodes: RecordingNodeRepository(),
+          subscriptions: subscriptions,
+        );
+        await first(url: _url, name: 'Kept');
+
+        await first(url: _url, nameHint: 'Remnawave');
+
+        expect(subscriptions.stored.single.name, 'Kept');
+      });
+    });
+
     test('a write the store refused is not reported as an import', () async {
       final nodes = RecordingNodeRepository()
         ..failure = const StorageFailure('database is locked');

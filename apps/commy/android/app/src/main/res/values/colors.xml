@@ -11,4 +11,11 @@
          is allowed outside the Flutter token set: Notification.color is read by
          the system before our UI exists, so it cannot come from commy_ui. -->
     <color name="commy_connected">#2FD98A</color>
+
+    <!-- The home-screen widget, dark tokens of docs/04-design-system.md. -->
+    <color name="widget_surface">#131519</color>
+    <color name="widget_raised">#24272C</color>
+    <color name="widget_text">#F2F3F5</color>
+    <color name="widget_text_tertiary">#8E939A</color>
+    <color name="widget_button_text">#0A0B0D</color>
 </resources>

@@ -60,7 +60,7 @@ class _SubscriptionSheetState extends ConsumerState<SubscriptionSheet> {
     final spacing = context.spacing;
     final state = ref.watch(importControllerProvider);
 
-    if (state.outcome != null || state.failure != null) {
+    if (state.hasResult) {
       return const ImportResultPanel();
     }
 

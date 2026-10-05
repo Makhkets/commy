@@ -6,6 +6,7 @@ import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/screens/settings/dns_screen.dart';
+import 'package:commy/src/screens/settings/routing_profiles_row.dart';
 import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -93,6 +94,7 @@ class _Body extends ConsumerWidget {
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
         if (warnings.isNotEmpty) _DroppedRules(warnings: warnings),
+        const RoutingProfilesRow(),
         Padding(
           padding: EdgeInsets.all(spacing.s4),
           child: SegmentedControl<RoutingMode>(

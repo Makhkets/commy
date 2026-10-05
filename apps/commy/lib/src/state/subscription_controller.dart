@@ -25,6 +25,7 @@ class SubscriptionActionState {
     this.refreshingId,
     this.failure,
     this.importedCount,
+    this.servedByMirror = false,
   });
 
   /// Nothing in flight.
@@ -39,16 +40,23 @@ class SubscriptionActionState {
   /// How many servers the last refresh brought in, for the toast.
   final int? importedCount;
 
+  /// Whether the last refresh was answered by one of the provider's mirrors
+  /// because the subscription's own address was silent (ADR-0019) — said in
+  /// the toast, since it is the first sign the address is in trouble.
+  final bool servedByMirror;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SubscriptionActionState &&
           other.refreshingId == refreshingId &&
           other.failure == failure &&
-          other.importedCount == importedCount;
+          other.importedCount == importedCount &&
+          other.servedByMirror == servedByMirror;
 
   @override
-  int get hashCode => Object.hash(refreshingId, failure, importedCount);
+  int get hashCode =>
+      Object.hash(refreshingId, failure, importedCount, servedByMirror);
 
   @override
   String toString() => 'SubscriptionActionState($refreshingId, $failure)';
@@ -88,10 +96,60 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
       state = SubscriptionActionState(failure: failure);
       return false;
     }
+    final synced = result.valueOrNull;
     state = SubscriptionActionState(
-      importedCount: result.valueOrNull?.importedCount ?? 0,
+      importedCount: synced?.importedCount ?? 0,
+      servedByMirror: synced?.servedBy == RecoverySource.mirror,
     );
     return true;
+  }
+
+  /// Answers the change of address the provider of [id] signed
+  /// (docs/adr/0019-subscription-domain-recovery.md), and on "yes" fetches
+  /// the subscription from its new address at once — the user just agreed to
+  /// it because the old one stopped working.
+  ///
+  /// Returns the subscription as stored after the answer, or `null` when it
+  /// could not be written.
+  Future<Subscription?> resolveDomainChange(
+    String id, {
+    required bool accept,
+  }) async {
+    final result = await ref.read(resolveDomainChangeUseCaseProvider)(
+      subscriptionId: id,
+      accept: accept,
+    );
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      ref.read(appLoggerProvider).warn(
+            'domain change not recorded: ${FailureLog.describe(failure)}',
+            tag: logTag,
+          );
+      _settle(failure);
+      return null;
+    }
+    ref.read(appLoggerProvider).info(
+          accept ? 'subscription moved by its provider' : 'move declined',
+          tag: logTag,
+        );
+    if (accept) {
+      await refresh(id);
+    }
+    return result.valueOrNull;
+  }
+
+  /// Lets the subscription use its provider's mirrors and meeting points, or
+  /// stops it (exception E-4).
+  Future<void> setRecoveryEnabled(
+    Subscription subscription, {
+    required bool enabled,
+  }) {
+    return _edit(subscription.id, (current) {
+      final recovery = current.recovery;
+      return recovery == null
+          ? current
+          : current.copyWith(recovery: recovery.copyWith(enabled: enabled));
+    });
   }
 
   /// Folds or unfolds the card.

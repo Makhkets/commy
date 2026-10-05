@@ -4,6 +4,7 @@ import 'package:commy_domain/src/entities/node_duplicates.dart';
 import 'package:commy_domain/src/entities/panel_notice.dart';
 import 'package:commy_domain/src/entities/parse_outcome.dart';
 import 'package:commy_domain/src/entities/proxy_node.dart';
+import 'package:commy_domain/src/entities/recovery_manifest.dart';
 import 'package:commy_domain/src/entities/subscription.dart';
 import 'package:commy_domain/src/entities/subscription_identity.dart';
 import 'package:commy_domain/src/entities/subscription_payload.dart';
@@ -13,6 +14,7 @@ import 'package:commy_domain/src/ports/link_parser.dart';
 import 'package:commy_domain/src/ports/node_repository.dart';
 import 'package:commy_domain/src/ports/subscription_fetcher.dart';
 import 'package:commy_domain/src/ports/subscription_repository.dart';
+import 'package:commy_domain/src/usecases/recovery_engine.dart';
 
 /// Adds a subscription: fetches it, parses it and stores both halves.
 ///
@@ -47,6 +49,7 @@ class AddSubscriptionUseCase {
     required this.subscriptions,
     required this.nodes,
     required this.ids,
+    this.recovery,
   });
 
   /// What downloads the document.
@@ -64,12 +67,23 @@ class AddSubscriptionUseCase {
   /// Where the new identifier comes from.
   final IdGenerator ids;
 
+  /// The recovery half: reads the provider's signed manifest, if it sent
+  /// one, and pins its key (docs/adr/0019-subscription-domain-recovery.md).
+  final RecoveryEngine? recovery;
+
   /// Fetches [url] and stores it as a subscription.
   ///
   /// [name] wins over the panel's own `profile-title`; when both are absent
   /// the host is used, which is at least recognisable. On a URL the user
   /// already has, an empty [name] keeps the name they gave that card rather
   /// than reverting it to whatever the panel calls itself.
+  ///
+  /// [nameHint] is a name someone other than the user and the panel offered:
+  /// the `name=` or fragment of another client's import link. It ranks below
+  /// the panel's title and above the host, and never renames a card that is
+  /// already there. Remnawave's stock page writes `name=Remnawave` into every
+  /// Clash and v2rayNG button, and ranked as [name] that word replaced the
+  /// panel's real title on every card added that way.
   ///
   /// [intervalHours] is the user's own choice of refresh period, and it is
   /// applied unless the panel sent one of its own in this very response. The
@@ -79,6 +93,7 @@ class AddSubscriptionUseCase {
   Future<Result<SubscriptionSyncResult, CommyFailure>> call({
     required Uri url,
     String? name,
+    String? nameHint,
     bool autoUpdate = false,
     int? intervalHours,
   }) async {
@@ -138,14 +153,30 @@ class AddSubscriptionUseCase {
         }
       }
 
+      // The address the user just gave is the subscription's own: a manifest
+      // in its answer may pin a key. Re-adding a card keeps what it had
+      // learnt and weighs the manifest against it, like a refresh does.
+      var recoveryState = fresh?.recovery;
+      final engine = recovery;
+      if (engine != null) {
+        final taken = await engine.take(
+          payload.manifest,
+          state: recoveryState,
+          source: RecoverySource.primary,
+          subscriptionUrl: url,
+        );
+        recoveryState = taken?.state ?? recoveryState;
+      }
+
       final id = fresh?.id ?? ids.newId();
       final draft = fresh == null
           ? Subscription(
               id: id,
-              name: _pickName(name, payload, url),
+              name: _pickName(name, payload, url, hint: nameHint),
               url: url,
               autoUpdate: autoUpdate,
               lastUpdatedAt: DateTime.now(),
+              recovery: recoveryState,
             )
           : fresh.copyWith(
               // The URL is rewritten to the one just typed. It matched, so it
@@ -156,6 +187,7 @@ class AddSubscriptionUseCase {
               name: _renamed(name) ?? fresh.name,
               autoUpdate: autoUpdate,
               lastUpdatedAt: DateTime.now(),
+              recovery: recoveryState,
             );
       final subscription = _withInterval(
         payload.applyTo(draft),
@@ -253,7 +285,12 @@ class AddSubscriptionUseCase {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  String _pickName(String? given, SubscriptionPayload payload, Uri url) {
+  String _pickName(
+    String? given,
+    SubscriptionPayload payload,
+    Uri url, {
+    String? hint,
+  }) {
     final trimmed = given?.trim() ?? '';
     if (trimmed.isNotEmpty) {
       return trimmed;
@@ -261,6 +298,10 @@ class AddSubscriptionUseCase {
     final title = payload.profileTitle?.trim() ?? '';
     if (title.isNotEmpty) {
       return title;
+    }
+    final hinted = hint?.trim() ?? '';
+    if (hinted.isNotEmpty) {
+      return hinted;
     }
     return url.host;
   }

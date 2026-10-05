@@ -1,4 +1,5 @@
 import 'package:commy_domain/src/entities/parse_outcome.dart';
+import 'package:commy_domain/src/entities/recovery_manifest.dart';
 import 'package:commy_domain/src/entities/subscription.dart';
 
 /// What a subscription add or refresh produced.
@@ -12,6 +13,7 @@ class SubscriptionSyncResult {
     required this.outcome,
     this.updatedExisting = false,
     this.panelNotices = const <String>[],
+    this.servedBy = RecoverySource.primary,
   });
 
   /// The stored subscription, metadata already refreshed.
@@ -35,6 +37,12 @@ class SubscriptionSyncResult {
   /// the difference between a silent no-op and an answer.
   final bool updatedExisting;
 
+  /// Which address answered: the subscription's own, or — when it did not —
+  /// one of the provider's mirrors (docs/adr/0019-subscription-domain-
+  /// recovery.md). Never [RecoverySource.rendezvous]: a meeting point serves
+  /// manifests, not servers.
+  final RecoverySource servedBy;
+
   /// How many nodes were imported.
   int get importedCount => outcome.nodes.length;
 
@@ -48,6 +56,7 @@ class SubscriptionSyncResult {
           other.subscription == subscription &&
           other.outcome == outcome &&
           other.updatedExisting == updatedExisting &&
+          other.servedBy == servedBy &&
           _sameNotices(other.panelNotices);
 
   @override
@@ -55,6 +64,7 @@ class SubscriptionSyncResult {
         subscription,
         outcome,
         updatedExisting,
+        servedBy,
         Object.hashAll(panelNotices),
       );
 

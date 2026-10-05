@@ -73,6 +73,11 @@ class SubscriptionHeaders {
     'profile-announce',
   ];
 
+  /// Header holding the provider's signed recovery manifest
+  /// (docs/adr/0019-subscription-domain-recovery.md). Passed on as it came;
+  /// believing it is `ManifestReader`'s job.
+  static const String manifestHeader = 'commy-manifest';
+
   /// Marker some panels put in front of a base64 encoded header value.
   static const String base64Prefix = 'base64:';
 
@@ -155,6 +160,7 @@ class SubscriptionHeaders {
         supportUrl: supportUrl,
         updateIntervalHours: updateIntervalHours,
         announcement: announcement,
+        manifest: value(manifestHeader),
       );
 
   /// Decodes a header value that may be base64, percent-encoded or plain.

@@ -44,7 +44,7 @@ class CommyDatabase extends _$CommyDatabase {
   /// Bump it in the same commit that adds the matching `if (from < n)` block in
   /// [migration] and the matching test. A VPN client that loses every profile
   /// on update has lost the user (docs/06-data-model.md, "Миграции").
-  static const int currentSchemaVersion = 1;
+  static const int currentSchemaVersion = 2;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -61,10 +61,15 @@ class CommyDatabase extends _$CommyDatabase {
           if (from < 1) {
             await migrator.createAll();
           }
-          // Version 2 goes here:
-          // if (from < 2) {
-          //   await migrator.addColumn(nodeRows, nodeRows.someNewColumn);
-          // }
+          // 2: what a provider's signed recovery manifests established
+          // (ADR-0019). A nullable column, so every card that has one reads
+          // as "no manifest seen yet" — which is exactly true.
+          if (from < 2) {
+            await migrator.addColumn(
+              subscriptionRows,
+              subscriptionRows.recoveryJson,
+            );
+          }
         },
         beforeOpen: (details) async {
           // The node table cascades off subscriptions and groups, and SQLite

@@ -205,17 +205,133 @@ void main() {
     harness.subscriptionFetcher.body = link;
     const inner = 'https://panel.example.com/sub/token123';
 
-    final nodeId = await container
-        .read(importControllerProvider.notifier)
-        .importText(
-          'sing-box://import-remote-profile'
-          '?url=${Uri.encodeComponent(inner)}#Home%20panel',
-        );
+    final nodeId =
+        await container.read(importControllerProvider.notifier).importText(
+              'sing-box://import-remote-profile'
+              '?url=${Uri.encodeComponent(inner)}#Home%20panel',
+            );
 
     expect(harness.subscriptionFetcher.requests, <Uri>[Uri.parse(inner)]);
     expect(nodeId, isNotNull);
     expect(harness.subscriptionRepository.items.single.name, 'Home panel');
     expect(container.read(importControllerProvider).failure, isNull);
+  });
+
+  // v2RayTun's button carries a lone key as readily as a subscription, and a
+  // panel's bot sends exactly that: the server inside is imported as if it
+  // had been pasted, and no panel is asked for anything.
+  test("a single server inside another client's link is imported as one",
+      () async {
+    start();
+
+    final nodeId = await container
+        .read(importControllerProvider.notifier)
+        .importText('v2raytun://import/${Uri.encodeComponent(link)}');
+
+    expect(harness.subscriptionFetcher.requests, isEmpty);
+    expect(nodeId, isNotNull);
+    expect(container.read(importControllerProvider).failure, isNull);
+    expect(
+      container.read(importControllerProvider).outcome?.nodes.single.name,
+      'Amsterdam 03',
+    );
+  });
+
+  test("a Clash button's name= is only a hint, used when the panel has none",
+      () async {
+    start();
+    harness.subscriptionFetcher.body = link;
+    const inner = 'https://panel.example.com/sub/token123';
+
+    await container.read(importControllerProvider.notifier).importText(
+          'clashmeta://install-config?name=Remnawave'
+          '&url=${Uri.encodeComponent(inner)}',
+        );
+
+    expect(harness.subscriptionFetcher.requests, <Uri>[Uri.parse(inner)]);
+    // The fake panel sends no profile-title, so the hint is what is left.
+    expect(harness.subscriptionRepository.items.single.name, 'Remnawave');
+  });
+
+  group('a batch of scanned codes', () {
+    const second = 'trojan://secret-password@de-07.example.net:443#Frankfurt';
+    final panelA = Uri.parse('https://a.example.com/sub/token-a');
+    final panelB = Uri.parse('https://b.example.com/sub/token-b');
+
+    test('subscriptions are fetched, links parsed together, one report',
+        () async {
+      start();
+      harness.subscriptionFetcher.body = link;
+
+      final nodeId = await container
+          .read(importControllerProvider.notifier)
+          .importBatch(<String>[
+        '$panelA',
+        second,
+        'happ://add/$panelB',
+        '  $panelA  ',
+      ]);
+
+      // The same code seen twice is one subscription, fetched once.
+      expect(harness.subscriptionFetcher.requests, <Uri>[panelA, panelB]);
+      expect(nodeId, isNotNull);
+      final state = container.read(importControllerProvider);
+      expect(state.failure, isNull);
+      expect(state.failedSubscriptions, 0);
+      expect(harness.subscriptionRepository.items, hasLength(2));
+      expect(
+        state.outcome?.nodes.map((node) => node.name),
+        containsAll(<String>['Amsterdam 03', 'Frankfurt']),
+      );
+    });
+
+    test('a subscription that fails is counted, the rest still lands',
+        () async {
+      start();
+      harness.subscriptionFetcher
+        ..body = link
+        ..failuresFor[panelB] = SubscriptionUnreachableFailure(
+          url: panelB,
+          cause: 'the panel did not answer',
+        );
+
+      await container
+          .read(importControllerProvider.notifier)
+          .importBatch(<String>['$panelA', '$panelB']);
+
+      final state = container.read(importControllerProvider);
+      expect(state.failure, isNull);
+      expect(state.failedSubscriptions, 1);
+      expect(state.outcome?.nodes, isNotEmpty);
+      expect(harness.subscriptionRepository.items, hasLength(1));
+    });
+
+    test('a batch that brings in nothing reports its first failure', () async {
+      start();
+      final refused = SubscriptionUnreachableFailure(
+        url: panelA,
+        cause: 'the panel did not answer',
+      );
+      harness.subscriptionFetcher.failure = refused;
+
+      final nodeId = await container
+          .read(importControllerProvider.notifier)
+          .importBatch(<String>['$panelA', '$panelB']);
+
+      expect(nodeId, isNull);
+      expect(container.read(importControllerProvider).failure, refused);
+    });
+
+    test('nothing to import is not an import', () async {
+      start();
+
+      final nodeId = await container
+          .read(importControllerProvider.notifier)
+          .importBatch(<String>['', '   ']);
+
+      expect(nodeId, isNull);
+      expect(container.read(importControllerProvider), ImportState.idle);
+    });
   });
 
   test('an http proxy link is still a proxy, not a subscription', () {

@@ -146,6 +146,22 @@ class SubscriptionMenuSheet extends ConsumerWidget {
               onTap: () =>
                   unawaited(_pickUserAgent(context, controller, current)),
             ),
+            // Only for a provider that signs recovery manifests: for every
+            // other subscription there is nothing to switch, and a row that
+            // only ever said "not available" would be noise (ADR-0019).
+            if (current.recovery case final SubscriptionRecovery recovery)
+              SettingsTile(
+                icon: CommyIcons.lock,
+                title: t.subscription.recovery.title,
+                subtitle: _recoveryStatus(t, recovery),
+                trailing: CommySwitch(
+                  value: recovery.enabled,
+                  semanticLabel: t.subscription.recovery.title,
+                  onChanged: (value) => unawaited(
+                    controller.setRecoveryEnabled(current, enabled: value),
+                  ),
+                ),
+              ),
             SettingsTile(
               icon: CommyIcons.delete,
               title: t.subscription.menu.delete,
@@ -157,6 +173,21 @@ class SubscriptionMenuSheet extends ConsumerWidget {
         SizedBox(height: spacing.s4),
       ],
     );
+  }
+
+  /// What recovery holds for this card, and where it would ask: the meeting
+  /// point's host is named before any request goes there (docs/09, E-4).
+  String _recoveryStatus(Translations t, SubscriptionRecovery recovery) {
+    if (!recovery.enabled) {
+      return t.subscription.recovery.off;
+    }
+    final points = recovery.rendezvous;
+    return points.isEmpty
+        ? t.subscription.recovery.status(mirrors: recovery.mirrors.length)
+        : t.subscription.recovery.statusPoint(
+            mirrors: recovery.mirrors.length,
+            host: points.first.host,
+          );
   }
 
   String _subtitle(Translations t, Subscription current, DateTime now) {

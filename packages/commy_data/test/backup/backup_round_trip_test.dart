@@ -86,6 +86,23 @@ void main() {
       ),
     );
     await phoneA.routing.writeDns(const DnsSettings(fakeIp: true));
+    await phoneA.routing.writeProfiles(
+      const RoutingProfiles(
+        activeId: 'home',
+        profiles: <RoutingProfile>[
+          RoutingProfile(
+            id: 'home',
+            name: 'Home',
+            policy: RoutingPolicy.defaults,
+          ),
+          RoutingProfile(
+            id: 'travel',
+            name: 'Travel',
+            policy: RoutingPolicy(mode: RoutingMode.global),
+          ),
+        ],
+      ),
+    );
     await phoneA.settings.write(const AppSettings(hideUnavailable: true));
     await phoneA.settings.writeSelectedNodeId('node-trojan');
     await phoneA.store.write(SecretKeys.deviceId, 'hwid-of-phone-a');
@@ -104,12 +121,14 @@ void main() {
   });
 
   test('every settings key travels', () {
-    // All four are the user's choices; a fifth needs a decision here.
+    // All five are the user's choices; a sixth needs a decision here.
+    // Routing profiles (D10) travel with the routing they belong to.
     expect(SettingKeys.all.toSet(), <String>{
       SettingKeys.appSettings,
       SettingKeys.routingPolicy,
       SettingKeys.dnsSettings,
       SettingKeys.selectedNodeId,
+      SettingKeys.routingProfiles,
     });
   });
 
@@ -148,6 +167,9 @@ void main() {
     expect(nodes.firstWhere((n) => n.id == 'node-trojan').groupId, 'g1');
     expect(policy.blockAds, isTrue);
     expect((await phoneB.routing.readDns()).valueOrNull!.fakeIp, isTrue);
+    final profiles = (await phoneB.routing.readProfiles()).valueOrNull!;
+    expect(profiles.profiles.map((p) => p.name), <String>['Home', 'Travel']);
+    expect(profiles.activeId, 'home');
     expect(
       (await phoneB.settings.read()).valueOrNull!.hideUnavailable,
       isTrue,

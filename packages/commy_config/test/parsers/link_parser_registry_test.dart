@@ -69,8 +69,7 @@ vless://uuid@a.example:443?type=kcp#K
 ''');
 
       final kinds = <(ImportFailureKind, String?)>[
-        for (final failure in outcome.failures)
-          (failure.kind, failure.subject),
+        for (final failure in outcome.failures) (failure.kind, failure.subject),
       ];
       expect(kinds, <(ImportFailureKind, String?)>[
         (ImportFailureKind.notALink, null),
@@ -83,6 +82,29 @@ vless://uuid@a.example:443?type=kcp#K
       // The subject is shown on screen: the key after the scheme is not.
       for (final failure in outcome.failures) {
         expect('${failure.subject}', isNot(contains('SeCrEtKeY')));
+      }
+    });
+
+    test('a link encrypted for another client says whose it is', () {
+      // A panel's bot hands out happ://crypt5/… on purpose, and "happ:// is
+      // not supported" sent the user looking for a newer Commy instead of
+      // asking the provider for the plain address.
+      final outcome = registry.parseLines(
+        'happ://crypt5/SeCrEtPaYlOaD\nincy://crypt1/SeCrEtPaYlOaD',
+      );
+
+      expect(
+        <(ImportFailureKind, String?)>[
+          for (final failure in outcome.failures)
+            (failure.kind, failure.subject),
+        ],
+        <(ImportFailureKind, String?)>[
+          (ImportFailureKind.encrypted, 'Happ'),
+          (ImportFailureKind.encrypted, 'INCY'),
+        ],
+      );
+      for (final failure in outcome.failures) {
+        expect(failure.reason, isNot(contains('SeCrEt')));
       }
     });
 

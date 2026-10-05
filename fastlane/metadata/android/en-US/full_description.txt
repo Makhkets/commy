@@ -1,0 +1,20 @@
+<p><b>Commy</b> connects you to <b>your own</b> servers, or to the subscription your provider gave you (Remnawave, Marzban, 3x-ui and other panels). It is a client, not a VPN service: no servers of ours, no bundled configs, no accounts.</p>
+
+<p><b>Protocols:</b> VLESS (Reality, XTLS Vision, XHTTP), VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard, ShadowTLS, SOCKS, HTTP — on the sing-box core.</p>
+
+<p><b>Features</b></p>
+<ul>
+<li>Subscriptions with quota, expiry and announcements; auto refresh; HWID for panels that limit devices</li>
+<li>Opens “Add to…” links of Happ, INCY, v2RayTun, Hiddify, Shadowrocket, v2rayNG, Clash and more</li>
+<li>QR codes, several in a row; files; clipboard</li>
+<li>Auto server, one-tap ping, failover when a server stops answering</li>
+<li>Connection diagnosis that names what broke: DNS, port, TLS or the protocol</li>
+<li>Routing: global, rules or direct; geoip/geosite; per-app; ad blocking through DNS; routing profiles you can share as a link</li>
+<li>Subscription address recovery: when your provider’s domain is blocked, Commy moves to the new one the provider signed — after you confirm</li>
+<li>Two DNS resolvers to avoid leaks; kill switch through Always-on VPN</li>
+<li>Encrypted backup under a password; Quick Settings tile and home-screen widget</li>
+</ul>
+
+<p><b>Quiet on the network.</b> No analytics, no crash reports, no update checks. Every exception is listed on one settings screen.</p>
+
+<p>GPL-3.0. Source and documentation: https://github.com/Makhkets/Commy · https://commy.makhkets.ru</p>

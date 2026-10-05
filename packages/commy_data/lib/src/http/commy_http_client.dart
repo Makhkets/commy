@@ -20,9 +20,12 @@ import 'package:dio/io.dart';
 /// * E-1, the external IP check, on an explicit button press, through the
 ///   tunnel, with the endpoint the user configured (empty by default);
 /// * E-2, the geoip/geosite rule sets, on an explicit button press;
-/// * E-3, the ad blocking lists, only while that feature is on.
+/// * E-3, the ad blocking lists, only while that feature is on;
+/// * E-4, a subscription provider's mirrors and meeting points, only for a
+///   subscription whose provider signed a recovery manifest
+///   (docs/adr/0019-subscription-domain-recovery.md).
 ///
-/// There is no fifth caller, no analytics, no crash reporter and no update
+/// There is no other caller, no analytics, no crash reporter and no update
 /// check. Adding one is an owner decision (docs/09-security-privacy.md).
 class CommyHttpClient {
   /// Creates the client.

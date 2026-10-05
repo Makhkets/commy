@@ -37,6 +37,7 @@ abstract final class SubscriptionMapper {
       lastUpdatedAt: row.lastUpdatedAt,
       sortIndex: row.sortIndex,
       isCollapsed: row.isCollapsed,
+      recovery: _recoveryOf(row.recoveryJson),
     );
   }
 
@@ -64,7 +65,26 @@ abstract final class SubscriptionMapper {
       lastUpdatedAt: Value<DateTime?>(subscription.lastUpdatedAt),
       sortIndex: Value<int>(subscription.sortIndex),
       isCollapsed: Value<bool>(subscription.isCollapsed),
+      recoveryJson: Value<String?>(
+        subscription.recovery == null
+            ? null
+            : JsonText.encode(subscription.recovery!.toJson()),
+      ),
     );
+  }
+
+  /// The stored recovery state, or `null` when there is none or it does not
+  /// read. A state that cannot be read costs a fresh trust-on-first-use on
+  /// the next refresh, never the card.
+  static SubscriptionRecovery? _recoveryOf(String? raw) {
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      return SubscriptionRecovery.fromJson(JsonText.decodeOrEmpty(raw));
+    } on Object {
+      return null;
+    }
   }
 
   static Uri? _uriOrNull(String? raw) =>

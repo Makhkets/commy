@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_network_diagnostics.dart';
 import 'fake_repositories.dart';
 
 /// The harness every widget test in this package pumps through.
@@ -76,6 +77,12 @@ class CommyTestHarness {
 
   /// The subscription server. Answers from a field, never opens a socket.
   final FakeSubscriptionFetcher subscriptionFetcher = FakeSubscriptionFetcher();
+
+  /// A provider's meeting points. Exception E-4, without a socket.
+  final FakeRendezvousFetcher rendezvous = FakeRendezvousFetcher();
+
+  /// A diagnosis's DNS and TLS checks, without a socket.
+  final FakeNetworkDiagnostics network = FakeNetworkDiagnostics();
 
   /// The geoip and geosite files. Exception E-2, without a socket.
   final FakeRuleSetRepository ruleSetRepository;
@@ -142,6 +149,8 @@ class CommyTestHarness {
       routingRepositoryProvider.overrideWithValue(routingRepository),
       logRepositoryProvider.overrideWithValue(logRepository),
       subscriptionFetcherProvider.overrideWithValue(subscriptionFetcher),
+      rendezvousFetcherProvider.overrideWithValue(rendezvous),
+      networkDiagnosticsProvider.overrideWithValue(network),
       ruleSetRepositoryProvider.overrideWithValue(ruleSetRepository),
       trafficHistoryRepositoryProvider.overrideWithValue(trafficHistory),
       // Never the real one: it opens a socket, and a test that dials out is

@@ -111,10 +111,26 @@
 
                 <!-- Migration from other clients, per docs/06-data-model.md.
                      Someone already using Happ or NekoBox should not have to
-                     retype anything to try this one. -->
+                     retype anything to try this one. The list is the one
+                     ForeignImportLink reads, and a test keeps the two equal:
+                     the buttons of Remnawave's stock subscription page, plus
+                     INCY and v2RayTun, which panels' bots send. -->
                 <data android:scheme="happ" />
+                <data android:scheme="incy" />
+                <data android:scheme="v2raytun" />
+                <data android:scheme="streisand" />
+                <data android:scheme="hiddify" />
                 <data android:scheme="sing-box" />
                 <data android:scheme="clash" />
+                <data android:scheme="clashmeta" />
+                <data android:scheme="flclashx" />
+                <data android:scheme="stash" />
+                <data android:scheme="koala-clash" />
+                <data android:scheme="prizrak-box" />
+                <data android:scheme="v2rayng" />
+                <data android:scheme="exclave" />
+                <data android:scheme="sub" />
+                <data android:scheme="shadowrocket" />
             </intent-filter>
 
             <!-- Config files opened from a file manager or a chat app. -->
@@ -202,6 +218,18 @@
                 android:name="android.service.quicksettings.TOGGLEABLE_TILE"
                 android:value="true" />
         </service>
+
+        <!-- Home-screen widget: the tile's state and button, on the launcher. -->
+        <receiver
+            android:name=".tunnel.CommyWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/commy_widget_info" />
+        </receiver>
 
         <receiver
             android:name=".tunnel.BootReceiver"

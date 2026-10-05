@@ -103,6 +103,8 @@ class ImportState {
     this.failure,
     this.updatedExisting = false,
     this.panelNotices = const <String>[],
+    this.failedSubscriptions = 0,
+    this.routingProfile,
   });
 
   /// Nothing has been tried.
@@ -132,6 +134,23 @@ class ImportState {
   /// for was the one already on the list.
   final bool updatedExisting;
 
+  /// How many subscriptions of a batch could not be added.
+  ///
+  /// Only a batch sets it ([ImportController.importBatch]): one scanned code
+  /// that fails is the import's [failure], but five codes of which two fail
+  /// still brought in what the other three hold, and the sheet has to say
+  /// both. Why each one failed is in the log.
+  final int failedSubscriptions;
+
+  /// A routing profile from a shared `commy://routing/` link, waiting for the
+  /// user to add it (D11). Nothing is changed until they do: a link from a
+  /// chat must not rewrite someone's routing on a tap.
+  final RoutingProfile? routingProfile;
+
+  /// Whether there is anything for the result panel to show.
+  bool get hasResult =>
+      outcome != null || failure != null || routingProfile != null;
+
   /// Whether the last import stored at least one server.
   bool get succeeded => (outcome?.nodes.length ?? 0) > 0;
 
@@ -143,6 +162,8 @@ class ImportState {
           other.outcome == outcome &&
           other.failure == failure &&
           other.updatedExisting == updatedExisting &&
+          other.failedSubscriptions == failedSubscriptions &&
+          other.routingProfile == routingProfile &&
           other.panelNotices.length == panelNotices.length &&
           other.panelNotices.join() == panelNotices.join();
 
@@ -152,6 +173,8 @@ class ImportState {
         outcome,
         failure,
         updatedExisting,
+        failedSubscriptions,
+        routingProfile,
         Object.hashAll(panelNotices),
       );
 
@@ -224,18 +247,41 @@ class ImportController extends Notifier<ImportState> {
     if (_alreadyRunning || input.trim().isEmpty) {
       return null;
     }
+    // A shared routing profile is not a server: it is offered on the sheet
+    // and only applied when the user says so.
+    if (RoutingProfileLink.matches(input)) {
+      final ticket = _begin();
+      final profile = RoutingProfileLink.decode(
+        input,
+        id: ref.read(idGeneratorProvider).newId(),
+      );
+      _publish(
+        ticket,
+        profile == null
+            ? const ImportState(
+                failure: SubscriptionMalformedFailure('routing profile link'),
+              )
+            : ImportState(routingProfile: profile),
+      );
+      return null;
+    }
     // Another client's import link — "Add to Happ", "Import to sing-box" on
     // a panel's page — carries a subscription inside. The scheme is
     // registered, so the tap lands here; the link parser knows none of these.
+    // Its name is the page's, not the user's: a hint the panel's own title
+    // outranks (Remnawave's stock page names every Clash button "Remnawave").
     final foreign = ForeignImportLink.unwrap(input);
     if (foreign != null) {
-      return addSubscription(url: foreign.url, name: foreign.name);
+      return addSubscription(url: foreign.url, nameHint: foreign.name);
     }
     final subscription = subscriptionAddress(input);
     if (subscription != null) {
       return addSubscription(url: subscription);
     }
-    return _importText(_begin(), input);
+    // Or a single server inside one: `v2raytun://import/vless%3A%2F%2F…`,
+    // which a panel's bot sends for a lone key. Parsed as if it were pasted.
+    final inner = ForeignImportLink.innerLink(input);
+    return _importText(_begin(), inner ?? input);
   }
 
   /// The address of a subscription, when [input] is one and nothing else.
@@ -273,9 +319,14 @@ class ImportController extends Notifier<ImportState> {
   /// subscription, on purpose: the panel's own `profile-update-interval`
   /// header wins when it sends one, and the user's choice only fills the gap
   /// when it does not (docs/05-ux-flows.md, scenario 3).
+  ///
+  /// [name] is the user's own and wins over everything; [nameHint] is what
+  /// another client's import link called the subscription, and only fills in
+  /// when the panel sends no title (`AddSubscriptionUseCase.call`).
   Future<String?> addSubscription({
     required Uri url,
     String? name,
+    String? nameHint,
     bool autoUpdate = true,
     int? intervalHours,
   }) async {
@@ -286,6 +337,7 @@ class ImportController extends Notifier<ImportState> {
     final result = await ref.read(addSubscriptionUseCaseProvider)(
       url: url,
       name: name,
+      nameHint: nameHint,
       autoUpdate: autoUpdate,
       intervalHours: intervalHours,
     );
@@ -317,6 +369,115 @@ class ImportController extends Notifier<ImportState> {
         outcome: outcome,
         updatedExisting: synced?.updatedExisting ?? false,
         panelNotices: synced?.panelNotices ?? const <String>[],
+      ),
+    );
+    return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;
+  }
+
+  /// Imports several scanned codes as one import.
+  ///
+  /// Operators hand QR codes out by the sheet — a leaflet of keys, a sticker
+  /// per subscription — and scanning them one sheet at a time meant opening
+  /// the scanner once per code (docs/19-commy-cloud.md, §3.1). Each payload is
+  /// sorted the way [importText] sorts one: another client's link or a bare
+  /// address is a subscription, fetched in turn; everything else is a link,
+  /// and all the links are parsed together as one paste.
+  ///
+  /// One report for the lot. Subscriptions that could not be added are
+  /// counted ([ImportState.failedSubscriptions]) and logged rather than
+  /// turning the whole batch into a failure; only a batch that brought in
+  /// nothing at all reports the first failure as the import's.
+  Future<String?> importBatch(List<String> payloads) async {
+    if (_alreadyRunning) {
+      return null;
+    }
+    final items = <String>{
+      for (final payload in payloads)
+        if (payload.trim().isNotEmpty) payload.trim(),
+    };
+    if (items.isEmpty) {
+      return null;
+    }
+    final ticket = _begin();
+    final links = <String>[];
+    final subscriptions = <({Uri url, String? hint})>[];
+    for (final item in items) {
+      final foreign = ForeignImportLink.unwrap(item);
+      if (foreign != null) {
+        subscriptions.add((url: foreign.url, hint: foreign.name));
+        continue;
+      }
+      final address = subscriptionAddress(item);
+      if (address != null) {
+        subscriptions.add((url: address, hint: null));
+        continue;
+      }
+      links.add(ForeignImportLink.innerLink(item) ?? item);
+    }
+
+    var outcome = ParseOutcome.empty;
+    CommyFailure? firstFailure;
+    var failed = 0;
+    var updatedExisting = false;
+    final notices = <String>[];
+    for (final subscription in subscriptions) {
+      final result = await ref.read(addSubscriptionUseCaseProvider)(
+        url: subscription.url,
+        nameHint: subscription.hint,
+        autoUpdate: true,
+      );
+      if (!ref.mounted) {
+        return null;
+      }
+      final failure = result.failureOrNull;
+      if (failure != null) {
+        ref.read(appLoggerProvider).warn(
+              'batch subscription import failed: '
+              '${FailureLog.describe(failure)}',
+              tag: logTag,
+            );
+        firstFailure ??= failure;
+        failed++;
+        continue;
+      }
+      final synced = result.valueOrNull;
+      outcome = outcome.merge(synced?.outcome ?? ParseOutcome.empty);
+      updatedExisting = updatedExisting || (synced?.updatedExisting ?? false);
+      notices.addAll(synced?.panelNotices ?? const <String>[]);
+    }
+    if (links.isNotEmpty) {
+      final result = await ref.read(importLinksUseCaseProvider)(
+        links.join('\n'),
+      );
+      if (!ref.mounted) {
+        return null;
+      }
+      final failure = result.failureOrNull;
+      if (failure != null) {
+        ref.read(appLoggerProvider).warn(
+              'batch import failed: ${FailureLog.describe(failure)}',
+              tag: logTag,
+            );
+        firstFailure ??= failure;
+      } else {
+        outcome = outcome.merge(result.valueOrNull ?? ParseOutcome.empty);
+      }
+    }
+
+    if (firstFailure != null &&
+        !outcome.hasNodes &&
+        !outcome.hasFailures &&
+        notices.isEmpty) {
+      _publish(ticket, ImportState(failure: firstFailure));
+      return null;
+    }
+    _publish(
+      ticket,
+      ImportState(
+        outcome: outcome,
+        updatedExisting: updatedExisting,
+        panelNotices: notices,
+        failedSubscriptions: failed,
       ),
     );
     return outcome.nodes.isEmpty ? null : outcome.nodes.first.id;

@@ -14,8 +14,8 @@ void main() {
   });
 
   group('CommyDatabase', () {
-    test('a fresh database is at schema version 1', () {
-      expect(stack.database.schemaVersion, equals(1));
+    test('a fresh database is at the current schema version', () {
+      expect(stack.database.schemaVersion, equals(2));
       expect(
         stack.database.schemaVersion,
         equals(CommyDatabase.currentSchemaVersion),
@@ -92,7 +92,7 @@ void main() {
 
       expect((await stack.subscriptions.getAll()).valueOrNull, isEmpty);
       expect(await stack.dumpAllValues(), isEmpty);
-      expect(stack.database.schemaVersion, equals(1));
+      expect(stack.database.schemaVersion, equals(2));
     });
   });
 

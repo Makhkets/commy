@@ -35,4 +35,9 @@
     <string name="notification_blocked_text">Система блокирует соединения без VPN, поэтому Commy не выпускает и DNS-запросы, пока вы не подключитесь.</string>
     <string name="notification_connect">Подключить</string>
     <string name="notification_vpn_settings">Настройки VPN</string>
+
+    <string name="widget_description">Commy: состояние туннеля и кнопка подключения</string>
+    <string name="widget_connect">Подключить</string>
+    <string name="widget_disconnect">Отключить</string>
+    <string name="widget_wait">Подождите…</string>
 </resources>

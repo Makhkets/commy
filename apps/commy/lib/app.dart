@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/state/app_visibility.dart';
+import 'package:commy/src/state/failover_watchdog.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/rule_set_scheduler.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -75,6 +76,9 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // The `checking` step. It belongs to the connection, not to whichever
       // screen happens to be on top when the tunnel comes up.
       ..watch(autoCheckProvider)
+      // Failover: a server that stops answering is swapped for a live one,
+      // while the switch is on and a server was picked by hand.
+      ..watch(failoverWatchdogProvider)
       // "Connect on launch", decided once off the first settled read.
       ..watch(autoConnectProvider)
       // Routing, DNS and settings edits reach a running core without a

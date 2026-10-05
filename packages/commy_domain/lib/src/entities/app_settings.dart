@@ -43,6 +43,7 @@ class AppSettings {
     this.autoSelect = false,
     this.startOnBoot = false,
     this.hideUnavailable = false,
+    this.failover = false,
     this.sendDeviceId = true,
     this.nodeSort = NodeSort.panel,
     this.pingMethod = PingMethod.get,
@@ -70,6 +71,7 @@ class AppSettings {
           'hideUnavailable',
           orElse: false,
         ),
+        failover: JsonRead.boolean(json, 'failover', orElse: false),
         sendDeviceId: JsonRead.boolean(json, 'sendDeviceId', orElse: true),
         nodeSort: NodeSort.values.byName(
           JsonRead.stringOr(json, 'nodeSort', orElse: 'panel'),
@@ -210,6 +212,15 @@ class AppSettings {
   /// silently is worse than showing it as unreachable.
   final bool hideUnavailable;
 
+  /// Whether a server that stops answering is swapped for the fastest one
+  /// that still does, without the user doing anything.
+  ///
+  /// For someone who picked a server by hand and wants it kept — until it
+  /// dies. The Auto group does this all the time; this does it only when the
+  /// chosen one fails, and says so. Off by default: moving someone's traffic
+  /// to another server is a choice they make.
+  final bool failover;
+
   /// Whether subscription requests carry the installation's identifier
   /// (HWID) and the name of the platform.
   ///
@@ -312,6 +323,7 @@ class AppSettings {
     bool? autoSelect,
     bool? startOnBoot,
     bool? hideUnavailable,
+    bool? failover,
     bool? sendDeviceId,
     NodeSort? nodeSort,
     PingMethod? pingMethod,
@@ -332,6 +344,7 @@ class AppSettings {
       autoSelect: autoSelect ?? this.autoSelect,
       startOnBoot: startOnBoot ?? this.startOnBoot,
       hideUnavailable: hideUnavailable ?? this.hideUnavailable,
+      failover: failover ?? this.failover,
       sendDeviceId: sendDeviceId ?? this.sendDeviceId,
       nodeSort: nodeSort ?? this.nodeSort,
       pingMethod: pingMethod ?? this.pingMethod,
@@ -354,6 +367,7 @@ class AppSettings {
         'autoSelect': autoSelect,
         'startOnBoot': startOnBoot,
         'hideUnavailable': hideUnavailable,
+        'failover': failover,
         'sendDeviceId': sendDeviceId,
         'nodeSort': nodeSort.name,
         'pingMethod': pingMethod.name,
@@ -377,6 +391,7 @@ class AppSettings {
           other.autoSelect == autoSelect &&
           other.startOnBoot == startOnBoot &&
           other.hideUnavailable == hideUnavailable &&
+          other.failover == failover &&
           other.sendDeviceId == sendDeviceId &&
           other.nodeSort == nodeSort &&
           other.pingMethod == pingMethod &&
@@ -397,6 +412,7 @@ class AppSettings {
         autoSelect,
         startOnBoot,
         hideUnavailable,
+        failover,
         sendDeviceId,
         nodeSort,
         pingMethod,

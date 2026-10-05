@@ -5,6 +5,7 @@ import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/screens/home/widgets/domain_change_row.dart';
 import 'package:commy/src/screens/home/widgets/measure_progress_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/panel_notice_row.dart';
@@ -55,6 +56,8 @@ class SubscriptionSection extends ConsumerWidget {
         ref.watch(panelNoticesProvider)[subscription.id] ?? const <String>[];
     final deviceIdOff =
         ref.watch(settingsProvider).value?.sendDeviceId == false;
+    final move = subscription.recovery?.pending;
+    final answering = busy.refreshingId != null;
     // What the clock changes on this card, not the clock itself. The clock
     // ticks every second, and a rebuild here rebuilds every server row of the
     // card — all of them, since the card lays them out in one column — to
@@ -124,6 +127,20 @@ class SubscriptionSection extends ConsumerWidget {
       // rows are what the user has to see — a run of "measure all" with its
       // only Cancel, and the panel's refusal with its one-tap fix.
       status: <Widget>[
+        // First of all: the one question the recovery protocol never answers
+        // for the user (ADR-0019), and the reason the servers below may be
+        // the old address's.
+        if (move != null)
+          DomainChangeRow(
+            subscription: subscription,
+            change: move,
+            onAccept: answering
+                ? null
+                : () => unawaited(_answerMove(context, ref, t, accept: true)),
+            onDecline: answering
+                ? null
+                : () => unawaited(_answerMove(context, ref, t, accept: false)),
+          ),
         // Above the servers, because when it is there they are usually not:
         // a panel that answers with a notice answers with nothing else.
         if (notices.isNotEmpty)
@@ -177,13 +194,17 @@ class SubscriptionSection extends ConsumerWidget {
       // Success says so too. The card's "just now" was the only sign, and
       // it is the line nobody reads — the owner kept pressing refresh to see
       // whether anything had happened.
+      final done = ref.read(subscriptionControllerProvider);
       ToastMessenger.show(
         context,
-        message: t.subscription.refreshed(
-          count: ref.read(subscriptionControllerProvider).importedCount ?? 0,
-        ),
-        tone: CommyTone.connected,
-        icon: CommyIcons.success,
+        // A mirror answering is a success with news in it: the address
+        // itself is in trouble, and the user should hear it before the
+        // mirrors run out too.
+        message: done.servedByMirror
+            ? t.subscription.recovery.viaMirror
+            : t.subscription.refreshed(count: done.importedCount ?? 0),
+        tone: done.servedByMirror ? CommyTone.info : CommyTone.connected,
+        icon: done.servedByMirror ? CommyIcons.info : CommyIcons.success,
       );
       return;
     }
@@ -213,6 +234,29 @@ class SubscriptionSection extends ConsumerWidget {
       icon: CommyIcons.warning,
       actionLabel: t.error.openLogs,
       onAction: () => context.go(AppRoutes.diagnosticsLogs),
+    );
+  }
+
+  /// Answers the provider's signed move, and says what was done.
+  Future<void> _answerMove(
+    BuildContext context,
+    WidgetRef ref,
+    Translations t, {
+    required bool accept,
+  }) async {
+    final answered = await ref
+        .read(subscriptionControllerProvider.notifier)
+        .resolveDomainChange(subscription.id, accept: accept);
+    if (!context.mounted || answered == null) {
+      return;
+    }
+    ToastMessenger.show(
+      context,
+      message: accept
+          ? t.subscription.recovery.moved(host: answered.url.host)
+          : t.subscription.recovery.declined,
+      tone: accept ? CommyTone.connected : CommyTone.info,
+      icon: accept ? CommyIcons.success : CommyIcons.info,
     );
   }
 

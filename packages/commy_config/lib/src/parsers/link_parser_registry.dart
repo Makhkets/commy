@@ -11,6 +11,7 @@ import 'package:commy_config/src/parsers/tuic_link_parser.dart';
 import 'package:commy_config/src/parsers/vless_link_parser.dart';
 import 'package:commy_config/src/parsers/vmess_link_parser.dart';
 import 'package:commy_config/src/parsers/wireguard_link_parser.dart';
+import 'package:commy_config/src/subscription/foreign_import_link.dart';
 import 'package:commy_domain/commy_domain.dart';
 
 /// Dispatches a link to the parser that owns its scheme.
@@ -96,6 +97,13 @@ class LinkParserRegistry {
     }
     final parser = _byScheme[scheme];
     if (parser == null) {
+      final client = ForeignImportLink.encryptedBy(raw);
+      if (client != null) {
+        throw LinkFormatException.encrypted(
+          'A link encrypted for $client',
+          subject: client,
+        );
+      }
       throw LinkFormatException.unsupportedScheme(
         'Unsupported scheme "$scheme://"',
         subject: '$scheme://',

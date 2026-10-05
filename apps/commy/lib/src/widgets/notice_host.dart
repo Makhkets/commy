@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/screens/diagnosis/diagnosis_sheet.dart';
 import 'package:commy/src/state/auto_refresh_notice.dart';
+import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
@@ -245,9 +249,38 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
           CommyTone.error,
           CommyIcons.warning,
         ),
+      TunnelNoticeKind.failedOver => (
+          t.home.failedOver(name: notice.name ?? ''),
+          CommyTone.info,
+          CommyIcons.proxy,
+        ),
     };
 
-    ToastMessenger.show(context, message: message, tone: tone, icon: icon);
+    // A check that failed right after a connect is the moment someone asks
+    // "why?" — so the toast offers the answer for the server in use.
+    final node = notice.kind == TunnelNoticeKind.checkFailed
+        ? ref.read(selectedNodeProvider)
+        : null;
+    ToastMessenger.show(
+      context,
+      message: message,
+      tone: tone,
+      icon: icon,
+      actionLabel: node == null ? null : t.diagnosis.why,
+      onAction: node == null
+          ? null
+          : () {
+              // This host sits above the navigator; the sheet needs one.
+              final navigatorContext = ref
+                  .read(routerProvider)
+                  .routerDelegate
+                  .navigatorKey
+                  .currentContext;
+              if (navigatorContext != null) {
+                unawaited(DiagnosisSheet.show(navigatorContext, node));
+              }
+            },
+    );
     ref.read(tunnelControllerProvider.notifier).clearNotice();
   }
 }

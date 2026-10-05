@@ -94,6 +94,22 @@ final importLinksUseCaseProvider = Provider<ImportLinksUseCase>((ref) {
   );
 });
 
+/// Asks a provider's meeting point for its latest recovery manifest —
+/// exception E-4 (docs/adr/0019-subscription-domain-recovery.md). Its own
+/// provider so that tests replace it and never open a socket.
+final rendezvousFetcherProvider = Provider<RendezvousFetcher>((ref) {
+  return HttpRendezvousFetcher(client: ref.watch(httpClientProvider));
+});
+
+/// Reads, checks and applies a provider's signed recovery manifests, for the
+/// add and the refresh alike.
+final recoveryEngineProvider = Provider<RecoveryEngine>((ref) {
+  return RecoveryEngine(
+    reader: const ManifestReader(verifier: Ed25519SignatureVerifier()),
+    rendezvous: ref.watch(rendezvousFetcherProvider),
+  );
+});
+
 /// Downloads a subscription and stores it with its nodes.
 final addSubscriptionUseCaseProvider = Provider<AddSubscriptionUseCase>((ref) {
   return AddSubscriptionUseCase(
@@ -102,6 +118,15 @@ final addSubscriptionUseCaseProvider = Provider<AddSubscriptionUseCase>((ref) {
     subscriptions: ref.watch(subscriptionRepositoryProvider),
     nodes: ref.watch(nodeRepositoryProvider),
     ids: ref.watch(idGeneratorProvider),
+    recovery: ref.watch(recoveryEngineProvider),
+  );
+});
+
+/// Accepts or turns down a provider's signed change of address.
+final resolveDomainChangeUseCaseProvider =
+    Provider<ResolveDomainChangeUseCase>((ref) {
+  return ResolveDomainChangeUseCase(
+    subscriptions: ref.watch(subscriptionRepositoryProvider),
   );
 });
 
@@ -113,6 +138,7 @@ final updateSubscriptionUseCaseProvider =
     parser: ref.watch(linkParserProvider),
     subscriptions: ref.watch(subscriptionRepositoryProvider),
     nodes: ref.watch(nodeRepositoryProvider),
+    recovery: ref.watch(recoveryEngineProvider),
   );
 });
 
@@ -206,6 +232,24 @@ final measureLatencyUseCaseProvider = Provider<MeasureLatencyUseCase>((ref) {
     core: ref.watch(coreClientProvider),
     probe: ref.watch(latencyProbeProvider),
     nodes: ref.watch(nodeRepositoryProvider),
+    settings: ref.watch(settingsRepositoryProvider),
+    routing: ref.watch(routingRepositoryProvider),
+    generator: ref.watch(configGeneratorProvider),
+  );
+});
+
+/// Name resolution and the TLS handshake of a diagnosis. Its own provider so
+/// that tests replace it and never open a socket.
+final networkDiagnosticsProvider = Provider<NetworkDiagnostics>(
+  (ref) => const IoNetworkDiagnostics(),
+);
+
+/// "Why does it not connect?" — a server checked one layer at a time.
+final diagnoseNodeUseCaseProvider = Provider<DiagnoseNodeUseCase>((ref) {
+  return DiagnoseNodeUseCase(
+    network: ref.watch(networkDiagnosticsProvider),
+    probe: ref.watch(latencyProbeProvider),
+    core: ref.watch(coreClientProvider),
     settings: ref.watch(settingsRepositoryProvider),
     routing: ref.watch(routingRepositoryProvider),
     generator: ref.watch(configGeneratorProvider),

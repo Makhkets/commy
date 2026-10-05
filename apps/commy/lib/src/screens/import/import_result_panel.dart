@@ -2,6 +2,8 @@ import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/routing_profiles_controller.dart';
+import 'package:commy/src/widgets/toast_messenger.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +34,11 @@ class ImportResultPanel extends ConsumerWidget {
       return _FailurePanel(failure: failure);
     }
 
+    final profile = state.routingProfile;
+    if (profile != null) {
+      return _RoutingProfilePanel(profile: profile);
+    }
+
     final outcome = state.outcome ?? ParseOutcome.empty;
     if (!outcome.hasNodes) {
       // A panel that refused said why, and its words beat our guess about
@@ -41,8 +48,8 @@ class ImportResultPanel extends ConsumerWidget {
       // The words a panel that limits devices sends a client without
       // `x-hwid`. With the identifier switched off that is the likeliest
       // reason by far, and the card this sheet leaves behind has the switch.
-      final deviceIdOff = refused &&
-          ref.watch(settingsProvider).value?.sendDeviceId == false;
+      final deviceIdOff =
+          refused && ref.watch(settingsProvider).value?.sendDeviceId == false;
       return Padding(
         padding: EdgeInsets.all(spacing.s4),
         child: Column(
@@ -51,9 +58,8 @@ class ImportResultPanel extends ConsumerWidget {
           children: <Widget>[
             EmptyState(
               icon: refused ? CommyIcons.warning : CommyIcons.empty,
-              title: refused
-                  ? t.subscription.panelSaid
-                  : t.import.result.nothing,
+              title:
+                  refused ? t.subscription.panelSaid : t.import.result.nothing,
               message: refused
                   ? state.panelNotices.join('\n')
                   : t.import.result.nothingBody,
@@ -103,6 +109,17 @@ class ImportResultPanel extends ConsumerWidget {
               ),
             ],
           ),
+          if (state.failedSubscriptions > 0) ...<Widget>[
+            SizedBox(height: spacing.s2),
+            // A batch that half worked: what came in is above, and the codes
+            // that did not are counted here rather than silently dropped.
+            Text(
+              t.import.result.batchFailed(count: state.failedSubscriptions),
+              style: context.typography.caption.copyWith(
+                color: context.colors.textSecondary,
+              ),
+            ),
+          ],
           if (state.updatedExisting) ...<Widget>[
             SizedBox(height: spacing.s2),
             // Said rather than left to be noticed. Adding a panel the user
@@ -249,6 +266,9 @@ class _SkippedLinesState extends State<_SkippedLines> {
       ImportFailureKind.incomplete => words.incomplete,
       ImportFailureKind.emptyBody => words.emptyBody,
       ImportFailureKind.unknownFormat => words.unknownFormat,
+      ImportFailureKind.encrypted when subject != null =>
+        words.encrypted(app: subject),
+      ImportFailureKind.encrypted => words.encryptedUnnamed,
     };
   }
 
@@ -309,6 +329,123 @@ class _SkippedLinesState extends State<_SkippedLines> {
             ),
         ],
       ],
+    );
+  }
+}
+
+/// A shared routing profile, shown before anything is changed (D11).
+///
+/// The link came from somewhere else — a chat, a provider's page — and it
+/// rewrites the user's routing, so the sheet names it, says what it is, and
+/// waits for a tap. The setup in force stays as a profile of its own.
+class _RoutingProfilePanel extends ConsumerWidget {
+  const _RoutingProfilePanel({required this.profile});
+
+  final RoutingProfile profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = Translations.of(context);
+    final spacing = context.spacing;
+    final policy = profile.policy;
+    final mode = switch (policy.mode) {
+      RoutingMode.global => t.routing.mode.global,
+      RoutingMode.rules => t.routing.mode.rules,
+      RoutingMode.direct => t.routing.mode.direct,
+    };
+
+    return Padding(
+      padding: EdgeInsets.all(spacing.s4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                CommyIcons.routing,
+                size: CommySizes.iconControl,
+                color: context.colors.textPrimary,
+              ),
+              SizedBox(width: spacing.s2),
+              Expanded(
+                child: Text(
+                  t.import.routing.title,
+                  style: context.typography.title3.copyWith(
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: spacing.s2),
+          Text(
+            t.import.routing.body(
+              name: profile.name,
+              mode: mode,
+              count: policy.rules.length,
+            ),
+            style: context.typography.body.copyWith(
+              color: context.colors.textPrimary,
+            ),
+          ),
+          for (final rule in policy.rules.take(8))
+            Text(
+              '${rule.matcher} → ${switch (rule.action) {
+                RuleAction.proxy => t.routing.action.proxy,
+                RuleAction.direct => t.routing.action.direct,
+                RuleAction.block => t.routing.action.block,
+              }}',
+              style: context.typography.mono.copyWith(
+                color: context.colors.textSecondary,
+              ),
+            ),
+          SizedBox(height: spacing.s3),
+          Text(
+            t.import.routing.note,
+            style: context.typography.caption.copyWith(
+              color: context.colors.textTertiary,
+            ),
+          ),
+          SizedBox(height: spacing.s4),
+          CommyButton(
+            label: t.import.routing.add,
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final ok = await ref
+                  .read(routingProfilesControllerProvider.notifier)
+                  .addAndSwitch(
+                    profile,
+                    currentName: t.routing.profiles.main,
+                  );
+              ref.read(importControllerProvider.notifier).reset();
+              if (!context.mounted) {
+                return;
+              }
+              ToastMessenger.show(
+                context,
+                message: ok
+                    ? t.import.routing.added(name: profile.name)
+                    : t.routing.profiles.failed,
+                tone: ok ? CommyTone.connected : CommyTone.error,
+                icon: ok ? CommyIcons.success : CommyIcons.warning,
+              );
+              if (navigator.canPop()) {
+                navigator.pop();
+              }
+            },
+          ),
+          SizedBox(height: spacing.s2),
+          CommyButton(
+            label: t.common.cancel,
+            variant: CommyButtonVariant.secondary,
+            onPressed: () {
+              ref.read(importControllerProvider.notifier).reset();
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
     );
   }
 }
