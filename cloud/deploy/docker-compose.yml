@@ -1,0 +1,23 @@
+# Commy Cloud on the owner's server (31.76.100.71).
+#
+# Caddy there runs in host network mode (/opt/caddy-public), so the service
+# publishes on loopback only and Caddy is the one way in, holding the TLS
+# certificate. State lives in ./data next to this file.
+services:
+  commy-cloud:
+    build: ./src
+    image: commy-cloud:latest
+    container_name: commy-cloud
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${COMMY_CLOUD_PORT:-8097}:8080"
+    environment:
+      COMMY_CLOUD_BASE_URL: https://commy.makhkets.ru
+      COMMY_CLOUD_TRUST_PROXY: "1"
+      COMMY_CLOUD_OPEN_SIGNUP: "1"
+    volumes:
+      - ./data:/data
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

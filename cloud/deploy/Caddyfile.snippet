@@ -1,0 +1,19 @@
+# --- Commy Cloud: сайт Commy, документация и точки встречи (добавлено 2026-10-05) ---
+# Контейнер commy-cloud (/opt/commy-cloud), слушает 127.0.0.1:8097.
+# Явный host-блок, поэтому во франшизный wildcard *.makhkets.ru не попадает,
+# а домен добавлен в @infra выше, иначе on_demand не выпустит сертификат.
+commy.makhkets.ru {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8097 {
+		header_up X-Real-IP {remote_host}
+	}
+	log {
+		output file /var/log/caddy/commy_access.log {
+			roll_size 10MB
+			roll_keep 3
+		}
+	}
+}

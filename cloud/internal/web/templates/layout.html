@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="same-origin">
+<title>{{.Title}} · Commy</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+{{block "head" .}}{{end}}
+</head>
+<body>
+{{block "shell" .}}
+<header class="top"><div class="top-in">
+  <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M16 8v8" stroke="var(--bg)" stroke-width="2.6" stroke-linecap="round"/><path d="M10.6 11.4a8 8 0 1 0 10.8 0" fill="none" stroke="var(--bg)" stroke-width="2.6" stroke-linecap="round"/></svg>COMMY <span class="muted">CLOUD</span></a>
+  <nav class="nav">
+    <a href="/{{if eq .Lang "en"}}en/{{end}}docs/">{{t .Lang "nav.docs"}}</a>
+    {{if .User}}
+      <a href="/cloud/">{{t .Lang "nav.projects"}}</a>
+      {{if .User.Admin}}<a href="/cloud/admin">{{t .Lang "nav.admin"}}</a>{{end}}
+      <form method="post" action="/cloud/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="btn small secondary" type="submit">{{t .Lang "nav.logout"}}</button></form>
+    {{else}}
+      <a href="/cloud/login">{{t .Lang "nav.login"}}</a>
+    {{end}}
+    <span class="lang"><a href="/cloud/lang/ru" {{if eq .Lang "ru"}}aria-current="true"{{end}}>RU</a><a href="/cloud/lang/en" {{if eq .Lang "en"}}aria-current="true"{{end}}>EN</a></span>
+  </nav>
+</div></header>
+<main class="{{block "width" .}}{{end}}">
+{{if .Flash}}<div class="alert ok" role="status">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="alert err" role="alert">{{.Error}}</div>{{end}}
+{{block "content" .}}{{end}}
+</main>
+<footer class="foot"><div class="in">
+  <span>Commy — open source, GPL-3.0</span>
+  <a href="https://github.com/Makhkets/Commy">GitHub</a>
+  <a href="/{{if eq .Lang "en"}}en/{{end}}docs/cloud/">Commy Cloud</a>
+</div></footer>
+{{end}}
+{{block "scripts" .}}{{end}}
+</body>
+</html>

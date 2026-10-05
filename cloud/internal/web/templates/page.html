@@ -1,0 +1,14 @@
+{{define "shell"}}
+<main class="sub" id="sub" data-accent="{{.Data.Project.Page.Accent}}" data-apps="{{join .Data.Apps ","}}" data-lang="{{.Lang}}">
+  <h1>{{.Data.Title}}</h1>
+  {{if .Data.Project.Page.Note}}<p class="lead">{{.Data.Project.Page.Note}}</p>{{end}}
+  <p class="lead" id="sub-missing">{{if eq .Lang "ru"}}В ссылке нет адреса подписки. Попросите у провайдера полную ссылку.{{else}}This link carries no subscription address. Ask your provider for the full link.{{end}}</p>
+  <div class="apps" id="apps"></div>
+  <div class="qr hidden" id="qr"></div>
+  <p class="row hidden" id="copy-row"><button class="btn secondary" type="button" id="copy-sub">{{if eq .Lang "ru"}}Скопировать ссылку подписки{{else}}Copy the subscription link{{end}}</button></p>
+  {{if .Data.Project.Page.Support}}<p class="lead"><a href="{{.Data.Project.Page.Support}}">{{if eq .Lang "ru"}}Поддержка{{else}}Support{{end}}</a></p>{{end}}
+  <p class="small muted lead">{{if eq .Lang "ru"}}Адрес подписки не покидает ваш браузер: эта страница его не видит и не хранит.{{else}}The subscription address never leaves your browser: this page neither sees nor keeps it.{{end}} · <a href="/">Commy</a></p>
+</main>
+<script src="/static/qr.js"></script>
+<script src="/static/page.js"></script>
+{{end}}

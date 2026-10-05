@@ -1,0 +1,131 @@
+{{define "content"}}
+{{$d := .Data}}{{$lang := .Lang}}
+<p class="small"><a href="/cloud/">{{t .Lang "common.back"}}</a></p>
+<h1>{{$d.Project.Name}} <span class="muted mono">{{$d.Project.ID}}</span></h1>
+
+<div class="card">
+  <h2>{{t .Lang "p.status"}}</h2>
+  {{if $d.Latest}}
+  <dl class="kv">
+    <dt>#</dt><dd>{{$d.Latest.Seq}} · {{date $d.Latest.Published}}</dd>
+    <dt>{{t .Lang "p.origin"}}</dt><dd class="mono">{{$d.Latest.Origin}}</dd>
+    <dt>{{t .Lang "p.mirrors"}}</dt><dd class="mono">{{if $d.Latest.Mirrors}}{{join $d.Latest.Mirrors ", "}}{{else}}—{{end}}</dd>
+    <dt>{{t .Lang "p.rendezvous"}}</dt><dd class="mono">{{if $d.Points}}{{join $d.Points ", "}}{{else}}—{{end}}</dd>
+  </dl>
+  <h3>{{t .Lang "p.header"}}</h3>
+  <p class="small muted">{{t .Lang "p.headerNote"}}</p>
+  <div class="copy"><pre id="header-value" class="mono">commy-manifest: {{$d.Header}}</pre><button class="btn small secondary" type="button" data-copy="header-raw">{{t .Lang "common.copy"}}</button></div>
+  <input type="hidden" id="header-raw" value="{{$d.Header}}">
+  <p class="small">{{t .Lang "p.howRemnawave"}}</p>
+  <p class="small">{{t .Lang "p.howCaddy"}}</p>
+  <pre class="mono">header Commy-Manifest "{{$d.Header}}"</pre>
+  <p class="small">{{t .Lang "p.howNginx"}}</p>
+  <pre class="mono">add_header Commy-Manifest "{{$d.Header}}" always;</pre>
+  {{else}}
+  <p class="muted">{{t .Lang "p.none"}}</p>
+  {{end}}
+</div>
+
+<div class="card" id="publish">
+  <h2>{{t .Lang "p.publish"}} #{{$d.NextSeq}}</h2>
+  <p class="small muted">{{t .Lang "p.publishNote"}}</p>
+  <form id="sign-form" data-id="{{$d.Project.ID}}" data-seq="{{$d.NextSeq}}" data-key="{{$d.Project.Key}}">
+    <label for="origin">{{t .Lang "p.origin"}}</label>
+    <input id="origin" type="url" required value="{{$d.Form.Origin}}" placeholder="https://sub.example.com">
+    <p class="hint">{{t .Lang "p.originHint"}}</p>
+    <label for="mirrors">{{t .Lang "p.mirrors"}}</label>
+    <textarea id="mirrors" placeholder="https://sub2.example.org">{{$d.Form.Mirrors}}</textarea>
+    <p class="hint">{{t .Lang "p.mirrorsHint"}}</p>
+    <label for="points">{{t .Lang "p.rendezvous"}}</label>
+    <textarea id="points">{{$d.Form.Rendezvous}}</textarea>
+    <p class="hint">{{t .Lang "p.rendezvousHint"}}</p>
+    <label for="mname">{{t .Lang "p.nameField"}}</label>
+    <input id="mname" type="text" maxlength="64" value="{{$d.Form.Name}}">
+    <label for="nextkey">{{t .Lang "p.nextKey"}}</label>
+    <input id="nextkey" type="text" class="mono" value="{{$d.Form.NextKey}}">
+    <label for="keyfile">{{t .Lang "p.keyFile"}}</label>
+    <input id="keyfile" type="file" accept=".json,application/json">
+    <p><button class="btn" type="submit">{{t .Lang "p.sign"}}</button></p>
+    <p class="alert err hidden" id="sign-error" role="alert"></p>
+  </form>
+  <form method="post" action="/cloud/p/{{$d.Project.ID}}/manifests" id="publish-form">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label for="manifest">{{t .Lang "p.orPaste"}}</label>
+    <textarea id="manifest" name="manifest" class="mono" placeholder="v1.…"></textarea>
+    <p><button class="btn secondary" type="submit">{{t .Lang "p.publishPasted"}}</button></p>
+  </form>
+</div>
+
+<div class="grid two">
+  <div class="card">
+    <h2>{{t .Lang "p.stats"}}</h2>
+    <p class="small muted">{{t .Lang "p.statsNote"}}</p>
+    <p><strong>{{$d.Total}}</strong> <span class="muted">{{t .Lang "p.unique"}} · 30 d</span></p>
+    {{if $d.MaxVisits}}<div class="bars" aria-hidden="true">{{range $d.Stats}}<progress value="{{.Unique}}" max="{{if $d.MaxVisits}}{{$d.MaxVisits}}{{else}}1{{end}}" title="{{.Date}}: {{.Unique}} / {{.Visits}}"></progress>{{end}}</div>{{end}}
+  </div>
+  <div class="card">
+    <h2>{{t .Lang "p.health"}}</h2>
+    <p class="small muted">{{t .Lang "p.healthNote"}}</p>
+    {{if $d.Health}}<ul class="list-plain">{{range $d.Health}}
+      <li><span class="mono">{{.URL}}</span>{{if .Up}}<span class="pill ok">{{t $lang "p.up"}} · {{.Status}} · {{.Latency}} ms</span>{{else}}<span class="pill err" title="{{.Error}}">{{t $lang "p.down"}}</span>{{end}}</li>
+    {{end}}</ul>{{else}}<p class="muted">—</p>{{end}}
+  </div>
+</div>
+
+<div class="card">
+  <h2>{{t .Lang "p.history"}}</h2>
+  {{if $d.Releases}}<div class="table-wrap"><table>
+    <tr><th>#</th><th>{{t .Lang "common.when"}}</th><th>{{t .Lang "p.origin"}}</th><th>{{t .Lang "p.mirrors"}}</th><th>{{t .Lang "common.who"}}</th></tr>
+    {{range $d.Releases}}<tr><td>{{.Seq}}</td><td>{{date .Published}}</td><td class="mono">{{.Origin}}</td><td class="mono">{{join .Mirrors ", "}}</td><td>{{.By}}</td></tr>{{end}}
+  </table></div>{{else}}<p class="muted">—</p>{{end}}
+  <h3>{{t .Lang "p.events"}}</h3>
+  <div class="table-wrap"><table>
+    <tr><th>{{t .Lang "common.when"}}</th><th>{{t .Lang "common.who"}}</th><th>{{t .Lang "common.what"}}</th></tr>
+    {{range $d.Events}}<tr><td>{{date .At}}</td><td>{{.By}}</td><td><code>{{.Action}}</code> {{.Detail}}</td></tr>{{end}}
+  </table></div>
+</div>
+
+<div class="card" id="page">
+  <h2>{{t .Lang "p.page"}}</h2>
+  <p class="small muted">{{tf .Lang "p.pageNote" .Base $d.Project.ID}}</p>
+  <form method="post" action="/cloud/p/{{$d.Project.ID}}/page">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label for="ptitle">{{t .Lang "p.pageTitle"}}</label>
+    <input id="ptitle" name="title" type="text" maxlength="64" value="{{$d.Project.Page.Title}}">
+    <label for="pnote">{{t .Lang "p.pageNote2"}}</label>
+    <input id="pnote" name="note" type="text" maxlength="280" value="{{$d.Project.Page.Note}}">
+    <label for="paccent">{{t .Lang "p.pageAccent"}}</label>
+    <input id="paccent" name="accent" type="text" maxlength="7" value="{{$d.Project.Page.Accent}}" placeholder="#2FD98A">
+    <label for="psupport">{{t .Lang "p.pageSupport"}}</label>
+    <input id="psupport" name="support" type="url" value="{{$d.Project.Page.Support}}" placeholder="https://t.me/…">
+    <p class="row small">{{range $d.Apps}}<label class="row"><input type="checkbox" name="apps" value="{{.}}" {{if has $d.Project.Page.Apps .}}checked{{end}}> {{.}}</label>{{end}}</p>
+    <p><button class="btn secondary" type="submit">{{t .Lang "p.save"}}</button> <a href="/s/{{$d.Project.ID}}#https://sub.example.com/sub/demo">/s/{{$d.Project.ID}}</a></p>
+  </form>
+</div>
+
+<div class="card" id="tokens">
+  <h2>{{t .Lang "p.tokens"}}</h2>
+  {{if $d.NewToken}}<div class="alert ok">{{t .Lang "p.tokenShown"}}<pre class="mono">{{$d.NewToken}}</pre></div>{{end}}
+  {{if $d.Tokens}}<ul class="list-plain">{{range $d.Tokens}}
+    <li><span>{{.Name}} <span class="muted small">{{date .Created}} · {{date .LastUsed}}</span></span>
+      <form method="post" action="/cloud/p/{{$d.Project.ID}}/tokens/{{.ID}}/revoke"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn small secondary">{{t $lang "p.revoke"}}</button></form></li>
+  {{end}}</ul>{{end}}
+  <form method="post" action="/cloud/p/{{$d.Project.ID}}/tokens" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input name="name" type="text" maxlength="40" placeholder="{{t .Lang "p.tokenName"}}">
+    <button class="btn secondary" type="submit">{{t .Lang "p.tokenCreate"}}</button>
+  </form>
+  <p class="small muted">{{t .Lang "p.api"}}: <code>GET {{.Base}}/api/v1/projects/{{$d.Project.ID}}</code>, <code>POST …/manifests</code>, <code>GET …/stats</code> — <a href="/docs/cloud/api/">docs</a></p>
+</div>
+
+<div class="card" id="danger">
+  <h2>{{t .Lang "p.delete"}}</h2>
+  <p class="small muted">{{t .Lang "p.deleteNote"}}</p>
+  <form method="post" action="/cloud/p/{{$d.Project.ID}}/delete" class="row">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <input name="confirm" type="text" placeholder="{{t .Lang "p.deleteConfirm"}}" autocomplete="off">
+    <button class="btn danger" type="submit">{{t .Lang "p.delete"}}</button>
+  </form>
+</div>
+{{end}}
+{{define "scripts"}}<script src="/static/sign.js" type="module"></script>{{end}}
