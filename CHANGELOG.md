@@ -10,93 +10,35 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
-- **Commy's own add link: `commy://add/<subscription address>`**, shaped
-  like every other client's (`happ://add/`); `commy://add?url=` works too.
-  `commy://import/` keeps working for links already shared.
-- **Coloured protocol tags, the way INCY draws them.** The line under a
-  server name is coloured word by word: the protocol in its family's colour
-  (VLESS blue, VMess sky, Trojan pink, Shadowsocks teal, Hysteria2 and TUIC
-  orange, WireGuard red), TLS green, Reality violet, the Vision flow yellow,
-  and the transport grey. `xtls-rprx-vision` is shown as `Vision`. A server
-  that did not answer stays grey all over.
-- **`geoip:ru,private` covers the private ranges again.** A rule that listed
-  `private` next to a country lost the private half without a word, so the
-  router and other LAN addresses went through the proxy. Both halves now
-  land in one rule (checked against sing-box 1.13.21 itself).
-- **A phone in another language opens Commy in English, not Russian.**
-  With Appearance → Language on "System", the first of the phone's languages
-  that Commy speaks wins, and a phone with neither gets English — as the
-  notification already did. On Android 13+ Commy is listed under the system's
-  per-app languages, and the APK no longer carries AndroidX strings in
-  eighty languages it never shows.
-- **Logs no longer leak a token written as JSON.** A credential header in
-  the form an XHTTP transport or a request dump puts it in a core log —
-  `"Authorization":"Bearer …"`, `"Cookie": "…"`, a Go header map — went
-  into the log view and into exports untouched. It is redacted now, and a
-  test holds that the app runs the wider redactor at all.
-- **The connection state is spelled out under the button** — "Tap to
-  connect", "Connecting…", "Checking access…", "Connected", "Disconnecting…",
-  "Connection error" — in the colour of the ring, as INCY does.
-- **A routing rule can be edited and switched off.** Tapping a rule opens it
-  filled in; it is rewritten where it stands, keeping its priority, and a
-  switch turns it off without losing it — or back on, for a rule that came
-  switched off in a backup or a shared profile.
-- **A failed connect offers more ways out.** Next to "Retry" the banner
-  offers "Change server" — every subscription's servers, and the pick
-  connects at once — and, when the core died on the way, "Check server",
-  the layered check that was only reachable by long-pressing a server.
-- **A subscription's link can be changed in place.** When a panel re-issues
-  the link, "Change link" in the card's menu points the card at the new one
-  and fetches it — the card keeps its name, interval, User-Agent, recovery
-  state and the chosen server. A link another card already has is refused.
-- **Launcher shortcuts.** A long press on the app icon offers Connect,
-  Scan a QR code and Import from clipboard, labelled in the app's language.
-- **The log holds still while you read it.** Scrolled up, new lines no
-  longer push the text under your finger; a button under the list counts
-  them and brings the newest back.
-- **A remote or a keyboard gets out of a text field.** Up and down leave a
-  field once the caret is at its edge, as Android's own fields do, so the
-  switch and the Save button under a field can be reached.
-- **On Android 13+ the system's per-app language and the app's agree.** A
-  language chosen in either place is the app's language.
-- **Server rows look like INCY's.** The flag sits on a rounded tile, the
-  chosen server is a rounded plate with a thin edge instead of a bar on the
-  left, and the lines between servers are gone.
-- **"Add to …" buttons of more clients open the import**: INCY, v2RayTun,
-  Hiddify, Streisand, Shadowrocket (`sub://`), v2rayNG, Stash, Clash Meta,
-  FlClashX, Koala Clash, Prizrak-Box and Exclave, as Remnawave's stock
-  subscription page writes them. A single server inside such a link is
-  imported too. A name such a link carries no longer replaces the panel's
-  own title.
-- **Several QR codes in a row.** The scanner has a "several codes" switch:
-  codes are collected as they are seen and added with one tap — for a
-  leaflet of keys or a sticker per subscription.
-- **Subscription address recovery** (ADR-0019). A provider can sign where
-  its subscription lives (`commy-manifest` header, Ed25519). When the
-  address is blocked, Commy tries the provider's mirrors and asks its
-  meeting point; a move of the address is offered on the card and happens
-  only after "Move". Off per subscription in its menu; listed under
-  "Network silence" as exception E-4. A subscription without a manifest
-  makes no new requests.
-- **Home-screen widget** (Android): the tunnel's state and a Connect /
-  Disconnect button, in the app's language; redrawn when the state changes,
-  never on a timer.
-- **"Why won't it connect?"** A server's menu has *Connection diagnosis*:
-  its name, its port, the TLS handshake and a request through it are checked
-  in turn, and the first one that breaks is named with what to do — a closed
-  port, SNI blocking, a refused certificate, or a key the server no longer
-  accepts. A failed check after connecting offers it as "Why?".
-- **Failover** (Settings → Connection, off by default). When the server you
-  picked stops answering, Commy measures the others — its own subscription
-  first — and moves to the fastest live one without dropping the tunnel, and
-  says so. If nothing answers, it stays: that is the network.
-- **Routing profiles.** Save the routing as named profiles — "Home",
-  "Travel" — and switch with a tap on the routing screen, without
-  reconnecting. A profile can be shared as a `commy://routing/…` link; opening
-  one shows its rules and asks before switching. Profiles are in backups.
-- **Encrypted Happ and INCY links** (`happ://crypt…`) are named as such, with
-  advice to ask the provider for the plain subscription address, instead of
-  "not supported".
+## [0.1.0-alpha.14]
+
+Installs over alpha.13.
+
+- **The server list, in INCY's style.** Protocol tags in colour (VLESS, VMess,
+  Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard; TLS, Reality, Vision),
+  flags on tiles, the chosen server as a highlighted plate, and the
+  connection state written under the button.
+- **Commy's own add link: `commy://add/<address>`.** The "Add to …" links of
+  12 other clients open the import too (Happ, INCY, v2RayTun, Hiddify,
+  Streisand, Shadowrocket, v2rayNG, Stash, Clash Meta, FlClashX, Koala Clash,
+  Prizrak-Box, Exclave), and several QR codes can be scanned in a row.
+- **Subscriptions.** A link the panel re-issued can be changed in place,
+  keeping the card and its settings. A provider can sign where its
+  subscription lives: when the address stops working, Commy tries its
+  mirrors and asks before moving to a new one.
+- **Routing.** Named rule profiles, switched with a tap and shared as
+  `commy://routing/…` links. A rule can be edited and switched off.
+  `geoip:ru,private` covers the private ranges again.
+- **When a server fails.** An optional switch to the fastest working server
+  without dropping the tunnel, and a check that says where it breaks (name,
+  port, TLS, a request through it). A failed connect offers another server.
+- **Android.** A home-screen widget; launcher shortcuts (Connect, Scan a QR
+  code, Import from clipboard); phones in other languages get English, and
+  Android 13+'s per-app language is respected.
+- **Privacy.** Tokens in JSON-shaped headers no longer reach the log or its
+  export.
+- Smaller: the log holds still while you read it; a remote or arrow keys
+  leave text fields; encrypted Happ and INCY links are named as such.
 
 ## [0.1.0-alpha.13]
 
