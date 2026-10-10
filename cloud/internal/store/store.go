@@ -616,18 +616,12 @@ const MaxStatDays = 365
 // Stats returns the last n days of a project's counters, oldest first,
 // including days with nothing. n is clamped to 0..MaxStatDays.
 func (s *Store) Stats(projectID string, n int) []DayStat {
-	// Spelled as comparisons, not min/max: that is the bound the code
-	// scanner recognises before an allocation.
-	if n < 0 {
-		n = 0
-	}
-	if n > MaxStatDays {
-		n = MaxStatDays
-	}
+	n = min(max(n, 0), MaxStatDays)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	now := s.now().UTC()
-	out := make([]DayStat, 0, n)
+	// Grown by append rather than sized up front by a number from a request.
+	out := []DayStat{}
 	for i := n - 1; i >= 0; i-- {
 		day := now.AddDate(0, 0, -i).Format("2006-01-02")
 		stat := DayStat{Date: day}
