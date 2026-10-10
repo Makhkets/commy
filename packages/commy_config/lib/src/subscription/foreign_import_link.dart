@@ -28,11 +28,13 @@ abstract final class ForeignImportLink {
   /// * `<scheme>://<host>/<url>` — the address written out as it is, or
   ///   percent-encoded as a whole: `happ://add/`, `incy://import/` (and
   ///   `incy://add/`), `v2raytun://import/`, `streisand://import/`,
-  ///   `hiddify://import/`, `commy://import/`;
+  ///   `hiddify://import/`, and Commy's own `commy://add/` (`commy://import/`
+  ///   too, for links already shared);
   /// * `<scheme>://<host>?url=<url>&name=<name>` — `sing-box://import-remote-
   ///   profile`, `clash://`, `clashmeta://`, `flclashx://`, `stash://`,
   ///   `koala-clash://`, `prizrak-box://` and `v2rayng://install-config`,
-  ///   `sn://` and `exclave://subscription`, and all three under `commy://`;
+  ///   `sn://` and `exclave://subscription`, and all three under `commy://`,
+  ///   with `commy://add?url=` and `commy://import?url=`;
   /// * Shadowrocket's `sub://<base64 of the url>`, its `sub://?url=<url>`
   ///   spelling, and either one wrapped in `shadowrocket://add/`.
   ///
@@ -140,7 +142,10 @@ abstract final class ForeignImportLink {
     'v2raytun': <String>['import'],
     'streisand': <String>['import'],
     'hiddify': <String>['import'],
-    'commy': <String>['import'],
+    // `add` first: Commy's own link, in the shape every client of this kind
+    // uses (`happ://add/`). `import` stays, so links already shared keep
+    // opening.
+    'commy': <String>['add', 'import'],
   };
 
   /// Query-form hosts, by scheme: `<scheme>://<host>?url=<url>`.
@@ -156,6 +161,8 @@ abstract final class ForeignImportLink {
     'sn': <String>{'subscription'},
     'exclave': <String>{'subscription'},
     'commy': <String>{
+      'add',
+      'import',
       'import-remote-profile',
       'install-config',
       'subscription',

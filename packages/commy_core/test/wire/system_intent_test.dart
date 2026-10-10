@@ -30,6 +30,16 @@ void main() {
       expect(intent?.uri, 'content://downloads/1');
     });
 
+    test('reads the launcher shortcuts, which carry nothing else', () {
+      expect(
+        SystemIntent.tryParse('{"kind":"scan"}')?.kind,
+        SystemIntentKind.scan,
+      );
+      final paste = SystemIntent.tryParse('{"kind":"paste"}');
+      expect(paste?.kind, SystemIntentKind.paste);
+      expect(paste?.payload, isNull);
+    });
+
     test('reads a Quick Settings tap, which carries nothing', () {
       final intent = SystemIntent.tryParse('{"kind":"connect"}');
 

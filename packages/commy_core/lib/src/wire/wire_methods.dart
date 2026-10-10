@@ -4,7 +4,8 @@
 /// one means editing the Kotlin side, this list and `docs/wire-protocol.md` in
 /// the same pull request.
 ///
-/// [openVpnSettings], [setStartOnBoot], [setLocale], [installedApps],
+/// [openVpnSettings], [setStartOnBoot], [setLocale], [appLocale],
+/// [installedApps],
 /// [deviceInfo], [probeOutbounds] and [ping] are not tunnel commands, and they
 /// are counted separately for that reason — see their own notes below.
 abstract final class WireMethods {
@@ -78,6 +79,12 @@ abstract final class WireMethods {
   /// the app was set to. The Kotlin side keeps the tag, because the tile and
   /// the boot reminder are drawn while Flutter is not running.
   static const String setLocale = 'setLocale';
+
+  /// Reads the language Android 13+ keeps for the app (Settings → Apps →
+  /// Commy → Language). No argument. Result: a bare language tag; `system`
+  /// when the user cleared a language the app had put there; an empty string
+  /// for none — always empty below Android 13.
+  static const String appLocale = 'appLocale';
 
   /// Measures every outbound of a configuration by a GET through it, in a
   /// core instance of its own. Argument: `{config, url, timeoutMs}`, where

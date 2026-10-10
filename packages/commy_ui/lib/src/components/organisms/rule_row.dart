@@ -30,6 +30,7 @@ class RuleRow extends StatelessWidget {
     this.dragHandleLabel,
     this.isFinal = false,
     this.isEnabled = true,
+    this.disabledLabel,
     this.onTap,
     super.key,
   }) : assert(
@@ -67,6 +68,12 @@ class RuleRow extends StatelessWidget {
   /// Whether the rule is currently applied. A disabled rule stays visible and
   /// legible; it just stops shouting.
   final bool isEnabled;
+
+  /// Announced as the row's value while [isEnabled] is false — "off". A row
+  /// that opens its rule on a tap stays an enabled button for the screen
+  /// reader even then: the tap is how a rule that is off is switched back on,
+  /// and a control read out as disabled is one nobody tries.
+  final String? disabledLabel;
 
   /// Tap handler, for editing the rule.
   final VoidCallback? onTap;
@@ -108,10 +115,15 @@ class RuleRow extends StatelessWidget {
         padding: EdgeInsetsDirectional.only(end: spacing.s4),
         child: Row(
           children: <Widget>[
-            if (index != null && !isFinal)
-              ReorderableDragStartListener(index: index, child: handle)
-            else
-              handle,
+            // Out of the tree: merged into the row, its "drag rule" became
+            // the name of a row a tap opens, and as a node of its own it was
+            // a stop with nothing to do. The reorder itself is the list's
+            // move up/down actions on the row, which the hint below names.
+            ExcludeSemantics(
+              child: index != null && !isFinal
+                  ? ReorderableDragStartListener(index: index, child: handle)
+                  : handle,
+            ),
             Expanded(
               child: Text(
                 matcher,
@@ -132,7 +144,9 @@ class RuleRow extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
-      enabled: isEnabled,
+      enabled: onTap != null || isEnabled,
+      value: isEnabled ? null : disabledLabel,
+      hint: index != null && !isFinal ? dragHandleLabel : null,
       child: Material(
         color: colors.bgSurface,
         child: onTap == null

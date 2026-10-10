@@ -95,7 +95,11 @@ void main() {
       NodeTile(
         name: 'Amsterdam 03 — очень длинное имя узла',
         countryCode: 'NL',
-        descriptors: const <String>['VLESS', 'Reality', 'TCP'],
+        descriptors: const <NodeTag>[
+          NodeTag('VLESS', hue: CommyTagHue.azure),
+          NodeTag('Reality', hue: CommyTagHue.iris),
+          NodeTag('TCP'),
+        ],
         latency: const Duration(milliseconds: 148),
         isActive: true,
         onTap: () {},
@@ -153,7 +157,11 @@ void main() {
           NodeTile(
             name: 'Авто-Выбор',
             countryCode: 'EU',
-            descriptors: const <String>['VLESS', 'Reality', 'TCP'],
+            descriptors: const <NodeTag>[
+              NodeTag('VLESS', hue: CommyTagHue.azure),
+              NodeTag('Reality', hue: CommyTagHue.iris),
+              NodeTag('TCP'),
+            ],
             latency: const Duration(milliseconds: 41),
             onTap: () {},
           ),

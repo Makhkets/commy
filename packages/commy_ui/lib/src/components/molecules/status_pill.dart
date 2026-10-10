@@ -14,6 +14,7 @@ class StatusPill extends StatelessWidget {
     required this.label,
     required this.tone,
     this.icon,
+    this.maxLines = 1,
     super.key,
   });
 
@@ -25,6 +26,11 @@ class StatusPill extends StatelessWidget {
 
   /// Optional Lucide icon shown instead of the dot.
   final IconData? icon;
+
+  /// How many lines the label may take before it is ellipsised. One for a
+  /// chip in a row; the status line under the connect button takes two, so
+  /// a long sentence at a large text size wraps instead of being cut.
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +66,9 @@ class StatusPill extends StatelessWidget {
             Flexible(
               child: Text(
                 label,
-                maxLines: 1,
+                maxLines: maxLines,
                 overflow: TextOverflow.ellipsis,
+                textAlign: maxLines > 1 ? TextAlign.center : null,
                 style: context.typography.captionStrong.copyWith(
                   color: foreground,
                 ),

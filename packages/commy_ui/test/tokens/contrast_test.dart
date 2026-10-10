@@ -25,11 +25,45 @@ void main() {
 
   const aa = 4.5;
 
-  for (final (name, colors) in <(String, CommyColors)>[
-    ('dark', CommyColors.dark),
-    ('light', CommyColors.light),
+  for (final (name, colors, tags) in <(String, CommyColors, CommyTagColors)>[
+    ('dark', CommyColors.dark, CommyTagColors.dark),
+    ('light', CommyColors.light, CommyTagColors.light),
   ]) {
     group(name, () {
+      // The protocol tags under a server name are 12 px caption text, so
+      // the full 4.5:1, on every ground a server row is drawn on: the card,
+      // the picker sheet, and the active row's plate over both.
+      test('every tag hue reads on every ground a server row sits on', () {
+        final grounds = <String, (Color, Color?)>{
+          'bg/surface': (colors.bgSurface, null),
+          'bg/raised': (colors.bgRaised, null),
+          'bg/overlay': (colors.bgOverlay, null),
+          'status/connected/wash on bg/surface': (
+            colors.statusConnectedWash,
+            colors.bgSurface
+          ),
+          'status/connected/wash on bg/raised': (
+            colors.statusConnectedWash,
+            colors.bgRaised
+          ),
+          // A pointer over an ordinary row. The plate gets no hover wash,
+          // and keyboard focus is a ring rather than a fill, so neither of
+          // those changes the ground under the words.
+          'accent/wash on bg/surface': (colors.accentWash, colors.bgSurface),
+          'accent/wash on bg/raised': (colors.accentWash, colors.bgRaised),
+        };
+        for (final hue in CommyTagHue.values) {
+          for (final MapEntry(key: ground, value: (fill, base))
+              in grounds.entries) {
+            expect(
+              contrast(tags.of(hue, colors), fill, base: base),
+              greaterThanOrEqualTo(aa),
+              reason: '${hue.name} on $ground',
+            );
+          }
+        }
+      });
+
       test('text/tertiary reads on every ground it is used on', () {
         final grounds = <String, double>{
           'bg/surface': contrast(colors.textTertiary, colors.bgSurface),

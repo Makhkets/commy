@@ -60,12 +60,9 @@ class NodeMenuSheet extends ConsumerWidget {
                 ),
               ),
               SizedBox(height: spacing.s1),
-              Text(
-                NodeDescriptors.of(node).join(NodeTile.descriptorSeparator),
-                style: context.typography.caption.copyWith(
-                  color: colors.textTertiary,
-                ),
-              ),
+              // Wraps here, unlike in the list: this is the one place the
+              // whole line can always be read, at any text size.
+              NodeTagLine(tags: NodeDescriptors.of(node), maxLines: null),
             ],
           ),
         ),

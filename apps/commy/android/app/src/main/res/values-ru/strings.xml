@@ -40,4 +40,9 @@
     <string name="widget_connect">Подключить</string>
     <string name="widget_disconnect">Отключить</string>
     <string name="widget_wait">Подождите…</string>
+
+    <!-- Launcher shortcuts (long press on the icon). AppShortcuts.kt. -->
+    <string name="shortcut_connect">Подключить</string>
+    <string name="shortcut_scan">Сканировать QR-код</string>
+    <string name="shortcut_paste">Импорт из буфера</string>
 </resources>

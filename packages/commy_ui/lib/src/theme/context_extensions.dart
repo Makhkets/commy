@@ -6,6 +6,7 @@ import 'package:commy_ui/src/tokens/layout_size.dart';
 import 'package:commy_ui/src/tokens/motion.dart';
 import 'package:commy_ui/src/tokens/radii.dart';
 import 'package:commy_ui/src/tokens/spacing.dart';
+import 'package:commy_ui/src/tokens/tag_colors.dart';
 import 'package:commy_ui/src/tokens/typography.dart';
 import 'package:flutter/material.dart';
 
@@ -73,15 +74,22 @@ extension CommyThemeContext on BuildContext {
             : CommyConnectTokens.light);
   }
 
+  /// Colours of the protocol tags on a server row.
+  CommyTagColors get tagColors {
+    final theme = Theme.of(this);
+    return theme.extension<CommyTagColors>() ??
+        (theme.brightness == Brightness.dark
+            ? CommyTagColors.dark
+            : CommyTagColors.light);
+  }
+
   /// Whether the platform asked for reduced motion.
-  bool get reduceMotion =>
-      MediaQuery.maybeDisableAnimationsOf(this) ?? false;
+  bool get reduceMotion => MediaQuery.maybeDisableAnimationsOf(this) ?? false;
 
   /// Which layout the current window width belongs to.
   CommyLayoutSize get layoutSize =>
       CommyBreakpoints.sizeFor(MediaQuery.sizeOf(this).width);
 
   /// Base screen inset: `space/4` on mobile, `space/6` from tablet up.
-  double get screenInset =>
-      layoutSize.isCompact ? spacing.s4 : spacing.s6;
+  double get screenInset => layoutSize.isCompact ? spacing.s4 : spacing.s6;
 }

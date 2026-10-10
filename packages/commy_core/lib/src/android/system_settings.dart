@@ -87,6 +87,24 @@ class SystemSettings {
     }
   }
 
+  /// What [appLocale] answers when the user chose "System default" in
+  /// Android's settings over a language the app had put there.
+  static const String appLocaleCleared = 'system';
+
+  /// The language Android 13+ holds for the app in its own settings, as a
+  /// bare tag such as `en`; [appLocaleCleared] when the user cleared one the
+  /// app had put there; an empty string when it holds none, below Android 13
+  /// and wherever nothing listens. Never throws.
+  Future<String> appLocale() async {
+    try {
+      return await _channel.invokeMethod<String>(WireMethods.appLocale) ?? '';
+    } on MissingPluginException {
+      return '';
+    } on PlatformException {
+      return '';
+    }
+  }
+
   /// What the device calls itself, or `null` where nothing can say.
   ///
   /// Exists so that a dependency does not. A panel that limits devices per

@@ -14,7 +14,10 @@
     "check": "Check",
     "cancel": "Cancel",
     "disconnect": "Disconnect",
-    "noNode": "Choose a server first"
+    "noNode": "Choose a server first",
+    "hint": "Tap to connect",
+    "failed": "Connection error",
+    "noServers": "No servers to connect to"
   },
 
   "time": {
@@ -208,12 +211,21 @@
       "collapse": "Collapse",
       "expand": "Expand",
       "rename": "Rename",
+      "changeLink": "Change link",
       "copyLink": "Copy link",
       "autoUpdate": "Auto refresh",
       "interval": "Refresh interval",
       "showQr": "Show QR code",
       "userAgent": "User-Agent",
       "delete": "Delete"
+    },
+    "changeLink": {
+      "title": "New link",
+      "body": "If the panel gave you a new link, paste it here. The card, its interval, its User-Agent and the chosen server stay; the servers are fetched again from the new link.",
+      "invalid": "This needs a link that starts with http:// or https://",
+      "unchanged": "That is the same link",
+      "taken": "That link already belongs to “$name”",
+      "paste": "Paste"
     },
     "userAgent": {
       "title": "User-Agent",
@@ -571,6 +583,10 @@
     "blockAds": "Block ads",
     "newRule": {
       "title": "New rule",
+      "editTitle": "Rule",
+      "off": "off",
+      "enabled": "Rule is on",
+      "enabledHint": "A rule that is off keeps its place in the list but does nothing",
       "matcher": "Match",
       "matcherHint": "geosite:ru, domain:example.com, geoip:private",
       "action": "Action",
@@ -614,6 +630,8 @@
     "redactionNotice": "UUIDs, passwords and subscription links are stripped automatically when copying and exporting.",
     "levelAll": "ALL",
     "logsEmpty": "No logs yet",
+    "toLatest": "Latest · $count",
+    "toLatestHint": "Scroll to the latest lines",
     "logsEmptyBody": "The core writes here while the tunnel runs. Connect and the lines will appear.",
     "logsFiltered": "Nothing matches",
     "logsFilteredBody": "No line passes the current level and search.",
@@ -672,6 +690,8 @@
   "error": {
     "title": "Something went wrong",
     "openLogs": "Open the logs",
+    "changeServer": "Change server",
+    "diagnose": "Check server",
     "subscriptionUnreachable": {
       "message": "The subscription server is not answering",
       "action": "Retry"

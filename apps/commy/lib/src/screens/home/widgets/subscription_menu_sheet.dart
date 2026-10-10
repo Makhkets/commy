@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/i18n/relative_time.dart';
+import 'package:commy/src/screens/home/widgets/subscription_section.dart';
 import 'package:commy/src/screens/home/widgets/user_agent_sheet.dart';
 import 'package:commy/src/screens/import/subscription_sheet.dart';
 import 'package:commy/src/state/library_providers.dart';
@@ -112,6 +115,12 @@ class SubscriptionMenuSheet extends ConsumerWidget {
               onTap: () => unawaited(_rename(context, controller, current)),
             ),
             SettingsTile(
+              icon: CommyIcons.link,
+              title: t.subscription.menu.changeLink,
+              onTap: () =>
+                  unawaited(_changeLink(context, ref, controller, current)),
+            ),
+            SettingsTile(
               icon: CommyIcons.copy,
               title: t.subscription.menu.copyLink,
               onTap: () => unawaited(_copyLink(context, controller, current)),
@@ -219,6 +228,84 @@ class SubscriptionMenuSheet extends ConsumerWidget {
       return;
     }
     await controller.rename(current, name);
+  }
+
+  /// Asks for the new link, points the card at it and fetches it.
+  ///
+  /// The field starts empty: the old link is the access token, and showing
+  /// it is what "Copy link" is for, deliberately, not a side effect of
+  /// editing. The menu closes once the card has its new address, and the
+  /// refresh reports through the screen below, as the card's own button does.
+  Future<void> _changeLink(
+    BuildContext context,
+    WidgetRef ref,
+    SubscriptionController controller,
+    Subscription current,
+  ) async {
+    final t = Translations.of(context);
+    final navigator = Navigator.of(context);
+    final url = await CommySheet.show<Uri>(
+      context: context,
+      title: t.subscription.changeLink.title,
+      builder: (context) => const _ChangeLinkSheet(),
+    );
+    if (url == null || !context.mounted) {
+      return;
+    }
+    final outcome = await controller.changeUrl(current, url);
+    if (!context.mounted) {
+      return;
+    }
+    switch (outcome?.change) {
+      case null:
+        final failure = ref.read(subscriptionControllerProvider).failure;
+        ToastMessenger.show(
+          context,
+          message: failure == null
+              ? t.error.title
+              : FailureText.of(failure, t).message,
+          tone: CommyTone.error,
+          icon: CommyIcons.warning,
+        );
+      case SubscriptionUrlChange.unchanged:
+        ToastMessenger.show(
+          context,
+          message: t.subscription.changeLink.unchanged,
+          tone: CommyTone.info,
+          icon: CommyIcons.info,
+        );
+      case SubscriptionUrlChange.taken:
+        ToastMessenger.show(
+          context,
+          message: t.subscription.changeLink.taken(
+            name: outcome!.subscription.name,
+          ),
+          tone: CommyTone.error,
+          icon: CommyIcons.warning,
+        );
+      case SubscriptionUrlChange.changed:
+        final below = navigator.context;
+        if (navigator.canPop()) {
+          navigator.pop();
+        }
+        unawaited(_refreshMoved(below, controller, outcome!.subscription));
+    }
+  }
+
+  /// Fetches the card from its new address once nothing else is refreshing.
+  ///
+  /// A refresh already running — the scheduler's, or a tap on the card — is
+  /// fetching the old address and would make the one asked for here a no-op.
+  static Future<void> _refreshMoved(
+    BuildContext context,
+    SubscriptionController controller,
+    Subscription moved,
+  ) async {
+    await controller.whenIdle;
+    if (!context.mounted) {
+      return;
+    }
+    await SubscriptionSection.refreshAndReport(context, moved);
   }
 
   /// Copies the subscription URL and confirms that it happened.
@@ -532,5 +619,97 @@ class _DeleteConfirmation extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// The new link, typed or pasted, checked before it leaves the sheet.
+class _ChangeLinkSheet extends ConsumerStatefulWidget {
+  const _ChangeLinkSheet();
+
+  @override
+  ConsumerState<_ChangeLinkSheet> createState() => _ChangeLinkSheetState();
+}
+
+class _ChangeLinkSheetState extends ConsumerState<_ChangeLinkSheet> {
+  final TextEditingController _url = TextEditingController();
+  bool _showError = false;
+
+  @override
+  void dispose() {
+    _url.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final spacing = context.spacing;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            t.subscription.changeLink.body,
+            style: context.typography.body.copyWith(
+              color: context.colors.textSecondary,
+            ),
+          ),
+          SizedBox(height: spacing.s4),
+          CommyTextField(
+            controller: _url,
+            labelText: t.import.subscription.url,
+            hintText: t.import.subscription.urlHint,
+            errorText: _showError ? t.subscription.changeLink.invalid : null,
+            keyboardType: TextInputType.url,
+            isMonospace: true,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            onChanged: (_) {
+              if (_showError) {
+                setState(() => _showError = false);
+              }
+            },
+            onSubmitted: (_) => _submit(),
+          ),
+          SizedBox(height: spacing.s3),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: CommyButton(
+              label: t.subscription.changeLink.paste,
+              variant: CommyButtonVariant.ghost,
+              isCompact: true,
+              icon: CommyIcons.copy,
+              onPressed: () => unawaited(_paste()),
+            ),
+          ),
+          SizedBox(height: spacing.s4),
+          CommyButton(label: t.common.save, onPressed: _submit),
+          SizedBox(height: spacing.s4),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _paste() async {
+    final read = await ref.read(clipboardProvider).read();
+    final text = read.valueOrNull;
+    if (!mounted || text == null) {
+      return;
+    }
+    _url.text = text.trim();
+    setState(() => _showError = false);
+  }
+
+  void _submit() {
+    final url = Uri.tryParse(_url.text.trim());
+    if (url == null ||
+        !ChangeSubscriptionUrlUseCase.isSubscriptionAddress(url)) {
+      setState(() => _showError = true);
+      return;
+    }
+    Navigator.of(context).pop(url);
   }
 }

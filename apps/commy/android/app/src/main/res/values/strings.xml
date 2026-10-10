@@ -52,4 +52,9 @@
     <string name="widget_connect">Connect</string>
     <string name="widget_disconnect">Disconnect</string>
     <string name="widget_wait">Wait…</string>
+
+    <!-- Launcher shortcuts (long press on the icon). AppShortcuts.kt. -->
+    <string name="shortcut_connect">Connect</string>
+    <string name="shortcut_scan">Scan a QR code</string>
+    <string name="shortcut_paste">Import from clipboard</string>
 </resources>

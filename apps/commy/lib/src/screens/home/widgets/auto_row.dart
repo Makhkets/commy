@@ -43,7 +43,7 @@ class AutoRow extends ConsumerWidget {
 
     return NodeTile(
       name: t.home.auto,
-      descriptors: <String>[label?.text ?? t.home.autoSubtitle],
+      descriptors: <NodeTag>[NodeTag(label?.text ?? t.home.autoSubtitle)],
       latency: picked?.latency,
       countryCode: CountryFlag.europeanUnion,
       isActive: isActive,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
+import 'package:commy/src/i18n/device_locale.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,12 +58,36 @@ final startOnBootSyncProvider = Provider<void>((ref) {
 /// root like [startOnBootSyncProvider].
 final nativeLocaleSyncProvider = Provider<void>((ref) {
   String? sent;
+  var askedSystem = false;
+  Future<void> firstSync(String tag) async {
+    // Before the first send: sending the app's choice also writes Android
+    // 13+'s per-app language, and would wipe a pick the user made there
+    // while the app was closed. Read it first, and take it over if it is
+    // one (DeviceLocale.adoptFromSystem).
+    final system = await ref.read(systemSettingsProvider).appLocale();
+    final adopted = DeviceLocale.adoptFromSystem(
+      chosen: tag,
+      systemTag: system,
+    );
+    if (adopted != null) {
+      await ref.read(settingsControllerProvider.notifier).setLocale(adopted);
+      return;
+    }
+    sent = tag;
+    await ref.read(systemSettingsProvider).setLocale(tag);
+  }
+
   void consider() {
     final settings = ref.read(settingsProvider).value;
     if (settings == null) {
       return;
     }
     final tag = settings.locale ?? '';
+    if (!askedSystem) {
+      askedSystem = true;
+      unawaited(firstSync(tag));
+      return;
+    }
     if (tag == sent) {
       return;
     }
@@ -224,6 +249,56 @@ class SettingsController extends Notifier<CommyFailure?> {
     );
     await saveRouting(
       policy.copyWith(rules: <RoutingRule>[...policy.rules, rule]),
+    );
+  }
+
+  /// Rewrites what a rule matches and where that traffic goes. Its place in
+  /// the list — its priority — stays where the user put it.
+  ///
+  /// A typo used to cost a swipe, a retype and a drag back into position.
+  ///
+  /// [enabled], when given, is written in the same save: one edit is one
+  /// write, never a half-applied pair, and one reload of a running core.
+  Future<void> updateRule(
+    String id, {
+    required String matcher,
+    required RuleAction action,
+    bool? enabled,
+  }) async {
+    final trimmed = matcher.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    final policy = await _routing();
+    await saveRouting(
+      policy.copyWith(
+        rules: <RoutingRule>[
+          for (final rule in policy.rules)
+            rule.id == id
+                ? rule.copyWith(
+                    matcher: trimmed,
+                    action: action,
+                    enabled: enabled,
+                  )
+                : rule,
+        ],
+      ),
+    );
+  }
+
+  /// Turns a rule off without losing it, or back on.
+  ///
+  /// A rule could arrive switched off — in a backup, inside a
+  /// `commy://routing/…` profile — and there was no way to switch it back.
+  Future<void> setRuleEnabled(String id, {required bool enabled}) async {
+    final policy = await _routing();
+    await saveRouting(
+      policy.copyWith(
+        rules: <RoutingRule>[
+          for (final rule in policy.rules)
+            rule.id == id ? rule.copyWith(enabled: enabled) : rule,
+        ],
+      ),
     );
   }
 

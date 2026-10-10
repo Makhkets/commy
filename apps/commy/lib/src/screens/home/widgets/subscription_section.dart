@@ -183,7 +183,21 @@ class SubscriptionSection extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Translations t,
+  ) =>
+      refreshAndReport(context, subscription);
+
+  /// Refreshes [subscription] and says how it went, success included — the
+  /// card's refresh button and the subscription menu (after the link was
+  /// changed) both answer the same way.
+  ///
+  /// Reads the providers through [context] rather than a widget's ref: the
+  /// menu calls this after closing itself, from the navigator's context.
+  static Future<void> refreshAndReport(
+    BuildContext context,
+    Subscription subscription,
   ) async {
+    final t = Translations.of(context);
+    final ref = ProviderScope.containerOf(context, listen: false);
     final ok = await ref
         .read(subscriptionControllerProvider.notifier)
         .refresh(subscription.id);

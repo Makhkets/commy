@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut, Connect: the power glyph of the tile and the connect button.
+     A launcher draws a shortcut icon as it is, untinted, on its own popup:
+     ink on a chalk disc (ink/900 on ink/50), the 24 dp glyph centred in the
+     48 dp shortcut grid. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#F2F3F5"
+        android:pathData="M24,0 A24,24 0 1,1 24,48 A24,24 0 1,1 24,0 Z" />
+    <path
+        android:strokeColor="#131519"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M24,15 L24,23" />
+    <path
+        android:strokeColor="#131519"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M19.5,18.2 A7,7 0 1,0 28.5,18.2" />
+</vector>

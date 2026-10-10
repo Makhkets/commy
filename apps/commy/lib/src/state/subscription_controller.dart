@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
@@ -84,6 +86,29 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
       return false;
     }
     state = SubscriptionActionState(refreshingId: id);
+    final running = _running = Completer<void>();
+    try {
+      return await _refresh(id);
+    } finally {
+      running.complete();
+      if (identical(_running, running)) {
+        _running = null;
+      }
+    }
+  }
+
+  /// The refresh in flight, if any.
+  Completer<void>? _running;
+
+  /// Completes once no refresh is running — at once when none is.
+  ///
+  /// "Change link" waits on it: a refresh of the same card that started
+  /// before the change is fetching the old address, ends in a failure the
+  /// moment it sees the card moved, and the new address would otherwise
+  /// never be fetched (review of session 25).
+  Future<void> get whenIdle => _running?.future ?? Future<void>.value();
+
+  Future<bool> _refresh(String id) async {
     final result = await ref.read(updateSubscriptionUseCaseProvider)(
       subscriptionId: id,
     );
@@ -197,6 +222,39 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
         userAgentOverride: trimmed.isEmpty ? null : trimmed,
       ),
     );
+  }
+
+  /// Gives the subscription a new address and keeps the card
+  /// ([ChangeSubscriptionUrlUseCase]). Returns what happened — with the card
+  /// that already has the address, when it is taken — or `null` when it could
+  /// not be written; the failure is in [state] then.
+  ///
+  /// Does not refresh: the caller does, so it can say how that went.
+  Future<({SubscriptionUrlChange change, Subscription subscription})?>
+      changeUrl(
+    Subscription subscription,
+    Uri url,
+  ) async {
+    final result = await ref.read(changeSubscriptionUrlUseCaseProvider)(
+      subscriptionId: subscription.id,
+      url: url,
+    );
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      ref.read(appLoggerProvider).warn(
+            'subscription link not changed: ${FailureLog.describe(failure)}',
+            tag: logTag,
+          );
+      _settle(failure);
+      return null;
+    }
+    final outcome = result.valueOrNull!;
+    if (outcome.change == SubscriptionUrlChange.changed) {
+      ref
+          .read(appLoggerProvider)
+          .info('subscription link changed', tag: logTag);
+    }
+    return outcome;
   }
 
   /// Renames the subscription.

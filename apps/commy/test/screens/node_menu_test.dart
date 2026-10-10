@@ -3,7 +3,9 @@ import 'package:commy/src/screens/home/widgets/node_menu_sheet.dart';
 import 'package:commy/src/widgets/qr_sheet.dart';
 import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
+import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -31,6 +33,53 @@ void main() {
     );
     await settle(tester);
   }
+
+  // The list row keeps its protocol line to one line; this header is where
+  // the whole of it can be read, so at 200 % on a narrow phone it wraps
+  // rather than cutting `Vision` off (it did, the day the line got colours).
+  testWidgets('the protocol line wraps at a large text size', (tester) async {
+    tester.view
+      ..physicalSize = const Size(320, 900)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const node = ProxyNode(
+      id: 'n-1',
+      name: 'Amsterdam 03',
+      protocol: Protocol.vless,
+      host: 'nl.example.net',
+      port: 443,
+      params: <String, Object?>{
+        'security': 'reality',
+        'type': 'xhttp',
+        'flow': 'xtls-rprx-vision',
+      },
+    );
+    harness = CommyTestHarness(nodes: <ProxyNode>[node]);
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(320, 900),
+          textScaler: TextScaler.linear(2),
+        ),
+        child: harness.wrap(
+          const Scaffold(
+            body: SingleChildScrollView(child: NodeMenuSheet(node: node)),
+          ),
+        ),
+      ),
+    );
+    await settle(tester);
+
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byType(NodeTagLine),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(paragraph.text.toPlainText(), contains('Vision'));
+  });
 
   testWidgets('offers exactly measure, copy, QR and delete', (tester) async {
     await pumpMenu(tester);

@@ -1,18 +1,22 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
+import 'package:commy/src/screens/diagnosis/diagnosis_sheet.dart';
 import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/first_run_view.dart';
 import 'package:commy/src/screens/home/widgets/hero_area.dart';
 import 'package:commy/src/screens/home/widgets/list_card.dart';
 import 'package:commy/src/screens/home/widgets/list_toolbar.dart';
+import 'package:commy/src/screens/home/widgets/node_picker_sheet.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/screens/home/widgets/subscription_section.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
 import 'package:commy/src/screens/import/import_sheet.dart';
 import 'package:commy/src/screens/import/paste_sheet.dart';
+import 'package:commy/src/screens/import/qr_scan_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -20,6 +24,7 @@ import 'package:commy/src/state/system_intent_listener.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/async_section.dart';
 import 'package:commy/src/widgets/failure_view.dart';
+import 'package:commy_core/commy_core.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -60,14 +65,36 @@ class HomeScreen extends ConsumerWidget {
     // A link tapped in another app lands here. It opens the sheet pre-filled
     // rather than importing on its own: the user has to see what arrived
     // before it becomes a stored server.
-    ref.listen<String?>(pendingImportProvider, (previous, next) {
-      if (next == null || next.isEmpty) {
-        return;
-      }
-      ref.read(pendingImportProvider.notifier).take();
-      ref.read(importControllerProvider.notifier).reset();
-      unawaited(PasteSheet.show(context, initialText: next));
-    });
+    ref
+      ..listen<String?>(pendingImportProvider, (previous, next) {
+        if (next == null || next.isEmpty) {
+          return;
+        }
+        ref.read(pendingImportProvider.notifier).take();
+        ref.read(importControllerProvider.notifier).reset();
+        unawaited(PasteSheet.show(context, initialText: next));
+      })
+      // A launcher shortcut: the scanner, or the paste sheet with whatever
+      // the clipboard holds. Read here and not on the native side — Android
+      // 10+ shows the clipboard only to the app in front, which this now is.
+      ..listen<SystemIntentKind?>(pendingShortcutProvider, (previous, next) {
+        if (next == null) {
+          return;
+        }
+        ref.read(pendingShortcutProvider.notifier).take();
+        ref.read(importControllerProvider.notifier).reset();
+        switch (next) {
+          case SystemIntentKind.scan:
+            unawaited(QrScanSheet.show(context));
+          case SystemIntentKind.paste:
+            unawaited(_pasteFromClipboard(context, ref));
+          case SystemIntentKind.link ||
+                SystemIntentKind.text ||
+                SystemIntentKind.file ||
+                SystemIntentKind.connect:
+            break;
+        }
+      });
 
     // One decision, handed to both slots: either the connection is a pane of
     // its own and the body is nothing but the list, or the two are the single
@@ -236,6 +263,17 @@ class HomeScreen extends ConsumerWidget {
 ///
 /// Both answers are pinned in `adaptive_layout_test.dart`, so a change to the
 /// shell's own rule fails a test here instead of losing the disc quietly.
+/// Opens the paste sheet with what the clipboard holds, or empty when it
+/// holds nothing the app may read — the sheet has its own paste button.
+Future<void> _pasteFromClipboard(BuildContext context, WidgetRef ref) async {
+  final read = await ref.read(clipboardProvider).read();
+  if (!context.mounted) {
+    return;
+  }
+  final text = read.valueOrNull?.trim() ?? '';
+  await PasteSheet.show(context, initialText: text.isEmpty ? null : text);
+}
+
 bool _fitsDetailPane(BuildContext context) {
   final layout = context.layoutSize;
   if (layout.isCompact) {
@@ -334,6 +372,27 @@ class _TunnelFailureBanner extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
+    final t = Translations.of(context);
+    final hasChoice = NodePickerSheet.isOffered(
+      ref.watch(nodesProvider).value ?? const <ProxyNode>[],
+    );
+    final servers = ref.watch(nodesProvider).value ?? const <ProxyNode>[];
+    // The server the connect went to: the chosen one or — with nothing
+    // chosen yet — the first, which is what `connect` takes. On Auto it is
+    // the group's pick, and with no pick known there is no one server to
+    // check: the button is left out rather than pointed at a guess.
+    final node = ref.watch(autoSelectedProvider)
+        ? ref.watch(autoNodeProvider)
+        : ref.watch(selectedNodeProvider) ??
+            (servers.isEmpty ? null : servers.first);
+    // A reload the core refused while the tunnel stays up is a settings
+    // problem: another server would hide it, not fix it.
+    final tunnelUp = switch (ref.watch(coreStatusProvider).value) {
+      TunnelConnected() || TunnelChecking() => true,
+      _ => false,
+    };
+    final serverMayBeAtFault = !tunnelUp && _serverMayBeAtFault(failure);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -344,11 +403,55 @@ class _TunnelFailureBanner extends ConsumerWidget {
           ),
           onDismiss: () =>
               ref.read(tunnelControllerProvider.notifier).clearFailure(),
+          // docs/05, scenario 2 promised these and the banner had only
+          // "Retry". Offered where the server can be the cause; a refused
+          // VPN permission is not fixed by another server.
+          extraActions: <Widget>[
+            if (serverMayBeAtFault && hasChoice)
+              CommyButton(
+                label: t.error.changeServer,
+                variant: CommyButtonVariant.ghost,
+                isCompact: true,
+                icon: CommyIcons.server,
+                onPressed: () => unawaited(
+                  NodePickerSheet.show(
+                    context,
+                    everyServer: true,
+                    connectOnPick: true,
+                  ),
+                ),
+              ),
+            if (serverMayBeAtFault && _isRuntime(failure) && node != null)
+              CommyButton(
+                label: t.error.diagnose,
+                variant: CommyButtonVariant.ghost,
+                isCompact: true,
+                icon: CommyIcons.diagnostics,
+                onPressed: () => unawaited(DiagnosisSheet.show(context, node)),
+              ),
+          ],
         ),
         SizedBox(height: context.spacing.s4),
       ],
     );
   }
+
+  /// Failures another server can fix: one the builder could not make a
+  /// document for, a protocol this build cannot speak, a core that died
+  /// under it, and the ones nobody classified.
+  static bool _serverMayBeAtFault(CommyFailure failure) => switch (failure) {
+        ConfigInvalidFailure() ||
+        UnsupportedProtocolFailure() ||
+        CoreCrashedFailure() ||
+        UnknownFailure() =>
+          true,
+        _ => false,
+      };
+
+  /// Failures that happened on the wire rather than on paper: worth walking
+  /// the path to the server (DNS, TCP, TLS, a request through it).
+  static bool _isRuntime(CommyFailure failure) =>
+      failure is CoreCrashedFailure || failure is UnknownFailure;
 }
 
 /// The connected-state body: hero area, an error if there is one, the list.
@@ -415,7 +518,16 @@ class _HomeContent extends ConsumerWidget {
         // Auto row, failure banner, toolbar, cards.
         if (!hasConnectionPane) const HeroArea(),
         if (hasChoice) ...<Widget>[
-          const ListCard(children: <Widget>[AutoRow()]),
+          ListCard(
+            children: <Widget>[
+              // The row's own inset is `space/1` vertically and `space/2`
+              // sideways; this evens the plate's distance to every edge.
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: spacing.s1),
+                child: const AutoRow(),
+              ),
+            ],
+          ),
           SizedBox(height: spacing.s4),
         ],
         if (!hasConnectionPane) const _TunnelFailureBanner(),
@@ -431,8 +543,16 @@ class _HomeContent extends ConsumerWidget {
                 title: t.home.manualGroup,
                 subtitle: t.home.manualGroupSubtitle,
               ),
-              for (final node in manual)
-                NodeRow(node: node, isActive: node.id == activeId),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: spacing.s1),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    for (final node in manual)
+                      NodeRow(node: node, isActive: node.id == activeId),
+                  ],
+                ),
+              ),
             ],
           ),
         // A search that matched nothing is the one empty state this screen

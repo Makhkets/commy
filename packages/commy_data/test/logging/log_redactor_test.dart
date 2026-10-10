@@ -276,6 +276,109 @@ void main() {
       expect(result, contains('Authorization: ${Redact.placeholder}'));
     });
 
+    // The forms a header actually reaches a core log in: an XHTTP transport's
+    // `headers` object, a JSON dump of a request, a Go `http.Header` map. The
+    // header-line pattern wanted the colon straight after the name, so every
+    // one of these went out with the token in it.
+    test('removes a credential header written as JSON', () {
+      const token = 'Bearer eyJhbGciOiJIUzI1NiJ9.cdn-access.sig';
+      const line = 'xhttp: extra '
+          '{"headers":{"Authorization":"$token","Host":"cdn.example.com"},'
+          ' "xPaddingBytes":"100-1000"}';
+      final result = redactor.redact(line);
+
+      expect(result, isNot(contains(token)));
+      expect(result, contains('Authorization": "${Redact.placeholder}"'));
+      // Only the value goes; the rest of the object stays readable.
+      expect(result, contains('"Host":"cdn.example.com"'));
+      expect(result, contains('xPaddingBytes'));
+    });
+
+    test('removes every credential header form', () {
+      const secret = 's3cr3t-session-value-0123456789';
+      for (final line in <String>[
+        '{"Cookie": "session=$secret"}',
+        "{'Proxy-Authorization': 'Basic $secret'}",
+        '"x-api-key":"$secret"',
+        'request headers map[Authorization:[Bearer $secret] Accept:[*/*]]',
+        'Set-Cookie: id=$secret; Path=/',
+      ]) {
+        expect(redactor.redact(line), isNot(contains(secret)), reason: line);
+      }
+    });
+
+    // Review of session 25: the forms the first fix still let through.
+    test('a quoted value ends at its own quote, not at an escaped one', () {
+      const line = r'{"Cookie":"a=\"s3cr3t-0123456789\"; b=1","Host":"x"}';
+      final result = redactor.redact(line);
+
+      expect(result, isNot(contains('s3cr3t-0123456789')));
+      expect(result, contains('"Host":"x"'));
+    });
+
+    test('JSON inside a JSON string is redacted too', () {
+      const line = r'detail: "{\"headers\":{\"Authorization\": '
+          r'\"Bearer abc.def.ghi-0123456789\"}}"';
+      expect(redactor.redact(line), isNot(contains('abc.def.ghi-0123456789')));
+    });
+
+    test('a pretty-printed header array is blanked across its lines', () {
+      const line = '"Authorization": [\n    "Bearer s3cr3t-0123456789"\n  ]';
+      final result = redactor.redact(line);
+
+      expect(result, isNot(contains('s3cr3t-0123456789')));
+      expect(result, contains('Authorization": [${Redact.placeholder}]'));
+    });
+
+    test('underscore spellings are credentials as well', () {
+      for (final line in <String>[
+        'env HTTP_AUTHORIZATION=Bearer s3cr3t-0123456789',
+        '{"proxy_authorization":"Basic dXNlcjpwYXNzd29yZA=="}',
+        'oauth access_token=s3cr3t0123456789xyz',
+      ]) {
+        final result = redactor.redact(line);
+        expect(result, isNot(contains('s3cr3t')), reason: line);
+        expect(result, isNot(contains('dXNlcjpwYXNzd29yZA')), reason: line);
+      }
+    });
+
+    test('a Bearer token under any header name is redacted', () {
+      const line = 'headers {"X-Access":"Bearer s3cr3t.0123456789"}';
+      expect(redactor.redact(line), isNot(contains('s3cr3t.0123456789')));
+    });
+
+    test('an XHTTP extra object is blanked whole, nesting and all', () {
+      const line = 'xhttp {"mode":"auto","extra":{"headers": '
+          '{"X-Cdn-Pass":"s3cr3t-pass"},"downloadSettings":{"address": '
+          '"cdn.example.com"}},"path":"/x"}';
+      final result = redactor.redact(line);
+
+      expect(result, isNot(contains('s3cr3t-pass')));
+      expect(result, isNot(contains('downloadSettings')));
+      expect(result, contains('"path":"/x"'));
+      expect(result, contains('"mode":"auto"'));
+    });
+
+    test('a scheme word in plain prose is not a token', () {
+      for (final line in <String>[
+        'tls: Basic configuration is missing',
+        'Bearer tokens are not supported here',
+      ]) {
+        expect(redactor.redact(line), line, reason: line);
+      }
+    });
+
+    test('leaves words that only start like a header alone', () {
+      for (final line in <String>[
+        'author: the panel admin',
+        'tls: authority: example.com',
+        'cookies: 3 stored',
+        '"authorization_mode":"none"',
+      ]) {
+        expect(redactor.redact(line), line, reason: line);
+      }
+    });
+
     test('keeps a short numeric id, which is not a secret', () {
       const line = 'connection id=42 closed';
 

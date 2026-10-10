@@ -45,9 +45,13 @@ class LogRedactor {
   /// whitespace or at a character that ends a field in a query string, a JSON
   /// object or a Go struct dump.
   static final RegExp credentialPattern = RegExp(
-    r'\b(uuid|password|passwd|pwd|psk|pre[_-]?shared[_-]?key|'
+    // Not `\b`: `access_token`, `HTTP_AUTHORIZATION`, `conn_sid` put an
+    // underscore — a word character — in front of the name, and a boundary
+    // there never matched.
+    '(?<![A-Za-z0-9])(uuid|password|passwd|pwd|psk|pre[_-]?shared[_-]?key|'
     'private[_-]?key|peer[_-]?public[_-]?key|short[_-]?id|sid|'
-    'obfs[_-]?password|auth[_-]?str|auth|token|secret|api[_-]?key)'
+    'obfs[_-]?password|auth[_-]?str|authorization|auth|token|secret|'
+    'api[_-]?key|cookie|extra)'
     r'''["']?\s*[=:]\s*(?:"([^"]*)"|'([^']*)'|([^\s,;&}\)\]"']+))''',
     caseSensitive: false,
   );
@@ -64,9 +68,45 @@ class LogRedactor {
   );
 
   /// Matches credential-bearing HTTP headers.
+  ///
+  /// As a header line — `Authorization: Bearer …`, where the rest of the line
+  /// is the value — and as an entry of a JSON object or a Go map, which is how
+  /// an XHTTP transport's `headers` and a dumped request reach a core log:
+  /// `"Authorization":"Bearer …"`, the same inside a JSON string
+  /// (`\"Authorization\":\"…\"`), and `Authorization:[Bearer …]`. A quoted
+  /// value ends at its own closing quote — escaped quotes inside it do not end
+  /// it — and an array at its bracket, across lines when it was
+  /// pretty-printed, so the rest of the object survives. Underscore
+  /// spellings (`proxy_authorization`, `HTTP_AUTHORIZATION`) count too.
   static final RegExp headerPattern = RegExp(
-    r'\b(authorization|proxy-authorization|x-api-key|api-key|cookie|'
-    r'set-cookie)\s*:\s*[^\r\n]+',
+    '(?<![A-Za-z0-9])(authorization|proxy[_-]authorization|x[_-]api[_-]key|'
+    'api[_-]key|cookie|set[_-]cookie)'
+    r'''(\\?["']?)\s*:\s*'''
+    r'''(?:\\"((?:[^"\\]|\\[^"])*)\\"|"((?:[^"\\]|\\.)*)"|'''
+    r''''((?:[^'\\]|\\.)*)'|(\[[^\]]*\])|[^\r\n]+)''',
+    caseSensitive: false,
+  );
+
+  /// Matches a `Bearer` or `Basic` credential under any header name.
+  ///
+  /// XHTTP headers are named by whoever runs the CDN — `X-Access`,
+  /// `X-Cdn-Pass` — and that is exactly where an access token goes; no list
+  /// of names catches them all, but the scheme in front of the token does.
+  /// The token has to look like one — eight characters at least, with a digit
+  /// or a `.`, `_`, `~`, `+`, `/` or `=` in it — so "Basic configuration" in
+  /// an error message stays readable.
+  static final RegExp bearerPattern = RegExp(
+    r'(?<![A-Za-z0-9])(Bearer|Basic)\s+'
+    '(?=[A-Za-z0-9._~+/=-]{8,})'
+    '([A-Za-z0-9._~+/=-]*[0-9._~+/=][A-Za-z0-9._~+/=-]*)',
+    caseSensitive: false,
+  );
+
+  /// The start of an `extra` object: the JSON an XHTTP share link carries,
+  /// with request headers and possibly a second server in it
+  /// (`ProxyNode.secretParamKeys`). Blanked whole, braces and all.
+  static final RegExp extraObjectPattern = RegExp(
+    r'''(?<![A-Za-z0-9])(\\?["']?extra\\?["']?)\s*:\s*\{''',
     caseSensitive: false,
   );
 
@@ -87,8 +127,27 @@ class LogRedactor {
     if (message.isEmpty) {
       return message;
     }
-    var result = message.replaceAllMapped(headerPattern, (match) {
-      return '${match.group(1)}: ${Redact.placeholder}';
+    var result = _blankExtraObjects(message);
+    result = result.replaceAllMapped(headerPattern, (match) {
+      final String value;
+      if (match.group(6) != null) {
+        value = '[${Redact.placeholder}]';
+      } else {
+        final quote = match.group(3) != null
+            ? r'\"'
+            : match.group(4) != null
+                ? '"'
+                : match.group(5) != null
+                    ? "'"
+                    : '';
+        value = '$quote${Redact.placeholder}$quote';
+      }
+      return '${match.group(1)}${match.group(2)}: $value';
+    });
+    // After the headers: a token they already blanked is gone, and the
+    // `]` of a placeholder can no longer end a header array early.
+    result = result.replaceAllMapped(bearerPattern, (match) {
+      return '${match.group(1)} ${Redact.placeholder}';
     });
     result = result.replaceAllMapped(urlPattern, _redactUrlMatch);
     result = result.replaceAllMapped(credentialPattern, (match) {
@@ -217,6 +276,61 @@ class LogRedactor {
     r'''(?=$|[\s,;&}\)\]"'])''',
   );
 
+  /// Replaces every `extra` object in [message] with the placeholder.
+  ///
+  /// By brace count rather than by a pattern: the object nests (`headers`,
+  /// `downloadSettings`), and a regular expression cannot find where it ends.
+  /// Braces inside its strings are skipped. An object cut off by the end of
+  /// the line is blanked to the end.
+  static String _blankExtraObjects(String message) {
+    final matches = extraObjectPattern.allMatches(message).toList();
+    if (matches.isEmpty) {
+      return message;
+    }
+    final out = StringBuffer();
+    var from = 0;
+    for (final match in matches) {
+      if (match.start < from) {
+        continue;
+      }
+      out
+        ..write(message.substring(from, match.start))
+        ..write('${match.group(1)}: "${Redact.placeholder}"');
+      from = _closingBrace(message, match.end - 1) + 1;
+    }
+    out.write(message.substring(from.clamp(0, message.length)));
+    return out.toString();
+  }
+
+  /// Index of the brace closing the one at [open], or the last index of
+  /// [text] when it is never closed.
+  static int _closingBrace(String text, int open) {
+    var depth = 0;
+    var inString = false;
+    for (var index = open; index < text.length; index++) {
+      final char = text[index];
+      if (inString) {
+        if (char == r'\') {
+          index++;
+        } else if (char == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (char == '"') {
+        inString = true;
+      } else if (char == '{') {
+        depth++;
+      } else if (char == '}') {
+        depth--;
+        if (depth == 0) {
+          return index;
+        }
+      }
+    }
+    return text.length - 1;
+  }
+
   /// True when the value [match] found is one this redactor already blanked.
   ///
   /// `[redacted]` ends in `]`, which is one of the characters that terminate a
@@ -237,8 +351,12 @@ class LogRedactor {
     // placeholder; the tail has to be read back off the line itself.
     final value = match.group(4) ?? '';
     final start = match.end - value.length;
-    return start >= 0 &&
-        _redactedValuePattern.matchAsPrefix(match.input, start) != null;
+    if (start < 0) {
+      return false;
+    }
+    // A header array the header pattern already blanked: `[[redacted]]`.
+    return _redactedValuePattern.matchAsPrefix(match.input, start) != null ||
+        match.input.startsWith('[${Redact.placeholder}]', start);
   }
 
   static String _redactIdMatch(Match match) {

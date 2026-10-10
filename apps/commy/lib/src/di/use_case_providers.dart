@@ -55,9 +55,8 @@ final configGeneratorProvider = Provider<ConfigGenerator>((ref) {
 /// `null` while the keystore has not answered, and for good when it cannot:
 /// the builder then leaves that proxy out rather than open it to every app.
 final localProxyAuthProvider = FutureProvider<LocalProxyAuth?>((ref) async {
-  final secret =
-      (await ref.watch(secretVaultProvider).ensureLocalProxySecret())
-          .valueOrNull;
+  final secret = (await ref.watch(secretVaultProvider).ensureLocalProxySecret())
+      .valueOrNull;
   return secret == null ? null : LocalProxyAuth(password: secret);
 });
 
@@ -119,6 +118,14 @@ final addSubscriptionUseCaseProvider = Provider<AddSubscriptionUseCase>((ref) {
     nodes: ref.watch(nodeRepositoryProvider),
     ids: ref.watch(idGeneratorProvider),
     recovery: ref.watch(recoveryEngineProvider),
+  );
+});
+
+/// Points a subscription at a new address, keeping the card.
+final changeSubscriptionUrlUseCaseProvider =
+    Provider<ChangeSubscriptionUrlUseCase>((ref) {
+  return ChangeSubscriptionUrlUseCase(
+    subscriptions: ref.watch(subscriptionRepositoryProvider),
   );
 });
 

@@ -54,6 +54,21 @@ void main() {
       expect(unwrap('commy://import/$sub')?.url, Uri.parse(sub));
     });
 
+    // Commy's own "add" link, shaped like everyone else's (`happ://add/`):
+    // the address as it is, percent-encoded, or as `?url=`, with a name.
+    test('commy://add/ is our own add link', () {
+      for (final link in <String>[
+        'commy://add/$sub',
+        'commy://add/$encoded',
+        'commy://add?url=$encoded',
+        'COMMY://add/$sub',
+      ]) {
+        expect(unwrap(link)?.url, Uri.parse(sub), reason: link);
+      }
+      expect(unwrap('commy://add/$sub#Home')?.name, 'Home');
+      expect(unwrap('commy://add?url=$encoded&name=Work')?.name, 'Work');
+    });
+
     // The buttons of Remnawave's stock subscription page, copied from its
     // default app-config.json, and the forms the owner's panel bots send.
     test('the path forms of INCY, v2RayTun, Streisand and Hiddify', () {

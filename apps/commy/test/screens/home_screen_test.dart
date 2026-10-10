@@ -1,17 +1,23 @@
 import 'dart:io';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/screens/diagnosis/diagnosis_sheet.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/list_toolbar.dart';
+import 'package:commy/src/screens/home/widgets/node_picker_sheet.dart';
 import 'package:commy/src/screens/import/import_result_panel.dart';
 import 'package:commy/src/state/import_controller.dart';
+import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// `Override` is not in flutter_riverpod's default export set.
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/commy_test_app.dart';
@@ -42,6 +48,98 @@ void main() {
   }
 
   group('tunnel states', () {
+    // Under the button, in words and in the tone of the ring — the way INCY
+    // spells it, and what docs/05 asks of every status: colour, mark, text.
+    final t = Translations();
+    for (final (status, text, tone) in <(TunnelStatus, String, CommyTone)>[
+      (const TunnelStatus.idle(), t.connect.hint, CommyTone.idle),
+      (const TunnelStatus.starting(), t.connect.starting, CommyTone.connecting),
+      (
+        TunnelStatus.connected(since: CommyTestHarness.now),
+        t.connect.connected,
+        CommyTone.connected,
+      ),
+      (
+        TunnelStatus.checking(since: CommyTestHarness.now),
+        t.connect.checking,
+        CommyTone.connected,
+      ),
+      (
+        const TunnelStatus.error(CommyFailure.permissionDenied()),
+        t.connect.failed,
+        CommyTone.error,
+      ),
+      // Grey, like the ring while it winds down — not amber like starting.
+      (const TunnelStatus.stopping(), t.connect.stopping, CommyTone.idle),
+    ]) {
+      testWidgets('$status is spelled out under the button', (tester) async {
+        await pumpHome(tester, status: status);
+        final pill = tester.widget<StatusPill>(find.byType(StatusPill));
+        expect(pill.label, text);
+        expect(pill.tone, tone);
+      });
+    }
+
+    // A tap with nothing to connect to does nothing; the line must not say
+    // it would.
+    testWidgets('a list with no servers does not invite a tap', (tester) async {
+      final empty = CommyTestHarness(
+        subscriptions: <Subscription>[testSubscription()],
+      );
+      addTearDown(empty.dispose);
+      await tester.pumpWidget(
+        empty.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
+      );
+      await settle(tester);
+
+      final pill = tester.widget<StatusPill>(find.byType(StatusPill));
+      expect(pill.label, Translations().connect.noServers);
+    });
+
+    testWidgets('the line wraps at 200 % on a narrow phone, never cut',
+        (tester) async {
+      tester.view
+        ..physicalSize = const Size(360, 2400)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 2400),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: harness.wrap(
+            const HomeScreen(),
+            status: const TunnelStatus.idle(),
+          ),
+        ),
+      );
+      await settle(tester);
+
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.descendant(
+          of: find.byType(StatusPill),
+          matching: find.byType(RichText),
+        ),
+      );
+      expect(paragraph.didExceedMaxLines, isFalse);
+    });
+
+    testWidgets('the screen reader hears the state once, from the button',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpHome(tester, status: const TunnelStatus.starting());
+
+      expect(
+        find.descendant(
+          of: find.byType(ExcludeSemantics),
+          matching: find.byType(StatusPill),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
     testWidgets('idle draws the idle button and no check button',
         (tester) async {
       await pumpHome(tester, status: const TunnelStatus.idle());
@@ -100,6 +198,159 @@ void main() {
       expect(find.text(t.error.permissionDenied.action), findsOneWidget);
       // And the way to diagnostics, because this action does not go there.
       expect(find.text(t.error.openLogs), findsOneWidget);
+    });
+  });
+
+  // docs/05, scenario 2: a failed connect offers more than "Retry". Which
+  // ways out depends on whether a server can be the cause at all.
+  group('the ways out of a failed connect', () {
+    late CommyTestHarness two;
+
+    setUp(() {
+      two = CommyTestHarness(
+        nodes: <ProxyNode>[
+          testNode(),
+          testNode(id: 'node-2', name: 'Warsaw 01'),
+        ],
+      );
+    });
+
+    tearDown(() => two.dispose());
+
+    Future<void> pumpFailed(WidgetTester tester, CommyFailure failure) async {
+      await two.settingsRepository.writeSelectedNodeId('node-1');
+      tester.view
+        ..physicalSize = const Size(400, 2000)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        two.wrap(const HomeScreen(), status: TunnelStatus.error(failure)),
+      );
+      await settle(tester);
+    }
+
+    final t = Translations();
+
+    testWidgets('a core that died offers another server and a diagnosis',
+        (tester) async {
+      await pumpFailed(tester, const CommyFailure.coreCrashed('panic'));
+
+      expect(find.text(t.error.changeServer), findsOneWidget);
+      expect(find.text(t.error.diagnose), findsOneWidget);
+
+      await tester.tap(find.text(t.error.changeServer));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byType(NodePickerSheet), findsOneWidget);
+    });
+
+    testWidgets('the diagnosis opens on the chosen server', (tester) async {
+      await pumpFailed(tester, const CommyFailure.coreCrashed('panic'));
+
+      await tester.tap(find.text(t.error.diagnose));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        tester.widget<DiagnosisSheet>(find.byType(DiagnosisSheet)).node.id,
+        'node-1',
+      );
+    });
+
+    testWidgets('a document that would not build offers another server only',
+        (tester) async {
+      await pumpFailed(tester, const CommyFailure.configInvalid('bad flow'));
+
+      expect(find.text(t.error.changeServer), findsOneWidget);
+      expect(find.text(t.error.diagnose), findsNothing);
+    });
+
+    // When a panel is down every one of its servers fails; the way out is
+    // another panel's, so the banner's picker lists them all.
+    testWidgets('"Change server" lists the servers of every subscription',
+        (tester) async {
+      final panels = CommyTestHarness(
+        subscriptions: <Subscription>[
+          testSubscription(),
+          testSubscription(id: 'sub-2', name: 'Second panel'),
+        ],
+        nodes: <ProxyNode>[
+          testNode(subscriptionId: 'sub-1'),
+          testNode(id: 'node-2', name: 'Warsaw 01', subscriptionId: 'sub-1'),
+          testNode(id: 'node-3', name: 'Berlin 02', subscriptionId: 'sub-2'),
+        ],
+      );
+      addTearDown(panels.dispose);
+      await panels.settingsRepository.writeSelectedNodeId('node-1');
+      tester.view
+        ..physicalSize = const Size(400, 2400)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        panels.wrap(
+          const HomeScreen(),
+          status: const TunnelStatus.error(CommyFailure.coreCrashed('panic')),
+        ),
+      );
+      await settle(tester);
+
+      await tester.tap(find.text(t.error.changeServer));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+
+      final berlin = find.descendant(
+        of: find.byType(NodePickerSheet),
+        matching: find.text('Berlin 02'),
+      );
+      expect(berlin, findsOneWidget);
+
+      // A pick here is a server to connect to, not only a new selection.
+      await tester.tap(berlin);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byType(NodePickerSheet), findsNothing);
+      expect(panels.core.lastConfig, isNotNull);
+      final stored = await panels.settingsRepository.readSelectedNodeId();
+      expect(stored.valueOrNull, 'node-3');
+
+      await ProviderScope.containerOf(
+        tester.element(find.byType(HomeScreen)),
+        listen: false,
+      ).read(tunnelControllerProvider.notifier).disconnect();
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    // A reload the core refused while the tunnel stays up is the settings'
+    // fault; another server would hide it rather than fix it.
+    testWidgets('a refused reload on a live tunnel offers no other server',
+        (tester) async {
+      await two.settingsRepository.writeSelectedNodeId('node-1');
+      tester.view
+        ..physicalSize = const Size(400, 2000)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        two.wrap(
+          const HomeScreen(),
+          status: TunnelStatus.connected(since: CommyTestHarness.now),
+          extra: <Override>[
+            tunnelStatusProvider.overrideWithValue(
+              const TunnelStatus.error(CommyFailure.configInvalid('dns')),
+            ),
+          ],
+        ),
+      );
+      await settle(tester);
+
+      expect(find.text(t.error.changeServer), findsNothing);
+      expect(find.text(t.error.diagnose), findsNothing);
+    });
+
+    testWidgets('a refused VPN permission offers no server at all',
+        (tester) async {
+      await pumpFailed(tester, const CommyFailure.permissionDenied());
+
+      expect(find.text(t.error.changeServer), findsNothing);
+      expect(find.text(t.error.diagnose), findsNothing);
     });
   });
 
@@ -162,7 +413,7 @@ void main() {
       expect(find.byType(NodeTile), findsOneWidget);
       final tile = tester.widget<NodeTile>(find.byType(NodeTile));
       expect(tile.name, 'Amsterdam 03');
-      expect(tile.descriptors, <String>['VLESS', 'Reality', 'TCP']);
+      expect(tile.descriptorLine, 'VLESS · Reality · TCP');
       expect(tile.countryCode, 'NL');
     });
   });
@@ -412,7 +663,7 @@ void main() {
       expect(tiles.first.name, t.home.auto);
       // Nothing is running, so the row says what the group does instead of
       // naming a server it has not picked.
-      expect(tiles.first.descriptors, <String>[t.home.autoSubtitle]);
+      expect(tiles.first.descriptorLine, t.home.autoSubtitle);
       expect(tiles.any((tile) => tile.name == 'Amsterdam 03'), isTrue);
     });
 
@@ -574,6 +825,9 @@ void main() {
       await settle(tester);
       await tester.enterText(find.byType(EditableText), 'berlin');
       await settle(tester);
+      // Focusing the field scrolls the list to it, and a list that is still
+      // scrolling keeps taps away from its rows.
+      await tester.pump(const Duration(seconds: 1));
 
       await tester.tap(find.byType(SelectedNode));
       await tester.pump();

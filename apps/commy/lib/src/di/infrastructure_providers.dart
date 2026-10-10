@@ -101,15 +101,20 @@ final systemSettingsProvider = Provider<SystemSettings>(
   (ref) => const SystemSettings(),
 );
 
+/// Builds the app's logger: `commy_data`'s [LogRedactor] in front of
+/// [AppLogger].
+///
+/// The redactor is injected rather than left at `commy_core`'s thinner
+/// default: the core package cannot depend on `commy_data`, so without it the
+/// app would run two different scrubbers and drift. One function for both
+/// places that build a logger — `main` and [appLoggerProvider] — so a test of
+/// this one is a test of what ships (rule R3).
+AppLogger buildAppLogger() => AppLogger(redact: const LogRedactor().redact);
+
 /// The single logger. Every `print` in this app would be a lint error; this is
 /// the replacement (docs/09-security-privacy.md, rule R3).
-///
-/// The redactor is `commy_data`'s, injected here rather than left at
-/// `commy_core`'s thinner default: the core package cannot depend on
-/// `commy_data`, so without this line the app would run two different
-/// scrubbers and drift.
 final appLoggerProvider = Provider<AppLogger>((ref) {
-  final logger = AppLogger(redact: const LogRedactor().redact);
+  final logger = buildAppLogger();
   ref.onDispose(logger.dispose);
   return logger;
 });

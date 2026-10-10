@@ -93,6 +93,9 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
               value: lines,
               skeleton: const ListSkeleton(rows: 8),
               builder: (context, all) => _LogBody(
+                // A new filter is a new list, not more of the one being read:
+                // the pause starts over with it.
+                key: ValueKey<(LogLevel?, String)>((_minimum, _query)),
                 lines: _filter(all),
                 isFiltered: _isFiltered,
                 onResetFilters: _resetFilters,
@@ -228,12 +231,13 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
   }
 }
 
-class _LogBody extends StatelessWidget {
+class _LogBody extends StatefulWidget {
   const _LogBody({
     required this.lines,
     required this.isFiltered,
     required this.onResetFilters,
     required this.onConnect,
+    super.key,
   });
 
   final List<LogLine> lines;
@@ -248,8 +252,120 @@ class _LogBody extends StatelessWidget {
   final VoidCallback onConnect;
 
   @override
+  State<_LogBody> createState() => _LogBodyState();
+}
+
+/// Pauses the list while the user reads.
+///
+/// The list is newest-last with the newest at the bottom, so a busy core used
+/// to move every line under a reader's finger: each new one pushed the rest
+/// up by a row (docs/05: "пауза при прокрутке вверх"). Scrolled away from the
+/// bottom, the list now holds the lines it had; what arrived since is counted
+/// on a button that brings the newest back and lets the list run again.
+class _LogBodyState extends State<_LogBody> {
+  final ScrollController _scroll = ScrollController();
+
+  /// The lines on screen while paused; `null` while following the tail.
+  List<LogLine>? _held;
+
+  /// How far from the bottom still counts as at the bottom — a fling that
+  /// stops one line short is not someone reading.
+  static const double _tailSlack = 24;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  /// Whether [_toLatest] is scrolling: its own animation passes through
+  /// offsets that would otherwise pause the list again on the way down.
+  bool _returning = false;
+
+  @override
+  void didUpdateWidget(covariant _LogBody old) {
+    super.didUpdateWidget(old);
+    final held = _held;
+    // Cleared while paused: the held lines are gone from the log, and
+    // holding on to them would show a list the log no longer has — Copy
+    // would then say there is nothing to copy over lines still on screen.
+    if (held != null &&
+        (widget.lines.isEmpty ||
+            (held.isNotEmpty && !_contains(widget.lines, held.last)))) {
+      _held = null;
+    }
+  }
+
+  void _onScroll() {
+    final atTail = _scroll.offset <= _tailSlack;
+    if (atTail && _held != null) {
+      setState(() => _held = null);
+    } else if (!atTail && _held == null && !_returning) {
+      setState(() => _held = widget.lines);
+    }
+  }
+
+  static bool _contains(List<LogLine> lines, LogLine line) {
+    for (var index = lines.length - 1; index >= 0; index--) {
+      if (identical(lines[index], line) || lines[index] == line) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Lines that arrived after the last one held.
+  int _newSince(List<LogLine> held) {
+    if (held.isEmpty) {
+      return widget.lines.length;
+    }
+    final last = held.last;
+    for (var index = widget.lines.length - 1; index >= 0; index--) {
+      if (identical(widget.lines[index], last) || widget.lines[index] == last) {
+        return widget.lines.length - 1 - index;
+      }
+    }
+    // The held lines have scrolled out of the buffer altogether.
+    return widget.lines.length;
+  }
+
+  void _toLatest() {
+    setState(() => _held = null);
+    if (!_scroll.hasClients) {
+      return;
+    }
+    // Reduced motion has every duration at zero, and `animateTo` asserts on
+    // that; the jump is what the setting asks for anyway.
+    if (context.reduceMotion) {
+      _scroll.jumpTo(0);
+      return;
+    }
+    _returning = true;
+    unawaited(
+      _scroll
+          .animateTo(
+            0,
+            duration: context.motion.base,
+            curve: context.motion.baseCurve,
+          )
+          .whenComplete(() => _returning = false),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
+    final held = _held;
+    final lines = held ?? widget.lines;
+    final isFiltered = widget.isFiltered;
     if (lines.isEmpty) {
       // Two different "nothing here", with two different ways out. A filter
       // that matched nothing is undone on this screen; a log that was never
@@ -261,7 +377,7 @@ class _LogBody extends StatelessWidget {
           title: t.diagnostics.logsFiltered,
           message: t.diagnostics.logsFilteredBody,
           actionLabel: t.diagnostics.resetFilters,
-          onAction: onResetFilters,
+          onAction: widget.onResetFilters,
         );
       }
       return EmptyState(
@@ -269,7 +385,7 @@ class _LogBody extends StatelessWidget {
         title: t.diagnostics.logsEmpty,
         message: t.diagnostics.logsEmptyBody,
         actionLabel: t.diagnostics.goConnect,
-        onAction: onConnect,
+        onAction: widget.onConnect,
       );
     }
     return Container(
@@ -280,13 +396,38 @@ class _LogBody extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       // Newest last, scrolled to the bottom: a log you have to scroll down to
-      // read is a log nobody reads.
-      child: ListView.builder(
-        reverse: true,
-        padding: EdgeInsets.symmetric(vertical: context.spacing.s2),
-        itemCount: lines.length,
-        itemBuilder: (context, index) =>
-            LogLineView(line: lines[lines.length - 1 - index]),
+      // read is a log nobody reads. The "latest" button sits in a strip under
+      // the list rather than over it: on top, it hid the newest held lines —
+      // the ones a reader stops to read.
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: ListView.builder(
+              controller: _scroll,
+              reverse: true,
+              padding: EdgeInsets.symmetric(vertical: context.spacing.s2),
+              itemCount: lines.length,
+              itemBuilder: (context, index) =>
+                  LogLineView(line: lines[lines.length - 1 - index]),
+            ),
+          ),
+          if (held != null)
+            Padding(
+              padding: EdgeInsets.all(context.spacing.s2),
+              child: Center(
+                child: Semantics(
+                  hint: t.diagnostics.toLatestHint,
+                  child: CommyButton(
+                    label: t.diagnostics.toLatest(count: _newSince(held)),
+                    icon: CommyIcons.arrowDown,
+                    isCompact: true,
+                    onPressed: _toLatest,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

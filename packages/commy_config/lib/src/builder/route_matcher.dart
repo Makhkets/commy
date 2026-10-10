@@ -246,21 +246,37 @@ class RouteMatcher {
         : RouteMatcher._domains(SingBoxKeys.domainKeyword, value);
   }
 
+  /// `geoip:ru`, `geoip:private`, and the two together.
+  ///
+  /// `private` is not a country and has no rule set: it is the core's own
+  /// `ip_is_private`. A list that mixes it with countries — `geoip:ru,private
+  /// -> direct`, the most common rule there is — used to lose the private
+  /// half without a word, and the router's own addresses went through the
+  /// proxy. Both now land in one rule: the core counts `ip_is_private` and
+  /// the rule sets' address rules as one destination-address group, so the
+  /// rule matches either (sing-box 1.13.21, `route/rule/rule_abstract.go`:
+  /// the outer rule's address match is the base the rule set's own rules
+  /// inherit).
   static RouteMatcher _geoip(String value) {
     final names = _split(value);
-    final isPrivate = names.every(
+    final hasPrivate = names.any(
       (name) => name.toLowerCase() == privateGeoip,
     );
-    if (isPrivate) {
-      return const RouteMatcher._fields(
-        <String, Object?>{SingBoxKeys.ipIsPrivate: true},
-      );
+    final countries = <String>[
+      for (final name in names)
+        if (name.toLowerCase() != privateGeoip) SingBoxTags.geoip(name),
+    ];
+    if (countries.isEmpty) {
+      return RouteMatcher._fields(<String, Object?>{
+        if (hasPrivate) SingBoxKeys.ipIsPrivate: true,
+      });
     }
-    return RouteMatcher._ruleSet(
-      <String>[
-        for (final name in names)
-          if (name.toLowerCase() != privateGeoip) SingBoxTags.geoip(name),
-      ],
+    return RouteMatcher._(
+      fields: <String, Object?>{
+        SingBoxKeys.ruleSet: countries,
+        if (hasPrivate) SingBoxKeys.ipIsPrivate: true,
+      },
+      ruleSets: countries.toSet(),
       matchesDomains: false,
     );
   }
