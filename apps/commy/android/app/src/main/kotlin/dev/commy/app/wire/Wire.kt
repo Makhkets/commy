@@ -83,6 +83,14 @@ internal object Wire {
         const val OPEN_VPN_SETTINGS = "openVpnSettings"
         const val SET_START_ON_BOOT = "setStartOnBoot"
         const val SET_LOCALE = "setLocale"
+
+        /**
+         * The language Android 13+ holds for the app — Settings → Apps →
+         * Commy → Language — as a bare tag; `system` when the user cleared
+         * one the app had mirrored there; an empty string for none and below
+         * Android 13. Lets Dart notice a pick made there.
+         */
+        const val APP_LOCALE = "appLocale"
         const val INSTALLED_APPS = "installedApps"
         const val DEVICE_INFO = "deviceInfo"
         const val PROBE_OUTBOUNDS = "probeOutbounds"
@@ -189,6 +197,19 @@ internal object Wire {
          * config is a secret and rule R2 keeps it out of native storage.
          */
         const val CONNECT = "connect"
+
+        /**
+         * "Open the QR scanner": `{"kind":"scan"}`, from the launcher shortcut
+         * ([dev.commy.app.AppShortcuts]).
+         */
+        const val SCAN = "scan"
+
+        /**
+         * "Import what is on the clipboard": `{"kind":"paste"}`, from the
+         * launcher shortcut. The clipboard itself is read by Dart, once the
+         * app is in front — Android 10+ hides it from anything that is not.
+         */
+        const val PASTE = "paste"
     }
 
     /** Error codes. A closed set; matches `WireErrorCodes`. */

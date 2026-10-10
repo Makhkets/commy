@@ -6,6 +6,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import dev.commy.app.AppShortcuts
 import dev.commy.app.tunnel.AppLanguage
 import dev.commy.app.tunnel.BootReceiver
 import dev.commy.app.tunnel.ServerProbes
@@ -140,12 +141,24 @@ internal class CoreMethodHandler(
 
         Wire.Methods.SET_LOCALE -> {
             // An empty string, or no argument at all, is "follow the system".
-            AppLanguage.store(context, call.arguments as? String)
+            val tag = call.arguments as? String
+            AppLanguage.store(context, tag)
+            // Android 13+ keeps a language per app as well, under Settings →
+            // Apps → Commy → Language (`localeConfig`). Kept equal to the
+            // app's own choice, so the two never disagree; a pick made there
+            // comes back through [Wire.Methods.APP_LOCALE].
+            AppLanguage.mirrorToSystem(context, tag)
             // The ongoing notification follows on its next tick and the tile
             // the next time the shade opens; the channels have to be told.
             TunnelNotifications(context).relabel()
+            // Sent at every launch as well as on a change, which makes it the
+            // one place the launcher shortcuts are (re)published from — after
+            // the first frame, never before it (rule R11).
+            withContext(Dispatchers.IO) { AppShortcuts.publish(context) }
             null
         }
+
+        Wire.Methods.APP_LOCALE -> AppLanguage.systemTag(context)
 
         Wire.Methods.INSTALLED_APPS -> installedApps()
 
@@ -304,6 +317,7 @@ internal class CoreMethodHandler(
             Wire.Methods.OPEN_VPN_SETTINGS,
             Wire.Methods.SET_START_ON_BOOT,
             Wire.Methods.SET_LOCALE,
+            Wire.Methods.APP_LOCALE,
             Wire.Methods.INSTALLED_APPS,
             Wire.Methods.DEVICE_INFO,
             Wire.Methods.PROBE_OUTBOUNDS,

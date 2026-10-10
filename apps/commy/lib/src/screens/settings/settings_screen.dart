@@ -180,6 +180,18 @@ class _Body extends ConsumerWidget {
               ),
             ),
             SettingsTile(
+              icon: CommyIcons.refresh,
+              title: t.settings.connection.failover,
+              subtitle: t.settings.connection.failoverHint,
+              trailing: CommySwitch(
+                value: settings.failover,
+                semanticLabel: t.settings.connection.failover,
+                onChanged: (value) => unawaited(
+                  controller.save(settings.copyWith(failover: value)),
+                ),
+              ),
+            ),
+            SettingsTile(
               icon: CommyIcons.globe,
               title: t.settings.connection.allowLan,
               subtitle: t.settings.connection.allowLanHint,
@@ -304,6 +316,14 @@ class _SilencePanel extends ConsumerWidget {
     // the list, and until it is on disk the switch changes nothing. The row
     // says which of the two it is rather than reporting "on" and leaving the
     // user to learn it from a banner two screens away.
+    // Exception E-4 exists only where a provider signs recovery manifests;
+    // with none of those it has no host to name and no row (ADR-0019).
+    final recovering = <SubscriptionRecovery>[
+      for (final subscription
+          in ref.watch(subscriptionsProvider).value ?? const <Subscription>[])
+        if (subscription.recovery case final SubscriptionRecovery recovery)
+          recovery,
+    ];
     final blockListMissing = (routing?.blockAds ?? false) &&
         !(ref.watch(ruleSetsProvider).value ?? const <RuleSet>[])
             .any((set) => set.tag == RouteSectionBuilder.adsRuleSetTag);
@@ -413,6 +433,13 @@ class _SilencePanel extends ConsumerWidget {
                   ? () => context.go(AppRoutes.ruleSets)
                   : null,
             ),
+            if (recovering.isNotEmpty)
+              SettingsTile(
+                icon: CommyIcons.lock,
+                title: t.settings.silence.recovery,
+                subtitle: _recoveryHosts(t, recovering),
+                isMonospaceSubtitle: true,
+              ),
           ],
         ),
         Padding(
@@ -432,6 +459,21 @@ class _SilencePanel extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// The meeting points exception E-4 may ask, and when; or that every card
+/// has it switched off. Switched per subscription, in its menu.
+String _recoveryHosts(Translations t, List<SubscriptionRecovery> recovering) {
+  final hosts = <String>{
+    for (final recovery in recovering)
+      if (recovery.enabled)
+        for (final point in recovery.rendezvous) point.host,
+  };
+  if (hosts.isEmpty) {
+    return t.settings.silence.recoveryOff;
+  }
+  return '${hosts.join(', ')}${NodeRow.separator}'
+      '${t.settings.silence.recoveryHint}';
 }
 
 /// Forgets the device identifier and says which of the two things happened.

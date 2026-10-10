@@ -1,0 +1,23 @@
+{{define "width"}}narrow{{end}}
+{{define "content"}}
+<div class="auth">
+  <h1>{{.Title}}</h1>
+  <p class="muted">{{t .Lang "auth.intro"}}</p>
+  {{if and .Data.Signup (not .Data.Open)}}
+    <div class="alert warn">{{t .Lang "auth.closed"}}</div>
+  {{else}}
+  <form method="post" action="/cloud/{{if .Data.Signup}}signup{{else}}login{{end}}" class="card">
+    <label for="email">{{t .Lang "auth.email"}}</label>
+    <input id="email" name="email" type="email" autocomplete="username" required value="{{.Data.Email}}">
+    <label for="password">{{t .Lang "auth.password"}}</label>
+    <input id="password" name="password" type="password" autocomplete="{{if .Data.Signup}}new-password{{else}}current-password{{end}}" required minlength="{{if .Data.Signup}}10{{else}}1{{end}}">
+    {{if .Data.Signup}}
+    <label for="password2">{{t .Lang "auth.password2"}}</label>
+    <input id="password2" name="password2" type="password" autocomplete="new-password" required minlength="10">
+    {{end}}
+    <p><button class="btn" type="submit">{{if .Data.Signup}}{{t .Lang "auth.submit.signup"}}{{else}}{{t .Lang "auth.submit.login"}}{{end}}</button></p>
+  </form>
+  {{end}}
+  <p class="small">{{if .Data.Signup}}<a href="/cloud/login">{{t .Lang "auth.toLogin"}}</a>{{else if .Data.Open}}<a href="/cloud/signup">{{t .Lang "auth.toSignup"}}</a>{{end}}</p>
+</div>
+{{end}}

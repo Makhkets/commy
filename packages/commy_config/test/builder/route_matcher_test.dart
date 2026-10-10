@@ -50,6 +50,39 @@ void main() {
       expect(matcher.matchesDomains, isFalse);
     });
 
+    // `geoip:ru,private -> direct` is the most common rule there is, and
+    // the private half used to vanish: the router's own addresses went
+    // through the proxy, with no warning (session 22 found it).
+    test('keeps private next to the countries it is listed with', () {
+      for (final raw in <String>[
+        'geoip:ru,private',
+        'geoip:private,ru',
+        'geoip:PRIVATE, RU',
+      ]) {
+        final matcher = _parse(raw)!;
+        expect(
+          matcher.fields,
+          <String, Object?>{
+            'rule_set': <String>['geoip-ru'],
+            'ip_is_private': true,
+          },
+          reason: raw,
+        );
+        expect(matcher.ruleSets, <String>{'geoip-ru'}, reason: raw);
+        expect(matcher.matchesDomains, isFalse, reason: raw);
+        expect(matcher.needsResolvedAddress, isTrue, reason: raw);
+      }
+      expect(
+        _parse('geoip:ru,private,nl')!.fields['rule_set'],
+        <String>['geoip-ru', 'geoip-nl'],
+      );
+    });
+
+    test('a geoip with no name at all is not the private ranges', () {
+      // An empty list used to satisfy "every name is private".
+      expect(_parse('geoip:,')?.isEmpty ?? true, isTrue);
+    });
+
     test('turns a geoip country into a rule set reference', () {
       final matcher = _parse('geoip:nl')!;
 

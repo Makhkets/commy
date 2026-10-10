@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/screens/diagnosis/diagnosis_sheet.dart';
 import 'package:commy/src/state/measurement_controller.dart';
 import 'package:commy/src/state/node_controller.dart';
 import 'package:commy/src/widgets/node_descriptors.dart';
@@ -59,12 +60,9 @@ class NodeMenuSheet extends ConsumerWidget {
                 ),
               ),
               SizedBox(height: spacing.s1),
-              Text(
-                NodeDescriptors.of(node).join(NodeTile.descriptorSeparator),
-                style: context.typography.caption.copyWith(
-                  color: colors.textTertiary,
-                ),
-              ),
+              // Wraps here, unlike in the list: this is the one place the
+              // whole line can always be read, at any text size.
+              NodeTagLine(tags: NodeDescriptors.of(node), maxLines: null),
             ],
           ),
         ),
@@ -79,6 +77,17 @@ class NodeMenuSheet extends ConsumerWidget {
                   ref.read(measurementProvider.notifier).measureOne(node),
                 );
                 Navigator.of(context).pop();
+              },
+            ),
+            SettingsTile(
+              icon: CommyIcons.info,
+              title: t.node.diagnose,
+              onTap: () {
+                final navigator = Navigator.of(context);
+                if (navigator.canPop()) {
+                  navigator.pop();
+                }
+                unawaited(DiagnosisSheet.show(navigator.context, node));
               },
             ),
             SettingsTile(

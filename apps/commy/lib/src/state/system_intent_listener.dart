@@ -41,6 +41,25 @@ class PendingImport extends Notifier<String?> {
   void take() => state = null;
 }
 
+/// A launcher shortcut that asked for a screen — the QR scanner or the paste
+/// sheet — and has not been answered yet. Set by [systemIntentProvider],
+/// taken by the home screen, which opens the sheet.
+final pendingShortcutProvider =
+    NotifierProvider<PendingShortcut, SystemIntentKind?>(PendingShortcut.new);
+
+/// Holds the shortcut until the home screen takes it.
+class PendingShortcut extends Notifier<SystemIntentKind?> {
+  @override
+  SystemIntentKind? build() => null;
+
+  /// Raises [kind] for the home screen.
+  // ignore: use_setters_to_change_properties
+  void offer(SystemIntentKind kind) => state = kind;
+
+  /// Marks the shortcut answered.
+  void take() => state = null;
+}
+
 /// Subscribes to the channel for as long as the app is alive.
 ///
 /// Watched from the root, like the log pump: a deep link that arrives while
@@ -68,6 +87,11 @@ final systemIntentProvider = Provider<void>((ref) {
           ref.read(unreadableFileProvider.notifier).raise();
         case SystemIntentKind.connect:
           unawaited(ref.read(tunnelControllerProvider.notifier).connect());
+        case SystemIntentKind.scan:
+        case SystemIntentKind.paste:
+          // A launcher shortcut: the screen that opens it is the home
+          // screen's to show, like a link's import sheet.
+          ref.read(pendingShortcutProvider.notifier).offer(intent.kind);
       }
     },
     onError: (Object error) => logger.warn('intent stream: $error', tag: _tag),

@@ -97,6 +97,9 @@ class MemoryRoutingRepository implements RoutingRepository {
   /// The stored DNS settings.
   DnsSettings dns = DnsSettings.defaults;
 
+  /// The stored routing profiles.
+  RoutingProfiles profiles = RoutingProfiles.empty;
+
   /// How many times either was written.
   int writes = 0;
 
@@ -136,6 +139,27 @@ class MemoryRoutingRepository implements RoutingRepository {
   Future<Result<void, CommyFailure>> writeDns(DnsSettings value) async {
     writes++;
     dns = value;
+    return const Ok(null);
+  }
+
+  @override
+  Stream<RoutingProfiles> watchProfiles() =>
+      Stream<RoutingProfiles>.value(profiles);
+
+  @override
+  Future<Result<RoutingProfiles, CommyFailure>> readProfiles() async =>
+      Ok(profiles);
+
+  @override
+  Future<Result<void, CommyFailure>> writeProfiles(
+    RoutingProfiles value, {
+    RoutingPolicy? live,
+  }) async {
+    writes++;
+    profiles = value;
+    if (live != null) {
+      policy = live;
+    }
     return const Ok(null);
   }
 }

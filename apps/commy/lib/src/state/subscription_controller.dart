@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/repository_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
@@ -25,6 +27,7 @@ class SubscriptionActionState {
     this.refreshingId,
     this.failure,
     this.importedCount,
+    this.servedByMirror = false,
   });
 
   /// Nothing in flight.
@@ -39,16 +42,23 @@ class SubscriptionActionState {
   /// How many servers the last refresh brought in, for the toast.
   final int? importedCount;
 
+  /// Whether the last refresh was answered by one of the provider's mirrors
+  /// because the subscription's own address was silent (ADR-0019) — said in
+  /// the toast, since it is the first sign the address is in trouble.
+  final bool servedByMirror;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is SubscriptionActionState &&
           other.refreshingId == refreshingId &&
           other.failure == failure &&
-          other.importedCount == importedCount;
+          other.importedCount == importedCount &&
+          other.servedByMirror == servedByMirror;
 
   @override
-  int get hashCode => Object.hash(refreshingId, failure, importedCount);
+  int get hashCode =>
+      Object.hash(refreshingId, failure, importedCount, servedByMirror);
 
   @override
   String toString() => 'SubscriptionActionState($refreshingId, $failure)';
@@ -76,6 +86,29 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
       return false;
     }
     state = SubscriptionActionState(refreshingId: id);
+    final running = _running = Completer<void>();
+    try {
+      return await _refresh(id);
+    } finally {
+      running.complete();
+      if (identical(_running, running)) {
+        _running = null;
+      }
+    }
+  }
+
+  /// The refresh in flight, if any.
+  Completer<void>? _running;
+
+  /// Completes once no refresh is running — at once when none is.
+  ///
+  /// "Change link" waits on it: a refresh of the same card that started
+  /// before the change is fetching the old address, ends in a failure the
+  /// moment it sees the card moved, and the new address would otherwise
+  /// never be fetched (review of session 25).
+  Future<void> get whenIdle => _running?.future ?? Future<void>.value();
+
+  Future<bool> _refresh(String id) async {
     final result = await ref.read(updateSubscriptionUseCaseProvider)(
       subscriptionId: id,
     );
@@ -88,10 +121,60 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
       state = SubscriptionActionState(failure: failure);
       return false;
     }
+    final synced = result.valueOrNull;
     state = SubscriptionActionState(
-      importedCount: result.valueOrNull?.importedCount ?? 0,
+      importedCount: synced?.importedCount ?? 0,
+      servedByMirror: synced?.servedBy == RecoverySource.mirror,
     );
     return true;
+  }
+
+  /// Answers the change of address the provider of [id] signed
+  /// (docs/adr/0019-subscription-domain-recovery.md), and on "yes" fetches
+  /// the subscription from its new address at once — the user just agreed to
+  /// it because the old one stopped working.
+  ///
+  /// Returns the subscription as stored after the answer, or `null` when it
+  /// could not be written.
+  Future<Subscription?> resolveDomainChange(
+    String id, {
+    required bool accept,
+  }) async {
+    final result = await ref.read(resolveDomainChangeUseCaseProvider)(
+      subscriptionId: id,
+      accept: accept,
+    );
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      ref.read(appLoggerProvider).warn(
+            'domain change not recorded: ${FailureLog.describe(failure)}',
+            tag: logTag,
+          );
+      _settle(failure);
+      return null;
+    }
+    ref.read(appLoggerProvider).info(
+          accept ? 'subscription moved by its provider' : 'move declined',
+          tag: logTag,
+        );
+    if (accept) {
+      await refresh(id);
+    }
+    return result.valueOrNull;
+  }
+
+  /// Lets the subscription use its provider's mirrors and meeting points, or
+  /// stops it (exception E-4).
+  Future<void> setRecoveryEnabled(
+    Subscription subscription, {
+    required bool enabled,
+  }) {
+    return _edit(subscription.id, (current) {
+      final recovery = current.recovery;
+      return recovery == null
+          ? current
+          : current.copyWith(recovery: recovery.copyWith(enabled: enabled));
+    });
   }
 
   /// Folds or unfolds the card.
@@ -139,6 +222,39 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
         userAgentOverride: trimmed.isEmpty ? null : trimmed,
       ),
     );
+  }
+
+  /// Gives the subscription a new address and keeps the card
+  /// ([ChangeSubscriptionUrlUseCase]). Returns what happened — with the card
+  /// that already has the address, when it is taken — or `null` when it could
+  /// not be written; the failure is in [state] then.
+  ///
+  /// Does not refresh: the caller does, so it can say how that went.
+  Future<({SubscriptionUrlChange change, Subscription subscription})?>
+      changeUrl(
+    Subscription subscription,
+    Uri url,
+  ) async {
+    final result = await ref.read(changeSubscriptionUrlUseCaseProvider)(
+      subscriptionId: subscription.id,
+      url: url,
+    );
+    final failure = result.failureOrNull;
+    if (failure != null) {
+      ref.read(appLoggerProvider).warn(
+            'subscription link not changed: ${FailureLog.describe(failure)}',
+            tag: logTag,
+          );
+      _settle(failure);
+      return null;
+    }
+    final outcome = result.valueOrNull!;
+    if (outcome.change == SubscriptionUrlChange.changed) {
+      ref
+          .read(appLoggerProvider)
+          .info('subscription link changed', tag: logTag);
+    }
+    return outcome;
   }
 
   /// Renames the subscription.

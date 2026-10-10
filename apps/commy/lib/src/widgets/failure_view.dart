@@ -83,6 +83,7 @@ class FailureBanner extends StatelessWidget {
     required this.failure,
     this.onRetry,
     this.onDismiss,
+    this.extraActions = const <Widget>[],
     super.key,
   });
 
@@ -95,11 +96,27 @@ class FailureBanner extends StatelessWidget {
   /// Called when the user closes the banner.
   final VoidCallback? onDismiss;
 
+  /// More ways out than the banner's own action, drawn as compact buttons
+  /// under it beside "Open logs" — "Change server", "Diagnose". The caller
+  /// decides which apply to [failure]; none is offered by default.
+  final List<Widget> extraActions;
+
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
     final text = FailureText.of(failure, t);
     final spacing = context.spacing;
+    final secondary = <Widget>[
+      ...extraActions,
+      if (text.needsLogRoute)
+        CommyButton(
+          label: t.error.openLogs,
+          variant: CommyButtonVariant.ghost,
+          isCompact: true,
+          icon: CommyIcons.document,
+          onPressed: () => context.go(FailureAction.openLogs.route!),
+        ),
+    ];
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: spacing.s4),
@@ -114,17 +131,14 @@ class FailureBanner extends StatelessWidget {
             onDismiss: onDismiss,
             dismissSemanticLabel: t.a11y.dismiss,
           ),
-          if (text.needsLogRoute) ...<Widget>[
+          if (secondary.isNotEmpty) ...<Widget>[
             SizedBox(height: spacing.s2),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: CommyButton(
-                label: t.error.openLogs,
-                variant: CommyButtonVariant.ghost,
-                isCompact: true,
-                icon: CommyIcons.document,
-                onPressed: () => context.go(FailureAction.openLogs.route!),
-              ),
+            // A wrap, not a row: three of them do not fit a narrow phone at
+            // a large text size, and a button cut in half is not a way out.
+            Wrap(
+              spacing: spacing.s2,
+              runSpacing: spacing.s2,
+              children: secondary,
             ),
           ],
         ],

@@ -630,6 +630,11 @@ enum TunnelNoticeKind {
 
   /// The reachability probe passed, but the IP check (E-1) did not answer.
   ipCheckFailed,
+
+  /// The chosen server stopped answering and failover moved the traffic to
+  /// another one (`AppSettings.failover`). [TunnelNotice.name] is the new
+  /// server.
+  failedOver,
 }
 
 /// A transient message and the one number or name it carries.
@@ -1134,6 +1139,17 @@ class TunnelController extends Notifier<TunnelActionState> {
 
   /// Drops the last notice once it has been shown.
   void clearNotice() => state = state.copyWith(clearNotice: true);
+
+  /// Says that failover moved the traffic to [to] — after [selectNode] did
+  /// the moving and said "switched", which reads as if the user had tapped.
+  void reportFailover(ProxyNode to) {
+    state = state.copyWith(
+      notice: TunnelNotice(
+        TunnelNoticeKind.failedOver,
+        name: NodeLabel.of(to).text,
+      ),
+    );
+  }
 
   /// Writes the Auto setting, and only when it actually changes.
   ///

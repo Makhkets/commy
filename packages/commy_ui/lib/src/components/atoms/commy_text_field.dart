@@ -128,7 +128,7 @@ class CommyTextField extends StatelessWidget {
           ),
         );
 
-    final field = TextField(
+    final textField = TextField(
       controller: controller,
       focusNode: focusNode,
       enabled: enabled,
@@ -194,6 +194,20 @@ class CommyTextField extends StatelessWidget {
       ),
     );
 
+    // A D-pad's up and down leave the field once the caret is at its edge,
+    // the way Android's own fields behave: before that they move the caret
+    // (to the start or end of a one-line field, a line at a time in a
+    // multi-line one), and where there is nothing to go to the key does
+    // what it always did. Stopping in the field for good left the switch
+    // and the Save button under it out of a remote's reach (the rule sheet,
+    // the paste sheet; review of session 25).
+    final Widget field = Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: _leaveAtEdge,
+      child: textField,
+    );
+
     final label = labelText;
     if (label == null) {
       return field;
@@ -220,4 +234,39 @@ class CommyTextField extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Hands the focus to the neighbour above or below when the caret already
+/// sits at that edge of the text, and lets everything else through to the
+/// field. Runs before the app-wide text-editing shortcuts, being closer to
+/// the focused field than they are.
+KeyEventResult _leaveAtEdge(FocusNode node, KeyEvent event) {
+  if (event is KeyUpEvent || HardwareKeyboard.instance.isShiftPressed) {
+    return KeyEventResult.ignored;
+  }
+  final key = event.logicalKey;
+  final down = key == LogicalKeyboardKey.arrowDown;
+  if (!down && key != LogicalKeyboardKey.arrowUp) {
+    return KeyEventResult.ignored;
+  }
+  final focus = primaryFocus;
+  final editable = focus?.context?.findAncestorStateOfType<EditableTextState>();
+  final value = editable?.textEditingValue;
+  if (focus == null || value == null) {
+    return KeyEventResult.ignored;
+  }
+  final selection = value.selection;
+  if (!selection.isValid || !selection.isCollapsed) {
+    return KeyEventResult.ignored;
+  }
+  final atEdge = down
+      ? selection.extentOffset >= value.text.length
+      : selection.extentOffset <= 0;
+  if (!atEdge) {
+    return KeyEventResult.ignored;
+  }
+  final moved = focus.focusInDirection(
+    down ? TraversalDirection.down : TraversalDirection.up,
+  );
+  return moved ? KeyEventResult.handled : KeyEventResult.ignored;
 }

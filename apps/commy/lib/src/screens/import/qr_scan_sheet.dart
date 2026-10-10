@@ -7,6 +7,7 @@ import 'package:commy/src/screens/import/qr_scan_error.dart';
 import 'package:commy/src/state/import_controller.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -20,6 +21,16 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 /// that latch a single code sitting in frame fires the import a dozen times a
 /// second. A retry after a failed import opens the latch again: the scanner
 /// comes back live, and it has to read the code it is shown.
+///
+/// ## Several codes in a row
+///
+/// Operators hand codes out by the sheet — a leaflet of keys, a sticker per
+/// subscription (docs/19-commy-cloud.md, §3.1) — and one code per opening of
+/// the scanner made that a chore. With the switch on, the camera keeps
+/// running, every code it has not seen before is collected and counted, and
+/// one tap adds them all through [ImportController.importBatch]. Off by
+/// default: one code, one import, no extra tap, which is what nearly everyone
+/// scanning is doing.
 class QrScanSheet extends ConsumerStatefulWidget {
   /// Creates the sheet body.
   const QrScanSheet({super.key});
@@ -49,6 +60,16 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
   );
   bool _handled = false;
 
+  /// Whether codes are being collected rather than imported one at a time.
+  bool _batch = false;
+
+  /// What the batch has collected so far, in the order it was seen.
+  ///
+  /// A set: `noDuplicates` only stops the scanner reporting the code it
+  /// reported last, and a leaflet moved back and forth under the camera
+  /// shows the same code again after another one.
+  final Set<String> _collected = <String>{};
+
   @override
   void dispose() {
     unawaited(_controller.dispose());
@@ -69,15 +90,15 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
     // state is idle too, and opening the latch there would let one code in
     // frame fire the import twice.
     ref.listen<ImportState>(importControllerProvider, (previous, next) {
-      final hadResult = previous != null &&
-          (previous.outcome != null || previous.failure != null);
-      final idle = next.outcome == null && next.failure == null && !next.isBusy;
+      final hadResult = previous != null && previous.hasResult;
+      final idle = !next.hasResult && !next.isBusy;
       if (hadResult && idle) {
         _handled = false;
+        _collected.clear();
       }
     });
 
-    if (state.outcome != null || state.failure != null) {
+    if (state.hasResult) {
       return const ImportResultPanel();
     }
 
@@ -116,9 +137,32 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
               ),
             ),
           ),
-          SizedBox(height: spacing.s4),
+          SizedBox(height: spacing.s3),
+          _BatchSwitch(
+            value: _batch,
+            onChanged: state.isBusy ? null : _setBatch,
+          ),
+          if (_batch && _collected.isNotEmpty) ...<Widget>[
+            SizedBox(height: spacing.s2),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                t.import.qr.collected(count: _collected.length),
+                style: context.typography.body.copyWith(
+                  color: context.colors.textPrimary,
+                ),
+              ),
+            ),
+            SizedBox(height: spacing.s3),
+            CommyButton(
+              label: t.import.qr.addAll(count: _collected.length),
+              isLoading: state.isBusy,
+              onPressed: state.isBusy ? null : _importCollected,
+            ),
+          ],
+          SizedBox(height: spacing.s3),
           Text(
-            t.import.qr.permissionBody,
+            _batch ? t.import.qr.batchHint : t.import.qr.permissionBody,
             style: context.typography.caption.copyWith(
               color: context.colors.textTertiary,
             ),
@@ -129,8 +173,31 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
     );
   }
 
+  void _setBatch(bool value) {
+    setState(() {
+      _batch = value;
+      _collected.clear();
+    });
+  }
+
   void _onDetect(BarcodeCapture capture) {
     if (_handled) {
+      return;
+    }
+    if (_batch) {
+      var added = false;
+      for (final barcode in capture.barcodes) {
+        final value = barcode.rawValue?.trim() ?? '';
+        if (value.isNotEmpty && _collected.add(value)) {
+          added = true;
+        }
+      }
+      if (added) {
+        // Felt rather than only seen: the user is looking at the paper, not
+        // at the counter, while moving from one code to the next.
+        unawaited(HapticFeedback.selectionClick());
+        setState(() {});
+      }
       return;
     }
     for (final barcode in capture.barcodes) {
@@ -145,5 +212,56 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
       );
       return;
     }
+  }
+
+  void _importCollected() {
+    if (_collected.isEmpty) {
+      return;
+    }
+    _handled = true;
+    unawaited(_controller.stop());
+    unawaited(
+      ref
+          .read(importControllerProvider.notifier)
+          .importBatch(_collected.toList()),
+    );
+  }
+}
+
+/// The "several codes in a row" row: a label the whole width can be tapped
+/// on, and the switch that shows the state.
+class _BatchSwitch extends StatelessWidget {
+  const _BatchSwitch({required this.value, required this.onChanged});
+
+  final bool value;
+
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final change = onChanged;
+    return MergeSemantics(
+      child: InkWell(
+        borderRadius: context.radii.mdAll,
+        onTap: change == null ? null : () => change(!value),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: CommySizes.minTapTarget),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  t.import.qr.batch,
+                  style: context.typography.body.copyWith(
+                    color: context.colors.textPrimary,
+                  ),
+                ),
+              ),
+              CommySwitch(value: value, onChanged: onChanged),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

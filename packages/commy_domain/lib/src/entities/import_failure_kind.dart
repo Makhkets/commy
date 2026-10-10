@@ -30,4 +30,12 @@ enum ImportFailureKind {
 
   /// The body is none of the formats the reader knows.
   unknownFormat,
+
+  /// A link another client encrypted so that only it can open it —
+  /// `happ://crypt…/`, `incy://crypt…/`. The subject names that client.
+  ///
+  /// Not [unsupportedScheme]: "happ:// is not supported" sent the user to
+  /// look for a newer Commy, when what helps is asking the provider for the
+  /// plain address of the subscription.
+  encrypted,
 }

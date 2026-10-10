@@ -2,6 +2,7 @@ import 'package:commy_domain/src/core/failure.dart';
 import 'package:commy_domain/src/core/result.dart';
 import 'package:commy_domain/src/entities/dns_settings.dart';
 import 'package:commy_domain/src/entities/routing.dart';
+import 'package:commy_domain/src/entities/routing_profile.dart';
 
 /// Storage of the routing policy and of the DNS policy.
 ///
@@ -25,4 +26,18 @@ abstract interface class RoutingRepository {
 
   /// Replaces the DNS policy wholesale.
   Future<Result<void, CommyFailure>> writeDns(DnsSettings settings);
+
+  /// The routing profiles, refreshed on every change.
+  Stream<RoutingProfiles> watchProfiles();
+
+  /// The routing profiles, once. [RoutingProfiles.empty] when none.
+  Future<Result<RoutingProfiles, CommyFailure>> readProfiles();
+
+  /// Stores [profiles] and, when given, [live] as the routing policy — in one
+  /// transaction, so a switch can never leave the list naming one profile
+  /// active while the rules in force are another's.
+  Future<Result<void, CommyFailure>> writeProfiles(
+    RoutingProfiles profiles, {
+    RoutingPolicy? live,
+  });
 }

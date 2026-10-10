@@ -53,6 +53,14 @@ class SubscriptionRows extends Table {
   /// Whether its node group is folded away in the UI.
   BoolColumn get isCollapsed => boolean().withDefault(const Constant(false))();
 
+  /// `SubscriptionRecovery.toJson`, or `null` for a provider that sends no
+  /// recovery manifest (docs/adr/0019-subscription-domain-recovery.md).
+  ///
+  /// A column and not the keystore: there is no token or credential in it —
+  /// a pinned public key, the provider's public addresses, a few counters.
+  /// Added in schema version 2.
+  TextColumn get recoveryJson => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 

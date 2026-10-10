@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/widgets/subscription_menu_sheet.dart';
+import 'package:commy/src/state/subscription_controller.dart';
 import 'package:commy/src/widgets/qr_sheet.dart';
 import 'package:commy_data/commy_data.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/commy_test_app.dart';
@@ -57,6 +61,132 @@ void main() {
       final sheet = tester.widget<QrSheet>(find.byType(QrSheet));
       expect(sheet.payload, stored().url.toString());
       expect(find.text(t.qr.subscriptionWarning), findsOneWidget);
+    });
+  });
+
+  // Panels re-issue a link when the user resets it. Following it used to
+  // mean deleting the card and adding it again, losing its settings.
+  group('change link', () {
+    final fresh = Uri.parse('https://panel.example.net/sub/new-token');
+
+    Future<void> openSheet(WidgetTester tester) async {
+      await tester.tap(find.text(t.subscription.menu.changeLink));
+      await tester.pumpAndSettle();
+      expect(find.text(t.subscription.changeLink.title), findsOneWidget);
+    }
+
+    testWidgets('starts empty: the old link is a secret, not a default',
+        (tester) async {
+      await pumpMenu(tester);
+      await openSheet(tester);
+
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        isEmpty,
+      );
+    });
+
+    testWidgets('refuses what is not an http(s) link, where it is typed',
+        (tester) async {
+      await pumpMenu(tester);
+      await openSheet(tester);
+
+      await tester.enterText(find.byType(CommyTextField), 'vless://x@y:443');
+      await tester.tap(find.text(t.common.save));
+      await tester.pumpAndSettle();
+
+      expect(find.text(t.subscription.changeLink.invalid), findsOneWidget);
+      expect(stored().url, Uri.parse('https://panel.example.net/sub/token'));
+    });
+
+    testWidgets('keeps the card and fetches from the new link', (tester) async {
+      await pumpMenu(tester);
+      await openSheet(tester);
+
+      await tester.enterText(find.byType(CommyTextField), ' $fresh ');
+      await tester.tap(find.text(t.common.save));
+      await tester.pumpAndSettle();
+
+      expect(stored().id, 'sub-1');
+      expect(stored().name, 'My panel');
+      expect(stored().url, fresh);
+      expect(harness.subscriptionFetcher.requests, contains(fresh));
+    });
+
+    // Review of session 25: a refresh of the same card that was already in
+    // the air fetched the old address, failed on seeing the card had moved,
+    // and the new address was never fetched.
+    testWidgets('a refresh already running does not swallow the new link',
+        (tester) async {
+      await pumpMenu(tester);
+      final gate = harness.subscriptionFetcher.gate = Completer<void>();
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SubscriptionMenuSheet)),
+        listen: false,
+      );
+      final running = container
+          .read(subscriptionControllerProvider.notifier)
+          .refresh('sub-1');
+      await tester.pump();
+
+      await openSheet(tester);
+      await tester.enterText(find.byType(CommyTextField), fresh.toString());
+      await tester.tap(find.text(t.common.save));
+      await tester.pump();
+      gate.complete();
+      await running;
+      await tester.pumpAndSettle();
+
+      expect(harness.subscriptionFetcher.requests.last, fresh);
+      expect(stored().url, fresh);
+    });
+
+    testWidgets('pastes from the clipboard', (tester) async {
+      await pumpMenu(tester);
+      harness.clipboard.text = '$fresh\n';
+      await openSheet(tester);
+
+      await tester.tap(find.text(t.subscription.changeLink.paste));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        fresh.toString(),
+      );
+    });
+
+    testWidgets('a link another card has is refused, naming that card',
+        (tester) async {
+      harness = CommyTestHarness(
+        subscriptions: <Subscription>[
+          testSubscription(),
+          Subscription(id: 'sub-2', name: 'Other panel', url: fresh),
+        ],
+      );
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(
+        harness.wrap(
+          Scaffold(
+            body: SingleChildScrollView(
+              child: SubscriptionMenuSheet(subscription: testSubscription()),
+            ),
+          ),
+        ),
+      );
+      await settle(tester);
+      await openSheet(tester);
+
+      await tester.enterText(find.byType(CommyTextField), fresh.toString());
+      await tester.tap(find.text(t.common.save));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(t.subscription.changeLink.taken(name: 'Other panel')),
+        findsOneWidget,
+      );
+      final first = harness.subscriptionRepository.items
+          .firstWhere((item) => item.id == 'sub-1');
+      expect(first.url, Uri.parse('https://panel.example.net/sub/token'));
     });
   });
 

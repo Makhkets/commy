@@ -70,6 +70,110 @@ void main() {
       );
 
   group('logs', () {
+    Future<void> fillLog(int count) async {
+      for (var index = 0; index < count; index++) {
+        await harness.logRepository.append(
+          LogLine(
+            level: LogLevel.info,
+            message: 'line $index',
+            at: CommyTestHarness.now.add(Duration(seconds: index)),
+          ),
+        );
+      }
+    }
+
+    void tallScreen(WidgetTester tester) {
+      tester.view
+        ..physicalSize = const Size(420, 800)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
+
+    testWidgets('clearing the log ends the pause', (tester) async {
+      tallScreen(tester);
+      await fillLog(80);
+      await pump(tester, const LogsScreen());
+      await tester.drag(find.byType(ListView).last, const Offset(0, 600));
+      await settle(tester);
+
+      await tester.tap(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is CommyIconButton && widget.icon == CommyIcons.delete,
+        ),
+      );
+      await settle(tester);
+
+      expect(find.byType(LogLineView), findsNothing);
+      expect(find.byType(EmptyState), findsOneWidget);
+    });
+
+    testWidgets('with animations off, "latest" jumps straight there',
+        (tester) async {
+      tallScreen(tester);
+      await fillLog(80);
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      final dispatcher = tester.platformDispatcher;
+      addTearDown(dispatcher.clearAccessibilityFeaturesTestValue);
+      await pump(tester, const LogsScreen());
+      await tester.drag(find.byType(ListView).last, const Offset(0, 600));
+      await settle(tester);
+
+      await tester.tap(find.text(t.diagnostics.toLatest(count: 0)));
+      await settle(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('line 79'), findsOneWidget);
+      expect(find.text(t.diagnostics.toLatest(count: 0)), findsNothing);
+    });
+
+    // A busy core moved every line under the reader's finger. Scrolled up,
+    // the list holds still; the button counts what came in and goes back.
+    testWidgets('reading pauses the list, and the button brings it back',
+        (tester) async {
+      tester.view
+        ..physicalSize = const Size(420, 800)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Future<void> write(int index) => harness.logRepository.append(
+            LogLine(
+              level: LogLevel.info,
+              message: 'line $index',
+              at: CommyTestHarness.now.add(Duration(seconds: index)),
+            ),
+          );
+      for (var index = 0; index < 80; index++) {
+        await write(index);
+      }
+      await pump(tester, const LogsScreen());
+      expect(find.text(t.diagnostics.toLatest(count: 0)), findsNothing);
+
+      // Up, away from the newest line.
+      await tester.drag(find.byType(ListView).last, const Offset(0, 600));
+      await settle(tester);
+      expect(find.text(t.diagnostics.toLatest(count: 0)), findsOneWidget);
+      List<String> onScreen() => <String>[
+            for (final element in find.byType(LogLineView).evaluate())
+              (element.widget as LogLineView).line.message,
+          ];
+      final before = onScreen();
+
+      await write(80);
+      await write(81);
+      await settle(tester);
+      expect(find.text(t.diagnostics.toLatest(count: 2)), findsOneWidget);
+      expect(find.textContaining('line 81'), findsNothing);
+      // The same lines, not the same count of lines shifted by two.
+      expect(onScreen(), before);
+
+      await tester.tap(find.text(t.diagnostics.toLatest(count: 2)));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('line 81'), findsOneWidget);
+      final toLatest = t.diagnostics.toLatest(count: 0);
+      expect(find.text(toLatest), findsNothing);
+    });
+
     testWidgets('with nothing written, the way out is the connect button',
         (tester) async {
       await pump(tester, const LogsScreen());

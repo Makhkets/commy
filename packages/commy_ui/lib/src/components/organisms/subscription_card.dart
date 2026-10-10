@@ -165,8 +165,14 @@ class SubscriptionCard extends StatelessWidget {
   /// exactly when it was the only thing to see.
   final List<Widget> status;
 
-  /// The node rows, normally `NodeTile`s. Separated by a hairline; the last
-  /// one gets none, so the card ends on a clean edge.
+  /// The node rows, normally `NodeTile`s.
+  ///
+  /// No hairline between them any more: each `NodeTile` is a rounded, inset
+  /// row of its own, and the active one a plate (INCY's look, the owner's
+  /// call). The block of them is padded by `space/1` top and bottom, which
+  /// with the row's own inset puts the plate as far from the card's edge
+  /// vertically as horizontally. One hairline still separates the block
+  /// from [status] above it.
   final List<Widget> nodes;
 
   /// Whether the node rows are folded away. Collapsing lives in the overflow
@@ -190,7 +196,8 @@ class SubscriptionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final radii = context.radii;
-    final rows = <Widget>[...status, if (!isCollapsed) ...nodes];
+    final spacing = context.spacing;
+    final shown = isCollapsed ? const <Widget>[] : nodes;
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -223,9 +230,19 @@ class SubscriptionCard extends StatelessWidget {
             onPingAll: onPingAll,
             onMore: onMore,
           ),
-          for (var index = 0; index < rows.length; index++) ...<Widget>[
+          for (var index = 0; index < status.length; index++) ...<Widget>[
             if (index > 0) const CommyDivider(),
-            rows[index],
+            status[index],
+          ],
+          if (shown.isNotEmpty) ...<Widget>[
+            if (status.isNotEmpty) const CommyDivider(),
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: spacing.s1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: shown,
+              ),
+            ),
           ],
         ],
       ),

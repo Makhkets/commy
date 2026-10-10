@@ -234,8 +234,8 @@ void main() {
     await tester.tap(localeRadio(''));
     await tester.pumpAndSettle();
 
-    // `CommyApp` calls `useDeviceLocale()` only when the stored tag is null or
-    // empty; anything else is handed to `setLocaleRaw`.
+    // `CommyApp` follows the phone (`DeviceLocale.resolve`) only when the
+    // stored tag is null or empty; anything else is handed to `setLocaleRaw`.
     expect((await stored()).locale, isNull);
     expect(chosen(tester, localeRadio('')), isTrue);
   });

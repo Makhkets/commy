@@ -1,8 +1,11 @@
 import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/di/infrastructure_providers.dart';
+import 'package:commy/src/i18n/device_locale.dart';
 import 'package:commy/src/router/app_router.dart';
 import 'package:commy/src/state/app_visibility.dart';
+import 'package:commy/src/state/failover_watchdog.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/rule_set_scheduler.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -37,7 +40,8 @@ class CommyApp extends ConsumerStatefulWidget {
   ConsumerState<CommyApp> createState() => _CommyAppState();
 }
 
-class _CommyAppState extends ConsumerState<CommyApp> {
+class _CommyAppState extends ConsumerState<CommyApp>
+    with WidgetsBindingObserver {
   /// The last language applied, so an unrelated settings write does not
   /// reload a translation bundle for nothing.
   String? _appliedLocale;
@@ -48,14 +52,50 @@ class _CommyAppState extends ConsumerState<CommyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _lifecycle = AppLifecycleListener(
       onHide: () => ref.read(appVisibleProvider.notifier).hide(),
       onShow: () => ref.read(appVisibleProvider.notifier).show(),
     );
   }
 
+  /// The phone's language changed while the app was open — Android's own
+  /// settings, or the per-app language of Android 13+.
+  ///
+  /// A per-app pick made in the system's settings is taken over as the
+  /// app's own choice (DeviceLocale.adoptFromSystem); otherwise only an app
+  /// that follows the system follows the change, and a language picked in
+  /// the app stays put.
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    unawaited(_followSystemLocale());
+  }
+
+  Future<void> _followSystemLocale() async {
+    final chosen = ref.read(settingsProvider).value?.locale;
+    final system = await ref.read(systemSettingsProvider).appLocale();
+    if (!mounted) {
+      return;
+    }
+    final adopted = DeviceLocale.adoptFromSystem(
+      chosen: chosen,
+      systemTag: system,
+    );
+    if (adopted != null) {
+      await ref.read(settingsControllerProvider.notifier).setLocale(adopted);
+      return;
+    }
+    if (chosen == null || chosen.isEmpty) {
+      await _applyLocale(chosen);
+      // The strings Android draws — the notification channels, the launcher
+      // shortcuts — follow the new system language too.
+      await ref.read(systemSettingsProvider).setLocale('');
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -75,6 +115,9 @@ class _CommyAppState extends ConsumerState<CommyApp> {
       // The `checking` step. It belongs to the connection, not to whichever
       // screen happens to be on top when the tunnel comes up.
       ..watch(autoCheckProvider)
+      // Failover: a server that stops answering is swapped for a live one,
+      // while the switch is on and a server was picked by hand.
+      ..watch(failoverWatchdogProvider)
       // "Connect on launch", decided once off the first settled read.
       ..watch(autoConnectProvider)
       // Routing, DNS and settings edits reach a running core without a
@@ -132,7 +175,13 @@ class _CommyAppState extends ConsumerState<CommyApp> {
 
   Future<void> _applyLocale(String? locale) async {
     if (locale == null || locale.isEmpty) {
-      await LocaleSettings.useDeviceLocale();
+      // Not `useDeviceLocale`: for a language Commy has no strings for, it
+      // answers Russian, the base locale (see [DeviceLocale]).
+      await LocaleSettings.setLocale(
+        DeviceLocale.resolve(
+          WidgetsBinding.instance.platformDispatcher.locales,
+        ),
+      );
       return;
     }
     await LocaleSettings.setLocaleRaw(locale);

@@ -1,0 +1,13 @@
+{{define "content"}}
+<h1>{{t .Lang "nav.admin"}}</h1>
+<div class="card"><h2>{{t .Lang "admin.users"}}</h2><div class="table-wrap"><table>
+<tr><th>E-mail</th><th>{{t .Lang "common.when"}}</th><th></th></tr>
+{{range .Data.Users}}<tr><td>{{.Email}}{{if .Admin}} <span class="pill">admin</span>{{end}}{{if .Disabled}} <span class="pill err">off</span>{{end}}</td><td>{{date .Created}}</td>
+<td>{{if not .Admin}}<form method="post" action="/cloud/admin/users/{{.ID}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn small secondary">{{if .Disabled}}{{t $.Lang "admin.enable"}}{{else}}{{t $.Lang "admin.disable"}}{{end}}</button></form>{{end}}</td></tr>{{end}}
+</table></div></div>
+<div class="card"><h2>{{t .Lang "admin.projects"}}</h2><div class="table-wrap"><table>
+<tr><th>ID</th><th>Name</th><th>{{t .Lang "common.when"}}</th><th></th></tr>
+{{range .Data.Projects}}<tr><td><a class="mono" href="/cloud/p/{{.ID}}">{{.ID}}</a></td><td>{{.Name}}{{if .Disabled}} <span class="pill err">off</span>{{end}}</td><td>{{date .Created}}</td>
+<td><form method="post" action="/cloud/admin/projects/{{.ID}}"><input type="hidden" name="csrf" value="{{$.CSRF}}"><button class="btn small secondary">{{if .Disabled}}{{t $.Lang "admin.enable"}}{{else}}{{t $.Lang "admin.disable"}}{{end}}</button></form></td></tr>{{end}}
+</table></div></div>
+{{end}}

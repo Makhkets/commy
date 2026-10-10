@@ -17,9 +17,12 @@ void main() {
   late _RecordingSystemSettings system;
   late ProviderContainer container;
 
-  void start({AppSettings settings = AppSettings.defaults}) {
+  void start({
+    AppSettings settings = AppSettings.defaults,
+    String systemTag = '',
+  }) {
     harness = CommyTestHarness(settings: settings);
-    system = _RecordingSystemSettings();
+    system = _RecordingSystemSettings()..systemTag = systemTag;
     container = ProviderContainer(
       overrides: harness.overrides(
         extra: <Override>[systemSettingsProvider.overrideWithValue(system)],
@@ -48,6 +51,46 @@ void main() {
     expect(system.locales, <String>['']);
   });
 
+  // Android 13+ lists Commy under Settings → Apps → Language. A pick made
+  // there while the app was closed wins, rather than being wiped by the
+  // app's own choice on the first send.
+  test('a language picked in the system settings is taken over', () async {
+    start(settings: const AppSettings(locale: 'ru'), systemTag: 'en');
+    await pumpEventQueue();
+
+    expect(system.locales, <String>['en']);
+    final stored = await harness.settingsRepository.read();
+    expect(stored.valueOrNull?.locale, 'en');
+  });
+
+  test('"System default" picked in the system settings is taken over',
+      () async {
+    start(
+      settings: const AppSettings(locale: 'ru'),
+      systemTag: SystemSettings.appLocaleCleared,
+    );
+    await pumpEventQueue();
+
+    expect(system.locales, <String>['']);
+    final stored = await harness.settingsRepository.read();
+    expect(stored.valueOrNull?.locale ?? '', isEmpty);
+  });
+
+  test('a system language Commy has no strings for is not taken over',
+      () async {
+    start(settings: const AppSettings(locale: 'ru'), systemTag: 'de');
+    await pumpEventQueue();
+
+    expect(system.locales, <String>['ru']);
+  });
+
+  test('the same language on both sides changes nothing', () async {
+    start(settings: const AppSettings(locale: 'en'), systemTag: 'en');
+    await pumpEventQueue();
+
+    expect(system.locales, <String>['en']);
+  });
+
   test('a change of language is sent once, and an unrelated write is not',
       () async {
     start(settings: const AppSettings(locale: 'ru'));
@@ -70,6 +113,12 @@ class _RecordingSystemSettings extends SystemSettings {
 
   /// Every tag handed to [setLocale], in order.
   final List<String> locales = <String>[];
+
+  /// What [appLocale] answers: the per-app language of Android 13+.
+  String systemTag = '';
+
+  @override
+  Future<String> appLocale() async => systemTag;
 
   @override
   Future<bool> setLocale(String? tag) async {

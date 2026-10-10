@@ -57,7 +57,7 @@ void main() {
     // and a surface that cut the last rows off would be testing the window
     // rather than the screen.
     tester.view
-      ..physicalSize = const Size(420, 3000)
+      ..physicalSize = const Size(420, 3400)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -157,7 +157,11 @@ void main() {
     // user entered, and no new host. That is why it sits in a section of its
     // own under the panel rather than as a fourth row inside it, and why the
     // panel's three are still counted separately below.
-    expect(find.byType(CommySwitch), findsNWidgets(8));
+    //
+    // Failover moved it once more and sends nothing new either: it measures
+    // the chosen server through the tunnel with the probe address "Ping"
+    // already uses.
+    expect(find.byType(CommySwitch), findsNWidgets(9));
     expect(switchFor(t.settings.identity.send), findsOneWidget);
     expect(
       find.descendant(

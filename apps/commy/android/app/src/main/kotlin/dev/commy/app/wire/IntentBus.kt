@@ -97,7 +97,7 @@ internal object IntentBus {
      * has no way to do that; the caller reads it and publishes the text.
      */
     fun fileOf(intent: Intent): Uri? {
-        if (intent.getBooleanExtra(EXTRA_CONNECT, false)) {
+        if (intent.getBooleanExtra(EXTRA_CONNECT, false) || intent.hasExtra(EXTRA_OPEN)) {
             return null
         }
         return when (intent.action) {
@@ -128,6 +128,10 @@ internal object IntentBus {
     private fun encode(intent: Intent): String? {
         if (intent.getBooleanExtra(EXTRA_CONNECT, false)) {
             return event(Wire.Intents.CONNECT)
+        }
+        when (intent.getStringExtra(EXTRA_OPEN)) {
+            Wire.Intents.SCAN -> return event(Wire.Intents.SCAN)
+            Wire.Intents.PASTE -> return event(Wire.Intents.PASTE)
         }
         return when (intent.action) {
             Intent.ACTION_VIEW -> {
@@ -168,4 +172,10 @@ internal object IntentBus {
 
     /** Set on the intent that opens the app from the tile or a notification. */
     const val EXTRA_CONNECT = "dev.commy.app.extra.CONNECT"
+
+    /**
+     * Which screen a launcher shortcut opens: [Wire.Intents.SCAN] or
+     * [Wire.Intents.PASTE]. Anything else is ignored.
+     */
+    const val EXTRA_OPEN = "dev.commy.app.extra.OPEN"
 }

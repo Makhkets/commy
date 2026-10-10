@@ -44,7 +44,9 @@ void main() {
     await pumpCard(tester, collapsed: false);
 
     expect(find.byType(NodeTile), findsNWidgets(2));
-    expect(find.byType(CommyDivider), findsNWidgets(2));
+    // One hairline, under the status: the servers themselves are inset rows
+    // with no line between them (INCY's look, 2026-10-10).
+    expect(find.byType(CommyDivider), findsOneWidget);
     final status = tester.getTopLeft(find.text('Замеряю 8 из 24')).dy;
     final first = tester.getTopLeft(find.text('Amsterdam 03')).dy;
     expect(status, lessThan(first));

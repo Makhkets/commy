@@ -4,6 +4,7 @@ import 'package:commy_domain/src/entities/dns_settings.dart';
 import 'package:commy_domain/src/entities/node_group.dart';
 import 'package:commy_domain/src/entities/proxy_node.dart';
 import 'package:commy_domain/src/entities/routing.dart';
+import 'package:commy_domain/src/entities/routing_profile.dart';
 import 'package:commy_domain/src/entities/subscription.dart';
 
 /// Everything a user would have to set up again on a new phone, in one value.
@@ -40,6 +41,7 @@ class BackupSnapshot {
     this.selectedNodeId,
     this.ruleSets = const <String>[],
     this.skipped = 0,
+    this.routingProfiles = RoutingProfiles.empty,
   });
 
   /// Reads the JSON [toJson] wrote.
@@ -127,6 +129,11 @@ class BackupSnapshot {
       settings: _tryParse(json['settings'], AppSettings.fromJson),
       selectedNodeId:
           selected is String && nodeIds.contains(selected) ? selected : null,
+      routingProfiles: _tryParse(
+            json['routingProfiles'],
+            RoutingProfiles.fromJson,
+          ) ??
+          RoutingProfiles.empty,
       ruleSets: <String>[
         for (final tag in json['ruleSets'] is List
             ? json['ruleSets']! as List<Object?>
@@ -192,6 +199,11 @@ class BackupSnapshot {
   /// that did not parse.
   final int skipped;
 
+  /// The named routing setups (D10); empty when the user made none. A
+  /// backup from before profiles existed reads as empty, which is exactly
+  /// what that phone had.
+  final RoutingProfiles routingProfiles;
+
   /// Servers the user added by hand rather than through a subscription.
   int get manualNodeCount =>
       nodes.where((node) => node.subscriptionId == null).length;
@@ -233,6 +245,8 @@ class BackupSnapshot {
         'settings': settings?.toJson(),
         'selectedNodeId': selectedNodeId,
         'ruleSets': ruleSets,
+        if (routingProfiles.isInUse)
+          'routingProfiles': routingProfiles.toJson(),
       };
 
   /// The routing section, one rule at a time: a rule with an action this

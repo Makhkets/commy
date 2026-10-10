@@ -78,7 +78,35 @@ class HeroArea extends ConsumerWidget {
             onPressed: () => _toggle(ref),
           ),
         ),
-        SizedBox(height: spacing.s5),
+        SizedBox(height: spacing.s3),
+        // The state in words, the way INCY spells it under its button: the
+        // ring alone told "checking" from "connected" and "starting" from
+        // "stopping" by colour and an arc (docs/05, "Доступность": status
+        // is colour + icon + text). Hidden from the screen reader, which
+        // already hears the same words as the button's value.
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          child: Center(
+            child: ExcludeSemantics(
+              child: StatusPill(
+                label: _statusLine(
+                  connectState,
+                  t,
+                  hasServers:
+                      (ref.watch(nodesProvider).value ?? const <ProxyNode>[])
+                          .isNotEmpty,
+                ),
+                tone: connectState.tone,
+                // Wraps rather than cuts: "Нажмите, чтобы подключиться" at
+                // 200 % does not fit a 360 dp phone or the side pane. Two
+                // lines are enough in Inter; three leave room for a wider
+                // system font.
+                maxLines: 3,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: spacing.s3),
         SelectedNode(
           name: _nodeLabel(t, isAuto: isAuto, name: label?.text),
           semanticLabel: t.home.selectNode,
@@ -151,6 +179,26 @@ class HeroArea extends ConsumerWidget {
         TunnelStopping() ||
         TunnelError() =>
           Duration.zero,
+      };
+
+  /// The line under the button. At rest it says what a tap does rather than
+  /// "disconnected" — the ring already looks idle — unless a tap would do
+  /// nothing, with no server to connect to. A failure says "connection
+  /// error" rather than "could not connect": the same state follows a tunnel
+  /// that was up and dropped, which the user never tried to connect.
+  String _statusLine(
+    ConnectState state,
+    Translations t, {
+    required bool hasServers,
+  }) =>
+      switch (state) {
+        ConnectState.idle => hasServers ? t.connect.hint : t.connect.noServers,
+        ConnectState.error => t.connect.failed,
+        ConnectState.starting ||
+        ConnectState.checking ||
+        ConnectState.connected ||
+        ConnectState.stopping =>
+          _statusLabel(state, t),
       };
 
   String _statusLabel(ConnectState state, Translations t) => switch (state) {

@@ -1,0 +1,6 @@
+[
+  {"title": "Начало", "pages": ["", "install", "quick-start"]},
+  {"title": "Пользование", "pages": ["servers", "routing", "dns", "privacy", "backup", "troubleshooting"]},
+  {"title": "Операторам панелей", "pages": ["operators", "cloud", "cloud/protocol", "cloud/api", "cloud/self-host"]},
+  {"title": "Разработчикам", "pages": ["developers"]}
+]

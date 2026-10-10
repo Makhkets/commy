@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../support/commy_test_app.dart';
+import '../support/fake_scanner.dart';
 
 /// The QR scanner after a scanned import has failed.
 ///
@@ -23,11 +24,11 @@ void main() {
   const link = 'https://panel.example.net/sub/token';
 
   late MobileScannerPlatform original;
-  late _FakeScanner scanner;
+  late FakeScanner scanner;
 
   setUp(() {
     original = MobileScannerPlatform.instance;
-    scanner = _FakeScanner();
+    scanner = FakeScanner();
     MobileScannerPlatform.instance = scanner;
   });
 
@@ -104,6 +105,50 @@ void main() {
     expect(harness.subscriptionFetcher.callCount, 1);
   });
 
+  testWidgets('several codes in a row are collected, then added together',
+      (tester) async {
+    final harness = await pumpSheet(tester);
+    const other = 'https://panel.example.net/sub/second';
+
+    await tester.tap(find.text(t.import.qr.batch));
+    await settle(tester);
+    scanner
+      ..show(link)
+      ..show(other)
+      ..show(link);
+    await settle(tester);
+
+    // Collected, not imported: nothing has been fetched yet, and the code
+    // seen twice is counted once.
+    expect(harness.subscriptionFetcher.callCount, 0);
+    expect(find.text(t.import.qr.collected(count: 2)), findsOneWidget);
+
+    await tester.tap(find.text(t.import.qr.addAll(count: 2)));
+    await settle(tester);
+
+    expect(
+      harness.subscriptionFetcher.requests,
+      <Uri>[Uri.parse(link), Uri.parse(other)],
+    );
+  });
+
+  testWidgets('switching the batch off forgets what it collected',
+      (tester) async {
+    await pumpSheet(tester);
+
+    await tester.tap(find.text(t.import.qr.batch));
+    await settle(tester);
+    scanner.show(link);
+    await settle(tester);
+    expect(find.text(t.import.qr.collected(count: 1)), findsOneWidget);
+
+    await tester.tap(find.text(t.import.qr.batch));
+    await settle(tester);
+
+    expect(find.text(t.import.qr.collected(count: 1)), findsNothing);
+    expect(find.text(t.import.qr.addAll(count: 1)), findsNothing);
+  });
+
   testWidgets('a download in flight shows it is busy', (tester) async {
     final harness = await pumpSheet(tester);
     final gate = harness.subscriptionFetcher.gate = Completer<void>();
@@ -117,60 +162,4 @@ void main() {
     gate.complete();
     await settle(tester);
   });
-}
-
-/// A camera that reads whatever the test holds up to it.
-class _FakeScanner extends MobileScannerPlatform {
-  final StreamController<BarcodeCapture?> _barcodes =
-      StreamController<BarcodeCapture?>.broadcast();
-
-  /// How many times the camera was started.
-  int starts = 0;
-
-  /// Puts a QR code holding [value] in front of the camera.
-  void show(String value) {
-    _barcodes.add(
-      BarcodeCapture(barcodes: <Barcode>[Barcode(rawValue: value)]),
-    );
-  }
-
-  Future<void> close() => _barcodes.close();
-
-  @override
-  Stream<BarcodeCapture?> get barcodesStream => _barcodes.stream;
-
-  @override
-  Stream<TorchState> get torchStateStream => const Stream<TorchState>.empty();
-
-  @override
-  Stream<double> get zoomScaleStateStream => const Stream<double>.empty();
-
-  @override
-  Widget buildCameraView() => const SizedBox.expand();
-
-  @override
-  Future<MobileScannerViewAttributes> start(StartOptions startOptions) async {
-    starts++;
-    return const MobileScannerViewAttributes(
-      cameraDirection: CameraFacing.back,
-      currentTorchMode: TorchState.unavailable,
-      size: Size(640, 640),
-      numberOfCameras: 1,
-    );
-  }
-
-  @override
-  Future<void> stop() async {}
-
-  @override
-  Future<void> pause() async {}
-
-  @override
-  Future<void> updateScanWindow(Rect? window) async {}
-
-  @override
-  Future<void> setFocusPoint(Offset position) async {}
-
-  @override
-  Future<void> dispose() async {}
 }

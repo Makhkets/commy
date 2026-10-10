@@ -72,6 +72,11 @@ final routingPolicyProvider = StreamProvider<RoutingPolicy>((ref) {
   return ref.watch(routingRepositoryProvider).watch();
 });
 
+/// The named routing setups and the active one (D10).
+final routingProfilesProvider = StreamProvider<RoutingProfiles>((ref) {
+  return ref.watch(routingRepositoryProvider).watchProfiles();
+});
+
 /// The rule sets currently on disk.
 final ruleSetsProvider = StreamProvider<List<RuleSet>>((ref) {
   return ref.watch(ruleSetRepositoryProvider).watch();

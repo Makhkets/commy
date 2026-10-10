@@ -47,4 +47,14 @@
     <string name="notification_blocked_text">The system blocks connections without a VPN, so Commy keeps DNS lookups in too until you connect.</string>
     <string name="notification_connect">Connect</string>
     <string name="notification_vpn_settings">VPN settings</string>
+
+    <string name="widget_description">Commy: tunnel state and a Connect button</string>
+    <string name="widget_connect">Connect</string>
+    <string name="widget_disconnect">Disconnect</string>
+    <string name="widget_wait">Wait…</string>
+
+    <!-- Launcher shortcuts (long press on the icon). AppShortcuts.kt. -->
+    <string name="shortcut_connect">Connect</string>
+    <string name="shortcut_scan">Scan a QR code</string>
+    <string name="shortcut_paste">Import from clipboard</string>
 </resources>

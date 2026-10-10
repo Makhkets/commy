@@ -14,7 +14,10 @@
     "check": "Check",
     "cancel": "Cancel",
     "disconnect": "Disconnect",
-    "noNode": "Choose a server first"
+    "noNode": "Choose a server first",
+    "hint": "Tap to connect",
+    "failed": "Connection error",
+    "noServers": "No servers to connect to"
   },
 
   "time": {
@@ -68,6 +71,7 @@
     "ipCheckFailed": "Access confirmed: $ms ms · the IP check did not answer",
     "switched": "Switched to $name",
     "switchedToAuto": "The server is now chosen automatically",
+    "failedOver": "The server stopped answering — switched to $name",
     "measuring": "Measured $done of $total",
     "measureSkippedUdp(plural, param=count)": {
       "one": "$count UDP server cannot be timed over TCP — pick GET or ICMP under Ping",
@@ -126,7 +130,17 @@
       "title": "Scan a QR code",
       "permission": "Camera access needed",
       "permissionBody": "Asked for here only, and only while the scanner is open.",
-      "unavailable": "No camera on this device"
+      "unavailable": "No camera on this device",
+      "batch": "Several codes in a row",
+      "batchHint": "Scan the codes one after another; they are all added at once.",
+      "collected(plural, param=count)": {
+        "one": "$count code found",
+        "other": "$count codes found"
+      },
+      "addAll(plural, param=count)": {
+        "one": "Add $count code",
+        "other": "Add $count codes"
+      }
     },
     "file": {
       "title": "Open a config file",
@@ -145,6 +159,7 @@
       "nothing": "No servers found",
       "nothingBody": "Check that the text holds a vless:// style link or a base64 subscription.",
       "alreadyThere": "You already had this subscription — it was refreshed in place.",
+      "batchFailed": "Subscriptions that could not be added: $count. The log says why.",
       "skippedReason": {
         "malformed": "Could not be read",
         "notALink": "Not a server, nor a link to one",
@@ -153,8 +168,18 @@
         "unsupportedUnnamed": "The server needs something Commy does not have",
         "incomplete": "Something required is missing: the address, port, key or password",
         "emptyBody": "The subscription came back empty",
-        "unknownFormat": "Not a link list, a Clash file or a sing-box config"
+        "unknownFormat": "Not a link list, a Clash file or a sing-box config",
+        "encrypted": "An encrypted $app link: only $app can open it. Ask your provider for the plain subscription address (https://…)",
+        "encryptedUnnamed": "An encrypted link: only the app it was made for can open it. Ask your provider for the plain subscription address (https://…)"
       }
+    },
+    "routing": {
+      "title": "Routing profile",
+      "body": "“$name”: $mode mode, $count rules",
+      "note": "The profile replaces your routing rules. The current rules stay as a profile of their own — you can switch back any time.",
+      "add": "Add and switch",
+      "added": "Profile “$name” on",
+      "invalid": "This routing-profile link is damaged or from a newer Commy"
     }
   },
 
@@ -186,12 +211,21 @@
       "collapse": "Collapse",
       "expand": "Expand",
       "rename": "Rename",
+      "changeLink": "Change link",
       "copyLink": "Copy link",
       "autoUpdate": "Auto refresh",
       "interval": "Refresh interval",
       "showQr": "Show QR code",
       "userAgent": "User-Agent",
       "delete": "Delete"
+    },
+    "changeLink": {
+      "title": "New link",
+      "body": "If the panel gave you a new link, paste it here. The card, its interval, its User-Agent and the chosen server stay; the servers are fetched again from the new link.",
+      "invalid": "This needs a link that starts with http:// or https://",
+      "unchanged": "That is the same link",
+      "taken": "That link already belongs to “$name”",
+      "paste": "Paste"
     },
     "userAgent": {
       "title": "User-Agent",
@@ -223,7 +257,22 @@
     "sendDeviceId": "Turn it on and refresh",
     "noServers": "This subscription has no servers yet",
     "autoRefreshed": "Subscription “$name” refreshed · $nodes",
-    "autoRefreshFailed": "Subscription “$name” was not refreshed"
+    "autoRefreshFailed": "Subscription “$name” was not refreshed",
+    "recovery": {
+      "title": "Address recovery",
+      "status": "Provider key pinned · mirrors: $mirrors",
+      "statusPoint": "Provider key pinned · mirrors: $mirrors · checked at: $host",
+      "off": "Off: if the address is blocked, the subscription will not move by itself",
+      "changedTitle": "Your provider moved this subscription",
+      "changedBody": "$name: $from → $to. The provider's signature checks out.",
+      "changedHint": "If you did not expect a move, do not trust it and ask your provider.",
+      "accept": "Move",
+      "decline": "Don't trust",
+      "moved": "The subscription moved to $host",
+      "declined": "Staying on the old address",
+      "viaMirror": "The main address did not answer; updated through a mirror",
+      "provider": "Your provider"
+    }
   },
 
   "node": {
@@ -234,6 +283,7 @@
     "delete": "Delete server",
     "copyLink": "Copy link",
     "measure": "Measure latency",
+    "diagnose": "Connection diagnosis",
     "showQr": "Show QR code",
     "linkCopied": "Link copied",
     "noLink": "This protocol has no share link format",
@@ -371,7 +421,10 @@
       "blockLists": "Ad block lists",
       "blockListsHint": "source is configurable",
       "blockListsMissing": "on, but the list is not downloaded — open Rule sets",
-      "footer": "A fourth exception cannot appear without changing this screen."
+      "recovery": "Subscription address recovery",
+      "recoveryHint": "when the address is silent and once a day, with no identifiers",
+      "recoveryOff": "off for every subscription",
+      "footer": "No new exception can appear without changing this screen."
     },
     "identity": {
       "title": "Device identifier",
@@ -393,6 +446,8 @@
       "killSwitchUnavailable": "This system has no VPN settings screen",
       "hideUnavailable": "Hide unreachable",
       "hideUnavailableHint": "Servers that did not answer a probe",
+      "failover": "Switch when the server fails",
+      "failoverHint": "If the chosen server stops answering, Commy moves to the fastest live one — from the same subscription first. The tunnel is not dropped",
       "allowLan": "Allow LAN access",
       "allowLanHint": "The proxy listens beyond localhost"
     },
@@ -528,6 +583,10 @@
     "blockAds": "Block ads",
     "newRule": {
       "title": "New rule",
+      "editTitle": "Rule",
+      "off": "off",
+      "enabled": "Rule is on",
+      "enabledHint": "A rule that is off keeps its place in the list but does nothing",
       "matcher": "Match",
       "matcherHint": "geosite:ru, domain:example.com, geoip:private",
       "action": "Action",
@@ -536,7 +595,26 @@
       "unknown": "Not a condition the app knows. Start it with domain:, suffix:, keyword:, geosite:, geoip:, ip:, port: or app:"
     },
     "emptyRules": "No rules of your own yet",
-    "emptyRulesBody": "With no rules everything follows the final outcome. Add the first one to split the traffic."
+    "emptyRulesBody": "With no rules everything follows the final outcome. Add the first one to split the traffic.",
+    "profiles": {
+      "title": "Profiles",
+      "main": "Main",
+      "add": "New",
+      "newTitle": "New profile",
+      "name": "Name",
+      "nameHint": "Say, “Home” or “Travel”",
+      "newBody": "A new profile is a copy of the current rules. Edit it as usual; switch with a tap on the profile, without reconnecting.",
+      "save": "Save",
+      "menuTitle": "Profile “$name”",
+      "rename": "Rename",
+      "share": "Copy the profile link",
+      "delete": "Delete",
+      "shared": "Profile link copied",
+      "switched": "Profile “$name”",
+      "deleted": "Profile deleted",
+      "activeCannotDelete": "The active profile cannot be deleted — switch to another first",
+      "failed": "The profile could not be saved"
+    }
   },
 
   "diagnostics": {
@@ -552,6 +630,8 @@
     "redactionNotice": "UUIDs, passwords and subscription links are stripped automatically when copying and exporting.",
     "levelAll": "ALL",
     "logsEmpty": "No logs yet",
+    "toLatest": "Latest · $count",
+    "toLatestHint": "Scroll to the latest lines",
     "logsEmptyBody": "The core writes here while the tunnel runs. Connect and the lines will appear.",
     "logsFiltered": "Nothing matches",
     "logsFilteredBody": "No line passes the current level and search.",
@@ -610,6 +690,8 @@
   "error": {
     "title": "Something went wrong",
     "openLogs": "Open the logs",
+    "changeServer": "Change server",
+    "diagnose": "Check server",
     "subscriptionUnreachable": {
       "message": "The subscription server is not answering",
       "action": "Retry"
@@ -708,5 +790,36 @@
     "subscriptionRunningOut": "Subscription is running out",
     "subscriptionExpired": "Subscription has expired",
     "dismiss": "Dismiss"
+  },
+
+  "diagnosis": {
+    "title": "Connection diagnosis",
+    "steps": {
+      "dns": "Server name",
+      "tcp": "Port open",
+      "tls": "TLS handshake",
+      "proxy": "Request through the server"
+    },
+    "skipped": "not needed",
+    "ms": "$ms ms",
+    "verdict": {
+      "running": "Checking…",
+      "works": "The server works from here",
+      "worksBody": "A request went through the server. If sites still do not open, look at routing and DNS.",
+      "dnsFailed": "The server name does not resolve",
+      "dnsFailedBody": "A typo in the address, an expired domain, or DNS filtered on this network. Try another network or refresh the subscription.",
+      "portClosed": "The server port is closed",
+      "portClosedBody": "The server is down, or this network or the server firewall blocks the port. Try another server or mobile data.",
+      "tlsFailed": "TLS does not get through",
+      "tlsFailedBody": "The connection drops at the handshake — the usual sign of blocking by name (SNI). Try another server or network.",
+      "certificateRefused": "The server certificate was refused",
+      "certificateRefusedBody": "The certificate expired, is for another name, or the phone clock is wrong.",
+      "protocolRefused": "The server answers but passes no traffic",
+      "protocolRefusedBody": "The network to the server is fine; the protocol is not. Most likely the key expired, the plan ran out, or DPI blocks the protocol. Refresh the subscription or contact your provider.",
+      "reachable": "The server is reachable",
+      "reachableBody": "The network to the server is fine. The check through the server is off: Ping has no probe address."
+    },
+    "retry": "Check again",
+    "why": "Why?"
   }
 }

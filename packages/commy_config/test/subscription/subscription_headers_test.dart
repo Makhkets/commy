@@ -137,5 +137,14 @@ void main() {
       expect(payload.updateIntervalHours, 6);
       expect(payload.body, 'vless://uuid@a.example:443#One');
     });
+
+    test('hands the recovery manifest on as it came, any casing', () {
+      final payload = SubscriptionHeaders.from(<String, Object?>{
+        'Commy-Manifest': <String>['v1.payload.signature'],
+      }).toPayload('x');
+
+      expect(payload.manifest, 'v1.payload.signature');
+      expect(SubscriptionHeaders.empty.toPayload('x').manifest, isNull);
+    });
   });
 }

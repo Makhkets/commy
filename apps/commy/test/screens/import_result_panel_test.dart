@@ -291,6 +291,21 @@ void main() {
     );
   });
 
+  testWidgets('a link encrypted for Happ says to ask for the plain address',
+      (tester) async {
+    await pumpPanel(tester);
+    await importText(tester, '$amsterdam\nhapp://crypt5/SeCrEtPaYlOaD');
+
+    await tester.tap(find.text(t.import.result.showSkipped));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(t.import.result.skippedReason.encrypted(app: 'Happ')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('SeCrEtPaYlOaD'), findsNothing);
+  });
+
   testWidgets('a line that failed to parse does not show its credential',
       (tester) async {
     await pumpPanel(tester);

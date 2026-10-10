@@ -85,7 +85,7 @@ class _ImportSheetState extends ConsumerState<ImportSheet> {
     final clipboard = ref.watch(clipboardPreviewProvider);
     final import = ref.watch(importControllerProvider);
 
-    if (!_childIsOpen && (import.outcome != null || import.failure != null)) {
+    if (!_childIsOpen && import.hasResult) {
       return const ImportResultPanel();
     }
 

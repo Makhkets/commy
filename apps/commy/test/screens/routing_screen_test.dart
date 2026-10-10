@@ -299,6 +299,82 @@ void main() {
     expect(stored().rules.single.matcher, 'process:curl');
   });
 
+  // A typo used to cost a swipe, a retype and a drag back into place.
+  testWidgets('a tapped rule opens filled in and is rewritten where it stands',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      policy: policyWith(<RoutingRule>[
+        rule('domain:exampel.com'),
+        rule('geoip:private', sortIndex: 1),
+      ]),
+    );
+
+    await tester.tap(find.text('domain:exampel.com'));
+    await tester.pumpAndSettle();
+    expect(find.text(t.routing.newRule.editTitle), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+      'domain:exampel.com',
+    );
+
+    await tester.enterText(find.byType(CommyTextField), 'domain:example.com');
+    await tester.tap(find.text(t.routing.action.proxy));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(t.routing.newRule.save));
+    await tester.pumpAndSettle();
+
+    final rules = stored().rules;
+    expect(storedMatchers(), <String>['domain:example.com', 'geoip:private']);
+    expect(rules.first.id, 'domain:exampel.com', reason: 'the same rule');
+    expect(rules.first.action, RuleAction.proxy);
+    expect(rules.first.sortIndex, 0, reason: 'its priority is kept');
+    expect(rules.first.enabled, isTrue);
+  });
+
+  // A rule can arrive switched off — from a backup, inside a shared profile
+  // link — and there was nowhere to switch it back on.
+  testWidgets('a rule is switched off without losing it, and back on',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      policy: policyWith(<RoutingRule>[rule('domain:example.com')]),
+    );
+
+    Future<void> flip() async {
+      await tester.tap(find.text('domain:example.com'));
+      await tester.pumpAndSettle();
+      // The screen has a switch of its own (LAN); this is the sheet's.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(CommySheetSurface),
+          matching: find.byType(CommySwitch),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(t.routing.newRule.save));
+      await tester.pumpAndSettle();
+    }
+
+    await flip();
+    expect(stored().rules.single.enabled, isFalse);
+    expect(stored().activeRules, isEmpty);
+    expect(rowFor(tester, 'domain:example.com').isEnabled, isFalse);
+
+    await flip();
+    expect(stored().rules.single.enabled, isTrue);
+    expect(rowFor(tester, 'domain:example.com').isEnabled, isTrue);
+  });
+
+  testWidgets('a new rule offers no on/off switch', (tester) async {
+    await pumpScreen(tester, policy: policyWith(const <RoutingRule>[]));
+
+    await tester.tap(find.text(t.routing.addRule).first);
+    await tester.pumpAndSettle();
+
+    expect(find.text(t.routing.newRule.enabled), findsNothing);
+  });
+
   testWidgets('swiping a rule away removes exactly that rule', (tester) async {
     await pumpScreen(
       tester,

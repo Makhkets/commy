@@ -170,6 +170,16 @@ android {
         }
     }
 
+    androidResources {
+        // The app speaks Russian and English and nothing else. AndroidX,
+        // Material and the plugins bring their strings in some eighty more
+        // languages, none of which a screen of this app can show; they went
+        // into every APK anyway. `values/` is English, so dropping them changes
+        // no text anyone sees. Keep in step with res/xml/locales_config.xml
+        // and the slang locales. Rule R11.
+        localeFilters += listOf("en", "ru")
+    }
+
     packaging {
         jniLibs {
             // Compressed inside an APK, stored inside a bundle.

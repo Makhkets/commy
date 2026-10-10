@@ -95,53 +95,150 @@ void main() {
     'node_tile',
     size: const Size(390, 370),
     builder: (context) => card(
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          NodeTile(
-            name: 'Авто-Выбор',
-            countryCode: 'EU',
-            descriptors: const <String>['VLESS', 'Reality', 'TCP'],
-            latency: const Duration(milliseconds: 41),
-            isActive: true,
-            onTap: () {},
-          ),
-          const CommyDivider(),
-          NodeTile(
-            name: 'Amsterdam 03',
-            countryCode: 'NL',
-            descriptors: const <String>['VLESS', 'Reality', 'TCP'],
-            latency: const Duration(milliseconds: 148),
-            onTap: () {},
-          ),
-          const CommyDivider(),
-          NodeTile(
-            name: 'Tokyo 01',
-            countryCode: 'JP',
-            descriptors: const <String>['Trojan', 'TLS', 'WS'],
-            latency: const Duration(milliseconds: 620),
-            onTap: () {},
-          ),
-          const CommyDivider(),
-          NodeTile(
-            name: 'Node without a country',
-            descriptors: const <String>['Hysteria2', 'QUIC'],
-            isReachable: false,
-            offlineSemanticLabel: 'Недоступен',
-            onTap: () {},
-          ),
-          const CommyDivider(),
-          // A server with a flag that failed its ping: the flag goes grey
-          // with the name, so the row reads as down before it is read.
-          NodeTile(
-            name: 'Frankfurt 02',
-            countryCode: 'DE',
-            descriptors: const <String>['VLESS', 'Reality', 'TCP'],
-            isReachable: false,
-            offlineSemanticLabel: 'Недоступен',
-            onTap: () {},
-          ),
-        ],
+      Padding(
+        padding: EdgeInsets.symmetric(vertical: context.spacing.s1),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            NodeTile(
+              name: 'Авто-Выбор',
+              countryCode: 'EU',
+              descriptors: const <NodeTag>[
+                NodeTag('VLESS', hue: CommyTagHue.azure),
+                NodeTag('Reality', hue: CommyTagHue.iris),
+                NodeTag('TCP'),
+                NodeTag('Vision', hue: CommyTagHue.gold),
+              ],
+              latency: const Duration(milliseconds: 41),
+              isActive: true,
+              onTap: () {},
+            ),
+            NodeTile(
+              name: 'Amsterdam 03',
+              countryCode: 'NL',
+              descriptors: const <NodeTag>[
+                NodeTag('VLESS', hue: CommyTagHue.azure),
+                NodeTag('Reality', hue: CommyTagHue.iris),
+                NodeTag('TCP'),
+              ],
+              latency: const Duration(milliseconds: 148),
+              onTap: () {},
+            ),
+            NodeTile(
+              name: 'Tokyo 01',
+              countryCode: 'JP',
+              descriptors: const <NodeTag>[
+                NodeTag('TROJAN', hue: CommyTagHue.orchid),
+                NodeTag('TLS', hue: CommyTagHue.mint),
+                NodeTag('WS'),
+              ],
+              latency: const Duration(milliseconds: 620),
+              onTap: () {},
+            ),
+            NodeTile(
+              name: 'Node without a country',
+              descriptors: const <NodeTag>[
+                NodeTag('HYSTERIA2', hue: CommyTagHue.tangerine),
+                NodeTag('QUIC'),
+              ],
+              isReachable: false,
+              offlineSemanticLabel: 'Недоступен',
+              onTap: () {},
+            ),
+            // A server with a flag that failed its ping: the flag goes grey
+            // with the name, so the row reads as down before it is read.
+            NodeTile(
+              name: 'Frankfurt 02',
+              countryCode: 'DE',
+              descriptors: const <NodeTag>[
+                NodeTag('VLESS', hue: CommyTagHue.azure),
+                NodeTag('Reality', hue: CommyTagHue.iris),
+                NodeTag('TCP'),
+              ],
+              isReachable: false,
+              offlineSemanticLabel: 'Недоступен',
+              onTap: () {},
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  // Every hue the server line can wear, one protocol family per row, so the
+  // palette is reviewed as a whole and not one row at a time.
+  goldenTest(
+    'node_tags',
+    size: const Size(390, 460),
+    builder: (context) => card(
+      Padding(
+        padding: EdgeInsets.symmetric(vertical: context.spacing.s1),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final (name, code, tags) in <(String, String, List<NodeTag>)>[
+              (
+                'Helsinki',
+                'FI',
+                const <NodeTag>[
+                  NodeTag('VLESS', hue: CommyTagHue.azure),
+                  NodeTag('TLS', hue: CommyTagHue.mint),
+                  NodeTag('XHTTP'),
+                ]
+              ),
+              (
+                'Warsaw',
+                'PL',
+                const <NodeTag>[
+                  NodeTag('VMESS', hue: CommyTagHue.sky),
+                  NodeTag('TLS', hue: CommyTagHue.mint),
+                  NodeTag('WS'),
+                ]
+              ),
+              (
+                'Riga',
+                'LV',
+                const <NodeTag>[
+                  NodeTag('SHADOWSOCKS', hue: CommyTagHue.teal),
+                  NodeTag('TCP'),
+                ]
+              ),
+              (
+                'Vilnius',
+                'LT',
+                const <NodeTag>[
+                  NodeTag('TUIC', hue: CommyTagHue.tangerine),
+                  NodeTag('QUIC'),
+                ]
+              ),
+              (
+                'Tallinn',
+                'EE',
+                const <NodeTag>[
+                  NodeTag('WIREGUARD', hue: CommyTagHue.coral),
+                  NodeTag('UDP'),
+                ]
+              ),
+              (
+                'Oslo',
+                'NO',
+                const <NodeTag>[
+                  NodeTag('TROJAN', hue: CommyTagHue.orchid),
+                  NodeTag('Reality', hue: CommyTagHue.iris),
+                  NodeTag('GRPC'),
+                ]
+              ),
+            ])
+              NodeTile(
+                name: name,
+                countryCode: code,
+                descriptors: tags,
+                latency: const Duration(milliseconds: 87),
+                isActive: name == 'Riga',
+                onTap: () {},
+              ),
+          ],
+        ),
       ),
     ),
   );
@@ -195,7 +292,11 @@ void main() {
         NodeTile(
           name: 'Авто-Выбор',
           countryCode: 'EU',
-          descriptors: const <String>['VLESS', 'Reality', 'TCP'],
+          descriptors: const <NodeTag>[
+            NodeTag('VLESS', hue: CommyTagHue.azure),
+            NodeTag('Reality', hue: CommyTagHue.iris),
+            NodeTag('TCP'),
+          ],
           latency: const Duration(milliseconds: 41),
           isActive: true,
           onTap: () {},
@@ -203,7 +304,11 @@ void main() {
         NodeTile(
           name: 'Amsterdam 03',
           countryCode: 'NL',
-          descriptors: const <String>['VLESS', 'Reality', 'TCP'],
+          descriptors: const <NodeTag>[
+            NodeTag('VLESS', hue: CommyTagHue.azure),
+            NodeTag('Reality', hue: CommyTagHue.iris),
+            NodeTag('TCP'),
+          ],
           latency: const Duration(milliseconds: 148),
           onTap: () {},
         ),

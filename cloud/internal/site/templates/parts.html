@@ -1,0 +1,32 @@
+{{define "head"}}<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="same-origin">
+<title>{{if .Title}}{{.Title}} · {{end}}Commy</title>
+<meta name="description" content="{{if .Page}}{{.Page.Summary}}{{else}}{{tr .Lang "hero.lead"}}{{end}}">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="alternate" hreflang="{{.Other}}" href="{{.OtherURL}}">
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <a class="logo" href="{{home .Lang}}"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M16 8v8" stroke="var(--bg)" stroke-width="2.6" stroke-linecap="round"/><path d="M10.6 11.4a8 8 0 1 0 10.8 0" fill="none" stroke="var(--bg)" stroke-width="2.6" stroke-linecap="round"/></svg>COMMY</a>
+  <nav class="nav">
+    <a href="{{docURL .Lang ""}}">{{tr .Lang "nav.docs"}}</a>
+    <a href="{{docURL .Lang "operators"}}">{{tr .Lang "nav.operators"}}</a>
+    <a href="/cloud/">{{tr .Lang "nav.cloud"}}</a>
+    <a class="btn small" href="{{.Download}}">{{tr .Lang "nav.download"}}</a>
+    <span class="lang"><a href="{{.OtherURL}}" hreflang="{{.Other}}">{{if eq .Other "en"}}EN{{else}}RU{{end}}</a></span>
+  </nav>
+</div></header>
+{{end}}
+{{define "foot"}}<footer class="foot"><div class="in">
+  <span>{{tr .Lang "foot.license"}}</span>
+  <a href="https://github.com/Makhkets/Commy">GitHub</a>
+  <a href="{{docURL .Lang "privacy"}}">{{if eq .Lang "ru"}}Приватность{{else}}Privacy{{end}}</a>
+  <a href="{{docURL .Lang "cloud"}}">Commy Cloud</a>
+</div></footer>
+<script src="/static/search.js"></script>
+</body></html>{{end}}

@@ -16,6 +16,7 @@ class SubscriptionPayload {
     this.supportUrl,
     this.updateIntervalHours,
     this.announcement,
+    this.manifest,
   });
 
   /// The response body, exactly as received. May be base64, YAML or JSON.
@@ -40,6 +41,12 @@ class SubscriptionPayload {
   /// admin, shown on the subscription card as it came.
   final String? announcement;
 
+  /// The `commy-manifest` header as it came, unchecked: the provider's signed
+  /// statement of where the subscription lives
+  /// (docs/adr/0019-subscription-domain-recovery.md). Whether to believe it
+  /// is `ManifestReader`'s call, not this class's.
+  final String? manifest;
+
   /// Applies everything the panel told us onto [subscription].
   ///
   /// Only overwrites fields the panel actually reported, so a server that
@@ -53,8 +60,7 @@ class SubscriptionPayload {
   Subscription applyTo(Subscription subscription) => subscription.copyWith(
         userInfo: userInfo ?? subscription.userInfo,
         profileTitle: profileTitle ?? subscription.profileTitle,
-        profileWebPageUrl:
-            profileWebPageUrl ?? subscription.profileWebPageUrl,
+        profileWebPageUrl: profileWebPageUrl ?? subscription.profileWebPageUrl,
         supportUrl: supportUrl ?? subscription.supportUrl,
         updateIntervalHours:
             updateIntervalHours ?? subscription.updateIntervalHours,

@@ -1,7 +1,11 @@
 package dev.commy.app.tunnel
 
+import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.Resources
+import android.os.Build
+import android.os.LocaleList
 import java.util.Locale
 
 /**
@@ -20,12 +24,15 @@ import java.util.Locale
  *
  * `LocaleManager.setApplicationLocales` would do the same from API 33 only,
  * and would move the Flutter view's locale too; one stored tag covers every
- * API level with one code path.
+ * API level with one code path. From API 33 the choice is mirrored there as
+ * well ([mirrorToSystem]), because Android 13 offers the same choice in its
+ * own settings, and a pick made there is read back through [systemTag].
  */
 internal object AppLanguage {
 
     private const val FILE = "commy.language"
     private const val KEY_TAG = "tag"
+    private const val KEY_MIRRORED = "mirrored"
 
     /**
      * The locale a stored tag names, or null for "follow the system".
@@ -64,11 +71,75 @@ internal object AppLanguage {
      * pending intent, a colour — keeps the real context.
      */
     fun localize(context: Context, tag: String?): Context {
-        val locale = localeOf(tag) ?: return context
+        val locale = localeOf(tag)
+        if (locale == null) {
+            // "Follow the system" just after a language was mirrored: the
+            // per-app language is being cleared, and this process may still
+            // carry it until the configuration change arrives. The system's
+            // own list is the answer the user asked for.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                return context
+            }
+            val configuration = Configuration(context.resources.configuration)
+            configuration.setLocales(Resources.getSystem().configuration.locales)
+            return context.createConfigurationContext(configuration)
+        }
         val configuration = Configuration(context.resources.configuration)
         configuration.setLocale(locale)
         return context.createConfigurationContext(configuration)
     }
+
+    /**
+     * Sets the per-app language Android 13+ keeps (Settings → Apps → Commy →
+     * Language) to [tag], or clears it for "follow the system". Nothing below
+     * Android 13, which has no such setting.
+     */
+    fun mirrorToSystem(context: Context, tag: String?) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return
+        }
+        val manager = context.getSystemService(LocaleManager::class.java) ?: return
+        val locale = localeOf(tag)
+        val wanted = locale?.let { LocaleList(it) } ?: LocaleList.getEmptyLocaleList()
+        if (manager.applicationLocales != wanted) {
+            manager.applicationLocales = wanted
+        }
+        // Remembered so that an empty per-app list later can be told apart:
+        // never set by us, or cleared by the user in the system's settings.
+        val editor = prefs(context).edit()
+        if (locale == null) {
+            editor.remove(KEY_MIRRORED)
+        } else {
+            editor.putString(KEY_MIRRORED, locale.language)
+        }
+        editor.apply()
+    }
+
+    /**
+     * The per-app language Android 13+ holds, as a bare language tag; [CLEARED]
+     * when the user cleared one the app had put there; an empty string when
+     * there is none or the platform has no such setting.
+     */
+    fun systemTag(context: Context): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return ""
+        }
+        val locales = context.getSystemService(LocaleManager::class.java)
+            ?.applicationLocales
+            ?: return ""
+        if (!locales.isEmpty) {
+            return locales[0].language
+        }
+        // Empty after the app had put a language there: the user chose
+        // "System default" in the system's settings.
+        return if (prefs(context).contains(KEY_MIRRORED)) CLEARED else ""
+    }
+
+    /**
+     * What [systemTag] answers when the user cleared a mirrored language in
+     * the system's settings. Matches `SystemSettings.appLocaleCleared`.
+     */
+    const val CLEARED = "system"
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)

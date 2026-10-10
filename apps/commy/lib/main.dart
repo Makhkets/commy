@@ -1,7 +1,9 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:commy/app.dart';
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/di/infrastructure_providers.dart';
-import 'package:commy_core/commy_core.dart';
+import 'package:commy/src/i18n/device_locale.dart';
 import 'package:commy_data/commy_data.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,10 +33,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // The redactor is commy_data's, not commy_core's thinner default: the core
-  // package cannot depend on commy_data, so this line is the only thing
-  // keeping the app from running two different scrubbers (rule R3).
-  final logger = AppLogger(redact: const LogRedactor().redact);
+  // The redactor is commy_data's, not commy_core's thinner default — the same
+  // factory the provider uses, so the logger that ships is the tested one
+  // (rule R3).
+  final logger = buildAppLogger();
   final secureStore = FlutterSecureStore();
   final vault = SecretVault(store: secureStore);
 
@@ -44,7 +46,9 @@ Future<void> main() async {
   // the splash screen stayed up for their sum rather than for the slowest of
   // them, which is the database by a wide margin.
   final (_, opened, package) = await (
-    LocaleSettings.useDeviceLocale(),
+    LocaleSettings.setLocale(
+      DeviceLocale.resolve(PlatformDispatcher.instance.locales),
+    ),
     openCommyDatabase(encryption: DatabaseEncryption(vault: vault)),
     PackageInfo.fromPlatform(),
   ).wait;

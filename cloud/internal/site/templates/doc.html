@@ -1,0 +1,14 @@
+{{template "head" .}}
+<main><div class="docs">
+  <aside class="side">
+    <div class="search"><input type="search" id="doc-search" placeholder="{{tr .Lang "search"}}" aria-label="{{tr .Lang "search"}}" data-index="{{if ne .Lang "ru"}}/{{.Lang}}{{end}}/search.json" autocomplete="off"><div class="search-results hidden" id="doc-results"></div></div>
+    {{$cur := .Page.Slug}}{{$lang := .Lang}}{{$pages := .Pages}}
+    {{range .Nav}}<h4>{{.Title}}</h4><ul>{{range .Pages}}{{$p := index $pages .}}<li><a href="{{docURL $lang .}}" {{if eq . $cur}}aria-current="page"{{end}}>{{$p.Title}}</a></li>{{end}}</ul>{{end}}
+  </aside>
+  <article class="prose">
+    <h1>{{.Page.Title}}</h1>
+    {{.Page.HTML}}
+    <nav class="pager">{{with .Page.Prev}}<a href="{{docURL .Lang .Slug}}"><small class="muted">{{tr $lang "prev"}}</small><br>{{.Title}}</a>{{end}}{{with .Page.Next}}<a class="next" href="{{docURL .Lang .Slug}}"><small class="muted">{{tr $lang "next"}}</small><br>{{.Title}}</a>{{end}}</nav>
+  </article>
+</div></main>
+{{template "foot" .}}

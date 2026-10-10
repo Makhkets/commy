@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
 import 'package:commy/src/state/library_providers.dart';
+import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
@@ -29,13 +32,35 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// picker emptied by a query the user cannot see from here would look broken.
 class NodePickerSheet extends ConsumerWidget {
   /// Creates the sheet body.
-  const NodePickerSheet({super.key});
+  const NodePickerSheet({
+    this.everyServer = false,
+    this.connectOnPick = false,
+    super.key,
+  });
+
+  /// Whether to list every server rather than those of the chosen server's
+  /// own subscription. The failure banner asks for it: when a panel is down
+  /// all of its servers fail together, and the way out is another panel's.
+  final bool everyServer;
+
+  /// Whether a pick also connects. The failure banner asks for it too: a
+  /// server picked as the way out of a failed connect is a server to connect
+  /// to, and a pick that only moved the selection left the old failure on
+  /// screen with nothing happening.
+  final bool connectOnPick;
 
   /// Opens the picker as a bottom sheet, or a dialog on a wide window.
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(
+    BuildContext context, {
+    bool everyServer = false,
+    bool connectOnPick = false,
+  }) {
     return CommySheet.show<void>(
       context: context,
-      builder: (context) => const NodePickerSheet(),
+      builder: (context) => NodePickerSheet(
+        everyServer: everyServer,
+        connectOnPick: connectOnPick,
+      ),
     );
   }
 
@@ -52,7 +77,7 @@ class NodePickerSheet extends ConsumerWidget {
     final colors = context.colors;
     final spacing = context.spacing;
     final all = ref.watch(nodesProvider).value ?? const <ProxyNode>[];
-    final anchor = ref.watch(selectedNodeProvider);
+    final anchor = everyServer ? null : ref.watch(selectedNodeProvider);
     final activeId = ref.watch(activeNodeIdProvider);
     final settings = ref.watch(settingsProvider).value;
 
@@ -68,6 +93,19 @@ class NodePickerSheet extends ConsumerWidget {
     ).apply(scoped);
 
     void close() => Navigator.of(context).pop();
+
+    /// Closes the sheet and, from the failure banner, connects to [nodeId]
+    /// — or to whatever Auto picks when it is `null`.
+    VoidCallback chosen({String? nodeId}) {
+      if (!connectOnPick) {
+        return close;
+      }
+      final tunnel = ref.read(tunnelControllerProvider.notifier);
+      return () {
+        close();
+        unawaited(tunnel.connect(nodeId: nodeId));
+      };
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -99,12 +137,12 @@ class NodePickerSheet extends ConsumerWidget {
             shrinkWrap: true,
             padding: EdgeInsets.zero,
             children: <Widget>[
-              if (isOffered(all)) AutoRow(onChosen: close),
+              if (isOffered(all)) AutoRow(onChosen: chosen()),
               for (final node in shown)
                 NodeRow(
                   node: node,
                   isActive: node.id == activeId,
-                  onChosen: close,
+                  onChosen: chosen(nodeId: node.id),
                 ),
             ],
           ),

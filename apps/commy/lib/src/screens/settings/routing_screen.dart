@@ -6,6 +6,7 @@ import 'package:commy/src/di/use_case_providers.dart';
 import 'package:commy/src/router/app_routes.dart';
 import 'package:commy/src/router/app_sections.dart';
 import 'package:commy/src/screens/settings/dns_screen.dart';
+import 'package:commy/src/screens/settings/routing_profiles_row.dart';
 import 'package:commy/src/screens/settings/rule_sets_screen.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/settings_controller.dart';
@@ -93,6 +94,7 @@ class _Body extends ConsumerWidget {
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
         if (warnings.isNotEmpty) _DroppedRules(warnings: warnings),
+        const RoutingProfilesRow(),
         Padding(
           padding: EdgeInsets.all(spacing.s4),
           child: SegmentedControl<RoutingMode>(
@@ -262,7 +264,7 @@ class _Body extends ConsumerWidget {
     final draft = await CommySheet.show<_RuleDraft>(
       context: context,
       title: t.routing.newRule.title,
-      builder: (context) => const _NewRuleSheet(),
+      builder: (context) => const _RuleSheet(),
     );
     if (draft == null) {
       return;
@@ -432,10 +434,40 @@ class _RuleList extends ConsumerWidget {
             dragIndex: index,
             dragHandleLabel: t.a11y.dragRule,
             isEnabled: rule.enabled,
+            disabledLabel: t.routing.newRule.off,
+            onTap: () => unawaited(_editRule(context, controller, rule)),
           ),
         );
       },
     );
+  }
+
+  /// The same sheet that adds a rule, filled in, with the switch that turns
+  /// it off. The rule keeps its place: only what it says changes.
+  Future<void> _editRule(
+    BuildContext context,
+    SettingsController controller,
+    RoutingRule rule,
+  ) async {
+    final t = Translations.of(context);
+    final draft = await CommySheet.show<_RuleDraft>(
+      context: context,
+      title: t.routing.newRule.editTitle,
+      builder: (context) => _RuleSheet(initial: rule),
+    );
+    if (draft == null) {
+      return;
+    }
+    if (draft.matcher != rule.matcher ||
+        draft.action != rule.action ||
+        draft.enabled != rule.enabled) {
+      await controller.updateRule(
+        rule.id,
+        matcher: draft.matcher,
+        action: draft.action,
+        enabled: draft.enabled,
+      );
+    }
   }
 }
 
@@ -448,25 +480,32 @@ String _actionLabel(Translations t, RuleAction action) => switch (action) {
     };
 
 class _RuleDraft {
-  const _RuleDraft(this.matcher, this.action);
+  const _RuleDraft(this.matcher, this.action, {this.enabled = true});
 
   final String matcher;
   final RuleAction action;
+  final bool enabled;
 }
 
-class _NewRuleSheet extends StatefulWidget {
-  const _NewRuleSheet();
+/// Adds a rule, or — given [initial] — edits one.
+class _RuleSheet extends StatefulWidget {
+  const _RuleSheet({this.initial});
+
+  /// The rule being edited; `null` for a new one.
+  final RoutingRule? initial;
 
   @override
-  State<_NewRuleSheet> createState() => _NewRuleSheetState();
+  State<_RuleSheet> createState() => _RuleSheetState();
 }
 
 /// Why the sheet refused the condition typed into it.
 enum _MatcherProblem { empty, unknown }
 
-class _NewRuleSheetState extends State<_NewRuleSheet> {
-  final TextEditingController _matcher = TextEditingController();
-  RuleAction _action = RuleAction.direct;
+class _RuleSheetState extends State<_RuleSheet> {
+  late final TextEditingController _matcher =
+      TextEditingController(text: widget.initial?.matcher ?? '');
+  late RuleAction _action = widget.initial?.action ?? RuleAction.direct;
+  late bool _enabled = widget.initial?.enabled ?? true;
   _MatcherProblem? _problem;
 
   /// Whether the core would understand [matcher] on some platform.
@@ -512,7 +551,8 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
               _MatcherProblem.unknown => t.routing.newRule.unknown,
               null => null,
             },
-            autofocus: true,
+            // A new rule starts at the field; an edit starts by reading.
+            autofocus: widget.initial == null,
             isMonospace: true,
             onChanged: (_) {
               if (_problem != null) {
@@ -546,6 +586,18 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
             ],
             onChanged: (action) => setState(() => _action = action),
           ),
+          if (widget.initial != null) ...<Widget>[
+            SizedBox(height: spacing.s4),
+            SettingsTile(
+              title: t.routing.newRule.enabled,
+              subtitle: t.routing.newRule.enabledHint,
+              trailing: CommySwitch(
+                value: _enabled,
+                semanticLabel: t.routing.newRule.enabled,
+                onChanged: (value) => setState(() => _enabled = value),
+              ),
+            ),
+          ],
           SizedBox(height: spacing.s5),
           CommyButton(
             label: t.routing.newRule.save,
@@ -560,7 +612,9 @@ class _NewRuleSheetState extends State<_NewRuleSheet> {
                 setState(() => _problem = problem);
                 return;
               }
-              Navigator.of(context).pop(_RuleDraft(matcher, _action));
+              Navigator.of(context).pop(
+                _RuleDraft(matcher, _action, enabled: _enabled),
+              );
             },
           ),
           SizedBox(height: spacing.s4),

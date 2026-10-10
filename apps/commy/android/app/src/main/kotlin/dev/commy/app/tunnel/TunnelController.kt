@@ -11,6 +11,10 @@ import androidx.core.content.ContextCompat
 import dev.commy.app.wire.Wire
 import dev.commy.app.wire.WireException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -103,6 +108,32 @@ internal object TunnelController {
 
     val isRunning: Boolean get() = service?.isCoreUp == true
 
+    @Volatile
+    private var widgetWatcher: Job? = null
+
+    /**
+     * Keeps the home-screen widgets in step with [status], for as long as the
+     * process lives. Started the first time anything with a context touches
+     * the tunnel; idempotent. A state flow of a few strings and a redraw per
+     * change — nothing runs while nothing changes.
+     */
+    fun watchWidgets(context: Context) {
+        if (widgetWatcher != null) {
+            return
+        }
+        val app = context.applicationContext
+        synchronized(this) {
+            if (widgetWatcher != null) {
+                return
+            }
+            widgetWatcher = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).launch {
+                statusState.collect { event ->
+                    runCatching { CommyWidgetProvider.refresh(app, event.state) }
+                }
+            }
+        }
+    }
+
     val state: String get() = statusState.value.state
 
     // ── called from the method channel ────────────────────────────────────
@@ -117,6 +148,7 @@ internal object TunnelController {
      * node is `select`; neither of them belongs here.
      */
     suspend fun start(context: Context, config: String) {
+        watchWidgets(context)
         if (isRunning) {
             throw WireException(Wire.Errors.ALREADY_RUNNING, "the tunnel is already up")
         }
@@ -269,6 +301,7 @@ internal object TunnelController {
 
     fun attach(instance: CommyVpnService) {
         service = instance
+        watchWidgets(instance)
     }
 
     fun detach(instance: CommyVpnService) {

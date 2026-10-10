@@ -79,6 +79,50 @@ class DriftRoutingRepository implements RoutingRepository {
   }
 
   @override
+  Stream<RoutingProfiles> watchProfiles() {
+    return _watchValue(SettingKeys.routingProfiles).map(
+      (json) => json == null
+          ? RoutingProfiles.empty
+          : StorageGuard.orElse(
+              () => RoutingProfiles.fromJson(json),
+              () => RoutingProfiles.empty,
+            ),
+    );
+  }
+
+  @override
+  Future<Result<RoutingProfiles, CommyFailure>> readProfiles() {
+    return StorageGuard.run(() async {
+      final json = await _readValue(SettingKeys.routingProfiles);
+      return json == null
+          ? RoutingProfiles.empty
+          : RoutingProfiles.fromJson(json);
+    });
+  }
+
+  @override
+  Future<Result<void, CommyFailure>> writeProfiles(
+    RoutingProfiles profiles, {
+    RoutingPolicy? live,
+  }) {
+    return StorageGuard.runVoid(() async {
+      await _db.transaction(() async {
+        await _writeValue(SettingKeys.routingProfiles, profiles.toJson());
+        if (live != null) {
+          await _writeValue(SettingKeys.routingPolicy, _envelopeOf(live));
+          await _db.delete(_db.routingRuleRows).go();
+          await _db.batch((batch) {
+            batch.insertAll(
+              _db.routingRuleRows,
+              live.rules.map(RoutingRuleMapper.toCompanion).toList(),
+            );
+          });
+        }
+      });
+    });
+  }
+
+  @override
   Stream<DnsSettings> watchDns() {
     return _watchValue(SettingKeys.dnsSettings).map(
       (json) => json == null

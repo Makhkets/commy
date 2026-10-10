@@ -109,11 +109,12 @@ abstract final class CommySizes {
   /// Stroke of the traffic sparkline — 1.5.
   static const double chartStroke = 1.5;
 
-  /// Width of the bar marking the active node on the left of its row — 3.
-  static const double activeMarkerWidth = 3;
-
-  /// Height of that bar — 24.
-  static const double activeMarkerHeight = 24;
+  /// Edge of the rounded tile a server row draws its flag on — 36.
+  ///
+  /// The tile, taken from INCY, gives every row the same square to start
+  /// from, so a list of flags reads as a column of icons rather than a ragged
+  /// edge of coloured stripes.
+  static const double flagTile = 36;
 
   /// Edge of a QR code — 220.
   ///

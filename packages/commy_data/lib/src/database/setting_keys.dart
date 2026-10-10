@@ -16,6 +16,9 @@ abstract final class SettingKeys {
   /// The node the user last picked, as `{"value": "<id>"}`.
   static const String selectedNodeId = 'selected_node_id';
 
+  /// `RoutingProfiles.toJson`: the named routing setups and the active one.
+  static const String routingProfiles = 'routing_profiles';
+
   /// Field the single-value keys wrap their payload in.
   static const String valueField = 'value';
 
@@ -25,5 +28,6 @@ abstract final class SettingKeys {
     routingPolicy,
     dnsSettings,
     selectedNodeId,
+    routingProfiles,
   ];
 }

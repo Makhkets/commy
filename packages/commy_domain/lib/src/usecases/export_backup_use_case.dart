@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:commy_domain/src/core/failure.dart';
 import 'package:commy_domain/src/core/result.dart';
 import 'package:commy_domain/src/entities/backup_snapshot.dart';
+import 'package:commy_domain/src/entities/routing_profile.dart';
 import 'package:commy_domain/src/entities/rule_set.dart';
 import 'package:commy_domain/src/ports/backup_cipher.dart';
 import 'package:commy_domain/src/ports/library_store.dart';
@@ -103,6 +104,7 @@ class ExportBackupUseCase {
     final selected = await settings.readSelectedNodeId();
     final policy = await routing.read();
     final dns = await routing.readDns();
+    final profiles = await routing.readProfiles();
     final sets = await ruleSets.list();
     final failure = contents.failureOrNull ??
         settingsValue.failureOrNull ??
@@ -123,6 +125,9 @@ class ExportBackupUseCase {
         nodes: taken.nodes,
         routing: policy.valueOrNull,
         dns: dns.valueOrNull,
+        // Profiles that cannot be read cost the backup its profiles, not the
+        // backup: the live policy above is the one in force either way.
+        routingProfiles: profiles.valueOrNull ?? RoutingProfiles.empty,
         settings: settingsValue.valueOrNull,
         selectedNodeId: selected.valueOrNull,
         // A rule-set directory that cannot be listed costs the backup a

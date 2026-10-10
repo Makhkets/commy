@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:commy/gen/strings.g.dart';
+import 'package:commy/src/screens/diagnosis/diagnosis_sheet.dart';
 import 'package:commy/src/screens/diagnostics/config_screen.dart';
 import 'package:commy/src/screens/diagnostics/logs_screen.dart';
 import 'package:commy/src/screens/home/home_screen.dart';
 import 'package:commy/src/screens/home/widgets/user_agent_sheet.dart';
+import 'package:commy/src/screens/import/qr_scan_sheet.dart';
 import 'package:commy/src/screens/settings/backup_password_sheet.dart';
 import 'package:commy/src/screens/settings/routing_screen.dart';
 import 'package:commy/src/screens/settings/settings_screen.dart';
@@ -13,15 +15,18 @@ import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
 import 'package:commy/src/widgets/notice_host.dart';
 import 'package:commy/src/widgets/toast_messenger.dart';
+import 'package:commy_config/commy_config.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../support/commy_fonts.dart';
 import '../support/commy_test_app.dart';
+import '../support/fake_scanner.dart';
 
 /// A photograph of each screen, in both themes.
 ///
@@ -120,6 +125,40 @@ void main() {
     extra: <Override>[liveTraffic],
   );
 
+  // A provider's signed move waiting for the user (ADR-0019): the question
+  // sits at the top of the card, above the servers it may be about to
+  // replace, with both addresses named.
+  final pendingMove = SubscriptionRecovery(
+    id: 'axm',
+    key: 'ZZ-IjUywx42vyrjuILWOaydXicDWaFHOOeI9qM4Q6MY',
+    seq: 3,
+    name: 'AXM VPN',
+    rendezvous: <Uri>[Uri.parse('https://commy.example.net/r/axm')],
+    pending: PendingDomainChange(
+      manifest: RecoveryManifest(
+        id: 'axm',
+        seq: 4,
+        issuedAt: CommyTestHarness.now,
+        origin: Uri.parse('https://sub.example.online'),
+        key: 'ZZ-IjUywx42vyrjuILWOaydXicDWaFHOOeI9qM4Q6MY',
+        name: 'AXM VPN',
+      ),
+      source: RecoverySource.rendezvous,
+    ),
+  );
+  screenGolden(
+    'home_domain_change',
+    size: const Size(390, 1040),
+    screen: const HomeScreen(),
+    harness: () => CommyTestHarness(
+      nodes: nodes,
+      subscriptions: <Subscription>[
+        subscription.copyWith(recovery: pendingMove),
+      ],
+    ),
+    status: const TunnelStatus.idle(),
+  );
+
   // The owner, 2026-09-24: results at the top, and a ping that answers. The
   // longest sentence a run produces — who answered, the best, the skipped —
   // over the list it measured: the toast has to clear the status area, stay
@@ -191,6 +230,32 @@ void main() {
           ),
         ],
       ),
+    ),
+  );
+
+  // Two profiles, the second in force: the chip row a person switches
+  // "home" and "travel" with (D10).
+  screenGolden(
+    'routing_profiles',
+    size: const Size(390, 420),
+    screen: const RoutingScreen(),
+    seed: (harness) => harness.routingRepository.writeProfiles(
+      const RoutingProfiles(
+        activeId: 'travel',
+        profiles: <RoutingProfile>[
+          RoutingProfile(
+            id: 'home',
+            name: 'Дома',
+            policy: RoutingPolicy.defaults,
+          ),
+          RoutingProfile(
+            id: 'travel',
+            name: 'В поездке',
+            policy: RoutingPolicy(mode: RoutingMode.global),
+          ),
+        ],
+      ),
+      live: const RoutingPolicy(mode: RoutingMode.global),
     ),
   );
 
@@ -313,6 +378,65 @@ void main() {
       ),
     ),
   );
+
+  // "Why does it not connect?" answered: name, port and TLS fine, the
+  // protocol refused — the verdict and what to do about it.
+  screenGolden(
+    'diagnosis',
+    size: const Size(390, 640),
+    screen: Scaffold(
+      body: Align(
+        alignment: Alignment.bottomCenter,
+        child: CommySheetSurface(
+          title: t.diagnosis.title,
+          child: DiagnosisSheet(node: nodes.first),
+        ),
+      ),
+    ),
+    harness: () {
+      final host = CommyTestHarness(nodes: nodes);
+      host.core.setLatency(SingBoxTags.forNode(nodes.first), null);
+      return host;
+    },
+  );
+
+  // Several codes in a row: the switch on, two codes collected, and the one
+  // button that adds them — what an operator's leaflet of keys is scanned
+  // with (docs/19-commy-cloud.md, §3.1). The camera is a fake that draws
+  // nothing; the frame around it is what is being photographed.
+  late FakeScanner scanner;
+  late MobileScannerPlatform camera;
+  setUp(() {
+    camera = MobileScannerPlatform.instance;
+    scanner = FakeScanner();
+    MobileScannerPlatform.instance = scanner;
+  });
+  tearDown(() async {
+    MobileScannerPlatform.instance = camera;
+    MobileScannerController.resetPlatformSessionOwner();
+    await scanner.close();
+  });
+  screenGolden(
+    'qr_batch',
+    size: const Size(390, 760),
+    screen: Scaffold(
+      body: Align(
+        alignment: Alignment.bottomCenter,
+        child: CommySheetSurface(
+          title: t.import.qr.title,
+          child: const QrScanSheet(),
+        ),
+      ),
+    ),
+    act: (tester) async {
+      await tester.tap(find.text(t.import.qr.batch));
+      await tester.pump();
+      scanner
+        ..show('https://panel.example.net/sub/first')
+        ..show('vless://11111111-2222-3333-4444-555555555555@a.example:443');
+      await tester.pump();
+    },
+  );
 }
 
 /// A phone, in logical pixels. The design is drawn at this size.
@@ -335,6 +459,9 @@ enum _Theme {
 
 /// Registers one golden per theme for [screen].
 ///
+/// [act], when given, does what a user would before the photograph — taps,
+/// scanned codes — and the screen settles again after it.
+///
 /// [toast], when given, raises a toast once the screen has settled. The
 /// frame then takes in the whole window instead of the route: toasts are
 /// drawn above the navigator, where the app's `ToastHost` sits, and a frame
@@ -350,6 +477,7 @@ void screenGolden(
   TunnelStatus? status,
   List<Override> extra = const <Override>[],
   Future<void> Function(WidgetTester tester)? toast,
+  Future<void> Function(WidgetTester tester)? act,
 }) {
   for (final theme in _Theme.values) {
     testWidgets(
@@ -396,6 +524,10 @@ void screenGolden(
                 ),
         );
         await settle(tester);
+        if (act != null) {
+          await act(tester);
+          await settle(tester);
+        }
 
         if (toast != null) {
           await toast(tester);

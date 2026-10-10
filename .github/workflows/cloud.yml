@@ -1,0 +1,33 @@
+name: Cloud
+
+# Commy Cloud (cloud/): the meeting points, dashboard and documentation site
+# of ADR-0019. Its own workflow so that a change to the server never waits on
+# the Flutter matrix, and a client change never rebuilds the server.
+on:
+  push:
+    branches: [main]
+    paths: ['cloud/**', '.github/workflows/cloud.yml']
+  pull_request:
+    paths: ['cloud/**', '.github/workflows/cloud.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: vet + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloud
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: cloud/go.mod
+          cache-dependency-path: cloud/go.sum
+      - run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: docker build -t commy-cloud .

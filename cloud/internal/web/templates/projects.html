@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>{{t .Lang "projects.title"}}</h1>
+{{if .Data.Projects}}
+<div class="card"><ul class="list-plain">
+{{range .Data.Projects}}
+  <li><a href="/cloud/p/{{.ID}}"><strong>{{.Name}}</strong> <span class="muted mono">{{.ID}}</span></a>{{if .Disabled}}<span class="pill err">off</span>{{end}}</li>
+{{end}}
+</ul></div>
+{{else}}
+<p class="muted">{{t .Lang "projects.empty"}}</p>
+{{end}}
+
+<div class="card" id="new">
+  <h2>{{t .Lang "projects.new"}}</h2>
+  <form method="post" action="/cloud/projects" id="new-project">
+    <input type="hidden" name="csrf" value="{{.CSRF}}">
+    <label for="pid">{{t .Lang "projects.id"}}</label>
+    <input id="pid" name="id" type="text" required pattern="[A-Za-z0-9_\-]{1,64}" maxlength="64" value="{{.Data.Form.ID}}" autocomplete="off">
+    <label for="pname">{{t .Lang "projects.name"}}</label>
+    <input id="pname" name="name" type="text" maxlength="64" value="{{.Data.Form.Name}}">
+    <input type="hidden" name="key" id="pkey" value="{{.Data.Form.Key}}">
+    <div id="manual-key" class="hidden">
+      <div class="alert warn">{{t .Lang "projects.noCrypto"}}</div>
+      <label for="pkey-manual">{{t .Lang "projects.publicKey"}}</label>
+      <input id="pkey-manual" type="text" class="mono">
+    </div>
+    <p class="hint">{{t .Lang "projects.keyNote"}}</p>
+    <p><button class="btn" type="submit">{{t .Lang "projects.create"}}</button></p>
+  </form>
+</div>
+{{end}}
+{{define "scripts"}}<script src="/static/sign.js" type="module"></script>{{end}}

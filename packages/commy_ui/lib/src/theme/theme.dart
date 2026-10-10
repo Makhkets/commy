@@ -6,6 +6,7 @@ import 'package:commy_ui/src/tokens/motion.dart';
 import 'package:commy_ui/src/tokens/radii.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:commy_ui/src/tokens/spacing.dart';
+import 'package:commy_ui/src/tokens/tag_colors.dart';
 import 'package:commy_ui/src/tokens/typography.dart';
 import 'package:flutter/material.dart';
 
@@ -24,6 +25,7 @@ abstract final class CommyTheme {
         colors: CommyColors.dark,
         elevation: CommyElevation.dark,
         connect: CommyConnectTokens.dark,
+        tags: CommyTagColors.dark,
         brightness: Brightness.dark,
       );
 
@@ -32,6 +34,7 @@ abstract final class CommyTheme {
         colors: CommyColors.light,
         elevation: CommyElevation.light,
         connect: CommyConnectTokens.light,
+        tags: CommyTagColors.light,
         brightness: Brightness.light,
       );
 
@@ -70,6 +73,7 @@ abstract final class CommyTheme {
     required CommyColors colors,
     required CommyElevation elevation,
     required CommyConnectTokens connect,
+    required CommyTagColors tags,
     required Brightness brightness,
   }) {
     const type = CommyTypography.standard;
@@ -131,6 +135,7 @@ abstract final class CommyTheme {
         colors,
         elevation,
         connect,
+        tags,
         type,
         radii,
         CommySpacing.standard,

@@ -311,6 +311,9 @@ class FakeRoutingRepository implements RoutingRepository {
 
   RoutingPolicy _policy;
   DnsSettings _dns;
+  RoutingProfiles _profiles = RoutingProfiles.empty;
+  final StreamController<RoutingProfiles> _profileChanges =
+      StreamController<RoutingProfiles>.broadcast();
   final StreamController<RoutingPolicy> _policyChanges =
       StreamController<RoutingPolicy>.broadcast();
   final StreamController<DnsSettings> _dnsChanges =
@@ -322,10 +325,14 @@ class FakeRoutingRepository implements RoutingRepository {
   /// The DNS settings currently stored.
   DnsSettings get dns => _dns;
 
+  /// The routing profiles currently stored.
+  RoutingProfiles get profiles => _profiles;
+
   /// Releases the broadcast controllers.
   Future<void> dispose() async {
     await _policyChanges.close();
     await _dnsChanges.close();
+    await _profileChanges.close();
   }
 
   @override
@@ -353,6 +360,28 @@ class FakeRoutingRepository implements RoutingRepository {
   Future<Result<void, CommyFailure>> writeDns(DnsSettings settings) async {
     _dns = settings;
     _dnsChanges.add(settings);
+    return const Ok<void, CommyFailure>(null);
+  }
+
+  @override
+  Stream<RoutingProfiles> watchProfiles() =>
+      _replay(_profileChanges, () => _profiles);
+
+  @override
+  Future<Result<RoutingProfiles, CommyFailure>> readProfiles() async =>
+      Ok<RoutingProfiles, CommyFailure>(_profiles);
+
+  @override
+  Future<Result<void, CommyFailure>> writeProfiles(
+    RoutingProfiles profiles, {
+    RoutingPolicy? live,
+  }) async {
+    _profiles = profiles;
+    _profileChanges.add(profiles);
+    if (live != null) {
+      _policy = live;
+      _policyChanges.add(live);
+    }
     return const Ok<void, CommyFailure>(null);
   }
 }
@@ -458,8 +487,14 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
   /// What the next fetch returns as the document.
   String body;
 
+  /// The `commy-manifest` header the next answer carries, if any.
+  String? manifest;
+
   /// Set to make every fetch fail.
   CommyFailure? failure;
+
+  /// Failures for particular addresses only; the rest answer with [body].
+  final Map<Uri, CommyFailure> failuresFor = <Uri, CommyFailure>{};
 
   /// Set to hold every fetch until it completes, so a test can look at a
   /// screen while a download is still in the air.
@@ -484,12 +519,12 @@ class FakeSubscriptionFetcher implements SubscriptionFetcher {
     requests.add(url);
     userAgents.add(userAgent);
     await gate?.future;
-    final refused = failure;
+    final refused = failure ?? failuresFor[url];
     if (refused != null) {
       return Err<SubscriptionPayload, CommyFailure>(refused);
     }
     return Ok<SubscriptionPayload, CommyFailure>(
-      SubscriptionPayload(body: body),
+      SubscriptionPayload(body: body, manifest: manifest),
     );
   }
 }
@@ -763,5 +798,25 @@ class FakeLibraryStore implements LibraryStore {
       await this.nodes.upsertGroup(group);
     }
     return this.nodes.upsertAll(nodes);
+  }
+}
+
+/// A provider's meeting points, answered from a map, never from a socket.
+class FakeRendezvousFetcher implements RendezvousFetcher {
+  /// What each point serves; a point not here fails.
+  final Map<Uri, String> served = <Uri, String>{};
+
+  /// The points asked, in order.
+  final List<Uri> visits = <Uri>[];
+
+  @override
+  Future<Result<String, CommyFailure>> fetch(Uri url) async {
+    visits.add(url);
+    final body = served[url];
+    return body == null
+        ? Err<String, CommyFailure>(
+            SubscriptionUnreachableFailure(url: url, cause: 'no answer'),
+          )
+        : Ok<String, CommyFailure>(body);
   }
 }

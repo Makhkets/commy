@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut, Import from the clipboard: Lucide "clipboard".
+     A launcher draws a shortcut icon as it is, untinted, on its own popup:
+     ink on a chalk disc (ink/900 on ink/50), the 24 dp glyph centred in the
+     48 dp shortcut grid. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#F2F3F5"
+        android:pathData="M24,0 A24,24 0 1,1 24,48 A24,24 0 1,1 24,0 Z" />
+    <path
+        android:strokeColor="#131519"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M28,16h2a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2H18a2,2 0 0,1 -2,-2V18a2,2 0 0,1 2,-2h2" />
+    <path
+        android:strokeColor="#131519"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M21,14h6a1,1 0 0,1 1,1v2a1,1 0 0,1 -1,1h-6a1,1 0 0,1 -1,-1v-2a1,1 0 0,1 1,-1z" />
+</vector>

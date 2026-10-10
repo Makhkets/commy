@@ -22,7 +22,14 @@ enum SystemIntentKind {
   text(wireName: 'text'),
 
   /// "Connect", asked for from outside the UI — the Quick Settings tile.
-  connect(wireName: 'connect');
+  connect(wireName: 'connect'),
+
+  /// "Open the QR scanner" — the launcher shortcut.
+  scan(wireName: 'scan'),
+
+  /// "Import what is on the clipboard" — the launcher shortcut. Carries no
+  /// text: the clipboard is read here, once the app is in front.
+  paste(wireName: 'paste');
 
   const SystemIntentKind({required this.wireName});
 

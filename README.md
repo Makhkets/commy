@@ -104,8 +104,9 @@ that carries all of your traffic, being auditable is not a nice-to-have.
 ## Principles
 
 1. **Your servers or nothing.** No bundled configs, no affiliate integrations.
-2. **Quiet on the network.** Zero outbound requests you did not ask for. Exactly three
-   optional exceptions, all user-triggered, all listed on one settings screen.
+2. **Quiet on the network.** Zero outbound requests you did not ask for. Exactly four
+   optional exceptions, all listed on one settings screen: three you trigger, and
+   address recovery for a subscription whose provider signed it — off with one switch.
 3. **Transparency over convenience.** Every generated config can be opened and read.
 4. **Same behaviour everywhere.** A routing rule written on your phone works
    identically on your laptop.

@@ -1,0 +1,29 @@
+{{template "head" .}}
+<main>
+<section class="hero">
+  <span class="badge-line">● {{tr .Lang "badge"}}</span>
+  <h1>{{tr .Lang "hero.title"}}</h1>
+  <p class="lead">{{tr .Lang "hero.lead"}}</p>
+  <div class="row"><a class="btn" href="{{.Download}}">{{tr .Lang "hero.download"}}</a><a class="btn secondary" href="{{docURL .Lang "quick-start"}}">{{tr .Lang "hero.docs"}}</a></div>
+  <p class="small muted">{{tr .Lang "hero.platforms"}}</p>
+</section>
+<section class="features">
+  <div class="feature"><div class="dot">⚡</div><h3>{{tr .Lang "f1.t"}}</h3><p>{{tr .Lang "f1.d"}}</p></div>
+  <div class="feature"><div class="dot">⇣</div><h3>{{tr .Lang "f2.t"}}</h3><p>{{tr .Lang "f2.d"}}</p></div>
+  <div class="feature"><div class="dot">⇄</div><h3>{{tr .Lang "f3.t"}}</h3><p>{{tr .Lang "f3.d"}}</p></div>
+  <div class="feature"><div class="dot">◎</div><h3>{{tr .Lang "f4.t"}}</h3><p>{{tr .Lang "f4.d"}}</p></div>
+  <div class="feature"><div class="dot">↻</div><h3>{{tr .Lang "f5.t"}}</h3><p>{{tr .Lang "f5.d"}}</p></div>
+  <div class="feature"><div class="dot">🔑</div><h3>{{tr .Lang "f6.t"}}</h3><p>{{tr .Lang "f6.d"}}</p></div>
+</section>
+<section class="card">
+  <h2>{{tr .Lang "ops.title"}}</h2>
+  <p>{{tr .Lang "ops.lead"}}</p>
+  <div class="row"><a class="btn" href="/cloud/signup">{{tr .Lang "ops.start"}}</a><a class="btn secondary" href="{{docURL .Lang "cloud"}}">{{tr .Lang "ops.how"}}</a></div>
+</section>
+<section class="card">
+  <h2>{{tr .Lang "open.title"}}</h2>
+  <p>{{tr .Lang "open.lead"}}</p>
+  <a class="btn secondary" href="https://github.com/Makhkets/Commy">{{tr .Lang "open.github"}}</a>
+</section>
+</main>
+{{template "foot" .}}
