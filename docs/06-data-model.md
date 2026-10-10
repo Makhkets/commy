@@ -200,12 +200,15 @@ profile-web-page-url: https://panel.example.com/
   ботов владельца, а не придуманы (сессия 24):
   - путь: `happ://add/<url>`, `incy://import/<url>` (и `incy://add/`),
     `v2raytun://import/<url>`, `streisand://import/<url>`,
-    `hiddify://import/<url>#<имя>`, свой `commy://import/<url>` — адрес как
-    есть или целиком в процентной кодировке;
+    `hiddify://import/<url>#<имя>`, свой **`commy://add/<url>`** (основная
+    форма, как у всех клиентов; `commy://import/<url>` тоже понимается — для
+    уже разосланных ссылок) — адрес как есть или целиком в процентной
+    кодировке;
   - запрос: `sing-box://import-remote-profile?url=<url>#<имя>`,
     `clash://`, `clashmeta://`, `flclashx://`, `stash://`, `koala-clash://`,
     `prizrak-box://`, `v2rayng://install-config?url=<url>&name=<имя>`,
-    `sn://` и `exclave://subscription?url=<url>`, те же три под `commy://`;
+    `sn://` и `exclave://subscription?url=<url>`, те же три под `commy://`,
+    плюс `commy://add?url=<url>` и `commy://import?url=<url>`;
   - Shadowrocket: `sub://<base64 адреса>[#имя]`, `sub://?url=<url>&remark=<имя>`
     и обе формы внутри `shadowrocket://add/`.
 
