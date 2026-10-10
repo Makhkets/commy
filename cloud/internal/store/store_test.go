@@ -119,3 +119,15 @@ func TestSessionsExpire(t *testing.T) {
 		t.Fatalf("expired session: %v", err)
 	}
 }
+
+// The API sizes the answer by a number from the request; the store holds the
+// line itself, whatever the caller checked.
+func TestStatsClampsTheNumberOfDays(t *testing.T) {
+	s, _ := openTemp(t)
+	if got := len(s.Stats("p", 1<<40)); got != MaxStatDays {
+		t.Fatalf("huge n: got %d days, want %d", got, MaxStatDays)
+	}
+	if got := len(s.Stats("p", -5)); got != 0 {
+		t.Fatalf("negative n: got %d days, want 0", got)
+	}
+}

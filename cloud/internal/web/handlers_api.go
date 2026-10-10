@@ -107,7 +107,7 @@ func (s *Server) apiPublish(w http.ResponseWriter, r *http.Request) {
 func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 	_, p := apiCaller(r)
 	days, err := strconv.Atoi(r.URL.Query().Get("days"))
-	if err != nil || days < 1 || days > 365 {
+	if err != nil || days < 1 || days > store.MaxStatDays {
 		days = 30
 	}
 	type day struct {

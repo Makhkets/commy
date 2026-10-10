@@ -609,9 +609,14 @@ type DayStat struct {
 	Day
 }
 
+// MaxStatDays is the most days Stats returns: a year. The API asks for a
+// number the caller chose, and the slice is sized by it.
+const MaxStatDays = 365
+
 // Stats returns the last n days of a project's counters, oldest first,
-// including days with nothing.
+// including days with nothing. n is clamped to 0..MaxStatDays.
 func (s *Store) Stats(projectID string, n int) []DayStat {
+	n = min(max(n, 0), MaxStatDays)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	now := s.now().UTC()
