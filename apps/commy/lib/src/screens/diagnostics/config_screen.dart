@@ -125,8 +125,8 @@ class ConfigScreen extends ConsumerWidget {
                 spacing.s4,
               ),
               decoration: BoxDecoration(
-                color: colors.bgInset,
-                borderRadius: context.radii.mdAll,
+                color: colors.bgSurface,
+                borderRadius: context.radii.cardAll,
               ),
               clipBehavior: Clip.antiAlias,
               child: SingleChildScrollView(

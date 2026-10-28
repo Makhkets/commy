@@ -37,16 +37,14 @@ void main() {
     test('defaults to GET, also for settings stored before it existed', () {
       expect(AppSettings.defaults.pingMethod, PingMethod.get);
       expect(
-        AppSettings.fromJson(<String, Object?>{'themeMode': 'dark'})
-            .pingMethod,
+        AppSettings.fromJson(<String, Object?>{'themeMode': 'dark'}).pingMethod,
         PingMethod.get,
       );
     });
 
     test('a method this build does not know reads as GET', () {
       expect(
-        AppSettings.fromJson(<String, Object?>{'pingMethod': 'udp'})
-            .pingMethod,
+        AppSettings.fromJson(<String, Object?>{'pingMethod': 'udp'}).pingMethod,
         PingMethod.get,
       );
     });
@@ -139,6 +137,41 @@ void main() {
             .toString(),
         'https://m.example/geoip-ru.srs',
       );
+    });
+  });
+
+  group('AppSettings accessibility', () {
+    test('defaults to the system size and motion, also for old settings', () {
+      final old = AppSettings.fromJson(<String, Object?>{'themeMode': 'dark'});
+      expect(old.textSize, AppTextSize.medium);
+      expect(old.reduceMotion, isFalse);
+      expect(AppSettings.defaults.textSize.factor, 1);
+    });
+
+    test('round-trips through JSON', () {
+      const settings = AppSettings(
+        textSize: AppTextSize.large,
+        reduceMotion: true,
+      );
+
+      final restored = AppSettings.fromJson(settings.toJson());
+
+      expect(restored.textSize, AppTextSize.large);
+      expect(restored.reduceMotion, isTrue);
+      expect(restored, settings);
+    });
+
+    test('a size this build does not know reads as the system size', () {
+      final settings = AppSettings.fromJson(
+        <String, Object?>{'textSize': 'huge', 'reduceMotion': true},
+      );
+      expect(settings.textSize, AppTextSize.medium);
+      expect(settings.reduceMotion, isTrue);
+    });
+
+    test('the three sizes are a step apart, smaller to larger', () {
+      expect(AppTextSize.small.factor, lessThan(AppTextSize.medium.factor));
+      expect(AppTextSize.large.factor, greaterThan(AppTextSize.medium.factor));
     });
   });
 }

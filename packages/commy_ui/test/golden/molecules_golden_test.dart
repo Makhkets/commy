@@ -135,26 +135,6 @@ void main() {
   );
 
   goldenTest(
-    'status_pill',
-    size: const Size(360, 200),
-    builder: (context) => Wrap(
-      spacing: CommySpacing.standard.s3,
-      runSpacing: CommySpacing.standard.s3,
-      children: const <Widget>[
-        StatusPill(label: 'Подключено', tone: CommyTone.connected),
-        StatusPill(label: 'Подключение', tone: CommyTone.connecting),
-        StatusPill(label: 'Ошибка', tone: CommyTone.error),
-        StatusPill(label: 'Отключено', tone: CommyTone.idle),
-        StatusPill(
-          label: 'Проверка',
-          tone: CommyTone.info,
-          icon: CommyIcons.refresh,
-        ),
-      ],
-    ),
-  );
-
-  goldenTest(
     'toast',
     size: const Size(400, 220),
     builder: (context) => column(<Widget>[

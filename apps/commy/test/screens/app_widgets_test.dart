@@ -651,7 +651,7 @@ void main() {
   });
 
   group('SettingsSection', () {
-    testWidgets('names the group in caps and rules only between the rows',
+    testWidgets('names the group as written and rules only between the rows',
         (tester) async {
       await pumpScreen(
         tester,
@@ -670,12 +670,11 @@ void main() {
         ),
       );
 
-      // Every caller passes the heading in sentence case; the uppercase run
-      // in docs/design-refs/08-settings.png is this widget's doing, and a
-      // screen that had to shout its own headings would drift within a
-      // release.
-      expect(find.text(_groupLabel.toUpperCase()), findsOneWidget);
-      expect(find.text(_groupLabel), findsNothing);
+      // Sentence case, as the caller wrote it: the capitals the headings
+      // used to be shouted in are one of the marks of a templated interface
+      // (docs/04-design-system.md §13).
+      expect(find.text(_groupLabel), findsOneWidget);
+      expect(find.text(_groupLabel.toUpperCase()), findsNothing);
       // One rule between each pair and none at either end: a seam under the
       // last row is what makes a card look unfinished.
       expect(find.byType(CommyDivider), findsNWidgets(2));
@@ -989,7 +988,7 @@ void main() {
 
         final toast = expectToastAtTop(
           tester,
-          'Отвечают 15 из 17 · лучший — Finland, 90 мс · 2 UDP пропущены',
+          'Отвечают 15 из 17; лучший — Finland, 90\u00a0мс; 2 UDP пропущены',
         );
         expect(toast.tone, CommyTone.connected);
         expect(toast.icon, CommyIcons.success);
@@ -1035,7 +1034,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final toast = expectToastAtTop(tester, 'Finland — 124 мс');
+        final toast = expectToastAtTop(tester, 'Finland — 124\u00a0мс');
         expect(toast.tone, CommyTone.connected);
 
         await expireToast(tester);
@@ -1100,7 +1099,7 @@ void main() {
 
         final toast = expectToastAtTop(
           tester,
-          'Отвечают 15 из 17 · лучший — Finland, 90 мс',
+          'Отвечают 15 из 17; лучший — Finland, 90\u00a0мс',
         );
         expect(toast.tone, CommyTone.connected);
         expect(find.text(t.error.configInvalid.message), findsNothing);
@@ -1121,7 +1120,7 @@ void main() {
 
         measurement.finish(report);
         await tester.pumpAndSettle();
-        expectToastAtTop(tester, 'Finland — 124 мс');
+        expectToastAtTop(tester, 'Finland — 124\u00a0мс');
         await expireToast(tester);
 
         // The same server pinged again with the same result, straight after:
@@ -1130,7 +1129,7 @@ void main() {
         // be no change of state at all.
         measurement.finish(report);
         await tester.pumpAndSettle();
-        expectToastAtTop(tester, 'Finland — 124 мс');
+        expectToastAtTop(tester, 'Finland — 124\u00a0мс');
         await expireToast(tester);
 
         // An unrelated change of state does not put it back on screen.
@@ -1159,7 +1158,7 @@ void main() {
 
           final toast = expectToastAtTop(
             tester,
-            'Подписка «Мой сервер» обновлена · $nodes',
+            'Подписка «Мой сервер» обновлена: $nodes',
           );
           expect(toast.tone, CommyTone.connected);
           expect(toast.icon, CommyIcons.refresh);
@@ -1230,7 +1229,7 @@ void main() {
 
         autoRefresh.refreshed(name: 'Мой сервер', count: 3);
         await tester.pumpAndSettle();
-        expectToastAtTop(tester, 'Подписка «Мой сервер» обновлена · 3 узла');
+        expectToastAtTop(tester, 'Подписка «Мой сервер» обновлена: 3 узла');
         await expireToast(tester);
 
         // Something else changes; the refresh is not announced a second time.
@@ -1241,7 +1240,7 @@ void main() {
         // The next sweep with the same outcome is news of its own.
         autoRefresh.refreshed(name: 'Мой сервер', count: 3);
         await tester.pumpAndSettle();
-        expectToastAtTop(tester, 'Подписка «Мой сервер» обновлена · 3 узла');
+        expectToastAtTop(tester, 'Подписка «Мой сервер» обновлена: 3 узла');
 
         await expireToast(tester);
       });

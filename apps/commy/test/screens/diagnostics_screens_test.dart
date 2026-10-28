@@ -599,7 +599,7 @@ void main() {
 
     expect(find.byType(EmptyState), findsNothing);
     // Section labels are drawn in capitals.
-    expect(find.text(t.diagnostics.statsDays.toUpperCase()), findsOneWidget);
+    expect(find.text(t.diagnostics.statsDays), findsOneWidget);
     expect(
       find.text(CommyByteFormat.bytes(5120, locale: t.flutterLocale)),
       findsOneWidget,

@@ -277,7 +277,9 @@ void main() {
         expect(find.byIcon(CommyIcons.add), findsOneWidget);
         expect(find.byIcon(CommyIcons.settings), findsOneWidget);
         expect(
-          tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
+          tester
+              .widget<ConnectionRoute>(find.byType(ConnectionRoute))
+              .onServerTap,
           isNotNull,
         );
       });
@@ -510,7 +512,7 @@ void main() {
         isNull,
       );
       expect(heroInList(), findsOneWidget);
-      expect(find.byType(ConnectButton), findsOneWidget);
+      expect(find.byType(ConnectionRoute), findsOneWidget);
     });
 
     testWidgets('at 420 the hero is still the top of the one list',
@@ -526,16 +528,20 @@ void main() {
       );
     });
 
-    testWidgets('the chip keeps its picker in one column', (tester) async {
+    testWidgets('the server stop keeps its picker in one column',
+        (tester) async {
       await pumpAt(tester, const HomeScreen(), width: 420, nodes: twoServers());
 
       expect(
-        tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
+        tester
+            .widget<ConnectionRoute>(find.byType(ConnectionRoute))
+            .onServerTap,
         isNotNull,
       );
     });
 
-    testWidgets('the chip keeps its picker beside a list pane', (tester) async {
+    testWidgets('the server stop keeps its picker beside a list pane',
+        (tester) async {
       await pumpAt(
         tester,
         const HomeScreen(),
@@ -547,7 +553,9 @@ void main() {
       // are on screen already, and the picker is still the shorter way: it
       // opens under the button, narrowed to the chosen subscription.
       expect(
-        tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
+        tester
+            .widget<ConnectionRoute>(find.byType(ConnectionRoute))
+            .onServerTap,
         isNotNull,
       );
     });
@@ -575,7 +583,7 @@ void main() {
       // "Nothing found" is the list pane's answer. The connection pane is not
       // part of the question, so the disc is still there to be pressed.
       expect(find.text(t.home.search.nothing), findsOneWidget);
-      expect(find.byType(ConnectButton), findsOneWidget);
+      expect(find.byType(ConnectionRoute), findsOneWidget);
     });
 
     testWidgets('a tunnel failure explains itself beside the disc it reddened',
@@ -625,7 +633,10 @@ void main() {
         tester.widget<DesktopShell>(find.byType(DesktopShell)).detail,
         isNull,
       );
-      expect(find.byType(ConnectButton), findsNothing);
+      // The first-run view draws the route at rest, as a picture of what
+      // Commy is; the hero — the answer and its button — is not there.
+      expect(find.byType(HeroArea), findsNothing);
+      expect(find.text(t.route.connect), findsNothing);
       expect(find.text(t.home.empty.title), findsOneWidget);
     });
 
@@ -655,7 +666,7 @@ void main() {
       tester.view.physicalSize = const Size(700, 1600);
       await settle(tester);
 
-      expect(find.byType(ConnectButton), findsOneWidget);
+      expect(find.byType(ConnectionRoute), findsOneWidget);
       expect(heroInList(), findsOneWidget);
       expect(
         tester.widget<TabletShell>(find.byType(TabletShell)).detail,
@@ -665,7 +676,7 @@ void main() {
       tester.view.physicalSize = const Size(900, 1600);
       await settle(tester);
 
-      expect(find.byType(ConnectButton), findsOneWidget);
+      expect(find.byType(ConnectionRoute), findsOneWidget);
       expect(heroInList(), findsNothing);
     });
   });

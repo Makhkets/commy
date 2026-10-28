@@ -5,6 +5,7 @@ import 'package:commy/src/screens/import/paste_sheet.dart';
 import 'package:commy/src/screens/import/qr_scan_sheet.dart';
 import 'package:commy/src/screens/import/subscription_sheet.dart';
 import 'package:commy/src/state/import_controller.dart';
+import 'package:commy/src/widgets/settings_tile.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,19 +13,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// The empty state of the home screen, and the whole onboarding.
 ///
 /// There is no carousel. docs/05-ux-flows.md: "Пустое состояние само по себе
-/// объясняет, что делать" — and the second paragraph says out loud that the
-/// emptiness is a product decision rather than a missing feature, because a
-/// user who has met three other clients expects a free server list here.
+/// объясняет, что делать" — and the line under the answer says out loud that
+/// the emptiness is a product decision rather than a missing feature, because
+/// a user who has met three other clients expects a free server list here.
 ///
-/// Layout follows docs/design-refs/01-first-run.png: explanation, then the
-/// clipboard offer if there is one, then the three remaining ways in.
+/// docs/04-design-system.md §9: the screen opens with what to do, "Add your
+/// server", in the answer's type, and then shows the product rather than
+/// describing it — the route at rest, with its middle stop empty: this
+/// device, *no server added*, the internet. That is what Commy is, in one
+/// picture, before the user has given it anything. Then the clipboard offer
+/// when there is something to offer, and the ways in as one grouped list —
+/// not three square tiles with an icon each, which is a template.
 ///
 /// Three of the five ways in open a sheet, which is what reports the import
-/// afterwards. The other two — the file tile and the clipboard offer — have no
-/// sheet of their own, so they only *start* the import and hand it back to the
-/// screen: this view is torn down the moment an import lands a server, and a
-/// result reported from here would be reported by a widget that is already
-/// gone. The home screen owns both callbacks for that reason.
+/// afterwards. The other two — the file row and the clipboard offer — have
+/// no sheet of their own, so they only *start* the import and hand it back to
+/// the screen: this view is torn down the moment an import lands a server,
+/// and a result reported from here would be reported by a widget that is
+/// already gone. The home screen owns both callbacks for that reason.
 class FirstRunView extends ConsumerWidget {
   /// Creates the view.
   const FirstRunView({
@@ -43,67 +49,100 @@ class FirstRunView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final spacing = context.spacing;
+    final colors = context.colors;
+    final type = context.typography;
     final clipboard = ref.watch(clipboardPreviewProvider).value;
     final state = ref.watch(importControllerProvider);
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.all(spacing.s4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Expanded(
-              child: EmptyState(
-                icon: CommyIcons.empty,
-                title: t.home.empty.title,
-                message: t.home.empty.body,
+    return ListView(
+      padding: EdgeInsets.only(top: spacing.s2, bottom: spacing.s10),
+      children: <Widget>[
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Semantics(
+                header: true,
+                child: Text(
+                  t.home.empty.title,
+                  style: type.display.copyWith(color: colors.textPrimary),
+                ),
               ),
-            ),
-            if (clipboard != null && clipboard.hasContent) ...<Widget>[
-              _ClipboardOffer(
-                preview: clipboard,
-                isBusy: state.isBusy,
-                onPaste: () => onPasteAndConnect(clipboard.text),
+              SizedBox(height: spacing.s2),
+              ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: CommySizes.readingWidth,
+                ),
+                child: Text(
+                  t.home.empty.body,
+                  style: type.bodyLarge.copyWith(color: colors.textSecondary),
+                ),
               ),
-              SizedBox(height: spacing.s3),
+              SizedBox(height: spacing.s6),
+              // The product, shown before it is explained: a route whose
+              // middle stop is still empty. Not interactive — there is
+              // nothing to pick yet — and read out as one sentence.
+              Semantics(
+                container: true,
+                label: t.route.summary(
+                  device: t.route.device,
+                  server: t.route.noServer,
+                  internet: t.route.internet,
+                  state: t.route.idle,
+                ),
+                child: ExcludeSemantics(
+                  child: ConnectionRoute(
+                    state: ConnectState.idle,
+                    deviceLabel: t.route.device,
+                    serverName: t.route.noServer,
+                    internetLabel: t.route.internet,
+                  ),
+                ),
+              ),
             ],
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: _ImportChoice(
-                    icon: CommyIcons.link,
-                    label: t.home.empty.subscription,
-                    onTap: () => unawaited(SubscriptionSheet.show(context)),
-                  ),
-                ),
-                SizedBox(width: spacing.s2),
-                Expanded(
-                  child: _ImportChoice(
-                    icon: CommyIcons.qrCode,
-                    label: t.home.empty.scan,
-                    onTap: () => unawaited(QrScanSheet.show(context)),
-                  ),
-                ),
-                SizedBox(width: spacing.s2),
-                Expanded(
-                  child: _ImportChoice(
-                    icon: CommyIcons.document,
-                    label: t.home.empty.file,
-                    onTap: onImportFile,
-                  ),
-                ),
-              ],
+          ),
+        ),
+        SizedBox(height: spacing.s6),
+        if (clipboard != null && clipboard.hasContent) ...<Widget>[
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+            child: _ClipboardOffer(
+              preview: clipboard,
+              isBusy: state.isBusy,
+              onPaste: () => onPasteAndConnect(clipboard.text),
             ),
-            SizedBox(height: spacing.s2),
-            CommyButton(
-              label: t.home.empty.paste,
-              variant: CommyButtonVariant.ghost,
+          ),
+          SizedBox(height: spacing.s3),
+        ],
+        SectionLabel(t.route.ways),
+        SettingsSection(
+          showsIcons: true,
+          children: <Widget>[
+            SettingsTile(
+              icon: CommyIcons.link,
+              title: t.home.empty.subscription,
+              onTap: () => unawaited(SubscriptionSheet.show(context)),
+            ),
+            SettingsTile(
+              icon: CommyIcons.qrCode,
+              title: t.home.empty.scan,
+              onTap: () => unawaited(QrScanSheet.show(context)),
+            ),
+            SettingsTile(
+              icon: CommyIcons.document,
+              title: t.home.empty.file,
+              onTap: onImportFile,
+            ),
+            SettingsTile(
               icon: CommyIcons.copy,
-              onPressed: () => unawaited(PasteSheet.show(context)),
+              title: t.home.empty.paste,
+              onTap: () => unawaited(PasteSheet.show(context)),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
@@ -135,7 +174,7 @@ class _ClipboardOffer extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: colors.statusInfoWash,
-        borderRadius: context.radii.lgAll,
+        borderRadius: context.radii.cardAll,
       ),
       padding: EdgeInsets.all(spacing.s4),
       child: Column(
@@ -176,61 +215,6 @@ class _ClipboardOffer extends StatelessWidget {
             onPressed: onPaste,
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// One of the three square buttons along the bottom.
-class _ImportChoice extends StatelessWidget {
-  const _ImportChoice({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final spacing = context.spacing;
-    final radii = context.radii;
-
-    return Material(
-      color: colors.bgSurface,
-      borderRadius: radii.lgAll,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: spacing.s2,
-            vertical: spacing.s4,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                icon,
-                size: CommySizes.iconControl,
-                color: colors.textSecondary,
-              ),
-              SizedBox(height: spacing.s2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: context.typography.caption.copyWith(
-                  color: colors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

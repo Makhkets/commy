@@ -109,7 +109,7 @@ class _QrScanSheetState extends ConsumerState<QrScanSheet> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           ClipRRect(
-            borderRadius: context.radii.lgAll,
+            borderRadius: context.radii.tileAll,
             child: AspectRatio(
               aspectRatio: 1,
               child: Stack(
@@ -243,7 +243,7 @@ class _BatchSwitch extends StatelessWidget {
     final change = onChanged;
     return MergeSemantics(
       child: InkWell(
-        borderRadius: context.radii.mdAll,
+        borderRadius: context.radii.blockAll,
         onTap: change == null ? null : () => change(!value),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: CommySizes.minTapTarget),

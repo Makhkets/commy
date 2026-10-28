@@ -59,11 +59,16 @@ class Toast extends StatelessWidget {
         child: SizedBox(
           width: double.infinity,
           child: Container(
+            // It floats, so it casts the menu-level shadow in light; in
+            // dark, where shadows do not read, the edge takes its place
+            // (docs/04-design-system.md §5).
             decoration: BoxDecoration(
               color: colors.bgRaised,
-              borderRadius: context.radii.smAll,
-              border: Border.all(color: colors.borderDefault),
-              boxShadow: context.elevation.level2,
+              borderRadius: context.radii.blockAll,
+              border: context.elevation.level3.isEmpty
+                  ? Border.all(color: colors.borderDefault)
+                  : null,
+              boxShadow: context.elevation.level3,
             ),
             // No vertical padding on the toast itself: the message carries
             // it, so that the action beside it can take the toast's whole

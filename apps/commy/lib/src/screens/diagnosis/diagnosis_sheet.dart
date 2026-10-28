@@ -84,18 +84,26 @@ class _DiagnosisSheetState extends ConsumerState<DiagnosisSheet> {
             ),
           ),
           SizedBox(height: spacing.s3),
-          for (final step in diagnosis?.steps ??
-              <DiagnosisResult>[
-                for (final step in DiagnoseNodeUseCase.stepsFor(widget.node))
-                  DiagnosisResult(step, StepStatus.pending),
-              ])
-            if (step.status != StepStatus.skipped)
-              _StepRow(
-                result: step,
-                // A layer above the one that broke is not judged: after the
-                // verdict it is shown as not checked, not as still running.
-                stopped: verdict != DiagnosisVerdict.running,
-              ),
+          // The layers as stops of the route (docs/04-design-system.md
+          // §1): solid up to where the path is fine, a cross where it broke.
+          RouteSteps(
+            steps: _onlyFirstRunning(<RouteStep>[
+              for (final step in diagnosis?.steps ??
+                  <DiagnosisResult>[
+                    for (final step
+                        in DiagnoseNodeUseCase.stepsFor(widget.node))
+                      DiagnosisResult(step, StepStatus.pending),
+                  ])
+                if (step.status != StepStatus.skipped)
+                  _stepOf(
+                    t,
+                    step,
+                    // A layer above the one that broke is not judged: after
+                    // the verdict it is shown as not checked, not as running.
+                    stopped: verdict != DiagnosisVerdict.running,
+                  ),
+            ]),
+          ),
           SizedBox(height: spacing.s4),
           Semantics(
             liveRegion: true,
@@ -107,7 +115,7 @@ class _DiagnosisSheetState extends ConsumerState<DiagnosisSheet> {
                   CommyTone.error => colors.statusErrorWash,
                   _ => colors.bgOverlay,
                 },
-                borderRadius: context.radii.mdAll,
+                borderRadius: context.radii.blockAll,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,76 +195,52 @@ class _DiagnosisSheetState extends ConsumerState<DiagnosisSheet> {
   }
 }
 
-/// One layer: its name, what it found, and a glyph for how it went.
-class _StepRow extends StatelessWidget {
-  const _StepRow({required this.result, required this.stopped});
+/// Keeps "running" on the first layer that has not answered yet — the one
+/// the check is on — and turns the ones after it back into waiting stops.
+List<RouteStep> _onlyFirstRunning(List<RouteStep> steps) {
+  var seen = false;
+  return <RouteStep>[
+    for (final step in steps)
+      if (step.state != RouteStepState.running)
+        step
+      else if (!seen && (seen = true))
+        step
+      else
+        RouteStep(
+          label: step.label,
+          detail: step.detail,
+          state: RouteStepState.pending,
+        ),
+  ];
+}
 
-  final DiagnosisResult result;
-
-  final bool stopped;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Translations.of(context);
-    final colors = context.colors;
-    final spacing = context.spacing;
-    final name = switch (result.step) {
-      DiagnosisStep.dns => t.diagnosis.steps.dns,
-      DiagnosisStep.tcp => t.diagnosis.steps.tcp,
-      DiagnosisStep.tls => t.diagnosis.steps.tls,
-      DiagnosisStep.proxy => t.diagnosis.steps.proxy,
-    };
-    final detail = result.detail;
-    final shown = detail == null
-        ? null
-        : (int.tryParse(detail) == null ? detail : t.diagnosis.ms(ms: detail));
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: CommySizes.minTapTarget),
-      child: Row(
-        children: <Widget>[
-          SizedBox.square(
-            dimension: CommySizes.iconControl,
-            child: switch (result.status) {
-              StepStatus.pending when !stopped => const CommySpinner(),
-              StepStatus.passed => Icon(
-                  CommyIcons.success,
-                  size: CommySizes.iconControl,
-                  color: colors.statusConnected,
-                ),
-              StepStatus.failed => Icon(
-                  CommyIcons.error,
-                  size: CommySizes.iconControl,
-                  color: colors.statusError,
-                ),
-              StepStatus.skipped || StepStatus.pending => Icon(
-                  CommyIcons.info,
-                  size: CommySizes.iconControl,
-                  color: colors.textTertiary,
-                ),
-            },
-          ),
-          SizedBox(width: spacing.s3),
-          Expanded(
-            child: Text(
-              name,
-              style: context.typography.body.copyWith(
-                color: colors.textPrimary,
-              ),
-            ),
-          ),
-          if (shown != null)
-            Flexible(
-              child: Text(
-                shown,
-                overflow: TextOverflow.ellipsis,
-                style: context.typography.mono.copyWith(
-                  color: colors.textTertiary,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+/// One layer: its name, what it found, and how it went.
+///
+/// Only the first layer still waiting is "running" — the one the check is on
+/// — and only while the check runs; the rest wait as plain stops.
+RouteStep _stepOf(
+  Translations t,
+  DiagnosisResult result, {
+  required bool stopped,
+}) {
+  final name = switch (result.step) {
+    DiagnosisStep.dns => t.diagnosis.steps.dns,
+    DiagnosisStep.tcp => t.diagnosis.steps.tcp,
+    DiagnosisStep.tls => t.diagnosis.steps.tls,
+    DiagnosisStep.proxy => t.diagnosis.steps.proxy,
+  };
+  final detail = result.detail;
+  final shown = detail == null
+      ? null
+      : (int.tryParse(detail) == null ? detail : t.diagnosis.ms(ms: detail));
+  return RouteStep(
+    label: name,
+    detail: shown,
+    state: switch (result.status) {
+      StepStatus.passed => RouteStepState.passed,
+      StepStatus.failed => RouteStepState.failed,
+      StepStatus.pending when !stopped => RouteStepState.running,
+      StepStatus.pending || StepStatus.skipped => RouteStepState.pending,
+    },
+  );
 }

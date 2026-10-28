@@ -11,6 +11,10 @@ abstract final class CommyBreakpoints {
   /// From this width the layout is [CommyLayoutSize.expanded], in dp.
   static const double expanded = 1000;
 
+  /// Where a laptop becomes a wide screen and the side inset grows from 32 to
+  /// 40 — 1440 (docs/04-design-system.md §4).
+  static const double wide = 1440;
+
   /// Classifies a width in logical pixels.
   static CommyLayoutSize sizeFor(double width) {
     if (width < compact) {

@@ -20,46 +20,46 @@ void main() {
     // See the note on `goldenTest` in test/support/commy_test_host.dart.
     skip: !Platform.isLinux,
     () {
-    final directory = Directory('test/golden/goldens');
-    expect(
-      directory.existsSync(),
-      isTrue,
-      reason: 'Run `flutter test --update-goldens` first.',
-    );
+      final directory = Directory('test/golden/goldens');
+      expect(
+        directory.existsSync(),
+        isTrue,
+        reason: 'Run `flutter test --update-goldens` first.',
+      );
 
-    final dark = directory
-        .listSync()
-        .whereType<File>()
-        .where((file) => file.path.endsWith('.dark.png'))
-        .toList()
-      ..sort((a, b) => a.path.compareTo(b.path));
+      final dark = directory
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.dark.png'))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
 
-    expect(
-      dark,
-      isNotEmpty,
-      reason: 'No goldens on disk — nothing was actually photographed.',
-    );
+      expect(
+        dark,
+        isNotEmpty,
+        reason: 'No goldens on disk — nothing was actually photographed.',
+      );
 
-    final identical = <String>[];
-    final orphaned = <String>[];
-    for (final file in dark) {
-      final light = File(file.path.replaceAll('.dark.png', '.light.png'));
-      if (!light.existsSync()) {
-        orphaned.add(file.uri.pathSegments.last);
-        continue;
+      final identical = <String>[];
+      final orphaned = <String>[];
+      for (final file in dark) {
+        final light = File(file.path.replaceAll('.dark.png', '.light.png'));
+        if (!light.existsSync()) {
+          orphaned.add(file.uri.pathSegments.last);
+          continue;
+        }
+        if (_sameBytes(file.readAsBytesSync(), light.readAsBytesSync())) {
+          identical.add(file.uri.pathSegments.last);
+        }
       }
-      if (_sameBytes(file.readAsBytesSync(), light.readAsBytesSync())) {
-        identical.add(file.uri.pathSegments.last);
-      }
-    }
 
-    expect(orphaned, isEmpty, reason: 'Dark goldens with no light twin.');
-    expect(
-      identical,
-      isEmpty,
-      reason: 'These render the same in both themes, so the theme never '
-          'applied and the golden proves nothing.',
-    );
+      expect(orphaned, isEmpty, reason: 'Dark goldens with no light twin.');
+      expect(
+        identical,
+        isEmpty,
+        reason: 'These render the same in both themes, so the theme never '
+            'applied and the golden proves nothing.',
+      );
     },
   );
 }

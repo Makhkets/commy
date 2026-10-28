@@ -114,17 +114,19 @@ void main() {
 
     await tester.tap(
       find.descendant(
-        of: find.ancestor(
-          of: find.text('Firefox'),
-          matching: find.byType(Row),
-        ).first,
+        of: find
+            .ancestor(
+              of: find.text('Firefox'),
+              matching: find.byType(Row),
+            )
+            .first,
         matching: find.byType(CommyCheckbox),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(stored().perAppPackages, <String>['org.mozilla.firefox']);
-    expect(find.text(t.apps.chosen(count: 1).toUpperCase()), findsOneWidget);
+    expect(find.text(t.apps.chosen(count: 1)), findsOneWidget);
   });
 
   testWidgets('unticking removes it and leaves the rest in order',
@@ -142,10 +144,12 @@ void main() {
 
     await tester.tap(
       find.descendant(
-        of: find.ancestor(
-          of: find.text('Firefox'),
-          matching: find.byType(Row),
-        ).first,
+        of: find
+            .ancestor(
+              of: find.text('Firefox'),
+              matching: find.byType(Row),
+            )
+            .first,
         matching: find.byType(CommyCheckbox),
       ),
     );

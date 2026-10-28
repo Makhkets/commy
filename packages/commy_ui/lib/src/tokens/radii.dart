@@ -1,42 +1,52 @@
 import 'package:flutter/material.dart';
 
-/// Corner radii. Deliberately larger than the usual draft values: small radii
-/// read as "system shape, 2015".
+/// Corner radii, growing with the surface they round
+/// (docs/04-design-system.md §5): the bigger the surface, the bigger the
+/// radius. A nested element takes `outer − inset`, so a 16 dp plate sits in
+/// a 20 dp card inset by 4.
 @immutable
 class CommyRadii extends ThemeExtension<CommyRadii> {
   /// Creates a radius scale. Use [standard] unless a test needs otherwise.
   const CommyRadii({
-    this.xs = 8,
-    this.sm = 12,
-    this.md = 18,
-    this.lg = 24,
-    this.xl = 32,
-    this.full = 999,
-    this.flag = 5,
+    this.xs = 6,
+    this.sm = 10,
+    this.control = 14,
+    this.block = 16,
+    this.card = 20,
+    this.tile = 24,
+    this.plate = 28,
+    this.pill = 999,
+    this.flag = 4,
   });
 
   /// The one and only scale.
   static const CommyRadii standard = CommyRadii();
 
-  /// `radius/xs` — 8. Badge, latency chip.
+  /// 6. A badge, a highlight inside a row.
   final double xs;
 
-  /// `radius/sm` — 12. Button, input field, secondary action.
+  /// 10. A flag tile, a segment's thumb, a mini block.
   final double sm;
 
-  /// `radius/md` — 18. Card, list row, row group.
-  final double md;
+  /// 14. A button, a field, the search field, the segment track.
+  final double control;
 
-  /// `radius/lg` — 24. Bottom sheet, dialog, profile card.
-  final double lg;
+  /// 16. A toast, a banner, the plate of the active server (`card − 4`).
+  final double block;
 
-  /// `radius/xl` — 32. Hero card.
-  final double xl;
+  /// 20. A card, a grouped list.
+  final double card;
 
-  /// `radius/full` — 999. Pill, chip, avatar, ring.
-  final double full;
+  /// 24. The large tiles of the first run.
+  final double tile;
 
-  /// Corner of the vector country flag, 5. Not part of the public scale: it
+  /// 28. The top of a sheet, a dialog.
+  final double plate;
+
+  /// 999. A chip, a switch, a dot of the route.
+  final double pill;
+
+  /// Corner of the vector country flag, 4. Not part of the public scale: it
   /// belongs to one component and exists here only so the painter stays free
   /// of literals.
   final double flag;
@@ -47,39 +57,50 @@ class CommyRadii extends ThemeExtension<CommyRadii> {
   /// [sm] as a symmetric [BorderRadius].
   BorderRadius get smAll => BorderRadius.circular(sm);
 
-  /// [md] as a symmetric [BorderRadius].
-  BorderRadius get mdAll => BorderRadius.circular(md);
+  /// [control] as a symmetric [BorderRadius].
+  BorderRadius get controlAll => BorderRadius.circular(control);
 
-  /// [lg] as a symmetric [BorderRadius].
-  BorderRadius get lgAll => BorderRadius.circular(lg);
+  /// [block] as a symmetric [BorderRadius].
+  BorderRadius get blockAll => BorderRadius.circular(block);
 
-  /// [xl] as a symmetric [BorderRadius].
-  BorderRadius get xlAll => BorderRadius.circular(xl);
+  /// [card] as a symmetric [BorderRadius].
+  BorderRadius get cardAll => BorderRadius.circular(card);
 
-  /// [full] as a symmetric [BorderRadius].
-  BorderRadius get fullAll => BorderRadius.circular(full);
+  /// [tile] as a symmetric [BorderRadius].
+  BorderRadius get tileAll => BorderRadius.circular(tile);
 
-  /// [lg] applied to the top corners only — the bottom sheet shape.
-  BorderRadius get lgTop => BorderRadius.vertical(top: Radius.circular(lg));
+  /// [plate] as a symmetric [BorderRadius].
+  BorderRadius get plateAll => BorderRadius.circular(plate);
+
+  /// [pill] as a symmetric [BorderRadius].
+  BorderRadius get pillAll => BorderRadius.circular(pill);
+
+  /// [plate] on the top corners only — the bottom sheet's shape.
+  BorderRadius get plateTop =>
+      BorderRadius.vertical(top: Radius.circular(plate));
 
   /// Returns a copy with the given radii replaced.
   @override
   CommyRadii copyWith({
     double? xs,
     double? sm,
-    double? md,
-    double? lg,
-    double? xl,
-    double? full,
+    double? control,
+    double? block,
+    double? card,
+    double? tile,
+    double? plate,
+    double? pill,
     double? flag,
   }) {
     return CommyRadii(
       xs: xs ?? this.xs,
       sm: sm ?? this.sm,
-      md: md ?? this.md,
-      lg: lg ?? this.lg,
-      xl: xl ?? this.xl,
-      full: full ?? this.full,
+      control: control ?? this.control,
+      block: block ?? this.block,
+      card: card ?? this.card,
+      tile: tile ?? this.tile,
+      plate: plate ?? this.plate,
+      pill: pill ?? this.pill,
       flag: flag ?? this.flag,
     );
   }

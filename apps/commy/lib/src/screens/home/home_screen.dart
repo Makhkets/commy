@@ -514,9 +514,13 @@ class _HomeContent extends ConsumerWidget {
       padding: EdgeInsets.only(bottom: spacing.s10),
       children: <Widget>[
         // The two that move: with a pane beside it the list starts at the
-        // Auto row. Without one the order is the phone's, unchanged — hero,
-        // Auto row, failure banner, toolbar, cards.
-        if (!hasConnectionPane) const HeroArea(),
+        // Auto row. Without one the order is the phone's — hero, failure
+        // banner, Auto row, toolbar, cards: the banner that explains a
+        // broken route sits right under it, not below a row of servers.
+        if (!hasConnectionPane) ...<Widget>[
+          const HeroArea(),
+          const _TunnelFailureBanner(),
+        ],
         if (hasChoice) ...<Widget>[
           ListCard(
             children: <Widget>[
@@ -530,7 +534,6 @@ class _HomeContent extends ConsumerWidget {
           ),
           SizedBox(height: spacing.s4),
         ],
-        if (!hasConnectionPane) const _TunnelFailureBanner(),
         if (hasChoice) ...<Widget>[
           const ListToolbar(),
           SizedBox(height: spacing.s4),
@@ -617,35 +620,49 @@ class _HiddenFooter extends ConsumerWidget {
 /// The shape of the answer while the first read lands.
 ///
 /// One column at every width, and no pane beside it: the screen does not know
-/// yet whether there is anything to connect to, and a disc drawn in a pane
+/// yet whether there is anything to connect to, and a route drawn in a pane
 /// that the first-run view is about to take away would be a promise made
-/// before the store answered.
+/// before the store answered. The blocks sit where the answer, the route and
+/// the button will be, so nothing jumps when they arrive.
 class _HomeSkeleton extends StatelessWidget {
   const _HomeSkeleton();
 
   @override
   Widget build(BuildContext context) {
     final spacing = context.spacing;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        SizedBox(height: spacing.s6),
-        const Center(
-          child: CommySkeleton(
-            width: CommyConnectTokens.discSize,
-            height: CommyConnectTokens.discSize,
-            borderRadius: BorderRadius.all(
-              Radius.circular(CommyConnectTokens.discSize / 2),
-            ),
+    final radii = context.radii;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(height: spacing.s2),
+          CommySkeleton(
+            width: _answerWidth,
+            height: CommySizes.buttonHeightSmall,
+            borderRadius: radii.xsAll,
           ),
-        ),
-        SizedBox(height: spacing.s5),
-        const Center(child: CommySkeleton(width: _chipWidth)),
-        SizedBox(height: spacing.s6),
-        const Expanded(child: ListSkeleton(hasHeader: true)),
-      ],
+          SizedBox(height: spacing.s2),
+          const CommySkeleton(width: _hintWidth),
+          SizedBox(height: spacing.s6),
+          const CommySkeleton(width: _hintWidth),
+          SizedBox(height: spacing.s6),
+          const CommySkeleton(width: _answerWidth),
+          SizedBox(height: spacing.s6),
+          const CommySkeleton(width: _hintWidth),
+          SizedBox(height: spacing.s5),
+          CommySkeleton(
+            width: double.infinity,
+            height: CommySizes.buttonHeightLarge,
+            borderRadius: radii.controlAll,
+          ),
+          SizedBox(height: spacing.s6),
+          const Expanded(child: ListSkeleton(hasHeader: true)),
+        ],
+      ),
     );
   }
 
-  static const double _chipWidth = 140;
+  static const double _answerWidth = 200;
+  static const double _hintWidth = 140;
 }

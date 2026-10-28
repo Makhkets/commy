@@ -31,8 +31,11 @@ class NodeRow extends ConsumerWidget {
     super.key,
   });
 
-  /// What joins the descriptor parts, and the subscription subtitle parts.
-  static const String separator = ' · ';
+  /// What joins the parts of a subtitle written out as one string — the
+  /// subscription's "2 h ago, auto every 1 h". A comma, not a middle dot:
+  /// metadata is joined the way a sentence would join it
+  /// (docs/04-design-system.md §12).
+  static const String separator = ', ';
 
   /// The server.
   final ProxyNode node;
@@ -52,12 +55,14 @@ class NodeRow extends ConsumerWidget {
     // The flag a panel typed into the name is drawn in the flag slot, not
     // left in the text beside an empty one.
     final label = NodeLabel.of(node);
+    final status = ref.watch(tunnelStatusProvider);
     return NodeTile(
       name: label.text,
       descriptors: NodeDescriptors.of(node),
       latency: node.latency,
       countryCode: label.countryCode,
       isActive: isActive,
+      isLive: status is TunnelConnected || status is TunnelChecking,
       isReachable: node.latency != null || node.lastCheckedAt == null,
       offlineSemanticLabel: t.a11y.offline,
       onTap: () {

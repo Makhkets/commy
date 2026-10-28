@@ -196,22 +196,10 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         ],
       ),
-      // The count and the reset used to be here, above the list. They are
-      // at the bottom now — see the bar below the scroll view.
-      Padding(
-        padding: EdgeInsetsDirectional.only(
-          start: spacing.s4,
-          end: spacing.s2,
-          top: spacing.s5,
-          bottom: spacing.s2,
-        ),
-        child: Text(
-          t.apps.chosen(count: chosen.length).toUpperCase(),
-          style: context.typography.label.copyWith(
-            color: colors.textTertiary,
-          ),
-        ),
-      ),
+      // The count and the reset live in the bar below the scroll view; the
+      // heading only names the list, so the screen never says the same
+      // number twice.
+      SectionLabel(t.apps.title),
     ];
 
     // A `CustomScrollView`, and the reason is the list at the end of it.
@@ -268,7 +256,7 @@ class _BodyState extends ConsumerState<_Body> {
             sliver: DecoratedSliver(
               decoration: BoxDecoration(
                 color: colors.bgSurface,
-                borderRadius: context.radii.lgAll,
+                borderRadius: context.radii.cardAll,
               ),
               sliver: SliverList.builder(
                 itemCount: visible.length,

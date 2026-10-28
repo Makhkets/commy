@@ -16,6 +16,26 @@ enum AppThemeMode {
   dark,
 }
 
+/// The size of the interface's text, on top of the operating system's own
+/// setting (docs/04-design-system.md §11). Three steps, as the design
+/// protocol asks: some people want more on a screen, some want it larger,
+/// and neither should have to change the whole phone for one app.
+enum AppTextSize {
+  /// A tenth smaller than the system's.
+  small(0.9),
+
+  /// As the system sets it.
+  medium(1),
+
+  /// Fifteen percent larger than the system's.
+  large(1.15);
+
+  const AppTextSize(this.factor);
+
+  /// What the system's text scale is multiplied by.
+  final double factor;
+}
+
 /// Which TUN stack the core uses.
 enum TunStack {
   /// The operating system stack. Fastest, not available everywhere.
@@ -38,6 +58,8 @@ class AppSettings {
   /// Creates the settings.
   const AppSettings({
     this.themeMode = AppThemeMode.system,
+    this.textSize = AppTextSize.medium,
+    this.reduceMotion = false,
     this.locale,
     this.autoConnect = false,
     this.autoSelect = false,
@@ -62,6 +84,12 @@ class AppSettings {
         themeMode: AppThemeMode.values.byName(
           JsonRead.stringOr(json, 'themeMode', orElse: 'system'),
         ),
+        // A size this build does not know — written by a newer one, or by
+        // hand — is the system's size, not a failure to read the settings.
+        textSize: AppTextSize.values
+                .asNameMap()[JsonRead.stringOrNull(json, 'textSize')] ??
+            AppTextSize.medium,
+        reduceMotion: JsonRead.boolean(json, 'reduceMotion', orElse: false),
         locale: JsonRead.stringOrNull(json, 'locale'),
         autoConnect: JsonRead.boolean(json, 'autoConnect', orElse: false),
         autoSelect: JsonRead.boolean(json, 'autoSelect', orElse: false),
@@ -160,6 +188,14 @@ class AppSettings {
 
   /// Light, dark or follow the system.
   final AppThemeMode themeMode;
+
+  /// The text size on top of the system's.
+  final AppTextSize textSize;
+
+  /// Whether the app keeps still: no springs, no travelling highlight, no
+  /// press scale — only colour changes. On top of the system's own setting,
+  /// which is honoured either way.
+  final bool reduceMotion;
 
   /// BCP-47 language tag, or `null` to follow the system.
   final String? locale;
@@ -318,6 +354,8 @@ class AppSettings {
   /// [locale] is the one nullable field; pass an empty string to clear it.
   AppSettings copyWith({
     AppThemeMode? themeMode,
+    AppTextSize? textSize,
+    bool? reduceMotion,
     String? locale,
     bool? autoConnect,
     bool? autoSelect,
@@ -339,6 +377,8 @@ class AppSettings {
     final nextLocale = locale ?? this.locale;
     return AppSettings(
       themeMode: themeMode ?? this.themeMode,
+      textSize: textSize ?? this.textSize,
+      reduceMotion: reduceMotion ?? this.reduceMotion,
       locale: nextLocale != null && nextLocale.isEmpty ? null : nextLocale,
       autoConnect: autoConnect ?? this.autoConnect,
       autoSelect: autoSelect ?? this.autoSelect,
@@ -362,6 +402,8 @@ class AppSettings {
   /// Serialises the settings.
   JsonMap toJson() => <String, Object?>{
         'themeMode': themeMode.name,
+        'textSize': textSize.name,
+        'reduceMotion': reduceMotion,
         'locale': locale,
         'autoConnect': autoConnect,
         'autoSelect': autoSelect,
@@ -386,6 +428,8 @@ class AppSettings {
       identical(this, other) ||
       other is AppSettings &&
           other.themeMode == themeMode &&
+          other.textSize == textSize &&
+          other.reduceMotion == reduceMotion &&
           other.locale == locale &&
           other.autoConnect == autoConnect &&
           other.autoSelect == autoSelect &&
@@ -407,6 +451,8 @@ class AppSettings {
   @override
   int get hashCode => Object.hash(
         themeMode,
+        textSize,
+        reduceMotion,
         locale,
         autoConnect,
         autoSelect,

@@ -23,9 +23,7 @@ Future<void> loadCommyFonts() async {
 
   const uiRoot = '../../packages/commy_ui/fonts';
   await _loadFamily(CommyFonts.ui, const <String>[
-    '$uiRoot/Inter-Regular.ttf',
-    '$uiRoot/Inter-Medium.ttf',
-    '$uiRoot/Inter-SemiBold.ttf',
+    '$uiRoot/InterVariable.ttf',
   ]);
   await _loadFamily(CommyFonts.mono, const <String>[
     '$uiRoot/JetBrainsMono-Regular.ttf',

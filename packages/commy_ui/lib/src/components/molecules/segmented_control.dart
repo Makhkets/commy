@@ -1,15 +1,22 @@
 import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/components/molecules/segmented_control_item.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
-import 'package:commy_ui/src/tokens/colors.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:flutter/material.dart';
 
-/// A row of mutually exclusive options sharing one recessed track.
+/// A row of mutually exclusive options on one track, the iOS way
+/// (docs/04-design-system.md §8).
 ///
 /// Used for the routing mode — global, rules, direct — where the three
 /// choices have to be visible at once because the difference between them is
-/// the whole point of the screen.
+/// the whole point of the screen, and for the diagnostics tabs.
+///
+/// The track is the neutral `fill`; the chosen option sits on a thumb that
+/// *travels* to the next one on the `snappy` spring, retargeting from wherever
+/// it is, so a quick second tap never makes it jump. The thumb is white on
+/// light and `#636366` on dark, with the small shadow of a floating part —
+/// and an edge of `line-strong`: the fill alone is 1.2:1 against the track,
+/// and what says which mode is on has to reach 3:1.
 ///
 /// Segments share the track in proportion to how wide their labels actually
 /// are, not in equal slices. Equal slices look tidy with labels of one
@@ -19,6 +26,9 @@ import 'package:flutter/material.dart';
 /// needs to tell apart both arrived as an ellipsis. Proportional shares fit
 /// all four, and when the labels genuinely cannot fit they shorten by the
 /// same ratio instead of the same number of pixels.
+///
+/// The visible track is 36 dp; the control is 48 tall, and the margin above
+/// and below still takes taps, so every segment is a full-size target.
 class SegmentedControl<T> extends StatelessWidget {
   /// Creates a segmented control.
   const SegmentedControl({
@@ -40,30 +50,83 @@ class SegmentedControl<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final spacing = context.spacing;
+    final motion = context.motion;
+    final radii = context.radii;
+    final enabled = onChanged != null;
+    final weights = <int>[
+      for (final segment in segments) _widthOf(context, segment),
+    ];
+    final total = weights.fold<int>(0, (sum, weight) => sum + weight);
+    final selected = segments.indexWhere((segment) => segment.value == value);
+    const inset = CommySizes.segmentedInset;
+    const margin = (CommySizes.minTapTarget - CommySizes.segmentedHeight) / 2;
+    final thumbRadius = BorderRadius.circular(radii.control - inset);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.bgInset,
-        borderRadius: context.radii.smAll,
-        border: Border.all(color: colors.borderDefault),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(spacing.s1),
-        child: Row(
-          children: <Widget>[
-            for (final segment in segments)
-              Expanded(
-                flex: _widthOf(context, segment),
-                child: _Segment<T>(
-                  segment: segment,
-                  isSelected: segment.value == value,
-                  onTap: onChanged == null
-                      ? null
-                      : () => onChanged!(segment.value),
+    return Opacity(
+      opacity: enabled ? 1 : CommySizes.disabledOpacity,
+      child: SizedBox(
+        height: CommySizes.minTapTarget,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth - inset * 2;
+            double startOf(int index) {
+              final before = weights
+                  .take(index)
+                  .fold<int>(0, (sum, weight) => sum + weight);
+              return inset + width * before / total;
+            }
+
+            return Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  top: margin,
+                  bottom: margin,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.fill,
+                      borderRadius: radii.controlAll,
+                    ),
+                  ),
                 ),
-              ),
-          ],
+                if (selected >= 0)
+                  AnimatedPositioned(
+                    duration: motion.fast,
+                    curve: motion.fastCurve,
+                    left: startOf(selected),
+                    width: width * weights[selected] / total,
+                    top: margin + inset,
+                    bottom: margin + inset,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colors.segmentThumb,
+                        borderRadius: thumbRadius,
+                        border: Border.all(color: colors.borderStrong),
+                        boxShadow: context.elevation.thumb,
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: inset),
+                  child: Row(
+                    children: <Widget>[
+                      for (var index = 0; index < segments.length; index++)
+                        Expanded(
+                          flex: weights[index],
+                          child: _Segment<T>(
+                            segment: segments[index],
+                            isSelected: index == selected,
+                            radius: thumbRadius,
+                            onTap: enabled
+                                ? () => onChanged!(segments[index].value)
+                                : null,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -101,99 +164,68 @@ class _Segment<T> extends StatelessWidget {
   const _Segment({
     required this.segment,
     required this.isSelected,
+    required this.radius,
     required this.onTap,
   });
 
   final SegmentedControlItem<T> segment;
   final bool isSelected;
+  final BorderRadius radius;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final spacing = context.spacing;
-    final motion = context.motion;
-    final enabled = onTap != null;
-    final Color foreground;
-    if (!enabled) {
-      foreground = colors.textDisabled;
-    } else {
-      foreground = isSelected ? colors.textPrimary : colors.textSecondary;
-    }
+    final foreground = isSelected ? colors.textPrimary : colors.textSecondary;
+    const margin = (CommySizes.minTapTarget - CommySizes.segmentedHeight) / 2;
 
     return Semantics(
       button: true,
       selected: isSelected,
-      enabled: enabled,
+      enabled: onTap != null,
       child: CommyFocusable(
         onActivate: onTap,
         builder: (context, {required isFocused}) => GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
-          child: AnimatedContainer(
-            duration: motion.instant,
-            curve: motion.instantCurve,
-            constraints: const BoxConstraints(
-              // Not `buttonHeightSmall`: a segment is the whole tap target —
-              // there is no room around it inside the track, and the track's
-              // own parents clip a hit test to their bounds, so a transparent
-              // margin like `CheckButton`'s cannot reach past it. At 36 the
-              // four diagnostics tabs and the three routing modes were the
-              // last controls under this design system's own floor. 48 is also
-              // what a text field and an icon button on the same screens are,
-              // so the row now lines up with them instead of reading denser.
-              minHeight: CommySizes.minTapTarget,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              vertical: margin + CommySizes.segmentedInset,
             ),
-            padding: EdgeInsets.symmetric(horizontal: spacing.s2),
-            decoration: BoxDecoration(
-              color: isSelected ? colors.bgOverlay : CommyColors.transparent,
-              borderRadius: context.radii.xsAll,
-            ),
-            // The outline of the chosen segment, or the focus ring in its
-            // place. Inside the segment, not around it: segments touch, and
-            // the track's own parents clip anything drawn past its edge.
-            //
-            // The outline is what says which mode is on. The fill alone is
-            // `bg/overlay` on `bg/inset` — 1.07:1 in the light theme, and
-            // the label steps from secondary to primary at 2.4:1 — so in
-            // daylight Global, Rules and Direct looked alike, and the design
-            // reference has always drawn it. `border/strong` is 3:1 against
-            // the light track and 3.9:1 against the dark one.
-            foregroundDecoration: BoxDecoration(
-              borderRadius: context.radii.xsAll,
-              border: isFocused
-                  ? CommyFocusable.ring(colors, isFocused: true)
-                  : Border.all(
-                      color: isSelected
-                          ? (enabled
-                              ? colors.borderStrong
-                              : colors.borderSubtle)
-                          : CommyColors.transparent,
-                    ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                if (segment.icon != null) ...<Widget>[
-                  Icon(
-                    segment.icon,
-                    size: CommySizes.iconInline,
-                    color: foreground,
-                  ),
-                  SizedBox(width: spacing.s1),
-                ],
-                Flexible(
-                  child: Text(
-                    segment.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: context.typography.captionStrong.copyWith(
+            child: Container(
+              alignment: Alignment.center,
+              padding: EdgeInsets.symmetric(horizontal: spacing.s2),
+              // The focus ring, on the segment's own shape: segments touch,
+              // and the track's parents clip anything drawn past its edge.
+              foregroundDecoration: BoxDecoration(
+                borderRadius: radius,
+                border: CommyFocusable.ring(colors, isFocused: isFocused),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  if (segment.icon != null) ...<Widget>[
+                    Icon(
+                      segment.icon,
+                      size: CommySizes.iconInline,
                       color: foreground,
                     ),
+                    SizedBox(width: spacing.s1),
+                  ],
+                  Flexible(
+                    child: Text(
+                      segment.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: context.typography.captionStrong.copyWith(
+                        color: foreground,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

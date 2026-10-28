@@ -43,42 +43,63 @@ void main() {
     await settle(tester);
   }
 
-  ConnectState stateOf(WidgetTester tester) {
-    return tester.widget<ConnectButton>(find.byType(ConnectButton)).state;
-  }
+  ConnectionRoute routeOf(WidgetTester tester) =>
+      tester.widget<ConnectionRoute>(find.byType(ConnectionRoute));
+
+  ConnectState stateOf(WidgetTester tester) => routeOf(tester).state;
+
+  /// The answer at the top of the screen: a heading the screen reader is
+  /// told about whenever it changes.
+  Finder answer(String text) => find.ancestor(
+        of: find.text(text),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              (widget.properties.header ?? false) &&
+              (widget.properties.liveRegion ?? false),
+        ),
+      );
 
   group('tunnel states', () {
-    // Under the button, in words and in the tone of the ring — the way INCY
-    // spells it, and what docs/05 asks of every status: colour, mark, text.
+    // The answer at the top of the screen, in words — and the route under it
+    // in the same state (docs/04-design-system.md §8, «Маршрут»).
     final t = Translations();
-    for (final (status, text, tone) in <(TunnelStatus, String, CommyTone)>[
-      (const TunnelStatus.idle(), t.connect.hint, CommyTone.idle),
-      (const TunnelStatus.starting(), t.connect.starting, CommyTone.connecting),
+    for (final (status, text, state) in <(TunnelStatus, String, ConnectState)>[
+      (const TunnelStatus.idle(), t.route.idle, ConnectState.idle),
+      (const TunnelStatus.starting(), t.route.starting, ConnectState.starting),
       (
         TunnelStatus.connected(since: CommyTestHarness.now),
-        t.connect.connected,
-        CommyTone.connected,
+        t.route.connected,
+        ConnectState.connected,
       ),
+      // A tunnel under its access check is already "Connected": the route's
+      // last leg says the check is still running.
       (
         TunnelStatus.checking(since: CommyTestHarness.now),
-        t.connect.checking,
-        CommyTone.connected,
+        t.route.connected,
+        ConnectState.checking,
       ),
       (
         const TunnelStatus.error(CommyFailure.permissionDenied()),
-        t.connect.failed,
-        CommyTone.error,
+        t.route.error,
+        ConnectState.error,
       ),
-      // Grey, like the ring while it winds down — not amber like starting.
-      (const TunnelStatus.stopping(), t.connect.stopping, CommyTone.idle),
+      (const TunnelStatus.stopping(), t.route.stopping, ConnectState.stopping),
     ]) {
-      testWidgets('$status is spelled out under the button', (tester) async {
+      testWidgets('$status is answered at the top and drawn by the route',
+          (tester) async {
         await pumpHome(tester, status: status);
-        final pill = tester.widget<StatusPill>(find.byType(StatusPill));
-        expect(pill.label, text);
-        expect(pill.tone, tone);
+        expect(answer(text), findsOneWidget);
+        expect(stateOf(tester), state);
       });
     }
+
+    testWidgets('at rest the line under the answer says where traffic goes',
+        (tester) async {
+      await pumpHome(tester, status: const TunnelStatus.idle());
+      expect(find.text(t.route.idleHint), findsOneWidget);
+      expect(find.text(t.route.connect), findsOneWidget);
+    });
 
     // A tap with nothing to connect to does nothing; the line must not say
     // it would.
@@ -92,11 +113,10 @@ void main() {
       );
       await settle(tester);
 
-      final pill = tester.widget<StatusPill>(find.byType(StatusPill));
-      expect(pill.label, Translations().connect.noServers);
+      expect(find.text(Translations().connect.noServers), findsOneWidget);
     });
 
-    testWidgets('the line wraps at 200 % on a narrow phone, never cut',
+    testWidgets('the answer wraps at 200 % on a narrow phone, never cut',
         (tester) async {
       tester.view
         ..physicalSize = const Size(360, 2400)
@@ -110,77 +130,103 @@ void main() {
           ),
           child: harness.wrap(
             const HomeScreen(),
-            status: const TunnelStatus.idle(),
+            status: const TunnelStatus.error(CommyFailure.permissionDenied()),
           ),
         ),
       );
       await settle(tester);
 
+      expect(tester.takeException(), isNull);
       final paragraph = tester.renderObject<RenderParagraph>(
-        find.descendant(
-          of: find.byType(StatusPill),
-          matching: find.byType(RichText),
-        ),
+        find
+            .descendant(
+              of: answer(t.route.error),
+              matching: find.byType(RichText),
+            )
+            .first,
       );
       expect(paragraph.didExceedMaxLines, isFalse);
     });
 
-    testWidgets('the screen reader hears the state once, from the button',
-        (tester) async {
-      final handle = tester.ensureSemantics();
-      await pumpHome(tester, status: const TunnelStatus.starting());
+    for (final (status, label) in <(TunnelStatus, String)>[
+      (const TunnelStatus.idle(), t.route.connect),
+      (TunnelStatus.connected(since: CommyTestHarness.now), t.route.disconnect),
+      (const TunnelStatus.starting(), t.route.cancel),
+      (const TunnelStatus.stopping(), t.route.stopping),
+    ]) {
+      testWidgets('the main action names its result: $status', (tester) async {
+        await pumpHome(tester, status: status);
+        expect(
+          find.descendant(
+            of: find.byType(CommyButton),
+            matching: find.text(label),
+          ),
+          findsOneWidget,
+        );
+      });
+    }
 
-      expect(
-        find.descendant(
-          of: find.byType(ExcludeSemantics),
-          matching: find.byType(StatusPill),
-        ),
-        findsOneWidget,
-      );
-      handle.dispose();
-    });
-
-    testWidgets('idle draws the idle button and no check button',
+    testWidgets('idle draws the idle route and offers no check',
         (tester) async {
       await pumpHome(tester, status: const TunnelStatus.idle());
 
       expect(stateOf(tester), ConnectState.idle);
-      expect(find.byType(CheckButton), findsNothing);
+      expect(routeOf(tester).onCheck, isNull);
     });
 
-    testWidgets('starting draws the starting button', (tester) async {
+    testWidgets('starting draws the starting route', (tester) async {
       await pumpHome(tester, status: const TunnelStatus.starting());
 
       expect(stateOf(tester), ConnectState.starting);
-      expect(find.byType(CheckButton), findsNothing);
+      expect(routeOf(tester).onCheck, isNull);
     });
 
-    testWidgets('connected draws the check button', (tester) async {
+    testWidgets('connected offers the check on the internet stop',
+        (tester) async {
       await pumpHome(
         tester,
         status: TunnelStatus.connected(since: CommyTestHarness.now),
       );
 
       expect(stateOf(tester), ConnectState.connected);
-      expect(find.byType(CheckButton), findsOneWidget);
+      expect(routeOf(tester).onCheck, isNotNull);
+      expect(find.text(Translations().route.check), findsOneWidget);
     });
 
-    testWidgets('checking keeps the check button and spins it', (tester) async {
+    testWidgets('checking keeps the check and spins it', (tester) async {
       await pumpHome(
         tester,
         status: TunnelStatus.checking(since: CommyTestHarness.now),
       );
 
       expect(stateOf(tester), ConnectState.checking);
-      final button = tester.widget<CheckButton>(find.byType(CheckButton));
-      expect(button.isChecking, isTrue);
+      expect(routeOf(tester).isChecking, isTrue);
+      expect(routeOf(tester).internetStatus, Translations().route.checking);
     });
 
-    testWidgets('stopping draws the stopping button', (tester) async {
+    testWidgets('stopping draws the stopping route', (tester) async {
       await pumpHome(tester, status: const TunnelStatus.stopping());
 
       expect(stateOf(tester), ConnectState.stopping);
-      expect(find.byType(CheckButton), findsNothing);
+      expect(routeOf(tester).onCheck, isNull);
+    });
+
+    testWidgets('a refused permission breaks the route at the device',
+        (tester) async {
+      await pumpHome(
+        tester,
+        status: const TunnelStatus.error(CommyFailure.permissionDenied()),
+      );
+      expect(routeOf(tester).breakAt, RouteBreak.device);
+    });
+
+    testWidgets('a core that died breaks the route on the way to the server',
+        (tester) async {
+      await pumpHome(
+        tester,
+        status: const TunnelStatus.error(CoreCrashedFailure('exit 2')),
+      );
+      expect(routeOf(tester).breakAt, RouteBreak.server);
     });
 
     testWidgets('error shows a cause, an action and a route to the logs',
@@ -380,8 +426,10 @@ void main() {
       expect(find.text(t.home.empty.scan), findsOneWidget);
       expect(find.text(t.home.empty.file), findsOneWidget);
       expect(find.text(t.home.empty.paste), findsOneWidget);
-      // Nothing to connect to means no connect button at all.
-      expect(find.byType(ConnectButton), findsNothing);
+      // Nothing to connect to means no connect button at all — only the
+      // route at rest, its middle stop empty.
+      expect(find.text(t.route.connect), findsNothing);
+      expect(find.text(t.route.noServer), findsOneWidget);
     });
 
     testWidgets('a clipboard link is offered before it is pasted',
@@ -413,7 +461,7 @@ void main() {
       expect(find.byType(NodeTile), findsOneWidget);
       final tile = tester.widget<NodeTile>(find.byType(NodeTile));
       expect(tile.name, 'Amsterdam 03');
-      expect(tile.descriptorLine, 'VLESS · Reality · TCP');
+      expect(tile.descriptorLine, 'VLESS, Reality, TCP');
       expect(tile.countryCode, 'NL');
     });
   });
@@ -702,7 +750,7 @@ void main() {
       );
     });
 
-    testWidgets('wears the European flag, in the list and in the chip',
+    testWidgets('wears the European flag, in the list and on the route',
         (tester) async {
       final t = Translations();
       await pumpTwo(tester);
@@ -716,13 +764,13 @@ void main() {
           .widgetList<NodeTile>(find.byType(NodeTile))
           .firstWhere((tile) => tile.name == t.home.auto);
       expect(row.countryCode, CountryFlag.europeanUnion);
-      final chipFlag = tester.widget<CountryFlag>(
+      final routeFlag = tester.widget<CountryFlag>(
         find.descendant(
-          of: find.byType(SelectedNode),
+          of: find.byType(ConnectionRoute),
           matching: find.byType(CountryFlag),
         ),
       );
-      expect(chipFlag.countryCode, CountryFlag.europeanUnion);
+      expect(routeFlag.countryCode, CountryFlag.europeanUnion);
     });
 
     testWidgets('the blocks of the list keep off the edges of the screen',
@@ -743,13 +791,18 @@ void main() {
     });
   });
 
-  /// The chip under the disc, and the list its chevron opens.
+  /// The server's stop on the route, and the list its chevron opens.
   ///
   /// It used to scroll the screen's own list instead — on the argument that a
   /// modal over those rows would be the same list twice — and on a real
   /// device that read as a chevron that does nothing. It opens a picker now:
   /// the servers of the chosen subscription, one tap from the button.
-  group('the selected-server chip', () {
+  group("the server's stop on the route", () {
+    Finder serverStop() => find.descendant(
+          of: find.byType(ConnectionRoute),
+          matching: find.byIcon(CommyIcons.chevronDown),
+        );
+
     late CommyTestHarness several;
 
     setUp(() async {
@@ -779,7 +832,7 @@ void main() {
         several.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
       await settle(tester);
-      await tester.tap(find.byType(SelectedNode));
+      await tester.tap(serverStop());
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
     }
@@ -811,10 +864,7 @@ void main() {
       expect(find.byType(CommySheetSurface), findsNothing);
       final stored = await several.settingsRepository.readSelectedNodeId();
       expect(stored.valueOrNull, 'node-2');
-      expect(
-        tester.widget<SelectedNode>(find.byType(SelectedNode)).name,
-        'Warsaw 01',
-      );
+      expect(routeOf(tester).serverName, 'Warsaw 01');
     });
 
     testWidgets('ignores the search typed over the list underneath',
@@ -829,7 +879,7 @@ void main() {
       // scrolling keeps taps away from its rows.
       await tester.pump(const Duration(seconds: 1));
 
-      await tester.tap(find.byType(SelectedNode));
+      await tester.tap(serverStop());
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
 
@@ -846,7 +896,7 @@ void main() {
       await settle(tester);
 
       expect(
-        tester.widget<SelectedNode>(find.byType(SelectedNode)).onTap,
+        routeOf(tester).onServerTap,
         isNull,
         reason: 'One server is not a choice; a chevron would promise one.',
       );
@@ -900,16 +950,15 @@ void main() {
       expect(italy.name, 'AXM VPN - Italy');
     });
 
-    testWidgets('is drawn in the chip under the button as well',
-        (tester) async {
+    testWidgets("is drawn on the route's server stop as well", (tester) async {
       await tester.pumpWidget(
         flagged.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
       await settle(tester);
 
-      final chip = tester.widget<SelectedNode>(find.byType(SelectedNode));
-      expect(chip.name, 'AXM VPN - Czech');
-      expect((chip.flag! as CountryFlag).countryCode, 'CZ');
+      final route = routeOf(tester);
+      expect(route.serverName, 'AXM VPN - Czech');
+      expect((route.flag! as CountryFlag).countryCode, 'CZ');
     });
 
     testWidgets('is found by typing the country it names', (tester) async {

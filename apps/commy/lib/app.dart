@@ -165,9 +165,27 @@ class _CommyAppState extends ConsumerState<CommyApp>
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
           // Toasts over the notices' host, so a notice raised anywhere —
           // and any toast a screen puts up — lands at the top of the window.
-          builder: (context, child) => ToastHost(
-            child: NoticeHost(child: child ?? const SizedBox.shrink()),
-          ),
+          //
+          // Above both, the two accessibility settings of «Внешний вид»
+          // (docs/04-design-system.md §11): the text size multiplies the
+          // system's own scale rather than replacing it, and "reduce motion"
+          // joins the system's switch — either one keeps the app still.
+          builder: (context, child) {
+            final media = MediaQuery.of(context);
+            return MediaQuery(
+              data: media.copyWith(
+                textScaler: _ScaledTextScaler.of(
+                  media.textScaler,
+                  settings.textSize.factor,
+                ),
+                disableAnimations:
+                    media.disableAnimations || settings.reduceMotion,
+              ),
+              child: ToastHost(
+                child: NoticeHost(child: child ?? const SizedBox.shrink()),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -192,4 +210,35 @@ class _CommyAppState extends ConsumerState<CommyApp>
         AppThemeMode.light => ThemeMode.light,
         AppThemeMode.dark => ThemeMode.dark,
       };
+}
+
+/// The system's text scaler, multiplied by the size picked in the app.
+///
+/// Wraps rather than replaces it, so Android 14's non-linear scaling — large
+/// text grows less than small — survives the multiplication.
+class _ScaledTextScaler extends TextScaler {
+  const _ScaledTextScaler(this.base, this.factor);
+
+  /// [base] as it is when [factor] is 1, and multiplied otherwise.
+  static TextScaler of(TextScaler base, double factor) =>
+      factor == 1 ? base : _ScaledTextScaler(base, factor);
+
+  final TextScaler base;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => base.scale(fontSize) * factor;
+
+  @override
+  // ignore: deprecated_member_use — required by the interface.
+  double get textScaleFactor => base.textScaleFactor * factor;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _ScaledTextScaler &&
+      other.base == base &&
+      other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(base, factor);
 }

@@ -13,11 +13,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// Theme and language.
+/// Theme, text size, motion and language.
 ///
-/// Text size is not here. It is the system setting, and every screen in the
-/// app is expected to survive 200% of it — duplicating the control would
-/// invite people to fix a layout bug by shrinking the text.
+/// The text size and "reduce motion" are what the design protocol asks every
+/// interface to offer on its own (docs/04-design-system.md §11). Both sit on
+/// top of the system's settings rather than replacing them: the size
+/// multiplies the system's scale, and the app keeps still when either switch
+/// says so. Every screen is still expected to survive 200 % of the system's
+/// size — the control is a preference, not a way around a layout bug.
 class AppearanceScreen extends ConsumerWidget {
   /// Creates the screen.
   const AppearanceScreen({super.key});
@@ -83,6 +86,38 @@ class _Body extends ConsumerWidget {
               ),
           ],
         ),
+        SectionLabel(t.appearance.textSize),
+        SettingsSection(
+          children: <Widget>[
+            for (final size in AppTextSize.values)
+              SettingsTile(
+                title: _sizeLabel(t, size),
+                selected: settings.textSize == size,
+                trailing: CommyRadio<AppTextSize>(
+                  value: size,
+                  groupValue: settings.textSize,
+                  onChanged: (value) =>
+                      unawaited(controller.setTextSize(value)),
+                ),
+                onTap: () => unawaited(controller.setTextSize(size)),
+              ),
+          ],
+        ),
+        SectionLabel(t.appearance.motion),
+        SettingsSection(
+          children: <Widget>[
+            SettingsTile(
+              title: t.appearance.reduceMotion,
+              subtitle: t.appearance.reduceMotionHint,
+              trailing: CommySwitch(
+                value: settings.reduceMotion,
+                semanticLabel: t.appearance.reduceMotion,
+                onChanged: (value) =>
+                    unawaited(controller.setReduceMotion(enabled: value)),
+              ),
+            ),
+          ],
+        ),
         SectionLabel(t.appearance.language),
         SettingsSection(
           children: <Widget>[
@@ -112,6 +147,12 @@ class _Body extends ConsumerWidget {
         AppThemeMode.system => t.appearance.themeSystem,
         AppThemeMode.light => t.appearance.themeLight,
         AppThemeMode.dark => t.appearance.themeDark,
+      };
+
+  String _sizeLabel(Translations t, AppTextSize size) => switch (size) {
+        AppTextSize.small => t.appearance.textSmall,
+        AppTextSize.medium => t.appearance.textMedium,
+        AppTextSize.large => t.appearance.textLarge,
       };
 
   String _localeLabel(Translations t, String locale) => switch (locale) {

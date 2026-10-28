@@ -96,7 +96,7 @@ class QrSheet extends StatelessWidget {
               padding: const EdgeInsets.all(CommySizes.qrQuietZone),
               decoration: BoxDecoration(
                 color: CommyQrPalette.ground,
-                borderRadius: radii.mdAll,
+                borderRadius: radii.cardAll,
               ),
               child: QrImageView(
                 data: payload,

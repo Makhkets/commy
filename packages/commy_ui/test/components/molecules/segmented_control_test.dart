@@ -7,23 +7,24 @@ import '../../support/commy_test_host.dart';
 /// Which segment is chosen has to be visible without telling two greys
 /// apart.
 ///
-/// The chosen segment was only a `bg/overlay` fill on the `bg/inset` track —
-/// 1.07:1 in the light theme — with a label one step darker; in daylight the
-/// routing screen's Global, Rules and Direct looked the same.
+/// The chosen segment was once only a fill one step off the track — 1.07:1
+/// in the light theme — and in daylight the routing screen's Global, Rules
+/// and Direct looked the same. Now one thumb travels under the chosen label,
+/// and its edge is `line-strong`: 3:1 against the track in both themes.
 void main() {
-  Color? outlineOf(WidgetTester tester, String label) {
-    final segment = tester.widget<Container>(
-      find
-          .ancestor(of: find.text(label), matching: find.byType(Container))
-          .first,
+  BoxDecoration thumbOf(WidgetTester tester) {
+    final positioned = tester.widget<AnimatedPositioned>(
+      find.byType(AnimatedPositioned),
     );
-    final decoration = segment.foregroundDecoration as BoxDecoration?;
-    return (decoration?.border as Border?)?.top.color;
+    return (positioned.child as DecoratedBox).decoration as BoxDecoration;
   }
+
+  Rect thumbRect(WidgetTester tester) =>
+      tester.getRect(find.byType(AnimatedPositioned));
 
   for (final theme in CommyGoldenTheme.values) {
     testWidgets(
-        'the chosen segment is outlined, the others are not · '
+        'the chosen segment sits on the one outlined thumb · '
         '${theme.name}', (tester) async {
       await pumpCommy(
         tester,
@@ -40,9 +41,18 @@ void main() {
       );
       final colors = theme.data.extension<CommyColors>()!;
 
-      expect(outlineOf(tester, 'Правила'), colors.borderStrong);
-      expect(outlineOf(tester, 'Глобально'), CommyColors.transparent);
-      expect(outlineOf(tester, 'Прямо'), CommyColors.transparent);
+      final edge = (thumbOf(tester).border! as Border).top.color;
+      expect(edge, colors.borderStrong);
+      // One thumb, and it sits under the chosen label.
+      expect(find.byType(AnimatedPositioned), findsOneWidget);
+      expect(
+        thumbRect(tester).contains(tester.getCenter(find.text('Правила'))),
+        isTrue,
+      );
+      expect(
+        thumbRect(tester).contains(tester.getCenter(find.text('Прямо'))),
+        isFalse,
+      );
     });
   }
 }

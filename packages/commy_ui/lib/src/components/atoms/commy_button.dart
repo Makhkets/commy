@@ -1,15 +1,22 @@
 import 'package:commy_ui/src/components/atoms/commy_button_variant.dart';
 import 'package:commy_ui/src/components/atoms/commy_spinner.dart';
 import 'package:commy_ui/src/components/commy_focusable.dart';
+import 'package:commy_ui/src/components/commy_pressable.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:flutter/material.dart';
 
-/// The button of the system, in its four variants.
+/// The button of the system, in its four variants
+/// (docs/04-design-system.md §8).
 ///
 /// [label] is a finished, translated string: this package holds no text and
-/// knows nothing about `slang`. The caller passes what the user reads.
+/// knows nothing about `slang`. The caller passes what the user reads — and
+/// the verb on it names the result: "Connect", "Save copy", never "OK".
+///
+/// A press shows the instant a finger lands: the button shrinks to 97 % on a
+/// spring ([CommyPressable]) and its fill darkens under the finger. The
+/// corner is `control` (14) at every height.
 class CommyButton extends StatelessWidget {
   /// Creates a button.
   const CommyButton({
@@ -20,9 +27,13 @@ class CommyButton extends StatelessWidget {
     this.isLoading = false,
     this.isFullWidth = false,
     this.isCompact = false,
+    this.isLarge = false,
     this.semanticLabel,
     super.key,
-  });
+  }) : assert(
+          !(isCompact && isLarge),
+          'A button is compact or large, not both.',
+        );
 
   /// Text on the button. Already translated.
   final String label;
@@ -46,6 +57,9 @@ class CommyButton extends StatelessWidget {
   /// Whether to use the dense 36 dp height instead of 44 dp.
   final bool isCompact;
 
+  /// Whether this is the one main action of the screen, 52 dp tall.
+  final bool isLarge;
+
   /// Overrides the label announced to assistive technology.
   final String? semanticLabel;
 
@@ -56,109 +70,92 @@ class CommyButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final spacing = context.spacing;
-    final radii = context.radii;
+    final shape = context.radii.controlAll;
     final foreground = _foreground(colors);
-    final border = _border(colors);
     final hasLeading = isLoading || icon != null;
-    final minHeight =
-        isCompact ? CommySizes.buttonHeightSmall : CommySizes.buttonHeight;
-    // The dense variant keeps its 36pt pill and gains transparent margin up
-    // to the minimum tap target, which still takes taps — the idiom
-    // `CheckButton` and `CommyChip` already use. It was the last control in
-    // the app under that floor: "add rule", "open logs", "grant permission"
-    // and the retry on a failed import are all this button, all on screens
-    // where the next thing to do is the small thing at the end of a row.
-    //
-    // The regular 44pt button is left alone. 44 is its own token, matches
-    // what iOS asks for, and every one of them would move by 4pt.
+    final minHeight = isCompact
+        ? CommySizes.buttonHeightSmall
+        : isLarge
+            ? CommySizes.buttonHeightLarge
+            : CommySizes.buttonHeight;
+    // The dense variant keeps its 36 dp body and gains transparent margin up
+    // to the minimum tap target, which still takes taps: "add rule", "open
+    // logs" and the retry on a failed import sit at the ends of rows, where
+    // the next thing to do is the small thing.
     final tapMargin = isCompact
         ? (CommySizes.minTapTarget - CommySizes.buttonHeightSmall) / 2
         : 0.0;
 
-    // What the fill becomes under a pointer, or `null` where it does not
-    // change. Only the primary variant needs saying: its fill is
-    // `accentSolid`, a near-white, and the global hover overlay is
-    // `accentWash` — eight percent of that same near-white, which on top of
-    // it moved exactly one pixel in a measured frame. `accentHover` exists
-    // for this and was referenced nowhere in the app. The ghost and the
-    // secondary variants sit on a transparent or a dark fill, where the
-    // overlay is plainly visible, and they are left alone.
-    final hoverFill =
-        variant == CommyButtonVariant.primary && isEnabled && !isCompact
-            ? colors.accentHover
-            : null;
-
-    // Focus is taken here rather than by the InkWell, for the same reason
-    // as the hover fill below: the InkWell shows focus as a 12% overlay of
-    // white on dark and of black on light, which on the primary fill — a
-    // near-white, a near-black — moved by 1.02:1, and on the compact
-    // variant sits under a fill painted above it. A keyboard user tabbing
-    // onto "Add" could not see that it was there. What shows focus now is
-    // the ring every control draws, on the button's own edge.
+    // Focus is a ring on the button's own edge, never the InkWell's 12 %
+    // overlay: on a black or a white fill that overlay moved by 1.02:1, and
+    // a keyboard user tabbing onto "Add" could not see that it was there.
     final button = Semantics(
       button: true,
       enabled: isEnabled,
       label: semanticLabel,
       child: CommyFocusable(
         onActivate: isEnabled ? onPressed : null,
-        builder: (context, {required isFocused}) => _HoverFill(
-          idle: isCompact ? CommyColors.transparent : _background(colors),
-          hovered: hoverFill,
-          builder: (context, fill) => Material(
-            // Compact draws its own fill below, inside the margin; anything
-            // else keeps painting it here.
-            color: fill,
-            borderRadius: radii.smAll,
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: isEnabled ? onPressed : null,
-              canRequestFocus: false,
-              borderRadius: radii.smAll,
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: tapMargin),
-                child: Container(
-                  constraints: BoxConstraints(minHeight: minHeight),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: spacing.s4,
-                    vertical: spacing.s2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isCompact ? _background(colors) : null,
-                    borderRadius: radii.smAll,
-                    border: border == null ? null : Border.all(color: border),
-                  ),
-                  foregroundDecoration: BoxDecoration(
-                    borderRadius: radii.smAll,
-                    border: CommyFocusable.ring(colors, isFocused: isFocused),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      if (isLoading)
-                        CommySpinner(
-                          size: CommySizes.iconControl,
-                          color: foreground,
-                        )
-                      else if (icon != null)
-                        Icon(
-                          icon,
-                          size: CommySizes.iconControl,
-                          color: foreground,
-                        ),
-                      if (hasLeading) SizedBox(width: spacing.s2),
-                      Flexible(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: context.typography.bodyStrong.copyWith(
+        builder: (context, {required isFocused}) => CommyPressable(
+          enabled: isEnabled,
+          child: _HoverFill(
+            idle: isCompact ? CommyColors.transparent : _background(colors),
+            hovered: isEnabled && !isCompact ? _pressed(colors) : null,
+            builder: (context, fill) => Material(
+              // Compact draws its own fill below, inside the margin.
+              color: fill,
+              borderRadius: shape,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: isEnabled ? onPressed : null,
+                canRequestFocus: false,
+                borderRadius: shape,
+                highlightColor: _pressedOverlay(colors),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: tapMargin),
+                  child: Container(
+                    constraints: BoxConstraints(minHeight: minHeight),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isCompact ? spacing.s3 : spacing.s4,
+                      vertical: spacing.s2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isCompact ? _background(colors) : null,
+                      borderRadius: shape,
+                    ),
+                    foregroundDecoration: BoxDecoration(
+                      borderRadius: shape,
+                      border: CommyFocusable.ring(colors, isFocused: isFocused),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        if (isLoading)
+                          CommySpinner(
+                            size: CommySizes.iconControl,
+                            color: foreground,
+                          )
+                        else if (icon != null)
+                          Icon(
+                            icon,
+                            size: CommySizes.iconControl,
                             color: foreground,
                           ),
+                        if (hasLeading) SizedBox(width: spacing.s2),
+                        Flexible(
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: (isCompact
+                                    ? context.typography.captionStrong
+                                    : context.typography.bodyStrong)
+                                .copyWith(color: foreground),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -178,15 +175,30 @@ class CommyButton extends StatelessWidget {
     if (!isEnabled) {
       return variant == CommyButtonVariant.ghost
           ? CommyColors.transparent
-          : colors.bgOverlay;
+          : colors.fill;
     }
     return switch (variant) {
       CommyButtonVariant.primary => colors.accentSolid,
-      CommyButtonVariant.secondary => colors.bgOverlay,
+      CommyButtonVariant.secondary => colors.fill,
       CommyButtonVariant.ghost => CommyColors.transparent,
-      CommyButtonVariant.danger => colors.statusError,
+      CommyButtonVariant.danger => colors.statusErrorSolid,
     };
   }
+
+  /// The fill under a pointer: only the primary needs its own, the others
+  /// take the global hover wash.
+  Color? _pressed(CommyColors colors) =>
+      variant == CommyButtonVariant.primary ? colors.accentHover : null;
+
+  /// What the fill turns into under a finger. On the primary — a black or a
+  /// white — a grey overlay would vanish into it, so the press paints the
+  /// pressed step of the action over it instead; elsewhere the theme's grey
+  /// highlight is the press.
+  Color? _pressedOverlay(CommyColors colors) => switch (variant) {
+        CommyButtonVariant.primary => colors.accentHover,
+        CommyButtonVariant.danger => colors.accentWash,
+        CommyButtonVariant.secondary || CommyButtonVariant.ghost => null,
+      };
 
   Color _foreground(CommyColors colors) {
     if (!isEnabled) {
@@ -196,15 +208,8 @@ class CommyButton extends StatelessWidget {
       CommyButtonVariant.primary => colors.accentOnSolid,
       CommyButtonVariant.secondary => colors.textPrimary,
       CommyButtonVariant.ghost => colors.textPrimary,
-      CommyButtonVariant.danger => colors.textInverse,
+      CommyButtonVariant.danger => colors.statusErrorOnSolid,
     };
-  }
-
-  Color? _border(CommyColors colors) {
-    if (variant != CommyButtonVariant.secondary) {
-      return null;
-    }
-    return isEnabled ? colors.borderDefault : colors.borderSubtle;
   }
 }
 

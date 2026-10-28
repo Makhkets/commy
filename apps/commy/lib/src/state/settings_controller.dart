@@ -175,6 +175,16 @@ class SettingsController extends Notifier<CommyFailure?> {
     await save((await _settings()).copyWith(themeMode: mode));
   }
 
+  /// Makes the interface's text smaller or larger than the system's.
+  Future<void> setTextSize(AppTextSize size) async {
+    await save((await _settings()).copyWith(textSize: size));
+  }
+
+  /// Keeps the app still — on top of the system's own setting.
+  Future<void> setReduceMotion({required bool enabled}) async {
+    await save((await _settings()).copyWith(reduceMotion: enabled));
+  }
+
   /// Switches the language. An empty string means "follow the system".
   Future<void> setLocale(String? locale) async {
     await save((await _settings()).copyWith(locale: locale ?? ''));

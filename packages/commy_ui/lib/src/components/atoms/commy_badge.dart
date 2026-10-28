@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 
 /// A small, static label. Not tappable — that is what a chip is for.
 ///
-/// Uses the `Label` style, which is always upper case; the transform is
-/// applied here so callers pass ordinary text.
+/// `label` style — 12 / 16, Semi Bold — in the case the caller wrote it:
+/// sentence case for words ("Прямо"), capitals only for names that are
+/// spelled that way. A tracked-out capital badge is one of the marks of a
+/// templated interface (docs/04-design-system.md §13).
 class CommyBadge extends StatelessWidget {
   /// Creates a badge.
   const CommyBadge({
@@ -16,7 +18,7 @@ class CommyBadge extends StatelessWidget {
     super.key,
   });
 
-  /// Text of the badge. Already translated; upper-cased on the way out.
+  /// Text of the badge. Already translated, drawn as given.
   final String label;
 
   /// Meaning the badge carries.
@@ -39,7 +41,7 @@ class CommyBadge extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: spacing.s2,
-          vertical: spacing.s1,
+          vertical: spacing.s05,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -49,7 +51,7 @@ class CommyBadge extends StatelessWidget {
               SizedBox(width: spacing.s1),
             ],
             Text(
-              label.toUpperCase(),
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: context.typography.label.copyWith(color: foreground),

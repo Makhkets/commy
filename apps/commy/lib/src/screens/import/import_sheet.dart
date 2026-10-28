@@ -193,7 +193,7 @@ class _ClipboardCard extends ConsumerWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colors.statusInfoWash,
-          borderRadius: context.radii.lgAll,
+          borderRadius: context.radii.cardAll,
         ),
         padding: EdgeInsets.all(spacing.s4),
         child: Column(

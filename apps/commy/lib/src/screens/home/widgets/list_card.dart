@@ -37,14 +37,13 @@ class ListCard extends StatelessWidget {
       child: rows == null
           ? child
           : Container(
-              // The same surface, corner, hairline and shadow as
-              // `SubscriptionCard`, so the blocks read as one kind of thing.
+              // The same surface and corner as `SubscriptionCard`, so the
+              // blocks read as one kind of thing — and, like it, no border
+              // and no shadow (docs/04-design-system.md §5).
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: colors.bgSurface,
-                borderRadius: context.radii.mdAll,
-                border: Border.all(color: colors.borderSubtle),
-                boxShadow: context.elevation.level1,
+                borderRadius: context.radii.cardAll,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

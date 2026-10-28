@@ -23,6 +23,21 @@ import '../support/commy_test_app.dart';
 /// `harness.routingRepository` — the same place `BuildConfigUseCase` reads it
 /// from — plus the banner, which is the only thing that ever tells a user
 /// their `geosite:` rule was dropped by the builder instead of applied.
+/// A routing mode's segment. Scoped, because the badge of a rule that goes
+/// direct is spelled the same as the mode that sends everything direct, and
+/// since the badges stopped shouting in capitals the two read alike.
+Finder _segment(String label) => find.descendant(
+      of: find.byWidgetPredicate((widget) => widget is SegmentedControl),
+      matching: find.text(label),
+    );
+
+/// A word inside the open sheet: the rule list behind it wears the same
+/// badges.
+Finder _inSheet(String label) => find.descendant(
+      of: find.byType(CommySheetSurface),
+      matching: find.text(label),
+    );
+
 void main() {
   final t = Translations();
 
@@ -126,15 +141,15 @@ void main() {
       (tester) async {
     await pumpScreen(tester);
 
-    expect(find.text(t.routing.mode.global), findsOneWidget);
-    expect(find.text(t.routing.mode.rules), findsOneWidget);
-    expect(find.text(t.routing.mode.direct), findsOneWidget);
+    expect(_segment(t.routing.mode.global), findsOneWidget);
+    expect(_segment(t.routing.mode.rules), findsOneWidget);
+    expect(_segment(t.routing.mode.direct), findsOneWidget);
 
-    await tester.tap(find.text(t.routing.mode.direct));
+    await tester.tap(_segment(t.routing.mode.direct));
     await tester.pumpAndSettle();
     expect(stored().mode, RoutingMode.direct);
 
-    await tester.tap(find.text(t.routing.mode.global));
+    await tester.tap(_segment(t.routing.mode.global));
     await tester.pumpAndSettle();
     expect(stored().mode, RoutingMode.global);
   });
@@ -168,7 +183,7 @@ void main() {
     await tester.tap(find.text(t.routing.addRule));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(CommyTextField), '  geosite:netflix  ');
-    await tester.tap(find.text(t.routing.action.block));
+    await tester.tap(_inSheet(t.routing.action.block));
     await tester.pumpAndSettle();
     await tester.tap(find.text(t.routing.newRule.save));
     await tester.pumpAndSettle();
@@ -319,7 +334,7 @@ void main() {
     );
 
     await tester.enterText(find.byType(CommyTextField), 'domain:example.com');
-    await tester.tap(find.text(t.routing.action.proxy));
+    await tester.tap(_inSheet(t.routing.action.proxy));
     await tester.pumpAndSettle();
     await tester.tap(find.text(t.routing.newRule.save));
     await tester.pumpAndSettle();
@@ -493,7 +508,7 @@ void main() {
 
     for (final entry in expected.entries) {
       final (segment, action, tag) = entry.value;
-      await tester.tap(find.text(segment));
+      await tester.tap(_segment(segment));
       await tester.pumpAndSettle();
 
       expect(stored().mode, entry.key);
@@ -517,7 +532,7 @@ void main() {
     // with nothing to disclose.
     expect(find.text(t.routing.inactive.body), findsNothing);
 
-    await tester.tap(find.text(t.routing.mode.global));
+    await tester.tap(_segment(t.routing.mode.global));
     await tester.pumpAndSettle();
 
     // The builder skips `activeRules` entirely outside Rules mode: the rule
@@ -530,7 +545,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(t.routing.dropped.title), findsNothing);
 
-    await tester.tap(find.text(t.routing.mode.direct));
+    await tester.tap(_segment(t.routing.mode.direct));
     await tester.pumpAndSettle();
     expect(find.text(t.routing.inactive.body), findsOneWidget);
   });
@@ -692,7 +707,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text(t.routing.mode.global));
+    await tester.tap(_segment(t.routing.mode.global));
     await tester.pumpAndSettle();
 
     // Global routing consults no rule, so nothing is missing. A row that kept

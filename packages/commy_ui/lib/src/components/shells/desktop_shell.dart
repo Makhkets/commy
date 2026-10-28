@@ -195,12 +195,12 @@ class _SidebarItem extends StatelessWidget {
       button: true,
       selected: isSelected,
       child: Material(
-        color: isSelected ? colors.accentWash : CommyColors.transparent,
-        borderRadius: radii.smAll,
+        color: isSelected ? colors.fill : CommyColors.transparent,
+        borderRadius: radii.controlAll,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onPressed,
-          borderRadius: radii.smAll,
+          borderRadius: radii.controlAll,
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: spacing.s3),
             child: ConstrainedBox(
@@ -220,9 +220,10 @@ class _SidebarItem extends StatelessWidget {
                       destination.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: context.typography.bodyStrong.copyWith(
-                        color: foreground,
-                      ),
+                      style: (isSelected
+                              ? context.typography.bodyStrong
+                              : context.typography.body)
+                          .copyWith(color: foreground),
                     ),
                   ),
                 ],

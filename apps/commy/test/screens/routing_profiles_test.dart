@@ -26,8 +26,7 @@ void main() {
   late CommyTestHarness harness;
 
   // A chip shows its label upper-cased.
-  Finder chip(String label) =>
-      find.widgetWithText(CommyChip, label.toUpperCase());
+  Finder chip(String label) => find.widgetWithText(CommyChip, label);
 
   Future<void> pumpScreen(WidgetTester tester) async {
     tester.view

@@ -43,7 +43,7 @@ void main() {
         await tester.sendKeyEvent(LogicalKeyboardKey.tab);
         await tester.pump();
 
-        expect(ringOf(tester, 'Добавить'), colors.borderStrong);
+        expect(ringOf(tester, 'Добавить'), colors.focusRing);
       });
     }
   }

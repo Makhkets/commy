@@ -1,10 +1,13 @@
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
 
-/// The uppercase label that names a group of rows.
+/// The label that names a group of rows.
 ///
-/// Matches the `РАЗДЕЛЫ` / `ПОДКЛЮЧЕНИЕ` headings in
-/// docs/design-refs/08-settings.png.
+/// Sentence case, `captionStrong`, `ink-2`, lined up with the text of the
+/// rows below it rather than with the card's edge — the way iOS sets a
+/// grouped list's header (docs/04-design-system.md §8). It used to be
+/// tracked-out capitals, which is one of the marks of a templated interface
+/// and heavy in Cyrillic.
 class SectionLabel extends StatelessWidget {
   /// Creates the label.
   const SectionLabel(this.text, {super.key});
@@ -17,15 +20,18 @@ class SectionLabel extends StatelessWidget {
     final spacing = context.spacing;
     return Padding(
       padding: EdgeInsetsDirectional.only(
-        start: spacing.s4,
+        start: spacing.s8,
         end: spacing.s4,
-        top: spacing.s5,
+        top: spacing.s6,
         bottom: spacing.s2,
       ),
-      child: Text(
-        text.toUpperCase(),
-        style: context.typography.label.copyWith(
-          color: context.colors.textTertiary,
+      child: Semantics(
+        header: true,
+        child: Text(
+          text,
+          style: context.typography.captionStrong.copyWith(
+            color: context.colors.textSecondary,
+          ),
         ),
       ),
     );
@@ -33,16 +39,26 @@ class SectionLabel extends StatelessWidget {
 }
 
 /// A rounded card that holds a run of [SettingsTile]s.
+///
+/// Rows inside have no corners of their own; the card is rounded and the
+/// rows are separated by hairlines that start at the text. Icons are drawn
+/// only in a section that [showsIcons] — a list of places to go, where a
+/// glyph helps find the right one. A section of switches has none: an icon
+/// beside every switch is decoration (docs/04-design-system.md §8, §13).
 class SettingsSection extends StatelessWidget {
   /// Creates the card.
   const SettingsSection({
     required this.children,
     this.tone = CommyTone.neutral,
+    this.showsIcons = false,
     super.key,
   });
 
   /// The rows.
   final List<Widget> children;
+
+  /// Whether the rows draw the icons they are given.
+  final bool showsIcons;
 
   /// Which wash the card sits on. Neutral means the plain surface.
   final CommyTone tone;
@@ -59,29 +75,51 @@ class SettingsSection extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: background,
-          borderRadius: context.radii.lgAll,
+          borderRadius: context.radii.cardAll,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            for (var index = 0; index < children.length; index++) ...<Widget>[
-              if (index > 0) const CommyDivider(indent: dividerIndent),
-              children[index],
+        child: _SectionIcons(
+          showsIcons: showsIcons,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              for (var index = 0; index < children.length; index++) ...<Widget>[
+                if (index > 0)
+                  CommyDivider(
+                    indent: showsIcons ? dividerIndent : spacing.s4,
+                  ),
+                children[index],
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  /// Lines the divider up with the text, not with the icon.
+  /// Lines the divider up with the text, not with the icon: the row's
+  /// padding, the icon and the gap after it — 16 + 20 + 12.
   ///
   /// Public because a long run of rows cannot go through this widget: a
   /// section builds all of its children at once, and the app list is
   /// hundreds of rows long. That list draws the same card and the same
   /// dividers from a lazy sliver, and it has to line them up identically.
-  static const double dividerIndent = 56;
+  static const double dividerIndent = 48;
+}
+
+/// Tells the rows of a section whether to draw their icons.
+class _SectionIcons extends InheritedWidget {
+  const _SectionIcons({required this.showsIcons, required super.child});
+
+  final bool showsIcons;
+
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_SectionIcons>()?.showsIcons ??
+      true;
+
+  @override
+  bool updateShouldNotify(_SectionIcons oldWidget) =>
+      oldWidget.showsIcons != showsIcons;
 }
 
 /// One row inside a [SettingsSection].
@@ -126,7 +164,9 @@ class SettingsTile extends StatelessWidget {
   /// Makes the row tappable and draws a chevron.
   final VoidCallback? onTap;
 
-  /// Renders [subtitle] in the monospace face, for hosts and versions.
+  /// Renders [subtitle] with tabular figures, for hosts and versions. Inter,
+  /// not monospace: the monospace face is for code only
+  /// (docs/04-design-system.md §3).
   final bool isMonospaceSubtitle;
 
   /// Whether this row is the chosen one of a set of mutually exclusive rows.
@@ -174,6 +214,8 @@ class SettingsTile extends StatelessWidget {
     final subtitleText = subtitle;
     final valueText = value;
     final control = trailing;
+    // Outside a section — a lone row — the icon is drawn as given.
+    final glyph = _SectionIcons.of(context) ? icon : null;
 
     final row = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: CommySizes.minTapTarget),
@@ -198,7 +240,7 @@ class SettingsTile extends StatelessWidget {
             // row read "Пер / еим / ено / вать". A value under the title
             // costs one line; a title spelled downwards costs the row.
             final fixed =
-                (icon == null ? 0.0 : CommySizes.iconControl + spacing.s3) +
+                (glyph == null ? 0.0 : CommySizes.iconControl + spacing.s3) +
                     (valueText == null ? 0.0 : spacing.s3) +
                     (onTap != null && control == null
                         ? CommySizes.iconControl + spacing.s2
@@ -218,11 +260,11 @@ class SettingsTile extends StatelessWidget {
 
             return Row(
               children: <Widget>[
-                if (icon != null) ...<Widget>[
+                if (glyph != null) ...<Widget>[
                   Icon(
-                    icon,
+                    glyph,
                     size: CommySizes.iconControl,
-                    color: colors.textSecondary,
+                    color: colors.textPrimary,
                   ),
                   SizedBox(width: spacing.s3),
                 ],
@@ -240,13 +282,15 @@ class SettingsTile extends StatelessWidget {
                         ),
                       ),
                       if (subtitleText != null) ...<Widget>[
-                        SizedBox(height: spacing.s1),
+                        SizedBox(height: spacing.s05),
                         Text(
                           subtitleText,
-                          style: (isMonospaceSubtitle
-                                  ? type.monoSmall
-                                  : type.caption)
-                              .copyWith(color: colors.textTertiary),
+                          style: type.caption.copyWith(
+                            color: colors.textSecondary,
+                            fontFeatures: isMonospaceSubtitle
+                                ? CommyTypography.tabular
+                                : null,
+                          ),
                         ),
                       ],
                       if (stackValue) ...<Widget>[

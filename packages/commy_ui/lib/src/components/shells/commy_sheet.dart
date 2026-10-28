@@ -15,6 +15,10 @@ import 'package:flutter/material.dart';
 /// The chrome — corner radius, handle, scrim, title — is [CommySheetSurface],
 /// which callers can also use directly when they need to embed the same
 /// treatment somewhere that is not a route.
+///
+/// A sheet rises on the `smooth` spring and leaves down the same path on the
+/// mirrored curve (docs/04-design-system.md §7.1: the way in is the way out);
+/// a finger that drags it hands its velocity to the fling.
 abstract final class CommySheet {
   /// Presents [builder] and completes with whatever the route was popped with.
   ///
@@ -47,6 +51,7 @@ abstract final class CommySheet {
       );
     }
 
+    final motion = context.motion;
     return showModalBottomSheet<T>(
       context: context,
       isDismissible: isDismissible,
@@ -56,6 +61,12 @@ abstract final class CommySheet {
       backgroundColor: CommyColors.transparent,
       barrierColor: colors.bgScrim,
       elevation: 0,
+      sheetAnimationStyle: AnimationStyle(
+        duration: motion.base,
+        reverseDuration: motion.fast,
+        curve: motion.springCurve,
+        reverseCurve: motion.springCurve.flipped,
+      ),
       builder: (context) => Padding(
         // The sheet rides above the keyboard. `isScrollControlled` lets a
         // sheet be as tall as it likes and leaves the insets to us; without
@@ -111,27 +122,30 @@ class CommySheetSurface extends StatelessWidget {
     final radii = context.radii;
     final heading = title;
 
+    final shadow = context.elevation.level2;
     final surface = DecoratedBox(
       decoration: BoxDecoration(
         color: colors.bgRaised,
-        borderRadius: isDialog ? radii.lgAll : radii.lgTop,
-        border: Border.all(color: colors.borderDefault),
-        boxShadow: context.elevation.level2,
+        borderRadius: isDialog ? radii.plateAll : radii.plateTop,
+        // A shadow in light; in dark, where a shadow does not read against
+        // the scrim, the hairline takes its place.
+        border: shadow.isEmpty ? Border.all(color: colors.borderSubtle) : null,
+        boxShadow: shadow,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           if (!isDialog && showHandle) ...<Widget>[
-            SizedBox(height: spacing.s2),
+            SizedBox(height: spacing.s15),
             Center(
               child: SizedBox(
                 width: CommySizes.sheetHandleWidth,
                 height: CommySizes.sheetHandleHeight,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.borderStrong,
-                    borderRadius: radii.fullAll,
+                    color: colors.fillStrong,
+                    borderRadius: radii.pillAll,
                   ),
                   child: const SizedBox.expand(),
                 ),

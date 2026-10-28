@@ -88,7 +88,7 @@ void main() {
     expect(line.textSpan?.style?.color, colors.textSecondary);
     expect(
       tester.widget<NodeTile>(find.byType(NodeTile)).descriptorLine,
-      'VLESS · Reality · TCP',
+      'VLESS, Reality, TCP',
     );
   });
 
@@ -126,7 +126,7 @@ void main() {
       ),
     );
     final ring = plate.foregroundDecoration! as BoxDecoration;
-    expect((ring.border! as Border).top.color, colors.borderStrong);
+    expect((ring.border! as Border).top.color, colors.focusRing);
     // The ink well itself never takes focus, so it never paints its fill.
     expect(
       tester.widget<InkWell>(find.byType(InkWell)).canRequestFocus,

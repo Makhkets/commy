@@ -73,6 +73,7 @@ class _Body extends ConsumerWidget {
       children: <Widget>[
         SectionLabel(t.settings.sections),
         SettingsSection(
+          showsIcons: true,
           children: <Widget>[
             SettingsTile(
               icon: CommyIcons.routing,
@@ -334,10 +335,13 @@ class _SilencePanel extends ConsumerWidget {
       children: <Widget>[
         Padding(
           padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          // A plain card, not a green one: green says "connected" and
+          // nothing else (docs/04-design-system.md §2). The promise is made
+          // by the words; the shield is the hint.
           child: Container(
             decoration: BoxDecoration(
-              color: colors.statusConnectedWash,
-              borderRadius: context.radii.lgAll,
+              color: colors.bgSurface,
+              borderRadius: context.radii.cardAll,
             ),
             padding: EdgeInsets.all(spacing.s4),
             child: Column(
@@ -349,7 +353,7 @@ class _SilencePanel extends ConsumerWidget {
                     Icon(
                       CommyIcons.proxy,
                       size: CommySizes.iconControl,
-                      color: colors.statusConnected,
+                      color: colors.textPrimary,
                     ),
                     SizedBox(width: spacing.s2),
                     // Flexible: at the largest system font the English title

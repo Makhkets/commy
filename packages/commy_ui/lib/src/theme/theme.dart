@@ -1,5 +1,4 @@
 import 'package:commy_ui/src/tokens/colors.dart';
-import 'package:commy_ui/src/tokens/connect_tokens.dart';
 import 'package:commy_ui/src/tokens/elevation.dart';
 import 'package:commy_ui/src/tokens/fonts.dart';
 import 'package:commy_ui/src/tokens/motion.dart';
@@ -24,7 +23,6 @@ abstract final class CommyTheme {
   static ThemeData get dark => _build(
         colors: CommyColors.dark,
         elevation: CommyElevation.dark,
-        connect: CommyConnectTokens.dark,
         tags: CommyTagColors.dark,
         brightness: Brightness.dark,
       );
@@ -33,7 +31,6 @@ abstract final class CommyTheme {
   static ThemeData get light => _build(
         colors: CommyColors.light,
         elevation: CommyElevation.light,
-        connect: CommyConnectTokens.light,
         tags: CommyTagColors.light,
         brightness: Brightness.light,
       );
@@ -62,7 +59,7 @@ abstract final class CommyTheme {
       bodySmall: type.caption,
       labelLarge: type.bodyStrong,
       labelMedium: type.captionStrong,
-      labelSmall: type.label,
+      labelSmall: type.footnote,
     ).apply(
       bodyColor: colors.textPrimary,
       displayColor: colors.textPrimary,
@@ -72,7 +69,6 @@ abstract final class CommyTheme {
   static ThemeData _build({
     required CommyColors colors,
     required CommyElevation elevation,
-    required CommyConnectTokens connect,
     required CommyTagColors tags,
     required Brightness brightness,
   }) {
@@ -86,8 +82,13 @@ abstract final class CommyTheme {
       fontFamily: CommyFonts.uiQualified,
       scaffoldBackgroundColor: colors.bgCanvas,
       canvasColor: colors.bgCanvas,
-      splashColor: colors.accentWash,
-      highlightColor: colors.accentWash,
+      // No ripple anywhere: a press answers the way an iOS row does, with the
+      // row turning grey under the finger for as long as it is held
+      // (docs/04-design-system.md §8). Our own controls add the 0.97 press
+      // scale on top; this covers the framework's InkWells.
+      splashFactory: NoSplash.splashFactory,
+      splashColor: CommyColors.transparent,
+      highlightColor: colors.fillStrong,
       hoverColor: colors.accentWash,
       dividerColor: colors.borderSubtle,
       textTheme: textTheme,
@@ -134,7 +135,6 @@ abstract final class CommyTheme {
       extensions: <ThemeExtension<dynamic>>[
         colors,
         elevation,
-        connect,
         tags,
         type,
         radii,

@@ -168,7 +168,9 @@ class _NoticeHostState extends ConsumerState<NoticeHost> {
     ];
     ToastMessenger.show(
       context,
-      message: parts.join(NodeTile.descriptorSeparator),
+      // Semicolons between the clauses: "the best" carries a comma of its
+      // own, and commas all the way through ran the sentence together.
+      message: parts.join('; '),
       tone: answered ? CommyTone.connected : CommyTone.error,
       icon: answered ? CommyIcons.success : CommyIcons.offline,
     );
