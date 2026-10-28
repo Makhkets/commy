@@ -22,7 +22,17 @@ void main() {
     container = ProviderContainer(overrides: harness.overrides());
     final handles = <ProviderSubscription<Object?>>[
       container.listen(coreStatusProvider, (_, __) {}),
-      container.listen(tunnelControllerProvider, (_, __) {}),
+      // What the toast host does in the app, and before the route hears of
+      // it: a notice is shown once and cleared at once. On a device this ran
+      // first and the route's internet stop never learnt the answer.
+      container.listen<TunnelActionState>(tunnelControllerProvider, (
+        previous,
+        next,
+      ) {
+        if (next.notice != null && next.notice != previous?.notice) {
+          container.read(tunnelControllerProvider.notifier).clearNotice();
+        }
+      }),
       container.listen(accessCheckProvider, (_, __) {}),
       container.listen(nodesProvider, (_, __) {}),
       container.listen(settingsProvider, (_, __) {}),
@@ -70,9 +80,9 @@ void main() {
     final answer = container.read(accessCheckProvider)!;
     expect(answer.passed, isTrue);
     expect(answer.milliseconds, isNotNull);
+    // The toast has had its notice, and cleared it.
+    expect(container.read(tunnelControllerProvider).notice, isNull);
 
-    // The toast host does this as soon as the toast is up.
-    tunnel().clearNotice();
     await pumpEventQueue();
     expect(container.read(accessCheckProvider), answer);
   });

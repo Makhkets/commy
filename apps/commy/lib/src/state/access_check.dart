@@ -42,36 +42,22 @@ final NotifierProvider<AccessCheckNotifier, AccessCheck?> accessCheckProvider =
   AccessCheckNotifier.new,
 );
 
-/// Keeps [AccessCheck] in step with the tunnel and its notices.
+/// Keeps [AccessCheck] in step with the tunnel.
+///
+/// It mirrors `TunnelActionState.lastCheck`, which the controller sets with
+/// every check's result and clears when a check starts, the server changes
+/// or the tunnel goes. It used to listen for the check's *notice* instead,
+/// and on a device the toast host cleared that notice before this notifier
+/// was told about it — the route's internet stop stayed blank after every
+/// check that the toast had just reported.
 class AccessCheckNotifier extends Notifier<AccessCheck?> {
   @override
   AccessCheck? build() {
     ref
-      ..listen<TunnelActionState>(tunnelControllerProvider, (previous, next) {
-        final notice = next.notice;
-        if (notice == null || notice == previous?.notice) {
-          return;
-        }
-        switch (notice.kind) {
-          case TunnelNoticeKind.checkPassed:
-          case TunnelNoticeKind.ipCheckFailed:
-            // The IP half is exception E-1 and optional; the access half
-            // passed either way.
-            state = AccessCheck(
-              passed: true,
-              milliseconds: notice.milliseconds,
-            );
-          case TunnelNoticeKind.checkFailed:
-            state = const AccessCheck(passed: false);
-          case TunnelNoticeKind.switched:
-          case TunnelNoticeKind.switchedToAuto:
-          case TunnelNoticeKind.failedOver:
-            // The answer was about the server traffic left.
-            state = null;
-          case TunnelNoticeKind.reloaded:
-            break;
-        }
-      })
+      ..listen<TunnelNotice?>(
+        tunnelControllerProvider.select((state) => state.lastCheck),
+        (previous, next) => state = _answerOf(next),
+      )
       ..listen<TunnelStatus>(tunnelStatusProvider, (previous, next) {
         final wasUp = previous is TunnelConnected || previous is TunnelChecking;
         final isUp = next is TunnelConnected || next is TunnelChecking;
@@ -79,6 +65,16 @@ class AccessCheckNotifier extends Notifier<AccessCheck?> {
           state = null;
         }
       });
-    return null;
+    return _answerOf(ref.read(tunnelControllerProvider).lastCheck);
   }
+
+  static AccessCheck? _answerOf(TunnelNotice? notice) => switch (notice?.kind) {
+        TunnelNoticeKind.checkPassed ||
+        TunnelNoticeKind.ipCheckFailed =>
+          // The IP half is exception E-1 and optional; the access half
+          // passed either way.
+          AccessCheck(passed: true, milliseconds: notice!.milliseconds),
+        TunnelNoticeKind.checkFailed => const AccessCheck(passed: false),
+        _ => null,
+      };
 }

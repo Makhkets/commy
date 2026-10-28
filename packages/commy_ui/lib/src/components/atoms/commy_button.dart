@@ -89,7 +89,11 @@ class CommyButton extends StatelessWidget {
     // Focus is a ring on the button's own edge, never the InkWell's 12 %
     // overlay: on a black or a white fill that overlay moved by 1.02:1, and
     // a keyboard user tabbing onto "Add" could not see that it was there.
+    // A node of its own: without the boundary a button merged into whatever
+    // text stood above it, and a screen reader heard "Not connected, Traffic
+    // goes direct, Connect" as one heading that was also a button.
     final button = Semantics(
+      container: true,
       button: true,
       enabled: isEnabled,
       label: semanticLabel,

@@ -122,15 +122,15 @@ class HeroArea extends ConsumerWidget {
               // screen reader hears them once, here, and the route's own
               // summary below carries the path.
               Semantics(
+                container: true,
                 header: true,
                 liveRegion: true,
-                child: AnimatedSwitcher(
-                  duration: context.motion.instant,
-                  child: Text(
-                    answer,
-                    key: ValueKey<String>(answer),
-                    style: type.display.copyWith(color: colors.textPrimary),
-                  ),
+                // Swapped, not cross-faded: during a fade the outgoing words
+                // stayed in the tree beside the new ones, and the live
+                // region could announce both.
+                child: Text(
+                  answer,
+                  style: type.display.copyWith(color: colors.textPrimary),
                 ),
               ),
               SizedBox(height: spacing.s1),
@@ -145,9 +145,12 @@ class HeroArea extends ConsumerWidget {
                   downlinkLabel: t.metrics.down,
                 )
               else
-                Text(
-                  _hint(connectState, t, hasServers: nodes.isNotEmpty),
-                  style: type.body.copyWith(color: colors.textSecondary),
+                Semantics(
+                  container: true,
+                  child: Text(
+                    _hint(connectState, t, hasServers: nodes.isNotEmpty),
+                    style: type.body.copyWith(color: colors.textSecondary),
+                  ),
                 ),
             ],
           ),
@@ -155,33 +158,32 @@ class HeroArea extends ConsumerWidget {
         SizedBox(height: spacing.s6),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: spacing.s4),
-          child: Semantics(
-            container: true,
-            label: t.route.summary(
+          child: ConnectionRoute(
+            semanticLabel: t.route.summary(
               device: t.route.device,
               server: serverName,
-              internet: t.route.internet,
+              internet: internetStatus == null
+                  ? t.route.internet
+                  : '${t.route.internet}: $internetStatus',
               state: answer,
             ),
-            child: ConnectionRoute(
-              state: connectState,
-              deviceLabel: t.route.device,
-              serverName: serverName,
-              internetLabel: t.route.internet,
-              flag: flag,
-              tags: tags,
-              latency: node?.latency,
-              onServerTap: hasChoice
-                  ? () => unawaited(NodePickerSheet.show(context))
-                  : null,
-              serverSemanticLabel: t.home.selectNode,
-              internetStatus: internetStatus,
-              internetTone: internetTone,
-              checkLabel: t.route.check,
-              onCheck: tunnelUp ? () => _check(ref) : null,
-              isChecking: isChecking,
-              breakAt: breakAt,
-            ),
+            state: connectState,
+            deviceLabel: t.route.device,
+            serverName: serverName,
+            internetLabel: t.route.internet,
+            flag: flag,
+            tags: tags,
+            latency: node?.latency,
+            onServerTap: hasChoice
+                ? () => unawaited(NodePickerSheet.show(context))
+                : null,
+            serverSemanticLabel: t.home.selectNode,
+            internetStatus: internetStatus,
+            internetTone: internetTone,
+            checkLabel: t.route.check,
+            onCheck: tunnelUp ? () => _check(ref) : null,
+            isChecking: isChecking,
+            breakAt: breakAt,
           ),
         ),
         SizedBox(height: spacing.s5),

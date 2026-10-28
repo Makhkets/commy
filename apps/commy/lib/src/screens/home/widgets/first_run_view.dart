@@ -84,22 +84,17 @@ class FirstRunView extends ConsumerWidget {
               // The product, shown before it is explained: a route whose
               // middle stop is still empty. Not interactive — there is
               // nothing to pick yet — and read out as one sentence.
-              Semantics(
-                container: true,
-                label: t.route.summary(
+              ConnectionRoute(
+                semanticLabel: t.route.summary(
                   device: t.route.device,
                   server: t.route.noServer,
                   internet: t.route.internet,
                   state: t.route.idle,
                 ),
-                child: ExcludeSemantics(
-                  child: ConnectionRoute(
-                    state: ConnectState.idle,
-                    deviceLabel: t.route.device,
-                    serverName: t.route.noServer,
-                    internetLabel: t.route.internet,
-                  ),
-                ),
+                state: ConnectState.idle,
+                deviceLabel: t.route.device,
+                serverName: t.route.noServer,
+                internetLabel: t.route.internet,
               ),
             ],
           ),

@@ -166,6 +166,46 @@ void main() {
       });
     }
 
+    // One node per thing to hear: the answer as a heading, the route as one
+    // sentence, and each control on its own. They used to merge into a
+    // single node that was a heading and a button at once.
+    testWidgets('the screen reader hears the answer and each control apart',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpHome(
+        tester,
+        status: TunnelStatus.connected(since: CommyTestHarness.now),
+      );
+      final t = Translations();
+
+      expect(
+        tester.getSemantics(find.text(t.route.connected)),
+        isSemantics(label: t.route.connected, isHeader: true),
+      );
+      expect(
+        tester.getSemantics(find.text(t.route.disconnect)),
+        isSemantics(label: t.route.disconnect, isButton: true),
+      );
+      expect(
+        tester.getSemantics(find.text(t.route.check)),
+        isSemantics(label: t.route.check, isButton: true),
+      );
+      // The route is one sentence, from this device to the internet.
+      final sentence = t.route.summary(
+        device: t.route.device,
+        server: t.home.noNodeSelected,
+        internet: t.route.internet,
+        state: '',
+      );
+      expect(
+        find.bySemanticsLabel(
+          RegExp('^${RegExp.escape(sentence.substring(0, 20))}'),
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
+    });
+
     testWidgets('idle draws the idle route and offers no check',
         (tester) async {
       await pumpHome(tester, status: const TunnelStatus.idle());

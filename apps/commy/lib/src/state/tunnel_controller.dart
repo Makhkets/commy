@@ -500,6 +500,7 @@ class TunnelActionState {
     this.isChecking = false,
     this.failure,
     this.notice,
+    this.lastCheck,
     this.lastConfig,
     this.rejectedConfig,
     this.configRefused = false,
@@ -522,6 +523,11 @@ class TunnelActionState {
 
   /// A one-line success message worth showing once, e.g. the check result.
   final TunnelNotice? notice;
+
+  /// What the last access check said — the same notice the toast shows,
+  /// kept after the toast has cleared [notice], for the route's internet
+  /// stop. `null` while a check runs and once the server changes.
+  final TunnelNotice? lastCheck;
 
   /// The configuration handed to the core on the last successful start.
   ///
@@ -565,11 +571,13 @@ class TunnelActionState {
     bool? isChecking,
     CommyFailure? failure,
     TunnelNotice? notice,
+    TunnelNotice? lastCheck,
     CoreConfig? lastConfig,
     CoreConfig? rejectedConfig,
     bool? configRefused,
     bool clearFailure = false,
     bool clearNotice = false,
+    bool clearLastCheck = false,
   }) {
     final failureChanges = clearFailure || failure != null;
     return TunnelActionState(
@@ -577,6 +585,7 @@ class TunnelActionState {
       isChecking: isChecking ?? this.isChecking,
       failure: clearFailure ? null : failure ?? this.failure,
       notice: clearNotice ? null : notice ?? this.notice,
+      lastCheck: clearLastCheck ? null : lastCheck ?? this.lastCheck,
       lastConfig: lastConfig ?? this.lastConfig,
       rejectedConfig: failureChanges ? rejectedConfig : this.rejectedConfig,
       configRefused:
@@ -592,6 +601,7 @@ class TunnelActionState {
           other.isChecking == isChecking &&
           other.failure == failure &&
           other.notice == notice &&
+          other.lastCheck == lastCheck &&
           other.lastConfig == lastConfig &&
           other.rejectedConfig == rejectedConfig &&
           other.configRefused == configRefused;
@@ -602,6 +612,7 @@ class TunnelActionState {
         isChecking,
         failure,
         notice,
+        lastCheck,
         lastConfig,
         rejectedConfig,
         configRefused,
@@ -732,6 +743,7 @@ class TunnelController extends Notifier<TunnelActionState> {
       isChecking: false,
       clearFailure: true,
       clearNotice: true,
+      clearLastCheck: true,
     );
     final logger = ref.read(appLoggerProvider)
       ..info('connect requested: ${_describe(target)}', tag: _tag);
@@ -803,6 +815,7 @@ class TunnelController extends Notifier<TunnelActionState> {
       isChecking: false,
       clearFailure: true,
       clearNotice: true,
+      clearLastCheck: true,
     );
     try {
       final result = await ref.read(disconnectUseCaseProvider)();
@@ -909,6 +922,7 @@ class TunnelController extends Notifier<TunnelActionState> {
           TunnelNoticeKind.switched,
           name: NodeLabel.of(node).text,
         ),
+        clearLastCheck: true,
       );
       return;
     }
@@ -929,6 +943,8 @@ class TunnelController extends Notifier<TunnelActionState> {
         TunnelNoticeKind.switched,
         name: NodeLabel.of(node).text,
       ),
+      // The answer was about the server traffic left.
+      clearLastCheck: true,
     );
   }
 
@@ -966,6 +982,7 @@ class TunnelController extends Notifier<TunnelActionState> {
     state = state.copyWith(
       clearFailure: true,
       notice: const TunnelNotice(TunnelNoticeKind.switchedToAuto),
+      clearLastCheck: true,
     );
   }
 
@@ -1057,6 +1074,7 @@ class TunnelController extends Notifier<TunnelActionState> {
       isChecking: true,
       clearNotice: true,
       clearFailure: true,
+      clearLastCheck: true,
     );
     final result = await ref.read(checkReachabilityUseCaseProvider)(
       outboundTag: tag,
@@ -1085,9 +1103,11 @@ class TunnelController extends Notifier<TunnelActionState> {
         'but the probe did not come back',
         tag: _tag,
       );
+      const notice = TunnelNotice(TunnelNoticeKind.checkFailed);
       state = state.copyWith(
         isChecking: false,
-        notice: const TunnelNotice(TunnelNoticeKind.checkFailed),
+        notice: notice,
+        lastCheck: notice,
       );
       return;
     }
@@ -1097,12 +1117,14 @@ class TunnelController extends Notifier<TunnelActionState> {
       tag: _tag,
     );
     if (!includeIp) {
+      final notice = TunnelNotice(
+        TunnelNoticeKind.checkPassed,
+        milliseconds: milliseconds,
+      );
       state = state.copyWith(
         isChecking: false,
-        notice: TunnelNotice(
-          TunnelNoticeKind.checkPassed,
-          milliseconds: milliseconds,
-        ),
+        notice: notice,
+        lastCheck: notice,
       );
       return;
     }
@@ -1115,22 +1137,26 @@ class TunnelController extends Notifier<TunnelActionState> {
     final ipFailure = ipResult.failureOrNull;
     if (ipFailure != null) {
       logger.warn('ip check failed: $ipFailure', tag: _tag);
+      final notice = TunnelNotice(
+        TunnelNoticeKind.ipCheckFailed,
+        milliseconds: milliseconds,
+      );
       state = state.copyWith(
         isChecking: false,
-        notice: TunnelNotice(
-          TunnelNoticeKind.ipCheckFailed,
-          milliseconds: milliseconds,
-        ),
+        notice: notice,
+        lastCheck: notice,
       );
       return;
     }
+    final notice = TunnelNotice(
+      TunnelNoticeKind.checkPassed,
+      milliseconds: milliseconds,
+      name: ipResult.valueOrNull?.label,
+    );
     state = state.copyWith(
       isChecking: false,
-      notice: TunnelNotice(
-        TunnelNoticeKind.checkPassed,
-        milliseconds: milliseconds,
-        name: ipResult.valueOrNull?.label,
-      ),
+      notice: notice,
+      lastCheck: notice,
     );
   }
 
@@ -1148,6 +1174,7 @@ class TunnelController extends Notifier<TunnelActionState> {
         TunnelNoticeKind.failedOver,
         name: NodeLabel.of(to).text,
       ),
+      clearLastCheck: true,
     );
   }
 

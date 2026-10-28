@@ -66,8 +66,15 @@ class ConnectionRoute extends StatefulWidget {
     this.onCheck,
     this.isChecking = false,
     this.breakAt,
+    this.semanticLabel,
     super.key,
   });
+
+  /// The route read out as one sentence — "Route: this device, Amsterdam 03,
+  /// the internet. Connected". The stops' words are then left out of the
+  /// tree, and only the two controls stay nodes of their own: the server
+  /// picker and the access check. Already translated.
+  final String? semanticLabel;
 
   /// The state of the tunnel the route draws.
   final ConnectState state;
@@ -285,6 +292,9 @@ class _ConnectionRouteState extends State<ConnectionRoute>
       type.body.fontSize! * type.body.height!,
     );
 
+    // Read as one sentence, the route keeps its plain words out of the tree
+    // so they are not heard twice; the two controls stay nodes of their own.
+    final quiet = widget.semanticLabel != null;
     final device = _RouteRow(
       stop: _device,
       isServer: false,
@@ -293,9 +303,12 @@ class _ConnectionRouteState extends State<ConnectionRoute>
       sweep: _sweep,
       child: Padding(
         padding: EdgeInsets.only(bottom: spacing.s4),
-        child: Text(
-          widget.deviceLabel,
-          style: type.body.copyWith(color: colors.textSecondary),
+        child: ExcludeSemantics(
+          excluding: quiet,
+          child: Text(
+            widget.deviceLabel,
+            style: type.body.copyWith(color: colors.textSecondary),
+          ),
         ),
       ),
     );
@@ -310,6 +323,8 @@ class _ConnectionRouteState extends State<ConnectionRoute>
       sweep: _sweep,
       onTap: widget.onServerTap,
       semanticLabel: widget.serverSemanticLabel,
+      value: widget.serverName,
+      quiet: quiet,
       child: Padding(
         padding: EdgeInsets.only(bottom: spacing.s4),
         child: Column(
@@ -362,24 +377,27 @@ class _ConnectionRouteState extends State<ConnectionRoute>
     final internetLine = hasCheck && firstLine < CommySizes.minTapTarget
         ? CommySizes.minTapTarget
         : firstLine;
-    final labels = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(
-          widget.internetLabel,
-          style: type.body.copyWith(color: colors.textSecondary),
-        ),
-        if (status != null)
+    final labels = ExcludeSemantics(
+      excluding: quiet,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
           Text(
-            status,
-            style: type.caption.copyWith(
-              color: widget.internetTone == CommyTone.neutral
-                  ? colors.textSecondary
-                  : widget.internetTone.foreground(colors),
-            ),
+            widget.internetLabel,
+            style: type.body.copyWith(color: colors.textSecondary),
           ),
-      ],
+          if (status != null)
+            Text(
+              status,
+              style: type.caption.copyWith(
+                color: widget.internetTone == CommyTone.neutral
+                    ? colors.textSecondary
+                    : widget.internetTone.foreground(colors),
+              ),
+            ),
+        ],
+      ),
     );
     final action = hasCheck
         ? _CheckAction(
@@ -434,7 +452,7 @@ class _ConnectionRouteState extends State<ConnectionRoute>
         final beside = action == null ||
             _CheckAction.widthOf(context, widget.checkLabel!) <=
                 content * _actionShare;
-        return Column(
+        final route = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -443,6 +461,11 @@ class _ConnectionRouteState extends State<ConnectionRoute>
             internetRow(actionBeside: beside),
           ],
         );
+        final sentence = widget.semanticLabel;
+        if (sentence == null) {
+          return route;
+        }
+        return Semantics(container: true, label: sentence, child: route);
       },
     );
   }
@@ -460,6 +483,8 @@ class _RouteRow extends StatelessWidget {
     this.legOut,
     this.onTap,
     this.semanticLabel,
+    this.value,
+    this.quiet = false,
   });
 
   final _Stop stop;
@@ -471,6 +496,14 @@ class _RouteRow extends StatelessWidget {
   final _Leg? legOut;
   final VoidCallback? onTap;
   final String? semanticLabel;
+
+  /// What a tappable stop is set to, read after its label: the server's
+  /// name after "Choose a server".
+  final String? value;
+
+  /// Whether the route is read as one sentence, so a stop with nothing to
+  /// press keeps its words out of the tree.
+  final bool quiet;
 
   @override
   Widget build(BuildContext context) {
@@ -499,11 +532,13 @@ class _RouteRow extends StatelessWidget {
 
     final tap = onTap;
     if (tap == null) {
-      return row;
+      return quiet ? ExcludeSemantics(child: row) : row;
     }
     return Semantics(
+      container: true,
       button: true,
       label: semanticLabel,
+      value: value,
       child: Material(
         type: MaterialType.transparency,
         borderRadius: context.radii.blockAll,
@@ -511,7 +546,9 @@ class _RouteRow extends StatelessWidget {
         child: InkWell(
           onTap: tap,
           borderRadius: context.radii.blockAll,
-          child: row,
+          // The button says its own label and value; the words inside it
+          // would repeat the name.
+          child: ExcludeSemantics(excluding: semanticLabel != null, child: row),
         ),
       ),
     );
@@ -782,6 +819,7 @@ class _CheckAction extends StatelessWidget {
     // The visible label is a line of text; the target around it is the 48 dp
     // floor, reaching up and down into the row's own padding.
     return Semantics(
+      container: true,
       button: true,
       enabled: onPressed != null,
       child: Material(

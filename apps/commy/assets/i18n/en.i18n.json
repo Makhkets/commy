@@ -551,7 +551,7 @@
       "appHint": "Theme, language, connection and checks, as after install",
       "appConfirm": {
         "title": "Reset app settings?",
-        "body": "Theme, language, auto connect, start on boot, checks and the other settings go back to their defaults. Servers, subscriptions, routing and DNS stay."
+        "body": "Theme, text size, language, auto connect, start on boot, checks and the other settings go back to their defaults. Servers, subscriptions, routing and DNS stay."
       },
       "appDone": "App settings reset",
       "confirm": "Reset",
