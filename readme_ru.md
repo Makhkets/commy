@@ -4,7 +4,46 @@
 
 [![CI](https://github.com/Makhkets/commy/actions/workflows/ci.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/ci.yml) [![Core](https://github.com/Makhkets/commy/actions/workflows/core.yml/badge.svg)](https://github.com/Makhkets/commy/actions/workflows/core.yml) [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/Makhkets/commy/blob/main/LICENSE) [![Status](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/Makhkets/commy/blob/main/docs/07-roadmap.md) [![sing-box](https://img.shields.io/badge/sing--box-v1.13.16-2FD98A.svg)](https://github.com/SagerNet/sing-box) [![Flutter](https://img.shields.io/badge/Flutter-3.44.8-0468D7.svg)](https://flutter.dev)
 
-Собрано из тех же экранов, что и в приложении. Интерфейс локализован: доступны русский и английский языки.
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="33%">
+<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy подключён: ответ наверху, маршрут от устройства через сервер в интернет и одна кнопка">
+</td>
+<td align="center" width="33%">
+<img src="docs/screenshots/home-connected-dark.png" width="250" alt="Тот же экран в тёмной теме">
+</td>
+<td align="center" width="33%">
+<img src="docs/screenshots/first-run-light.png" width="250" alt="Первый запуск: добавьте свой сервер; у маршрута пока пустая средняя остановка">
+</td>
+</tr>
+<tr>
+<td align="center"><sub><b>Маршрут.</b> Куда идёт трафик: это устройство, ваш сервер, интернет — сплошная линия, когда путь есть.</sub></td>
+<td align="center"><sub><b>Обе темы</b>, каждая нарочно: чистый чёрный под карточками, любой текст контрастнее 4.5:1.</sub></td>
+<td align="center"><sub><b>Первый запуск.</b> Пусто, пока вы не добавите сервер, — встроенных серверов нет.</sub></td>
+</tr>
+<tr>
+<td align="center" width="33%">
+<img src="docs/screenshots/diagnosis-dark.png" width="250" alt="Диагностика подключения: слои проверки — остановки той же линии, крестик там, где оборвалось">
+</td>
+<td align="center" width="33%">
+<img src="docs/screenshots/routing-light.png" width="250" alt="Маршрутизация: режим сегментами, правила сгруппированным списком">
+</td>
+<td align="center" width="33%">
+<img src="docs/screenshots/settings-dark.png" width="250" alt="Настройки сгруппированными списками">
+</td>
+</tr>
+<tr>
+<td align="center"><sub><b>Диагностика.</b> Та же линия через имя, порт, TLS и запрос — крестик на слое, который не прошёл.</sub></td>
+<td align="center"><sub><b>Маршрутизация.</b> Глобально, по правилам или напрямую; правила по важности.</sub></td>
+<td align="center"><sub><b>Настройки.</b> Каждый запрос, который Commy может сделать сам, перечислен и выключен, пока вы его не включите.</sub></td>
+</tr>
+</table>
+
+<sub>Собрано из тех же виджетов, что и приложение (<code>apps/commy/test/screenshots/capture_screenshots.dart</code>); телефон вокруг нарисован. Интерфейс на русском и английском. Дизайн — по принципам Apple: <a href="docs/04-design-system.md">docs/04-design-system.md</a>.</sub>
+
+</div>
 
 ---
 

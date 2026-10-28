@@ -72,7 +72,10 @@ GPS. `start`: `-no-window -gpu swiftshader_indirect -no-audio -no-boot-anim`.
 | `android-30;aosp_atd;x86_64` | Второй уровень API (Android 11: ветка `registerNetworkCallback` без `BestMatching`, нет разрешения на уведомления). Самый лёгкий из существующих: **грузится за 30 с**, 103 пакета против 248, без Google‑сервисов. Рутуется, есть `tcpdump`. И главное — **в нём есть сотовая сеть** (LTE на `eth0` рядом с Wi‑Fi на `wlan0`): настоящий переход Wi‑Fi ↔ мобильная проверяется только здесь. Doze в нём выключен |
 
 **Сборка под эмулятор** — релизная, но под x86_64 (быстрее трансляции и
-ничем не отличается логикой):
+ничем не отличается логикой). ARM-сборка через трансляцию ставится и
+рисуется, но **падает при подключении**: `SIGILL` в `libndk_translation`
+(`UndefinedInsnThunk`) на инструкции Go-ядра (сессия 26) — подключение
+проверять только на x64:
 
 ```bash
 cd apps/commy && fvm flutter build apk --release --target-platform android-x64

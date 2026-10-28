@@ -10,6 +10,24 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- **A new look, after Apple's design principles.** The main screen opens with
+  the answer — "Connected", "Not connected" — and draws the route your traffic
+  takes: this device, your server, the internet. A leg is dashed while there
+  is no path, travels while it is being built and is solid once it is there;
+  a cross marks where it broke. The server's stop picks the server, the
+  internet's stop checks access, and the one button says what it does
+  ("Connect", "Disconnect").
+- **The rest of the app follows.** Grouped lists with plain-case headings,
+  iOS-style switches and segments, sheets that rise on a spring, buttons that
+  give under the finger, a first run that shows the route before it explains
+  it, and the connection check drawn as the same line.
+- **Type and colour.** Inter with optical sizes, figures that do not jump,
+  Apple's grouped palette with text that clears contrast on every ground,
+  green only for what is done.
+- **Accessibility.** Text size (smaller, as the system, larger) and Reduce
+  motion in Appearance, on top of the system settings.
+- Smaller APK: one variable font instead of three static ones.
+
 ## [0.1.0-alpha.14]
 
 Installs over alpha.13.
