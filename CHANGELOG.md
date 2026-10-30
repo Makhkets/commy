@@ -10,6 +10,10 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+## [0.1.0-alpha.15]
+
+Installs over alpha.14.
+
 - **A new look, after Apple's design principles.** The main screen opens with
   the answer — "Connected", "Not connected" — and draws the route your traffic
   takes: this device, your server, the internet. A leg is dashed while there
@@ -816,7 +820,9 @@ ADRs rather than buried in commits:
   end-of-life; credentials now live in Keystore/Keychain through secure storage
   and the database holds metadata only.
 
-[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.13...main
+[Unreleased]: https://github.com/Makhkets/commy/compare/v0.1.0-alpha.15...main
+[0.1.0-alpha.15]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.15
+[0.1.0-alpha.14]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.14
 [0.1.0-alpha.13]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.13
 [0.1.0-alpha.12]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.12
 [0.1.0-alpha.11]: https://github.com/Makhkets/commy/releases/tag/v0.1.0-alpha.11
