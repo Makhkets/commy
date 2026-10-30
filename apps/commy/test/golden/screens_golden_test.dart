@@ -125,6 +125,48 @@ void main() {
     extra: <Override>[liveTraffic],
   );
 
+  // The route at rest: dashed legs, the chosen server at the middle stop,
+  // and the one action of the screen in the action fill (docs/04 §8).
+  screenGolden(
+    'home_idle',
+    screen: const HomeScreen(),
+    harness: () => CommyTestHarness(
+      nodes: nodes,
+      subscriptions: <Subscription>[subscription],
+    ),
+    seed: (harness) =>
+        harness.settingsRepository.writeSelectedNodeId('sub-1-1'),
+    status: const TunnelStatus.idle(),
+  );
+
+  // The route broken on the way to the server: the cross on the server's
+  // stop, the leg to it in the error fill, the banner with its ways out.
+  screenGolden(
+    'home_error',
+    screen: const HomeScreen(),
+    harness: () => CommyTestHarness(
+      nodes: nodes,
+      subscriptions: <Subscription>[subscription],
+    ),
+    seed: (harness) =>
+        harness.settingsRepository.writeSelectedNodeId('sub-1-1'),
+    status: const TunnelStatus.error(CoreCrashedFailure('core exited')),
+  );
+
+  // While the core comes up, with motion reduced: the first leg is half
+  // drawn and still, the server's stop a ring in the transition hue.
+  screenGolden(
+    'home_connecting',
+    screen: const HomeScreen(),
+    harness: () => CommyTestHarness(
+      nodes: nodes,
+      subscriptions: <Subscription>[subscription],
+    ),
+    seed: (harness) =>
+        harness.settingsRepository.writeSelectedNodeId('sub-1-1'),
+    status: const TunnelStatus.starting(),
+  );
+
   // A provider's signed move waiting for the user (ADR-0019): the question
   // sits at the top of the card, above the servers it may be about to
   // replace, with both addresses named.

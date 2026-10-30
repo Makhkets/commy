@@ -2,28 +2,30 @@ import 'dart:async';
 
 import 'package:commy/gen/strings.g.dart';
 import 'package:commy/src/screens/home/widgets/node_picker_sheet.dart';
+import 'package:commy/src/state/access_check.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/tunnel_controller.dart';
+import 'package:commy/src/widgets/node_descriptors.dart';
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/commy_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Everything above the server list: metrics, the button, the chosen server.
+/// Everything above the server list: the answer, the route, the one button.
 ///
-/// The order is fixed by docs/design-refs/02-home-idle.png and
-/// 03-home-connected.png — metrics strip, connect button, selected server,
-/// and, only while the tunnel is up, the check button left-aligned above the
-/// list. The check button appears rather than being disabled: there is nothing
-/// to check when there is no tunnel, and a permanently greyed control teaches
-/// people to ignore it.
+/// docs/04-design-system.md §8 and §9. The screen opens with the answer to
+/// the question it exists for — "Connected", "Not connected" — in the largest
+/// type in the product, and under it the line of fact that goes with it: the
+/// session clock and the rates while the tunnel is up, where traffic goes
+/// while it is not. Then the route, the signature: this device, the server,
+/// the internet, each leg dashed, travelling or solid. The server's stop is
+/// the server picker and the internet's stop carries the access check —
+/// each control beside what it acts on. Last, the one action of the screen,
+/// the full width of the column: "Connect" or "Disconnect", in words.
 ///
-/// The chosen-server chip opens [NodePickerSheet] at every width. It used to
-/// scroll the list on a phone and do nothing beside a list pane, on the
-/// argument that the rows were already on screen; the chevron it draws says
-/// "a list opens here", and the owner's verdict on a chevron that did not was
-/// that it is broken. It loses the chevron only when there is nothing to pick
-/// between.
+/// The picker opens at every width; it loses its chevron only when there is
+/// nothing to pick between.
 class HeroArea extends ConsumerWidget {
   /// Creates the area.
   const HeroArea({super.key});
@@ -32,132 +34,188 @@ class HeroArea extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = Translations.of(context);
     final spacing = context.spacing;
+    final colors = context.colors;
+    final type = context.typography;
     final status = ref.watch(tunnelStatusProvider);
+    final action = ref.watch(tunnelControllerProvider);
+    final access = ref.watch(accessCheckProvider);
     final connectState = ConnectState.of(status);
-    // On Auto the chip names the group and the server the group landed on,
-    // in that order: "Авто" alone would leave the one question this row
-    // exists to answer — through what? — unanswered for as long as the core
-    // keeps choosing.
+    // On Auto the stop names the server the group landed on, and says that
+    // the group chose it: "Auto" alone would leave the question this stop
+    // exists to answer — through what? — unanswered.
     final isAuto = ref.watch(autoSelectedProvider);
     final node =
         isAuto ? ref.watch(autoNodeProvider) : ref.watch(selectedNodeProvider);
     // The flag a panel typed into the name goes into the flag slot, exactly
     // as in the list below.
     final label = node == null ? null : NodeLabel.of(node);
-    final hasChoice = NodePickerSheet.isOffered(
-      ref.watch(nodesProvider).value ?? const <ProxyNode>[],
-    );
+    final nodes = ref.watch(nodesProvider).value ?? const <ProxyNode>[];
+    final hasChoice = NodePickerSheet.isOffered(nodes);
     final traffic = ref.watch(trafficProvider).value;
     final now = ref.watch(clockProvider).value ?? DateTime.now();
+    final isChecking = status is TunnelChecking || action.isChecking;
+    final checkFailed = access != null && !access.passed;
+
+    final serverName = node == null
+        ? (isAuto ? t.home.auto : t.home.noNodeSelected)
+        : label!.text;
+    final tags = <NodeTag>[
+      if (isAuto)
+        NodeTag(node == null ? t.route.autoWaiting : t.route.autoPicked),
+      if (!isAuto && node != null) ...NodeDescriptors.of(node),
+    ];
+    final flag = node == null
+        ? (isAuto
+            ? const CountryFlag(countryCode: CountryFlag.europeanUnion)
+            : null)
+        : CountryFlag(
+            countryCode: label!.countryCode,
+            semanticLabel: label.countryCode == null
+                ? null
+                : t.a11y.flag(country: label.countryCode!),
+          );
+
+    final String? internetStatus;
+    final CommyTone internetTone;
+    if (isChecking) {
+      internetStatus = t.route.checking;
+      internetTone = CommyTone.neutral;
+    } else if (connectState == ConnectState.connected && access != null) {
+      internetStatus = access.passed
+          ? t.route.online(ms: access.milliseconds ?? 0)
+          : t.route.noAnswer;
+      internetTone = access.passed ? CommyTone.connected : CommyTone.connecting;
+    } else {
+      internetStatus = null;
+      internetTone = CommyTone.neutral;
+    }
+
+    final failure = switch (status) {
+      TunnelError(:final failure) => failure,
+      _ => null,
+    };
+    final breakAt = failure != null
+        ? _breakOf(failure)
+        : checkFailed && connectState == ConnectState.connected
+            ? RouteBreak.internet
+            : null;
+
+    final answer = _answer(connectState, t);
+    final tunnelUp = connectState.isTunnelUp;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: spacing.s4,
-            vertical: spacing.s3,
+          padding: EdgeInsets.fromLTRB(
+            spacing.s4,
+            spacing.s2,
+            spacing.s4,
+            spacing.s0,
           ),
-          child: MetricsStrip(
-            uplink: traffic?.uplink ?? 0,
-            downlink: traffic?.downlink ?? 0,
-            session: _sessionOf(status, now),
-            isActive: connectState.isTunnelUp,
-            uplinkLabel: t.metrics.up,
-            sessionLabel: t.metrics.session,
-            downlinkLabel: t.metrics.down,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              // The words the route says, as the heading of the screen: a
+              // screen reader hears them once, here, and the route's own
+              // summary below carries the path.
+              Semantics(
+                container: true,
+                header: true,
+                liveRegion: true,
+                // Swapped, not cross-faded: during a fade the outgoing words
+                // stayed in the tree beside the new ones, and the live
+                // region could announce both.
+                child: Text(
+                  answer,
+                  style: type.display.copyWith(color: colors.textPrimary),
+                ),
+              ),
+              SizedBox(height: spacing.s1),
+              if (tunnelUp)
+                MetricsStrip(
+                  uplink: traffic?.uplink ?? 0,
+                  downlink: traffic?.downlink ?? 0,
+                  session: _sessionOf(status, now),
+                  isActive: true,
+                  uplinkLabel: t.metrics.up,
+                  sessionLabel: t.metrics.session,
+                  downlinkLabel: t.metrics.down,
+                )
+              else
+                Semantics(
+                  container: true,
+                  child: Text(
+                    _hint(connectState, t, hasServers: nodes.isNotEmpty),
+                    style: type.body.copyWith(color: colors.textSecondary),
+                  ),
+                ),
+            ],
           ),
         ),
-        SizedBox(height: spacing.s4),
-        Center(
-          child: ConnectButton(
+        SizedBox(height: spacing.s6),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          child: ConnectionRoute(
+            semanticLabel: t.route.summary(
+              device: t.route.device,
+              server: serverName,
+              internet: internetStatus == null
+                  ? t.route.internet
+                  : '${t.route.internet}: $internetStatus',
+              state: answer,
+            ),
             state: connectState,
-            semanticLabel: t.a11y.connect,
-            semanticValue: _statusLabel(connectState, t),
+            deviceLabel: t.route.device,
+            serverName: serverName,
+            internetLabel: t.route.internet,
+            flag: flag,
+            tags: tags,
+            latency: node?.latency,
+            onServerTap: hasChoice
+                ? () => unawaited(NodePickerSheet.show(context))
+                : null,
+            serverSemanticLabel: t.home.selectNode,
+            internetStatus: internetStatus,
+            internetTone: internetTone,
+            checkLabel: t.route.check,
+            onCheck: tunnelUp ? () => _check(ref) : null,
+            isChecking: isChecking,
+            breakAt: breakAt,
+          ),
+        ),
+        SizedBox(height: spacing.s5),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          child: _MainAction(
+            state: connectState,
             onPressed: () => _toggle(ref),
           ),
         ),
-        SizedBox(height: spacing.s3),
-        // The state in words, the way INCY spells it under its button: the
-        // ring alone told "checking" from "connected" and "starting" from
-        // "stopping" by colour and an arc (docs/05, "Доступность": status
-        // is colour + icon + text). Hidden from the screen reader, which
-        // already hears the same words as the button's value.
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
-          child: Center(
-            child: ExcludeSemantics(
-              child: StatusPill(
-                label: _statusLine(
-                  connectState,
-                  t,
-                  hasServers:
-                      (ref.watch(nodesProvider).value ?? const <ProxyNode>[])
-                          .isNotEmpty,
-                ),
-                tone: connectState.tone,
-                // Wraps rather than cuts: "Нажмите, чтобы подключиться" at
-                // 200 % does not fit a 360 dp phone or the side pane. Two
-                // lines are enough in Inter; three leave room for a wider
-                // system font.
-                maxLines: 3,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(height: spacing.s3),
-        SelectedNode(
-          name: _nodeLabel(t, isAuto: isAuto, name: label?.text),
-          semanticLabel: t.home.selectNode,
-          // Auto wears the flag it wears in the list below, whether or not
-          // the group has picked a server yet; the chip used to go without
-          // one until it had.
-          flag: isAuto
-              ? const CountryFlag(countryCode: CountryFlag.europeanUnion)
-              : label == null
-                  ? null
-                  : CountryFlag(
-                      countryCode: label.countryCode,
-                      semanticLabel: label.countryCode == null
-                          ? null
-                          : t.a11y.flag(country: label.countryCode!),
-                    ),
-          onTap:
-              hasChoice ? () => unawaited(NodePickerSheet.show(context)) : null,
-        ),
-        if (connectState.showsCheckButton) ...<Widget>[
-          SizedBox(height: spacing.s4),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: spacing.s4),
-            child: CheckButton(
-              label: t.connect.check,
-              isChecking: status is TunnelChecking,
-              onPressed: () => _check(ref),
-            ),
-          ),
-        ],
-        SizedBox(height: spacing.s4),
+        SizedBox(height: spacing.s6),
       ],
     );
   }
 
-  /// What the chip reads: the group, the group and its pick, or the server.
-  String _nodeLabel(
-    Translations t, {
-    required bool isAuto,
-    required String? name,
-  }) {
-    if (!isAuto) {
-      return name ?? t.home.noNodeSelected;
-    }
-    if (name == null) {
-      return t.home.auto;
-    }
-    return '${t.home.auto}${NodeTile.descriptorSeparator}$name';
-  }
+  /// Where the route broke, by what broke it.
+  ///
+  /// The device: the VPN permission was refused, or the helper that owns the
+  /// tunnel on a desktop is not there. Everything else that keeps a tunnel
+  /// from coming up — a configuration, a protocol, the core — happened on the
+  /// way to the server.
+  static RouteBreak _breakOf(CommyFailure failure) => switch (failure) {
+        PermissionDeniedFailure() ||
+        HelperUnavailableFailure() =>
+          RouteBreak.device,
+        _ => RouteBreak.server,
+      };
 
   void _toggle(WidgetRef ref) {
+    // The one tap that matters most gets the lightest tick, on the same
+    // frame the button sinks: cause and feel together (docs/04 §7).
+    unawaited(HapticFeedback.lightImpact());
     unawaited(ref.read(tunnelControllerProvider.notifier).toggle());
   }
 
@@ -181,32 +239,86 @@ class HeroArea extends ConsumerWidget {
           Duration.zero,
       };
 
-  /// The line under the button. At rest it says what a tap does rather than
-  /// "disconnected" — the ring already looks idle — unless a tap would do
-  /// nothing, with no server to connect to. A failure says "connection
-  /// error" rather than "could not connect": the same state follows a tunnel
-  /// that was up and dropped, which the user never tried to connect.
-  String _statusLine(
+  /// The answer: what the route says, in words.
+  ///
+  /// A tunnel being checked is already "Connected" — the route's last leg
+  /// says the check is still running — so the heading does not flicker
+  /// between two words the moment the probe comes back.
+  static String _answer(ConnectState state, Translations t) => switch (state) {
+        ConnectState.idle => t.route.idle,
+        ConnectState.starting => t.route.starting,
+        ConnectState.checking || ConnectState.connected => t.route.connected,
+        ConnectState.stopping => t.route.stopping,
+        ConnectState.error => t.route.error,
+      };
+
+  /// The line under the answer while the tunnel is down: where traffic goes
+  /// now, or what is happening. A failure explains itself in the banner
+  /// under the button, so the line stays quiet then.
+  static String _hint(
     ConnectState state,
     Translations t, {
     required bool hasServers,
   }) =>
       switch (state) {
-        ConnectState.idle => hasServers ? t.connect.hint : t.connect.noServers,
-        ConnectState.error => t.connect.failed,
-        ConnectState.starting ||
-        ConnectState.checking ||
-        ConnectState.connected ||
-        ConnectState.stopping =>
-          _statusLabel(state, t),
+        ConnectState.idle =>
+          hasServers ? t.route.idleHint : t.connect.noServers,
+        ConnectState.starting => t.route.startingHint,
+        ConnectState.error => t.route.idleHint,
+        ConnectState.stopping => t.route.idleHint,
+        ConnectState.checking || ConnectState.connected => '',
       };
+}
 
-  String _statusLabel(ConnectState state, Translations t) => switch (state) {
-        ConnectState.idle => t.connect.idle,
-        ConnectState.starting => t.connect.starting,
-        ConnectState.checking => t.connect.checking,
-        ConnectState.connected => t.connect.connected,
-        ConnectState.stopping => t.connect.stopping,
-        ConnectState.error => t.connect.error,
-      };
+/// The one action of the screen: "Connect" or "Disconnect", in words.
+///
+/// The verb names the result (docs/04 §12). Primary — the action fill — while
+/// it starts a connection; tinted while it ends one or calls one off, so the
+/// screen's loudest control is always the way *in*. Disconnecting shows a
+/// spinner and takes no tap until the core has let go.
+class _MainAction extends StatelessWidget {
+  const _MainAction({required this.state, required this.onPressed});
+
+  final ConnectState state;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Translations.of(context);
+    final (label, variant, icon, busy) = switch (state) {
+      ConnectState.idle || ConnectState.error => (
+          t.route.connect,
+          CommyButtonVariant.primary,
+          CommyIcons.power,
+          false,
+        ),
+      ConnectState.starting => (
+          t.route.cancel,
+          CommyButtonVariant.secondary,
+          CommyIcons.close,
+          false,
+        ),
+      ConnectState.checking || ConnectState.connected => (
+          t.route.disconnect,
+          CommyButtonVariant.secondary,
+          CommyIcons.power,
+          false,
+        ),
+      ConnectState.stopping => (
+          t.route.stopping,
+          CommyButtonVariant.secondary,
+          null,
+          true,
+        ),
+    };
+    return CommyButton(
+      label: label,
+      icon: icon,
+      variant: variant,
+      isLarge: true,
+      isFullWidth: true,
+      isLoading: busy,
+      onPressed: onPressed,
+    );
+  }
 }

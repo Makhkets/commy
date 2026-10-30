@@ -5,22 +5,21 @@ import 'package:commy_ui/src/util/byte_format.dart';
 import 'package:commy_ui/src/util/duration_format.dart';
 import 'package:flutter/material.dart';
 
-/// Upload, session length and download — one line above the connect button.
+/// Session length, download and upload — the line under the answer at the
+/// top of the main screen, while the tunnel is up.
 ///
-/// The big timer that used to sit inside the ring is gone on purpose: those
-/// digits change once a second, and at 44 dp they turn a calm screen into an
-/// instrument panel. Here they are `Mono/Strong` with tabular figures, where
-/// a changing digit does not move anything around it.
+/// Quiet on purpose: `numericBody` — Inter with tabular figures, so a digit
+/// that changes once a second moves nothing around it — in `ink-2`, starting
+/// at the leading edge under the answer it belongs to. Digits that tick at
+/// 44 dp turn a calm screen into an instrument panel; here they are a line of
+/// fact under "Connected".
 ///
-/// While nothing is connected the row shows zeros in `text/disabled` rather
-/// than hiding: it must not jump the moment the tunnel comes up.
+/// While nothing is connected the row shows zeros in `ink-disabled` rather
+/// than hiding, for a caller that keeps it on screen.
 ///
-/// At large text scales the three readouts reflow onto a second line instead
-/// of overflowing. Which of them moves is decided here rather than left to a
-/// [Wrap]: the up and down rates are read as a pair, and a plain wrap broke
-/// exactly that pair — at 1.6x it produced "↑ 384 KB/s ⏱ 00:42:00" on one
-/// line and a lone "↓ 3.0 MB/s" under it, so the two halves of one answer
-/// were separated by the clock. The clock is the one that moves now.
+/// At large text scales the readouts reflow instead of overflowing, and the
+/// down and up rates stay together as a pair: a plain wrap once split them
+/// across the clock. The clock keeps the first line.
 class MetricsStrip extends StatelessWidget {
   /// Creates a metrics strip.
   ///
@@ -64,7 +63,7 @@ class MetricsStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final spacing = context.spacing;
     final color =
-        isActive ? context.colors.textPrimary : context.colors.textDisabled;
+        isActive ? context.colors.textSecondary : context.colors.textDisabled;
 
     final up = _Metric(
       icon: CommyIcons.arrowUp,
@@ -99,34 +98,28 @@ class MetricsStrip extends StatelessWidget {
         final downWidth = _widthOf(context, down.value);
         final gap = spacing.s4;
 
-        // Everything on one line: the original `Wrap`, unchanged, because
-        // it is the only one of the two that shrinks to its content when the
-        // parent hands it loose constraints — a `Row` would have spread the
-        // three readouts to the edges of whatever it was given, which is a
-        // different picture in every golden that measures this component.
+        // Everything on one line, from the leading edge.
         if (upWidth + clockWidth + downWidth + gap * 2 <= available) {
           return Wrap(
-            alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: gap,
             runSpacing: spacing.s1,
-            children: <Widget>[up, clock, down],
+            children: <Widget>[clock, down, up],
           );
         }
-        // The pair holds the line and the clock drops below it.
+        // The clock keeps the first line, the pair takes the second.
         if (upWidth + downWidth + gap <= available) {
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              clock,
+              SizedBox(height: spacing.s1),
               Wrap(
-                alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: gap,
-                children: <Widget>[up, down],
+                children: <Widget>[down, up],
               ),
-              SizedBox(height: spacing.s1),
-              Align(child: clock),
             ],
           );
         }
@@ -135,11 +128,11 @@ class MetricsStrip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            up,
+            clock,
             SizedBox(height: spacing.s1),
             down,
             SizedBox(height: spacing.s1),
-            clock,
+            up,
           ],
         );
       },
@@ -150,7 +143,7 @@ class MetricsStrip extends StatelessWidget {
   /// with the style and the text scale it will actually be drawn with.
   double _widthOf(BuildContext context, String value) {
     final painter = TextPainter(
-      text: TextSpan(text: value, style: context.typography.monoStrong),
+      text: TextSpan(text: value, style: context.typography.numericBody),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
       maxLines: 1,
@@ -185,7 +178,7 @@ class _Metric extends StatelessWidget {
         Text(
           value,
           maxLines: 1,
-          style: context.typography.monoStrong.copyWith(color: color),
+          style: context.typography.numericBody.copyWith(color: color),
         ),
       ],
     );

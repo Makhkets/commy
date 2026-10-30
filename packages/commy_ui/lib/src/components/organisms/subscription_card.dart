@@ -7,6 +7,7 @@ import 'package:commy_ui/src/components/commy_tone.dart';
 import 'package:commy_ui/src/components/molecules/quota_bar.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
+import 'package:commy_ui/src/tokens/typography.dart';
 import 'package:flutter/material.dart';
 
 /// How healthy a subscription is, as the leading glyph of the card shows it.
@@ -23,9 +24,11 @@ enum SubscriptionHealth {
   /// The last refresh failed, or the subscription has run out.
   error;
 
-  /// Meaning this state carries.
+  /// Meaning this state carries. A healthy subscription is neutral: green on
+  /// the main screen belongs to the route alone, and a card that is merely
+  /// fine has nothing to say in colour.
   CommyTone get tone => switch (this) {
-        SubscriptionHealth.ok => CommyTone.connected,
+        SubscriptionHealth.ok => CommyTone.neutral,
         SubscriptionHealth.warning => CommyTone.connecting,
         SubscriptionHealth.error => CommyTone.error,
       };
@@ -66,11 +69,12 @@ class SubscriptionCardLink {
 /// A subscription and its nodes, as one card.
 ///
 /// This is the single most important structural decision on the main screen
-/// (docs/05-ux-flows.md, scenario 4): the header sits on `bg/group-header`,
-/// the node rows on `bg/surface`, and that step in background is the only
-/// thing tying a subscription to its servers. Split into a card per node and
-/// the list reads as unrelated blocks — nobody can tell which server belongs
-/// to which subscription, and the whole screen stops making sense.
+/// (docs/05-ux-flows.md, scenario 4): one card holds the subscription and
+/// its servers, the header above a hairline and the rows below it. Split
+/// into a card per node and the list reads as unrelated blocks — nobody can
+/// tell which server belongs to which subscription. The card is `surface` on
+/// the canvas with the `card` corner and nothing else: no border, no shadow
+/// (docs/04-design-system.md §5).
 ///
 /// The header carries **exactly three** actions: refresh, ping every node,
 /// and an overflow menu. The first two are pressed often, so they are
@@ -203,9 +207,7 @@ class SubscriptionCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: colors.bgSurface,
-        borderRadius: radii.mdAll,
-        border: Border.all(color: colors.borderSubtle),
-        boxShadow: context.elevation.level1,
+        borderRadius: radii.cardAll,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -231,11 +233,11 @@ class SubscriptionCard extends StatelessWidget {
             onMore: onMore,
           ),
           for (var index = 0; index < status.length; index++) ...<Widget>[
-            if (index > 0) const CommyDivider(),
+            CommyDivider(indent: spacing.s4),
             status[index],
           ],
           if (shown.isNotEmpty) ...<Widget>[
-            if (status.isNotEmpty) const CommyDivider(),
+            CommyDivider(indent: spacing.s4),
             Padding(
               padding: EdgeInsets.symmetric(vertical: spacing.s1),
               child: Column(
@@ -250,8 +252,8 @@ class SubscriptionCard extends StatelessWidget {
   }
 }
 
-/// Everything standing on `bg/group-header`: title, actions, quota, the
-/// admin's own line and the footer of links.
+/// Everything above the servers: title, actions, quota, the admin's own line
+/// and the footer of links.
 class _Header extends StatelessWidget {
   const _Header({
     required this.name,
@@ -304,8 +306,8 @@ class _Header extends StatelessWidget {
     final note = announcement;
     final hasLabels = volume != null || expiry != null;
 
-    return ColoredBox(
-      color: colors.bgGroupHeader,
+    return Material(
+      type: MaterialType.transparency,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
@@ -313,7 +315,7 @@ class _Header extends StatelessWidget {
             padding: EdgeInsetsDirectional.only(
               start: spacing.s4,
               top: spacing.s2,
-              end: spacing.s2,
+              end: spacing.s1,
             ),
             child: Row(
               children: <Widget>[
@@ -409,8 +411,9 @@ class _Header extends StatelessWidget {
                       volume ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: type.bodyStrong.copyWith(
+                      style: type.captionStrong.copyWith(
                         color: colors.textPrimary,
+                        fontFeatures: CommyTypography.tabular,
                       ),
                     ),
                   ),
@@ -438,7 +441,7 @@ class _Header extends StatelessWidget {
           else
             SizedBox(height: spacing.s3),
           if (links.isNotEmpty) ...<Widget>[
-            const CommyDivider(),
+            CommyDivider(indent: spacing.s4),
             Row(
               children: <Widget>[
                 for (final link in links)
@@ -564,9 +567,9 @@ class _AnnouncementState extends State<_Announcement> {
                 bottom: spacing.s3,
               ),
               // No `minHeight` here, and not for want of the rule: two lines
-              // of `monoSmall` plus this padding clear the 48pt floor on
+              // of `caption` plus this padding clear the 48 dp floor on
               // their own, and a constraint on top of that only padded the
-              // card with air. Measured: 388x52.
+              // card with air.
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -580,11 +583,11 @@ class _AnnouncementState extends State<_Announcement> {
                       maxLines: _expanded ? null : 2,
                       overflow:
                           _expanded ? TextOverflow.clip : TextOverflow.ellipsis,
-                      // Secondary, not tertiary: this is 11 px, and the
-                      // tertiary step is for 13 px and up. It is also the
-                      // one line the panel's admin gets to say anything —
-                      // often where the support contact is.
-                      style: context.typography.monoSmall
+                      // Secondary: it is the one line the panel's admin gets
+                      // to say anything — often where the support contact
+                      // is. Inter, not the monospace it used to be: this is
+                      // words, not code (docs/04-design-system.md §3).
+                      style: context.typography.caption
                           .copyWith(color: colors.textSecondary),
                     ),
                   ),

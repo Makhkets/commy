@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Commy",
-    "wordmark": "COMMY"
+    "wordmark": "Commy"
   },
 
   "connect": {
@@ -18,6 +18,30 @@
     "hint": "Tap to connect",
     "failed": "Connection error",
     "noServers": "No servers to connect to"
+  },
+
+  "route": {
+    "idle": "Not connected",
+    "idleHint": "Traffic goes direct",
+    "starting": "Connecting…",
+    "startingHint": "Reaching the server",
+    "connected": "Connected",
+    "stopping": "Disconnecting…",
+    "error": "Connection error",
+    "device": "This device",
+    "internet": "Internet",
+    "checking": "Checking access…",
+    "online": "Online, $ms\u00a0ms",
+    "noAnswer": "No answer through the server",
+    "check": "Check access",
+    "autoPicked": "Auto: the quickest",
+    "autoWaiting": "Auto: picked when you connect",
+    "noServer": "No server added",
+    "ways": "Ways to add one",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "cancel": "Cancel",
+    "summary": "Route: $device, $server, $internet. $state"
   },
 
   "time": {
@@ -37,14 +61,14 @@
   "home": {
     "title": "Home",
     "empty": {
-      "title": "No servers yet",
-      "body": "Commy stays empty until you import something. We run no servers of our own and sell none.",
-      "paste": "Paste a link",
+      "title": "Add your server",
+      "body": "Commy connects only to your servers — it has none of its own and never will. Your provider gives you a subscription link, a QR code or a file.",
+      "paste": "Paste from the clipboard",
       "pasteAndConnect": "Paste and connect",
       "clipboardFound": "A link was found in the clipboard",
-      "subscription": "Subscription",
-      "scan": "QR code",
-      "file": "File"
+      "subscription": "Add a subscription",
+      "scan": "Scan a QR code",
+      "file": "Open a file"
     },
     "selectNode": "Choose a server",
     "noNodeSelected": "No server selected",
@@ -65,10 +89,10 @@
       "latency": "By latency",
       "name": "By name"
     },
-    "checkOk": "Access confirmed: $ms ms",
+    "checkOk": "Access confirmed: $ms\u00a0ms",
     "checkFailed": "The check did not pass",
-    "checkOkWithIp": "Access confirmed: $ms ms · $ip",
-    "ipCheckFailed": "Access confirmed: $ms ms · the IP check did not answer",
+    "checkOkWithIp": "Access confirmed, $ms\u00a0ms, IP $ip",
+    "ipCheckFailed": "Access confirmed, $ms\u00a0ms, the IP check did not answer",
     "switched": "Switched to $name",
     "switchedToAuto": "The server is now chosen automatically",
     "failedOver": "The server stopped answering — switched to $name",
@@ -83,7 +107,7 @@
         "one": "$count of $total answered",
         "other": "$count of $total answered"
       },
-      "best": "best: $name, $ms ms",
+      "best": "best: $name, $ms\u00a0ms",
       "noneAnswered(plural, param=count)": {
         "one": "$count server did not answer",
         "other": "None of the $count servers answered"
@@ -92,7 +116,7 @@
         "one": "$count UDP server skipped",
         "other": "$count UDP servers skipped"
       },
-      "single": "$name — $ms ms",
+      "single": "$name — $ms\u00a0ms",
       "singleSilent": "$name did not answer"
     }
   },
@@ -190,7 +214,7 @@
     "never": "never refreshed",
     "quota": "$used of $total",
     "unlimited": "unlimited",
-    "usedUnlimited": "$used · unlimited",
+    "usedUnlimited": "$used, unlimited",
     "daysLeft": "$count left",
     "days": "$count d",
     "expired": "expired",
@@ -256,12 +280,12 @@
     "deviceIdOff": "Sending the device identifier (HWID) is off, and a panel that limits devices answers like this without it.",
     "sendDeviceId": "Turn it on and refresh",
     "noServers": "This subscription has no servers yet",
-    "autoRefreshed": "Subscription “$name” refreshed · $nodes",
+    "autoRefreshed": "Subscription “$name” refreshed: $nodes",
     "autoRefreshFailed": "Subscription “$name” was not refreshed",
     "recovery": {
       "title": "Address recovery",
-      "status": "Provider key pinned · mirrors: $mirrors",
-      "statusPoint": "Provider key pinned · mirrors: $mirrors · checked at: $host",
+      "status": "Provider key pinned, mirrors: $mirrors",
+      "statusPoint": "Provider key pinned, mirrors: $mirrors, checked at: $host",
       "off": "Off: if the address is blocked, the subscription will not move by itself",
       "changedTitle": "Your provider moved this subscription",
       "changedBody": "$name: $from → $to. The provider's signature checks out.",
@@ -276,7 +300,7 @@
   },
 
   "node": {
-    "latency": "$ms ms",
+    "latency": "$ms\u00a0ms",
     "notMeasured": "—",
     "unreachable": "Unreachable",
     "auto": "Auto",
@@ -308,7 +332,7 @@
     "onDisk": "On disk",
     "download": "Download",
     "update": "Update",
-    "size": "$size · $age old",
+    "size": "$size, $age old",
     "missing": "Not downloaded",
     "unused": "No rule needs it",
     "noneNeeded": "Your rules need no lists",
@@ -401,13 +425,13 @@
     "routingSubtitle": "Mode, rules, apps, DNS",
     "routingModeRules": "Rule-based",
     "routingValue(plural, param=count)": {
-      "one": "$mode · $count rule",
-      "other": "$mode · $count rules"
+      "one": "$mode, $count rule",
+      "other": "$mode, $count rules"
     },
     "diagnostics": "Diagnostics",
     "diagnosticsSubtitle": "Logs, connections, config, statistics",
     "appearance": "Appearance",
-    "appearanceSubtitle": "Theme and language",
+    "appearanceSubtitle": "Theme, text size, motion, language",
     "about": "About",
     "aboutSubtitle": "Version, core, licences",
     "silence": {
@@ -481,7 +505,7 @@
         "open": "Open"
       },
       "fileTitle": "Save a Commy backup",
-      "saved": "Backup saved · $contents",
+      "saved": "Backup saved: $contents",
       "notSaved": "Backup not saved",
       "subscriptions(plural, param=count)": {
         "zero": "no subscriptions",
@@ -504,7 +528,7 @@
         "confirm": "Replace",
         "cancel": "Cancel"
       },
-      "restored": "Restored · $contents",
+      "restored": "Restored: $contents",
       "ruleSetsMissing": "Rule sets are not part of a backup — download them again",
       "ruleSetsAction": "Open",
       "perAppDropped": "The app list was made on another system — it is turned off",
@@ -527,7 +551,7 @@
       "appHint": "Theme, language, connection and checks, as after install",
       "appConfirm": {
         "title": "Reset app settings?",
-        "body": "Theme, language, auto connect, start on boot, checks and the other settings go back to their defaults. Servers, subscriptions, routing and DNS stay."
+        "body": "Theme, text size, language, auto connect, start on boot, checks and the other settings go back to their defaults. Servers, subscriptions, routing and DNS stay."
       },
       "appDone": "App settings reset",
       "confirm": "Reset",
@@ -544,7 +568,7 @@
       "direct": "Direct"
     },
     "rules": "Rules",
-    "rulesHint": "Rules · order = priority",
+    "rulesHint": "Rules by priority",
     "inactive": {
       "body": "These rules are not in force right now: only Rules mode reads them.",
       "action": "Switch to Rules"
@@ -578,7 +602,7 @@
     "ruleSetsHintAuto": "Downloaded when you tap, and $interval",
     "ruleSetsValue": "$have of $need",
     "dns": "DNS",
-    "dnsValue": "$remote · $strategy",
+    "dnsValue": "$remote, $strategy",
     "bypassLan": "LAN bypasses the proxy",
     "blockAds": "Block ads",
     "newRule": {
@@ -628,9 +652,9 @@
     "export": "Export to a file",
     "clear": "Clear",
     "redactionNotice": "UUIDs, passwords and subscription links are stripped automatically when copying and exporting.",
-    "levelAll": "ALL",
+    "levelAll": "All",
     "logsEmpty": "No logs yet",
-    "toLatest": "Latest · $count",
+    "toLatest": "Latest: $count",
     "toLatestHint": "Scroll to the latest lines",
     "logsEmptyBody": "The core writes here while the tunnel runs. Connect and the lines will appear.",
     "logsFiltered": "Nothing matches",
@@ -654,7 +678,7 @@
     "statsDown": "Downloaded",
     "statsTotal": "Session total",
     "statsDays": "By day",
-    "statsDayDetail": "Sent $up · received $down",
+    "statsDayDetail": "Sent $up, received $down",
     "exportWarning": {
       "title": "Export the logs?",
       "body": "Credentials, subscription links and full addresses are stripped before saving. Read the file before sending it anywhere.",
@@ -672,7 +696,14 @@
     "language": "Language",
     "languageSystem": "Match system",
     "languageRu": "Русский",
-    "languageEn": "English"
+    "languageEn": "English",
+    "textSize": "Text size",
+    "textSmall": "Smaller",
+    "textMedium": "Match system",
+    "textLarge": "Larger",
+    "motion": "Motion",
+    "reduceMotion": "Reduce motion",
+    "reduceMotionHint": "No springs or travelling highlights, only colour changes. The system setting applies either way"
   },
 
   "about": {
@@ -801,7 +832,7 @@
       "proxy": "Request through the server"
     },
     "skipped": "not needed",
-    "ms": "$ms ms",
+    "ms": "$ms\u00a0ms",
     "verdict": {
       "running": "Checking…",
       "works": "The server works from here",

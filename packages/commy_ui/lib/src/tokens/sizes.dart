@@ -24,6 +24,10 @@ abstract final class CommySizes {
   /// Height of a standard button — 44.
   static const double buttonHeight = 44;
 
+  /// Height of the one main action of a screen — 52. "Connect" on the main
+  /// screen; nothing else is that large.
+  static const double buttonHeightLarge = 52;
+
   /// Height of a compact button, used inside dense rows — 36.
   static const double buttonHeightSmall = 36;
 
@@ -32,6 +36,23 @@ abstract final class CommySizes {
 
   /// Height of a single-line text field — 48.
   static const double fieldHeight = 48;
+
+  /// Height of the search field — 44, the iOS search bar's.
+  static const double searchHeight = 44;
+
+  /// Height of the segmented control's track — 36. Its segments keep their
+  /// taps up to [minTapTarget] through transparent margin.
+  static const double segmentedHeight = 36;
+
+  /// Inset of the segmented control's thumb inside its track — 2.
+  static const double segmentedInset = 2;
+
+  /// How far a pressed control shrinks — to 97 %. docs/04 §7.1.
+  static const double pressScale = 0.97;
+
+  /// Opacity of a control that cannot be used — the switch and the segments
+  /// fade as a whole, the way iOS shows it.
+  static const double disabledOpacity = 0.4;
 
   /// Hairline border — 1.
   static const double borderThin = 1;
@@ -43,26 +64,29 @@ abstract final class CommySizes {
   /// control that has keyboard focus — 2.
   static const double borderThick = 2;
 
-  /// Switch track width — 44.
-  static const double switchWidth = 44;
+  /// Switch track width — 51, the iOS switch's.
+  static const double switchWidth = 51;
 
-  /// Switch track height — 26.
-  static const double switchHeight = 26;
+  /// Switch track height — 31.
+  static const double switchHeight = 31;
 
-  /// Switch thumb diameter — 20.
-  static const double switchThumb = 20;
+  /// Switch thumb diameter — 27.
+  static const double switchThumb = 27;
 
-  /// Inset of the thumb inside the track — 3.
-  static const double switchPadding = 3;
+  /// Width the thumb stretches to while it is pressed — 33, as iOS does it.
+  static const double switchThumbPressed = 33;
 
-  /// Checkbox side — 20.
-  static const double checkboxSize = 20;
+  /// Inset of the thumb inside the track — 2.
+  static const double switchPadding = 2;
 
-  /// Radio outer diameter — 20.
-  static const double radioSize = 20;
+  /// Checkbox side — 22.
+  static const double checkboxSize = 22;
 
-  /// Radio inner dot diameter — 8.
-  static const double radioDot = 8;
+  /// Radio outer diameter — 22.
+  static const double radioSize = 22;
+
+  /// Radio inner dot diameter — 10.
+  static const double radioDot = 10;
 
   /// Status dot inside a pill — 8.
   static const double statusDot = 8;
@@ -85,8 +109,8 @@ abstract final class CommySizes {
   /// How many bars a latency badge draws — 3.
   static const int latencyBarCount = 3;
 
-  /// Height of the quota track — 6.
-  static const double quotaBarHeight = 6;
+  /// Height of the quota track — 4.
+  static const double quotaBarHeight = 4;
 
   /// Divider thickness — 1.
   static const double dividerThickness = 1;
@@ -134,8 +158,8 @@ abstract final class CommySizes {
   /// Width of the drag handle at the top of a bottom sheet — 36.
   static const double sheetHandleWidth = 36;
 
-  /// Height of that handle — 4.
-  static const double sheetHandleHeight = 4;
+  /// Height of that handle — 5.
+  static const double sheetHandleHeight = 5;
 
   /// Widest a dialog gets on desktop — 480.
   static const double dialogMaxWidth = 480;
@@ -157,4 +181,37 @@ abstract final class CommySizes {
 
   /// Height of a full-width progress or shimmer band — 8.
   static const double bandHeight = 8;
+
+  /// Width of the column the route's rail is drawn in — 24.
+  static const double routeRail = 24;
+
+  /// Diameter of a stop on the route — 12.
+  static const double routeDot = 12;
+
+  /// Diameter of the server's stop, the one the route is about — 16.
+  static const double routeDotServer = 16;
+
+  /// Diameter of the marker on the stop where the route broke — 20. Large
+  /// enough to carry its ✕ at 3:1.
+  static const double routeMarker = 20;
+
+  /// Stroke of a leg of the route — 2.
+  static const double routeStroke = 2;
+
+  /// Length of a dash of a leg that does not exist yet — 4, with gaps of
+  /// [routeDashGap].
+  static const double routeDash = 4;
+
+  /// Gap between two dashes — 4.
+  static const double routeDashGap = 4;
+
+  /// How much of a leg the travelling highlight covers — 40 %.
+  static const double routeSweepFraction = 0.4;
+
+  /// Shortest a leg of the route is drawn — 16, so two stops never touch.
+  static const double routeLegMin = 16;
+
+  /// Widest a paragraph runs before it is set in a narrower column — 560.
+  /// About 75 characters of body text (docs/04 §3).
+  static const double readingWidth = 560;
 }

@@ -42,13 +42,15 @@ void main() {
       1,
     );
     expect(fill, colors.accentSolid);
-    expect(fill, isNot(colors.statusError));
+    expect(fill, isNot(colors.statusErrorSolid));
   });
 
   testWidgets('a quota that is nearly gone is still red', (tester) async {
     final fill = await fillOf(tester, const QuotaBar(ratio: 0.97));
     final colors = tester.element(find.byType(QuotaBar)).colors;
 
-    expect(fill, colors.statusError);
+    // The error *fill*: a bar is a graphic, drawn in the solid that holds
+    // 3:1 on the track, not in the colour meant for words.
+    expect(fill, colors.statusErrorSolid);
   });
 }

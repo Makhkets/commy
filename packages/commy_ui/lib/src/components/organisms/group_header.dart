@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 
 /// The header of a group of nodes the user added by hand.
 ///
-/// It is the plain sibling of `SubscriptionCard`: same step in background,
-/// same title block, same actions on the trailing side — but no quota, no
+/// It is the plain sibling of `SubscriptionCard`: same surface, same title
+/// block, same actions on the trailing side — but no quota, no
 /// expiry and no panel announcement, because a hand-made group has none of
 /// those. Only two actions are offered here: a manual group has nothing to
 /// refresh.
@@ -85,8 +85,8 @@ class GroupHeader extends StatelessWidget {
     final leadingWidget = leading;
     final collapse = onToggleCollapse;
 
-    return ColoredBox(
-      color: colors.bgGroupHeader,
+    return Material(
+      type: MaterialType.transparency,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
           minHeight: CommySizes.minTapTarget,
@@ -95,7 +95,7 @@ class GroupHeader extends StatelessWidget {
           padding: EdgeInsetsDirectional.only(
             start: spacing.s4,
             top: spacing.s2,
-            end: spacing.s2,
+            end: spacing.s1,
             bottom: spacing.s2,
           ),
           child: Row(

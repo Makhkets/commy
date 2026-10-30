@@ -12,6 +12,11 @@ import '../support/commy_test_host.dart';
 /// the DNS sheet's warning that the system resolver would leak every name
 /// ended mid-word on a phone.
 void main() {
+  // Measured in the real face: in the test font every glyph is a square one
+  // em wide, and a sentence of 14 px squares wraps to more lines than any
+  // field would ever show it in.
+  setUpAll(loadCommyFonts);
+
   const error = 'Системный резолвер отвечает мимо туннеля: каждое имя, '
       'которое идёт через прокси, утекло бы. Укажите адрес резолвера';
   const helper = 'Схемы: udp, tcp, tls, https, quic, h3, dhcp. Голый адрес — '

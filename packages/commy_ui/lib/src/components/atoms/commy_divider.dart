@@ -2,10 +2,13 @@ import 'package:commy_ui/src/theme/context_extensions.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:flutter/material.dart';
 
-/// A hairline separator.
+/// A hairline separator: one physical pixel, whatever the screen's density,
+/// the way iOS draws the line between two rows (docs/04-design-system.md §8).
 ///
-/// Defaults to `border/subtle`, which is what separates rows inside one card.
-/// [isStrong] switches to `border/default`, for the edge between two blocks.
+/// Defaults to `line`, which separates rows inside one list — started at
+/// the row's text, not at the card's edge, so the icon or flag column stays
+/// clean. [isStrong] switches to `line-default`, for the edge between two
+/// blocks.
 class CommyDivider extends StatelessWidget {
   /// Creates a horizontal divider.
   const CommyDivider({
@@ -24,13 +27,23 @@ class CommyDivider extends StatelessWidget {
   /// Whether to use `border/default` instead of `border/subtle`.
   final bool isStrong;
 
+  /// One physical pixel at the density of [context], capped at the
+  /// [CommySizes.dividerThickness] the layout reserves.
+  static double hairlineOf(BuildContext context) {
+    final ratio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+    final pixel = 1 / ratio;
+    return pixel > CommySizes.dividerThickness
+        ? CommySizes.dividerThickness
+        : pixel;
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Padding(
       padding: EdgeInsetsDirectional.only(start: indent, end: endIndent),
       child: SizedBox(
-        height: CommySizes.dividerThickness,
+        height: hairlineOf(context),
         child: ColoredBox(
           color: isStrong ? colors.borderDefault : colors.borderSubtle,
           child: const SizedBox.expand(),

@@ -140,10 +140,18 @@ class _Body extends ConsumerWidget {
           child: Row(
             children: <Widget>[
               Expanded(
-                child: Text(
-                  t.routing.rulesHint.toUpperCase(),
-                  style: context.typography.label.copyWith(
-                    color: colors.textTertiary,
+                child: Padding(
+                  // In line with the text of the rules below, like every
+                  // section label (docs/04-design-system.md §8).
+                  padding: EdgeInsetsDirectional.only(start: spacing.s4),
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      t.routing.rulesHint,
+                      style: context.typography.captionStrong.copyWith(
+                        color: colors.textSecondary,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -158,7 +166,7 @@ class _Body extends ConsumerWidget {
           ),
         ),
         SizedBox(height: spacing.s2),
-        if (rules.isEmpty)
+        if (rules.isEmpty) ...<Widget>[
           Padding(
             padding: EdgeInsets.symmetric(horizontal: spacing.s4),
             child: EmptyState(
@@ -168,24 +176,50 @@ class _Body extends ConsumerWidget {
               actionLabel: t.routing.addRule,
               onAction: () => unawaited(_addRule(context, controller)),
             ),
-          )
-        else
-          _RuleList(policy: policy),
-        // The final outcome is drawn outside the reorderable list because it
-        // is not reorderable: routing must end somewhere, and a rule you can
-        // drag above the last one is a rule that can be made unreachable.
-        RuleRow(
-          matcher: t.routing.finalRule,
-          actionLabel: _actionLabel(t, finalAction),
-          action: finalAction,
-          isFinal: true,
+          ),
+          SizedBox(height: spacing.s3),
+        ],
+        // One grouped card, like every list in the app: the user's rules,
+        // then the final outcome. The final outcome is drawn outside the
+        // reorderable list because it is not reorderable: routing must end
+        // somewhere, and a rule you can drag above the last one is a rule
+        // that can be made unreachable.
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          child: ClipRRect(
+            borderRadius: context.radii.cardAll,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (rules.isNotEmpty) ...<Widget>[
+                  _RuleList(policy: policy),
+                  ColoredBox(
+                    color: colors.bgSurface,
+                    child: CommyDivider(indent: spacing.s4),
+                  ),
+                ],
+                RuleRow(
+                  matcher: t.routing.finalRule,
+                  actionLabel: _actionLabel(t, finalAction),
+                  action: finalAction,
+                  isFinal: true,
+                ),
+              ],
+            ),
+          ),
         ),
         Padding(
-          padding: EdgeInsets.all(spacing.s4),
+          padding: EdgeInsetsDirectional.fromSTEB(
+            spacing.s8,
+            spacing.s2,
+            spacing.s4,
+            spacing.s0,
+          ),
           child: Text(
             t.routing.finalRuleHint,
             style: context.typography.caption.copyWith(
-              color: colors.textTertiary,
+              color: colors.textSecondary,
             ),
           ),
         ),
@@ -330,7 +364,7 @@ class _DroppedRules extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: colors.statusErrorWash,
-          borderRadius: context.radii.lgAll,
+          borderRadius: context.radii.cardAll,
         ),
         padding: EdgeInsets.all(spacing.s4),
         child: Column(

@@ -2,16 +2,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/animation.dart';
 
-/// A damped-spring curve, expressed the way Figma expresses one: a damping
-/// ratio plus a response time.
+/// A damped-spring curve, expressed the way a designer names a spring: a
+/// damping ratio plus a response time.
 ///
-/// Only `motion/connect` uses it, and only for the connection state change —
-/// the one moment in the product where a bit of physical overshoot reads as
-/// "something happened" rather than as decoration.
+/// What the implicit animations run on (`CommySprings.curve`): laid over
+/// 1.5 × T it moves exactly like the interactive `SpringSimulation` of the
+/// same preset, and the implicit widgets retarget it from the value on
+/// screen (docs/04-design-system.md §7.2).
 ///
 /// Time is normalised: [response] is a fraction of the animation's own
-/// duration, not seconds. With the default 0.5 the spring completes roughly
-/// two periods' worth of settling inside the 620 ms of `motion/connect`.
+/// duration, not seconds.
 class CommySpringCurve extends Curve {
   /// Creates a spring with the given [dampingRatio] and [response].
   const CommySpringCurve({
@@ -36,12 +36,11 @@ class CommySpringCurve extends Curve {
     }
     final damped = omega * math.sqrt(1 - zeta * zeta);
     final decay = math.exp(-zeta * omega * t);
-    final oscillation = math.cos(damped * t) +
-        (zeta * omega / damped) * math.sin(damped * t);
+    final oscillation =
+        math.cos(damped * t) + (zeta * omega / damped) * math.sin(damped * t);
     return 1 - decay * oscillation;
   }
 
   @override
-  String toString() =>
-      'CommySpringCurve($dampingRatio / $response)';
+  String toString() => 'CommySpringCurve($dampingRatio / $response)';
 }

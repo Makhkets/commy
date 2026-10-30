@@ -18,25 +18,95 @@ void main() {
         builder: (context) => DecoratedBox(
           decoration: BoxDecoration(
             color: context.colors.bgSurface,
-            borderRadius: context.radii.mdAll,
-            border: Border.all(color: context.colors.borderSubtle),
+            borderRadius: context.radii.cardAll,
           ),
           child: child,
         ),
       );
 
+  // The signature in every state (docs/04-design-system.md §8, «Маршрут»).
+  // Motion is reduced in goldens, so a leg being built is the still,
+  // half-drawn one.
   for (final state in ConnectState.values) {
     goldenTest(
-      'connect_button_${state.name}',
-      size: const Size(280, 280),
-      builder: (context) => ConnectButton(
-        state: state,
-        onPressed: () {},
-        semanticLabel: 'Подключиться',
-        semanticValue: state.name,
+      'connection_route_${state.name}',
+      size: const Size(390, 260),
+      builder: (context) => Padding(
+        padding: EdgeInsets.all(context.spacing.s4),
+        child: ConnectionRoute(
+          state: state,
+          deviceLabel: 'Это устройство',
+          serverName: 'Amsterdam 03',
+          internetLabel: 'Интернет',
+          flag: const CountryFlag(countryCode: 'NL'),
+          tags: const <NodeTag>[
+            NodeTag('VLESS', hue: CommyTagHue.azure),
+            NodeTag('Reality', hue: CommyTagHue.iris),
+            NodeTag('TCP'),
+          ],
+          latency: const Duration(milliseconds: 48),
+          onServerTap: () {},
+          checkLabel: 'Проверить доступ',
+          onCheck: state.isTunnelUp ? () {} : null,
+          internetStatus:
+              state == ConnectState.connected ? 'Доступ есть, 52 мс' : null,
+          internetTone: CommyTone.connected,
+          breakAt: state == ConnectState.error ? RouteBreak.server : null,
+        ),
       ),
     );
   }
+
+  goldenTest(
+    'connection_route_no_answer',
+    size: const Size(390, 260),
+    builder: (context) => Padding(
+      padding: EdgeInsets.all(context.spacing.s4),
+      child: ConnectionRoute(
+        state: ConnectState.connected,
+        deviceLabel: 'Это устройство',
+        serverName: 'Amsterdam 03',
+        internetLabel: 'Интернет',
+        flag: const CountryFlag(countryCode: 'NL'),
+        checkLabel: 'Проверить доступ',
+        onCheck: () {},
+        internetStatus: 'Через сервер нет ответа',
+        internetTone: CommyTone.connecting,
+        breakAt: RouteBreak.internet,
+      ),
+    ),
+  );
+
+  goldenTest(
+    'route_steps',
+    size: const Size(390, 220),
+    builder: (context) => Padding(
+      padding: EdgeInsets.all(context.spacing.s4),
+      child: const RouteSteps(
+        steps: <RouteStep>[
+          RouteStep(
+            label: 'Имя сервера',
+            state: RouteStepState.passed,
+            detail: '198.51.100.7',
+          ),
+          RouteStep(
+            label: 'Порт открыт',
+            state: RouteStepState.passed,
+            detail: '37 мс',
+          ),
+          RouteStep(
+            label: 'TLS-рукопожатие',
+            state: RouteStepState.passed,
+            detail: 'nl-03.example.net',
+          ),
+          RouteStep(
+            label: 'Запрос через сервер',
+            state: RouteStepState.failed,
+          ),
+        ],
+      ),
+    ),
+  );
 
   goldenTest(
     'metrics_strip',
@@ -62,32 +132,6 @@ void main() {
       uplinkLabel: 'Отдача',
       sessionLabel: 'Сессия',
       downlinkLabel: 'Загрузка',
-    ),
-  );
-
-  goldenTest(
-    'selected_node',
-    size: const Size(360, 120),
-    builder: (context) => SelectedNode(
-      name: 'Авто-Выбор',
-      onTap: () {},
-      flag: const CountryFlag(countryCode: 'EU'),
-    ),
-  );
-
-  goldenTest(
-    'check_button',
-    size: const Size(320, 120),
-    builder: (context) => CheckButton(label: 'Проверить', onPressed: () {}),
-  );
-
-  goldenTest(
-    'check_button_running',
-    size: const Size(320, 120),
-    builder: (context) => CheckButton(
-      label: 'Проверить',
-      onPressed: () {},
-      isChecking: true,
     ),
   );
 

@@ -55,9 +55,7 @@ Future<void> loadCommyFonts() async {
   // running the package's tests and running an app that depends on it — the
   // path never does.
   await _loadFamily(CommyFonts.ui, const <String>[
-    'fonts/Inter-Regular.ttf',
-    'fonts/Inter-Medium.ttf',
-    'fonts/Inter-SemiBold.ttf',
+    'fonts/InterVariable.ttf',
   ]);
   await _loadFamily(CommyFonts.mono, const <String>[
     'fonts/JetBrainsMono-Regular.ttf',

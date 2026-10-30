@@ -18,7 +18,13 @@ dependencies:
   # Only the Dart* classes are used, so no plugin can swap the implementation.
   cryptography: ^2.9.0
   dio: ^5.4.0
-  drift: '>=2.20.0 <3.0.0'
+  # Pinned together with `drift_dev` below, to the exact version. This
+  # package's lockfile is not committed, so CI resolves the generator fresh,
+  # while the app compiles against the runtime its own lockfile pins: drift
+  # 2.35 shipped a generator that calls runtime API 2.34 lacks, and every
+  # CI build broke on code that was never touched. Bump both here and the
+  # app's lockfile in one change.
+  drift: 2.35.0
   flutter:
     sdk: flutter
   flutter_secure_storage: ^11.1.1
@@ -32,7 +38,8 @@ dependencies:
 
 dev_dependencies:
   build_runner: ^2.4.0
-  drift_dev: '>=2.20.0 <3.0.0'
+  # Exactly the runtime's version — see `drift` above.
+  drift_dev: 2.35.0
   flutter_test:
     sdk: flutter
   very_good_analysis: '>=6.0.0 <11.0.0'

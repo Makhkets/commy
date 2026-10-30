@@ -40,6 +40,7 @@ class AutoRow extends ConsumerWidget {
     final isActive = ref.watch(autoSelectedProvider);
     final picked = isActive ? ref.watch(autoNodeProvider) : null;
     final label = picked == null ? null : NodeLabel.of(picked);
+    final status = ref.watch(tunnelStatusProvider);
 
     return NodeTile(
       name: t.home.auto,
@@ -47,6 +48,7 @@ class AutoRow extends ConsumerWidget {
       latency: picked?.latency,
       countryCode: CountryFlag.europeanUnion,
       isActive: isActive,
+      isLive: status is TunnelConnected || status is TunnelChecking,
       onTap: () {
         unawaited(ref.read(tunnelControllerProvider.notifier).selectAuto());
         onChosen?.call();

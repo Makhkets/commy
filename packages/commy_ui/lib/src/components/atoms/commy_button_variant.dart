@@ -3,15 +3,16 @@
 /// There are four and there will not be a fifth: the moment a system grows a
 /// "primary but quieter" it has stopped being a system.
 enum CommyButtonVariant {
-  /// The one action the screen exists for. Chalk on dark, ink on light.
+  /// The one action the screen exists for. Ink on light, chalk on dark.
   primary,
 
-  /// A real alternative to the primary action. Raised surface plus a border.
+  /// A real alternative to the primary action. Tinted: the neutral `fill`
+  /// under ink, no border — "Disconnect" beside the route.
   secondary,
 
-  /// A tertiary action that must not pull the eye. No fill, no border.
+  /// A tertiary action that must not pull the eye. Text only.
   ghost,
 
-  /// Destructive and irreversible. Filled with `status/error`.
+  /// Destructive and irreversible. The error fill under white.
   danger,
 }

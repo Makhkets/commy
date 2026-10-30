@@ -56,34 +56,21 @@ void main() {
     );
   });
 
-  testWidgets('SelectedNode survives 200 %', (tester) async {
+  testWidgets('ConnectionRoute survives 200 %', (tester) async {
     await expectSurvives(
       tester,
-      'SelectedNode',
-      SelectedNode(
-        name: 'Amsterdam 03 — очень длинное имя узла',
-        onTap: () {},
-        flag: const CountryFlag(countryCode: 'NL'),
-      ),
-    );
-  });
-
-  testWidgets('CheckButton survives 200 %', (tester) async {
-    await expectSurvives(
-      tester,
-      'CheckButton',
-      CheckButton(label: 'Проверить соединение', onPressed: () {}),
-    );
-  });
-
-  testWidgets('ConnectButton survives 200 %', (tester) async {
-    await expectSurvives(
-      tester,
-      'ConnectButton',
-      ConnectButton(
+      'ConnectionRoute',
+      ConnectionRoute(
         state: ConnectState.connected,
-        onPressed: () {},
-        semanticLabel: 'Отключиться',
+        deviceLabel: 'Это устройство',
+        serverName: 'Amsterdam 03 — очень длинное имя узла',
+        internetLabel: 'Интернет',
+        flag: const CountryFlag(countryCode: 'NL'),
+        latency: const Duration(milliseconds: 48),
+        onServerTap: () {},
+        checkLabel: 'Проверить доступ',
+        onCheck: () {},
+        internetStatus: 'Доступ есть, 52 мс',
       ),
     );
   });

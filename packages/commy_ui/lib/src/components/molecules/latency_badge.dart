@@ -100,9 +100,13 @@ class LatencyBadge extends StatelessWidget {
             ),
           if (showNumber) ...<Widget>[
             SizedBox(width: spacing.s2),
+            // Inter with tabular figures, not the monospace it used to be:
+            // a column of 48, 62 and 191 ms lines up just the same, and a
+            // monospace face for small figures is one of the marks of a
+            // templated interface (docs/04-design-system.md §3).
             Text(
               text,
-              style: context.typography.monoSmall.copyWith(
+              style: context.typography.numericBody.copyWith(
                 color: foreground,
               ),
             ),

@@ -4,18 +4,25 @@ import 'package:commy_ui/src/tokens/fonts.dart';
 import 'package:flutter/material.dart';
 
 /// The type scale, one field per row of the table in
-/// docs/04-design-system.md.
+/// docs/04-design-system.md §3.
 ///
-/// Two conversions happen here and nowhere else:
+/// The interface face is Inter 4.1 as one variable font, with two axes:
+/// `wght` and `opsz`, the optical size. Flutter maps `fontWeight` onto `wght`
+/// on its own; it does **not** pick `opsz` from the font size, so every style
+/// below names its optical size explicitly — large text in the tighter,
+/// sharper display cut, small text in the open text cut, the way SF Display
+/// and SF Text split. A style built outside this scale renders at `opsz 14`,
+/// which is one more reason there is no such style.
 ///
-/// * line height is stored in Figma as an absolute pixel value and in Flutter
-///   as a multiplier, so every `height` is written as `<leading> / <size>`;
-/// * tracking is stored in Figma as a percentage of the size and in Flutter as
-///   logical pixels, so every `letterSpacing` is written as
-///   `<size> * <percent / 100>`.
+/// Three conversions happen here and nowhere else, each left as visible
+/// arithmetic rather than a pre-computed decimal:
 ///
-/// Both are left as visible arithmetic instead of a pre-computed decimal: the
-/// numbers stay comparable with the document without a calculator.
+/// * line height is written as `<leading> / <size>`;
+/// * tracking follows Inter's dynamic metrics,
+///   `−0.0223 + 0.185·e^(−0.1745·size)` em, written as `<size> * <em>`:
+///   large text tighter, small text a hair looser — the size-specific
+///   tracking Apple's type is built on;
+/// * the optical size is the font size clamped to the axis, 14–32.
 ///
 /// Styles carry no colour. Widgets apply one from `CommyColors` explicitly —
 /// there is no implicit "text colour" in this system.
@@ -34,6 +41,7 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
     required this.caption,
     required this.captionStrong,
     required this.label,
+    required this.footnote,
     required this.numericDisplay,
     required this.numericBody,
     required this.mono,
@@ -41,10 +49,27 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
     required this.monoStrong,
   });
 
-  /// Tabular figures. Mandatory on every numeric and monospace style: without
-  /// them a speed readout jitters on every digit change, and it shows.
+  /// Tabular figures. Mandatory on every number the user reads — speed,
+  /// timer, latency, quota: without them a readout jitters on every digit
+  /// change, and it shows.
   static const List<ui.FontFeature> tabular = <ui.FontFeature>[
     ui.FontFeature.tabularFigures(),
+  ];
+
+  static const List<ui.FontVariation> _opsz14 = <ui.FontVariation>[
+    ui.FontVariation('opsz', 14),
+  ];
+  static const List<ui.FontVariation> _opsz16 = <ui.FontVariation>[
+    ui.FontVariation('opsz', 16),
+  ];
+  static const List<ui.FontVariation> _opsz20 = <ui.FontVariation>[
+    ui.FontVariation('opsz', 20),
+  ];
+  static const List<ui.FontVariation> _opsz24 = <ui.FontVariation>[
+    ui.FontVariation('opsz', 24),
+  ];
+  static const List<ui.FontVariation> _opsz32 = <ui.FontVariation>[
+    ui.FontVariation('opsz', 32),
   ];
 
   /// The one and only scale.
@@ -53,27 +78,29 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
       fontSize: 44,
-      height: 48 / 44,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 44 * -0.03,
+      height: 50 / 44,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 44 * -0.0222,
+      fontVariations: _opsz32,
       fontFeatures: tabular,
     ),
     display: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 34,
-      height: 40 / 34,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 34 * -0.025,
-      fontFeatures: tabular,
+      fontSize: 32,
+      height: 38 / 32,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 32 * -0.0216,
+      fontVariations: _opsz32,
     ),
     title1: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 26,
-      height: 32 / 26,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 26 * -0.02,
+      fontSize: 24,
+      height: 30 / 24,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 24 * -0.0195,
+      fontVariations: _opsz24,
     ),
     title2: TextStyle(
       fontFamily: CommyFonts.ui,
@@ -81,15 +108,17 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
       fontSize: 20,
       height: 26 / 20,
       fontWeight: FontWeight.w600,
-      letterSpacing: 20 * -0.015,
+      letterSpacing: 20 * -0.0167,
+      fontVariations: _opsz20,
     ),
     title3: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 17,
-      height: 22 / 17,
+      fontSize: 16,
+      height: 22 / 16,
       fontWeight: FontWeight.w600,
-      letterSpacing: 17 * -0.01,
+      letterSpacing: 16 * -0.011,
+      fontVariations: _opsz16,
     ),
     bodyLarge: TextStyle(
       fontFamily: CommyFonts.ui,
@@ -97,133 +126,159 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
       fontSize: 16,
       height: 24 / 16,
       fontWeight: FontWeight.w400,
+      letterSpacing: 16 * -0.011,
+      fontVariations: _opsz16,
     ),
     body: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 15,
-      height: 22 / 15,
+      fontSize: 16,
+      height: 22 / 16,
       fontWeight: FontWeight.w400,
+      letterSpacing: 16 * -0.011,
+      fontVariations: _opsz16,
     ),
     bodyStrong: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 15,
-      height: 22 / 15,
-      fontWeight: FontWeight.w500,
+      fontSize: 16,
+      height: 22 / 16,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 16 * -0.011,
+      fontVariations: _opsz16,
     ),
     caption: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 13,
-      height: 18 / 13,
+      fontSize: 14,
+      height: 20 / 14,
       fontWeight: FontWeight.w400,
+      letterSpacing: 14 * -0.0062,
+      fontVariations: _opsz14,
     ),
     captionStrong: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 13,
-      height: 18 / 13,
-      fontWeight: FontWeight.w500,
+      fontSize: 14,
+      height: 20 / 14,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 14 * -0.0062,
+      fontVariations: _opsz14,
     ),
     label: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 11,
-      height: 14 / 11,
+      fontSize: 12,
+      height: 16 / 12,
       fontWeight: FontWeight.w600,
-      letterSpacing: 11 * 0.06,
+      letterSpacing: 12 * 0.0005,
+      fontVariations: _opsz14,
+    ),
+    footnote: TextStyle(
+      fontFamily: CommyFonts.ui,
+      package: CommyFonts.package,
+      fontSize: 12,
+      height: 16 / 12,
+      fontWeight: FontWeight.w400,
+      letterSpacing: 12 * 0.0005,
+      fontVariations: _opsz14,
     ),
     numericDisplay: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 30,
-      height: 34 / 30,
+      fontSize: 32,
+      height: 38 / 32,
       fontWeight: FontWeight.w600,
-      letterSpacing: 30 * -0.02,
+      letterSpacing: 32 * -0.0216,
+      fontVariations: _opsz32,
       fontFeatures: tabular,
     ),
     numericBody: TextStyle(
       fontFamily: CommyFonts.ui,
       package: CommyFonts.package,
-      fontSize: 15,
-      height: 20 / 15,
+      fontSize: 14,
+      height: 20 / 14,
       fontWeight: FontWeight.w500,
+      letterSpacing: 14 * -0.0062,
+      fontVariations: _opsz14,
       fontFeatures: tabular,
     ),
     mono: TextStyle(
       fontFamily: CommyFonts.mono,
       package: CommyFonts.package,
-      fontSize: 13,
-      height: 20 / 13,
+      fontSize: 12,
+      height: 18 / 12,
       fontWeight: FontWeight.w400,
       fontFeatures: tabular,
     ),
     monoSmall: TextStyle(
       fontFamily: CommyFonts.mono,
       package: CommyFonts.package,
-      fontSize: 11,
-      height: 16 / 11,
+      fontSize: 12,
+      height: 16 / 12,
       fontWeight: FontWeight.w400,
       fontFeatures: tabular,
     ),
     monoStrong: TextStyle(
       fontFamily: CommyFonts.mono,
       package: CommyFonts.package,
-      fontSize: 13,
-      height: 20 / 13,
+      fontSize: 12,
+      height: 18 / 12,
       fontWeight: FontWeight.w500,
       fontFeatures: tabular,
     ),
   );
 
-  /// `Display/XL` — 44 / 48, Semi Bold, −3%. Session timer inside the ring.
+  /// 44 / 50, Bold, display cut. Reserved for one large number.
   final TextStyle displayXl;
 
-  /// `Display` — 34 / 40, Semi Bold, −2.5%. Documentation section heading.
+  /// 32 / 38, Bold, display cut. The answer at the top of the main screen.
   final TextStyle display;
 
-  /// `Title/1` — 26 / 32, Semi Bold, −2%. Screen heading.
+  /// 24 / 30, Bold. A screen's title.
   final TextStyle title1;
 
-  /// `Title/2` — 20 / 26, Semi Bold, −1.5%. Sheet and section heading.
+  /// 20 / 26, Semi Bold. A sheet's or a card's title.
   final TextStyle title2;
 
-  /// `Title/3` — 17 / 22, Semi Bold, −1%. Card heading, node name.
+  /// 16 / 22, Semi Bold. A server's name, a row's title.
   final TextStyle title3;
 
-  /// `Body/Large` — 16 / 24, Regular. Body text on mobile.
+  /// 16 / 24, Regular. Paragraphs of explanation.
   final TextStyle bodyLarge;
 
-  /// `Body` — 15 / 22, Regular. Body text.
+  /// 16 / 22, Regular. The text of a row.
   final TextStyle body;
 
-  /// `Body/Strong` — 15 / 22, Medium. Action label, emphasis in a row.
+  /// 16 / 22, Semi Bold. A button's label, emphasis.
   final TextStyle bodyStrong;
 
-  /// `Caption` — 13 / 18, Regular. Captions, metadata, tabs.
+  /// 14 / 20, Regular. A row's subtitle, captions.
   final TextStyle caption;
 
-  /// `Caption/Strong` — 13 / 18, Medium. Secondary action.
+  /// 14 / 20, Semi Bold. A list section's header, a small button.
   final TextStyle captionStrong;
 
-  /// `Label` — 11 / 14, Semi Bold, +6%. Section headers and chips. Always
-  /// upper case; the widgets that use it apply the transform.
+  /// 12 / 16, Semi Bold. Badges, chips, protocol tags. Sentence case: the
+  /// widgets that use it no longer upper-case it.
   final TextStyle label;
 
-  /// `Numeric/Display` — 30 / 34, Semi Bold, −2%. Up and down speed.
+  /// 12 / 16, Regular. A footnote under a group, metadata.
+  final TextStyle footnote;
+
+  /// 32 / 38, Semi Bold, tabular. A large figure.
   final TextStyle numericDisplay;
 
-  /// `Numeric/Body` — 15 / 20, Medium. Numbers inside rows.
+  /// 14 / 20, Medium, tabular. Latency, speed, quota inside rows.
   final TextStyle numericBody;
 
-  /// `Mono` — 13 / 20, JetBrains Mono Regular. Logs, configuration.
+  /// 12 / 18, JetBrains Mono Regular. Logs and configuration — code only.
   final TextStyle mono;
 
-  /// `Mono/Small` — 11 / 16, JetBrains Mono Regular. Latency, IP, port.
+  /// 12 / 16, JetBrains Mono Regular. Dense log lines.
   final TextStyle monoSmall;
 
-  /// `Mono/Strong` — 13 / 20, JetBrains Mono Medium. Routing rule expression.
+  /// 12 / 18, JetBrains Mono Medium. A routing rule's expression.
   final TextStyle monoStrong;
 
   /// Returns a copy with the given styles replaced.
@@ -240,6 +295,7 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
     TextStyle? caption,
     TextStyle? captionStrong,
     TextStyle? label,
+    TextStyle? footnote,
     TextStyle? numericDisplay,
     TextStyle? numericBody,
     TextStyle? mono,
@@ -258,6 +314,7 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
       caption: caption ?? this.caption,
       captionStrong: captionStrong ?? this.captionStrong,
       label: label ?? this.label,
+      footnote: footnote ?? this.footnote,
       numericDisplay: numericDisplay ?? this.numericDisplay,
       numericBody: numericBody ?? this.numericBody,
       mono: mono ?? this.mono,
@@ -272,23 +329,25 @@ class CommyTypography extends ThemeExtension<CommyTypography> {
     if (other == null) {
       return this;
     }
+    TextStyle mix(TextStyle a, TextStyle b) => TextStyle.lerp(a, b, t)!;
     return CommyTypography(
-      displayXl: TextStyle.lerp(displayXl, other.displayXl, t)!,
-      display: TextStyle.lerp(display, other.display, t)!,
-      title1: TextStyle.lerp(title1, other.title1, t)!,
-      title2: TextStyle.lerp(title2, other.title2, t)!,
-      title3: TextStyle.lerp(title3, other.title3, t)!,
-      bodyLarge: TextStyle.lerp(bodyLarge, other.bodyLarge, t)!,
-      body: TextStyle.lerp(body, other.body, t)!,
-      bodyStrong: TextStyle.lerp(bodyStrong, other.bodyStrong, t)!,
-      caption: TextStyle.lerp(caption, other.caption, t)!,
-      captionStrong: TextStyle.lerp(captionStrong, other.captionStrong, t)!,
-      label: TextStyle.lerp(label, other.label, t)!,
-      numericDisplay: TextStyle.lerp(numericDisplay, other.numericDisplay, t)!,
-      numericBody: TextStyle.lerp(numericBody, other.numericBody, t)!,
-      mono: TextStyle.lerp(mono, other.mono, t)!,
-      monoSmall: TextStyle.lerp(monoSmall, other.monoSmall, t)!,
-      monoStrong: TextStyle.lerp(monoStrong, other.monoStrong, t)!,
+      displayXl: mix(displayXl, other.displayXl),
+      display: mix(display, other.display),
+      title1: mix(title1, other.title1),
+      title2: mix(title2, other.title2),
+      title3: mix(title3, other.title3),
+      bodyLarge: mix(bodyLarge, other.bodyLarge),
+      body: mix(body, other.body),
+      bodyStrong: mix(bodyStrong, other.bodyStrong),
+      caption: mix(caption, other.caption),
+      captionStrong: mix(captionStrong, other.captionStrong),
+      label: mix(label, other.label),
+      footnote: mix(footnote, other.footnote),
+      numericDisplay: mix(numericDisplay, other.numericDisplay),
+      numericBody: mix(numericBody, other.numericBody),
+      mono: mix(mono, other.mono),
+      monoSmall: mix(monoSmall, other.monoSmall),
+      monoStrong: mix(monoStrong, other.monoStrong),
     );
   }
 }

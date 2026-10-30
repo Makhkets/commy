@@ -7,7 +7,15 @@ import 'package:flutter/services.dart';
 ///
 /// Wraps Material's [TextField] rather than replacing it: text editing is
 /// deep platform behaviour — selection handles, autofill, IME, accessibility
-/// — and reimplementing it would be a mistake. Only the decoration is ours.
+/// — and reimplementing it would be a mistake. Only the decoration is ours
+/// (docs/04-design-system.md §8): `surface-2` under a `line-default` edge,
+/// the `control` corner, a 2 dp `line-strong` edge while focused, and a
+/// label that is always visible above the field rather than a placeholder
+/// that vanishes as soon as typing starts. An error is said in words under
+/// the field; the red edge repeats it, never replaces it.
+///
+/// [isSearch] is the search field's shape: the neutral `fill` and no edge,
+/// as iOS draws a search bar.
 class CommyTextField extends StatelessWidget {
   /// Creates a text field.
   const CommyTextField({
@@ -31,6 +39,7 @@ class CommyTextField extends StatelessWidget {
     this.onSubmitted,
     this.isMonospace = false,
     this.isSecret = false,
+    this.isSearch = false,
     super.key,
   });
 
@@ -108,24 +117,26 @@ class CommyTextField extends StatelessWidget {
   /// once the user taps "show", the field is ordinary text to the keyboard.
   final bool isSecret;
 
+  /// Whether this is a search field: `fill`, no edge.
+  final bool isSearch;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final spacing = context.spacing;
     final type = context.typography;
-    final radius = context.radii.smAll;
+    final radius = context.radii.controlAll;
     final hasError = errorText != null;
 
-    OutlineInputBorder borderWith(Color color) => OutlineInputBorder(
+    OutlineInputBorder borderWith(
+      Color color, {
+      double width = CommySizes.borderThin,
+    }) =>
+        OutlineInputBorder(
           borderRadius: radius,
-          borderSide: BorderSide(
-            color: color,
-            // The token happens to equal Flutter's own default today. Naming
-            // it anyway is the point of rule R4 — the day the hairline moves,
-            // it moves here and not in fourteen widgets.
-            // ignore: avoid_redundant_argument_values
-            width: CommySizes.borderThin,
-          ),
+          borderSide: isSearch && !hasError
+              ? BorderSide.none
+              : BorderSide(color: color, width: width),
         );
 
     final textField = TextField(
@@ -149,11 +160,11 @@ class CommyTextField extends StatelessWidget {
       ),
       decoration: InputDecoration(
         filled: true,
-        fillColor: colors.bgOverlay,
+        fillColor: isSearch ? colors.fill : colors.bgOverlay,
         hintText: hintText,
         hintStyle: type.body.copyWith(color: colors.textTertiary),
         helperText: helperText,
-        helperStyle: type.caption.copyWith(color: colors.textTertiary),
+        helperStyle: type.caption.copyWith(color: colors.textSecondary),
         helperMaxLines: messageMaxLines,
         errorText: errorText,
         errorStyle: type.caption.copyWith(color: colors.statusError),
@@ -186,11 +197,16 @@ class CommyTextField extends StatelessWidget {
         border: borderWith(colors.borderDefault),
         enabledBorder:
             borderWith(hasError ? colors.statusError : colors.borderDefault),
-        focusedBorder:
-            borderWith(hasError ? colors.statusError : colors.borderStrong),
+        focusedBorder: borderWith(
+          hasError ? colors.statusError : colors.borderStrong,
+          width: CommySizes.borderThick,
+        ),
         disabledBorder: borderWith(colors.borderSubtle),
         errorBorder: borderWith(colors.statusError),
-        focusedErrorBorder: borderWith(colors.statusError),
+        focusedErrorBorder: borderWith(
+          colors.statusError,
+          width: CommySizes.borderThick,
+        ),
       ),
     );
 

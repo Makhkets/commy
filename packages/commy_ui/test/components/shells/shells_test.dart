@@ -170,7 +170,8 @@ void main() {
   });
 
   group('CommyAppBar', () {
-    testWidgets('upper-cases the wordmark and centres it', (tester) async {
+    testWidgets('draws the wordmark as written, and centres it',
+        (tester) async {
       await pumpCommy(
         tester,
         size: const Size(390, 120),
@@ -193,9 +194,10 @@ void main() {
           ],
         ),
       );
-      expect(find.text('COMMY'), findsOneWidget);
+      expect(find.text('Commy'), findsOneWidget);
+      expect(find.text('COMMY'), findsNothing);
       expect(
-        tester.getCenter(find.text('COMMY')).dx,
+        tester.getCenter(find.text('Commy')).dx,
         moreOrLessEquals(195, epsilon: 1),
       );
       expect(

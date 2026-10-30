@@ -1,30 +1,29 @@
 import 'package:commy_domain/commy_domain.dart';
 import 'package:commy_ui/src/components/commy_tone.dart';
 
-/// The six states the hero area of the main screen can be in.
+/// The six states the top of the main screen can be in.
 ///
-/// This is the domain's [TunnelStatus] with the payload dropped: the button
-/// draws a ring, a glow and an arc, and none of that depends on *when* the
-/// tunnel came up or *which* failure took it down. Keeping the two types
-/// apart means a widget test can name a state in one word, and it keeps the
-/// painter from having to switch over classes that carry data it must not
-/// read.
+/// This is the domain's [TunnelStatus] with the payload dropped: the route
+/// draws legs and stops, and none of that depends on *when* the tunnel came
+/// up or *which* failure took it down. Keeping the two types apart means a
+/// widget test can name a state in one word, and it keeps the painter from
+/// having to switch over classes that carry data it must not read.
 ///
 /// Use [ConnectState.of] at the edge of the presentation layer and pass the
 /// result down; the mapping is total, so a seventh tunnel state would break
 /// the build here rather than silently render as idle.
 enum ConnectState {
-  /// Nothing is running. Neutral ring, no glow.
+  /// Nothing is running. Both legs of the route are dashed.
   idle,
 
-  /// The core was asked to start. The progress arc rotates.
+  /// The core was asked to start. The first leg is being built.
   starting,
 
   /// The tunnel is up and reachability is being probed. A raised tunnel is
   /// not yet working internet, and the user has to see the difference.
   checking,
 
-  /// The tunnel is up and confirmed. The only state that glows and pulses.
+  /// The tunnel is up and confirmed. Both legs are solid.
   connected,
 
   /// The core was asked to stop and has not finished yet.
@@ -60,23 +59,12 @@ enum ConnectState {
   /// and a button that cannot do anything is worse than no button.
   bool get showsCheckButton => isTunnelUp;
 
-  /// Whether the button draws a rotating progress arc.
-  bool get showsArc =>
-      this == ConnectState.starting || this == ConnectState.checking;
-
-  /// Whether the ring carries a glow. The only glow in the product.
-  bool get glows =>
-      this == ConnectState.connected || this == ConnectState.error;
-
-  /// Whether that glow breathes. [connected] alone does.
-  bool get pulses => this == ConnectState.connected;
-
-  /// The meaning to hand a pill, chip or banner sitting next to the button.
+  /// The meaning to hand a chip or banner sitting next to the route.
   ///
   /// [stopping] answers [CommyTone.idle] rather than
-  /// [CommyTone.connecting] on purpose: the spec paints its ring
-  /// `status/idle`, and a status pill that disagreed with the ring right
-  /// beside it would be a bug the eye catches immediately.
+  /// [CommyTone.connecting] on purpose: the route is already fading back to
+  /// its dashes, and a chip that disagreed with it right beside it would be a
+  /// bug the eye catches immediately.
   CommyTone get tone => switch (this) {
         ConnectState.idle => CommyTone.idle,
         ConnectState.starting => CommyTone.connecting,

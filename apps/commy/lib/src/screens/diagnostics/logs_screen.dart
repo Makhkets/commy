@@ -391,8 +391,8 @@ class _LogBodyState extends State<_LogBody> {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: context.spacing.s4),
       decoration: BoxDecoration(
-        color: context.colors.bgInset,
-        borderRadius: context.radii.mdAll,
+        color: context.colors.bgSurface,
+        borderRadius: context.radii.cardAll,
       ),
       clipBehavior: Clip.antiAlias,
       // Newest last, scrolled to the bottom: a log you have to scroll down to
@@ -495,10 +495,12 @@ class _RedactionNotice extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
+              // Ink-2, not green: this is a promise about the log, not the
+              // state of a connection (docs/04-design-system.md §2).
               Icon(
                 CommyIcons.proxy,
                 size: CommySizes.iconControl,
-                color: colors.statusConnected,
+                color: colors.textSecondary,
               ),
               SizedBox(width: spacing.s2),
               Expanded(

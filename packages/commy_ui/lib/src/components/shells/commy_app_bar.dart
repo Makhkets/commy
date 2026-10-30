@@ -1,3 +1,4 @@
+import 'package:commy_ui/src/components/atoms/commy_divider.dart';
 import 'package:commy_ui/src/components/atoms/commy_icon_button.dart';
 import 'package:commy_ui/src/components/commy_icons.dart';
 import 'package:commy_ui/src/theme/context_extensions.dart';
@@ -13,17 +14,23 @@ enum _AppBarLayout {
   section,
 }
 
-/// The top bar of every screen, in its two shapes.
+/// The top bar of every screen, in its two shapes
+/// (docs/04-design-system.md §6).
 ///
-/// The root shape is what docs/design-refs/02-home-idle.png shows: the cog on
-/// the left, the plus on the right, and the wordmark centred between them in
-/// `Label` — 11 pt, Semi Bold, upper case, `text/secondary`. It is deliberately
-/// quiet. The largest thing on that screen is the connect button, and a bar
-/// that competes with it is a bar in the wrong place.
+/// The root shape: the cog on the left, the plus on the right, and the name
+/// of the app centred between them as an inline title — `bodyStrong`, in the
+/// case it is written. It is deliberately quiet. The answer under it is the
+/// largest thing on that screen, and a bar that competes with it is a bar in
+/// the wrong place.
 ///
-/// The section shape is docs/design-refs/08-settings.png: a back arrow and the
-/// section's name in `Title/1`, both on the leading edge. A centred title there
-/// would leave the back arrow floating on its own.
+/// The section shape: a back arrow and the section's name in `title1`, both
+/// on the leading edge. A centred title there would leave the back arrow
+/// floating on its own.
+///
+/// The bar is the colour of the canvas and has no line under it — until
+/// content scrolls beneath it. Then a hairline appears at its edge, the
+/// scroll-edge effect of iOS: a divider only where the floating chrome
+/// actually overlaps something.
 ///
 /// **At most two controls a side**, asserted rather than merely written down.
 /// A third one always turns out to be something that belonged in a menu.
@@ -33,7 +40,7 @@ enum _AppBarLayout {
 /// platforms do with their own bars, and it is the difference between a large
 /// system font making the app more readable and it eating a third of the
 /// window before anything has been read.
-class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
+class CommyAppBar extends StatefulWidget implements PreferredSizeWidget {
   /// Creates the root bar: [title] centred as a wordmark.
   ///
   /// [leading] and [actions] are normally [CommyIconButton]s and are already
@@ -69,8 +76,7 @@ class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// growing; the screen under it does not.
   static const double maxTextScale = 1.4;
 
-  /// The wordmark, or the section's name. Already translated. The wordmark
-  /// shape upper-cases it on the way out.
+  /// The wordmark, or the section's name. Already translated, drawn as given.
   final String title;
 
   /// Controls on the leading side, at most two. Empty in the section shape,
@@ -92,7 +98,48 @@ class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(CommySizes.appBarHeight);
 
   @override
+  State<CommyAppBar> createState() => _CommyAppBarState();
+}
+
+class _CommyAppBarState extends State<CommyAppBar> {
+  ScrollNotificationObserverState? _observer;
+  bool _scrolledUnder = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _observer?.removeListener(_onScroll);
+    _observer = ScrollNotificationObserver.maybeOf(context);
+    _observer?.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _observer?.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  /// The scaffold's own scroll view, and only it, decides the hairline: a
+  /// horizontal strip of chips scrolling inside the page says nothing about
+  /// what lies under the bar.
+  void _onScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification ||
+        notification.depth != 0 ||
+        notification.metrics.axis != Axis.vertical) {
+      return;
+    }
+    final under = notification.metrics.extentBefore > 0;
+    if (under != _scrolledUnder) {
+      setState(() => _scrolledUnder = under);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final widget = this.widget;
+    final leading = widget.leading;
+    final actions = widget.actions;
+    final title = widget.title;
     // Not constructor asserts: `List.length` cannot be evaluated in a const
     // context, and a bar with a fixed title is worth keeping const-capable.
     assert(
@@ -111,7 +158,7 @@ class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
     final spacing = context.spacing;
 
     final Widget content;
-    switch (_layout) {
+    switch (widget._layout) {
       case _AppBarLayout.wordmark:
         content = Stack(
           children: <Widget>[
@@ -124,10 +171,10 @@ class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Semantics(
                   header: true,
                   child: Text(
-                    title.toUpperCase(),
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: type.label.copyWith(color: colors.textSecondary),
+                    style: type.bodyStrong.copyWith(color: colors.textPrimary),
                   ),
                 ),
               ),
@@ -142,14 +189,14 @@ class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
           ],
         );
       case _AppBarLayout.section:
-        final back = onBack;
+        final back = widget.onBack;
         content = Row(
           children: <Widget>[
             if (back != null)
               CommyIconButton(
                 icon: CommyIcons.chevronLeft,
                 onPressed: back,
-                semanticLabel: backSemanticLabel!,
+                semanticLabel: widget.backSemanticLabel!,
               )
             else
               SizedBox(width: spacing.s2),
@@ -177,12 +224,29 @@ class CommyAppBar extends StatelessWidget implements PreferredSizeWidget {
       child: SafeArea(
         bottom: false,
         child: MediaQuery.withClampedTextScaling(
-          maxScaleFactor: maxTextScale,
+          maxScaleFactor: CommyAppBar.maxTextScale,
           child: SizedBox(
             height: CommySizes.appBarHeight,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: spacing.s2),
-              child: content,
+            child: Stack(
+              children: <Widget>[
+                Positioned.fill(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: spacing.s1),
+                    child: content,
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: AnimatedOpacity(
+                    opacity: _scrolledUnder ? 1 : 0,
+                    duration: context.motion.instant,
+                    curve: context.motion.instantCurve,
+                    child: const CommyDivider(),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

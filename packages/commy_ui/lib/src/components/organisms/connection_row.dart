@@ -30,8 +30,9 @@ class ConnectionRow extends StatelessWidget {
     super.key,
   });
 
-  /// What sits between the rule and the outbound it selected.
-  static const String separator = ' · ';
+  /// What sits between the rule and the outbound it selected: the rule
+  /// leads *to* the outbound, so an arrow says it, not a middle dot.
+  static const String separator = ' → ';
 
   /// The connection, as the core reports it.
   final ConnectionInfo connection;

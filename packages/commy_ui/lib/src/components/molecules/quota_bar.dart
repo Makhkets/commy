@@ -55,9 +55,9 @@ class QuotaBar extends StatelessWidget {
     if (isUnlimited) {
       fill = colors.accentSolid;
     } else if (clampedRatio >= CommyThresholds.quotaCritical) {
-      fill = colors.statusError;
+      fill = colors.statusErrorSolid;
     } else if (clampedRatio >= CommyThresholds.quotaWarn) {
-      fill = colors.statusConnecting;
+      fill = colors.statusConnectingSolid;
     } else {
       fill = colors.accentSolid;
     }
@@ -92,11 +92,11 @@ class QuotaBar extends StatelessWidget {
             SizedBox(height: spacing.s1),
           ],
           ClipRRect(
-            borderRadius: context.radii.fullAll,
+            borderRadius: context.radii.pillAll,
             child: SizedBox(
               height: CommySizes.quotaBarHeight,
               child: ColoredBox(
-                color: colors.bgInset,
+                color: colors.fill,
                 child: Align(
                   alignment: AlignmentDirectional.centerStart,
                   child: FractionallySizedBox(

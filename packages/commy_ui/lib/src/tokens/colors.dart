@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 
-/// Semantic colour tokens of the "Graphite and signal" system.
+/// Semantic colour tokens of the "Route" system.
 ///
-/// This class is the whole colour vocabulary of the product: the raw Ink /
-/// Jade / Amber / Rose / Azure ramps of docs/04-design-system.md never reach
-/// widget code, only the semantic names below do. Rule R4 — nothing outside
-/// `lib/src/tokens/` may write a colour literal.
+/// This class is the whole colour vocabulary of the product. The roles are
+/// the ones docs/04-design-system.md §2 lists — canvas, surface, fill, ink,
+/// line, action, the statuses — under the Dart names the code has always
+/// used: `canvas` is [bgCanvas], `ink-2` is [textSecondary], `action` is
+/// [accentSolid]. The table in §2.1 is the dictionary between the two. Rule
+/// R4 — nothing outside `lib/src/tokens/` may write a colour literal.
 ///
-/// Names are the camelCase form of the Figma variable: `bg/surface` becomes
-/// [bgSurface], `status/connected` becomes [statusConnected]. A name that
-/// disagrees with Figma is a bug, not a detail.
+/// The base is Apple's grouped palette — a grey canvas under white cards in
+/// light, true black under `#1C1C1E` in dark — with the secondary and
+/// tertiary inks taken darker (light) and lighter (dark) than Apple's, whose
+/// values fall under 4.5:1 on their own grounds.
+///
+/// Every status comes in three: the colour for words and icons (4.5:1 and
+/// up), a `…Solid` for lines, dots and fills under text (3:1 and up against
+/// the canvas), and the `…OnSolid` drawn on top of that fill.
 ///
 /// Alpha-bearing tokens are pre-multiplied here instead of being produced with
 /// `withOpacity` at the call site: the value has to be identical in every
@@ -17,18 +24,22 @@ import 'package:flutter/material.dart';
 @immutable
 class CommyColors extends ThemeExtension<CommyColors> {
   /// Creates a colour set. Use [dark] or [light]; build a new one only in
-  /// tests or when previewing an alternative signature hue.
+  /// tests.
   const CommyColors({
     required this.bgCanvas,
     required this.bgSurface,
-    required this.bgGroupHeader,
     required this.bgRaised,
     required this.bgOverlay,
     required this.bgInset,
     required this.bgScrim,
+    required this.fill,
+    required this.fillStrong,
     required this.borderSubtle,
     required this.borderDefault,
     required this.borderStrong,
+    required this.focusRing,
+    required this.thumb,
+    required this.segmentThumb,
     required this.textPrimary,
     required this.textSecondary,
     required this.textTertiary,
@@ -43,133 +54,180 @@ class CommyColors extends ThemeExtension<CommyColors> {
     required this.statusError,
     required this.statusInfo,
     required this.statusIdle,
+    required this.statusConnectedSolid,
+    required this.statusConnectingSolid,
+    required this.statusErrorSolid,
+    required this.statusInfoSolid,
+    required this.statusIdleSolid,
+    required this.statusConnectedOnSolid,
+    required this.statusConnectingOnSolid,
+    required this.statusErrorOnSolid,
+    required this.statusInfoOnSolid,
+    required this.statusIdleOnSolid,
     required this.statusConnectedWash,
     required this.statusConnectingWash,
     required this.statusErrorWash,
     required this.statusInfoWash,
     required this.statusIdleWash,
-    required this.statusConnectedGlow,
-    required this.statusErrorGlow,
   });
 
   /// Fully transparent. Exists so that no widget has to reach for
   /// `Colors.transparent`, which rule R4 forbids outside this directory.
   static const Color transparent = Color(0x00000000);
 
-  /// The dark theme. This is the theme the product was designed in.
+  /// The dark theme: true black under `#1C1C1E` cards, as iOS draws it.
   static const CommyColors dark = CommyColors(
-    bgCanvas: Color(0xFF0A0B0D),
-    bgSurface: Color(0xFF131519),
-    bgGroupHeader: Color(0xFF1B1D21),
-    bgRaised: Color(0xFF1B1D21),
-    bgOverlay: Color(0xFF24272C),
-    bgInset: Color(0xFF0E1013),
-    bgScrim: Color(0xA3000000),
-    borderSubtle: Color(0xFF1B1D21),
-    borderDefault: Color(0xFF24272C),
-    borderStrong: Color(0xFF6C7178),
-    textPrimary: Color(0xFFF2F3F5),
-    textSecondary: Color(0xFFB3B7BD),
-    // ink/400 (#8D9299) lifted by one in each channel: ink/400 itself made
-    // 4.46:1 on the connected wash of an active row. See the contrast table.
-    textTertiary: Color(0xFF8E939A),
-    textDisabled: Color(0xFF6C7178),
-    textInverse: Color(0xFF0A0B0D),
-    accentSolid: Color(0xFFF2F3F5),
-    accentHover: Color(0xFFFFFFFF),
-    accentOnSolid: Color(0xFF0A0B0D),
-    accentWash: Color(0x14F2F3F5),
+    bgCanvas: Color(0xFF000000),
+    bgSurface: Color(0xFF1C1C1E),
+    // A sheet in dark is the colour of a card, the way iOS raises it: a
+    // lighter sheet would drop the protocol tags on the active server's
+    // plate under 4.5:1.
+    bgRaised: Color(0xFF1C1C1E),
+    bgOverlay: Color(0xFF2C2C2E),
+    bgInset: Color(0xFF000000),
+    bgScrim: Color(0x99000000),
+    fill: Color(0x3D787880),
+    fillStrong: Color(0x5C787880),
+    borderSubtle: Color(0xFF38383A),
+    borderDefault: Color(0xFF48484A),
+    // 3:1 against the fill of a track, which is lighter than the card.
+    borderStrong: Color(0xFF7E7E84),
+    focusRing: Color(0xFFFFFFFF),
+    thumb: Color(0xFFFFFFFF),
+    segmentThumb: Color(0xFF636366),
+    textPrimary: Color(0xFFFFFFFF),
+    textSecondary: Color(0xFFB5B5BB),
+    textTertiary: Color(0xFF9C9CA2),
+    textDisabled: Color(0xFF636366),
+    textInverse: Color(0xFF000000),
+    accentSolid: Color(0xFFFFFFFF),
+    accentHover: Color(0xFFD1D1D6),
+    accentOnSolid: Color(0xFF000000),
+    accentWash: Color(0x14FFFFFF),
     statusConnected: Color(0xFF2FD98A),
-    statusConnecting: Color(0xFFF0A93B),
-    statusError: Color(0xFFF76C6C),
-    statusInfo: Color(0xFF63A8FF),
-    statusIdle: Color(0xFF8D9299),
+    statusConnecting: Color(0xFFF5B547),
+    statusError: Color(0xFFFF7A70),
+    statusInfo: Color(0xFF64A8FF),
+    statusIdle: Color(0xFF9C9CA2),
+    statusConnectedSolid: Color(0xFF2FD98A),
+    statusConnectingSolid: Color(0xFFF5B547),
+    // Darker than the words: white has to read on it at 4.5:1.
+    statusErrorSolid: Color(0xFFD93A3A),
+    statusInfoSolid: Color(0xFF64A8FF),
+    statusIdleSolid: Color(0xFF77777D),
+    statusConnectedOnSolid: Color(0xFF000000),
+    statusConnectingOnSolid: Color(0xFF000000),
+    statusErrorOnSolid: Color(0xFFFFFFFF),
+    statusInfoOnSolid: Color(0xFF000000),
+    statusIdleOnSolid: Color(0xFF000000),
     statusConnectedWash: Color(0x242FD98A),
-    statusConnectingWash: Color(0x24F0A93B),
-    statusErrorWash: Color(0x24F76C6C),
-    statusInfoWash: Color(0x2463A8FF),
-    statusIdleWash: Color(0x248D9299),
-    statusConnectedGlow: Color(0x3D2FD98A),
-    statusErrorGlow: Color(0x3DF76C6C),
+    statusConnectingWash: Color(0x24F5B547),
+    statusErrorWash: Color(0x24FF7A70),
+    statusInfoWash: Color(0x2464A8FF),
+    statusIdleWash: Color(0x249C9CA2),
   );
 
-  /// The light theme. Derived from the dark one, never "left to happen".
+  /// The light theme: white cards on Apple's grouped grey.
   static const CommyColors light = CommyColors(
-    bgCanvas: Color(0xFFF6F7F9),
+    bgCanvas: Color(0xFFF2F2F7),
     bgSurface: Color(0xFFFFFFFF),
-    bgGroupHeader: Color(0xFFF2F3F5),
     bgRaised: Color(0xFFFFFFFF),
-    bgOverlay: Color(0xFFF2F3F5),
-    bgInset: Color(0xFFFAFBFC),
-    bgScrim: Color(0x66131519),
-    borderSubtle: Color(0xFFE6E8EB),
-    borderDefault: Color(0xFFD2D6DB),
-    borderStrong: Color(0xFF8D9299),
-    textPrimary: Color(0xFF131519),
-    textSecondary: Color(0xFF4E535B),
-    // ink/500 (#6C7178) darkened by four in each channel: ink/500 itself
-    // fell under 4.5:1 on the grey and tinted grounds it is drawn on — the
-    // hint in a text field, the idle badge, an active row. See the contrast
-    // table.
-    textTertiary: Color(0xFF686D74),
-    textDisabled: Color(0xFFB3B7BD),
+    bgOverlay: Color(0xFFE9E9EF),
+    bgInset: Color(0xFFF2F2F7),
+    bgScrim: Color(0x66000000),
+    fill: Color(0x1F787880),
+    fillStrong: Color(0x33787880),
+    borderSubtle: Color(0xFFD8D8DD),
+    borderDefault: Color(0xFFC6C6C8),
+    borderStrong: Color(0xFF7C7C82),
+    focusRing: Color(0xFF000000),
+    thumb: Color(0xFFFFFFFF),
+    segmentThumb: Color(0xFFFFFFFF),
+    textPrimary: Color(0xFF000000),
+    textSecondary: Color(0xFF4A4A50),
+    // Darker than Apple's tertiary label, which is 2:1: this one holds 4.5:1
+    // on every ground it is drawn on, the search field's fill included.
+    textTertiary: Color(0xFF626268),
+    textDisabled: Color(0xFFAEAEB2),
     textInverse: Color(0xFFFFFFFF),
-    accentSolid: Color(0xFF131519),
-    accentHover: Color(0xFF24272C),
+    accentSolid: Color(0xFF000000),
+    accentHover: Color(0xFF2C2C2E),
     accentOnSolid: Color(0xFFFFFFFF),
-    accentWash: Color(0x0F131519),
-    statusConnected: Color(0xFF0C7A4A),
-    statusConnecting: Color(0xFF93560A),
-    statusError: Color(0xFFA02020),
-    statusInfo: Color(0xFF1D4FD8),
-    statusIdle: Color(0xFF686D74),
-    statusConnectedWash: Color(0x1A0C7A4A),
-    statusConnectingWash: Color(0x1A93560A),
-    statusErrorWash: Color(0x1AA02020),
-    statusInfoWash: Color(0x1A1D4FD8),
-    statusIdleWash: Color(0x1A686D74),
-    statusConnectedGlow: Color(0x2E0C7A4A),
-    statusErrorGlow: Color(0x2EA02020),
+    accentWash: Color(0x0D000000),
+    statusConnected: Color(0xFF0B7546),
+    statusConnecting: Color(0xFF8A4B00),
+    statusError: Color(0xFFB42318),
+    statusInfo: Color(0xFF1F5BD8),
+    statusIdle: Color(0xFF626268),
+    statusConnectedSolid: Color(0xFF159555),
+    statusConnectingSolid: Color(0xFFB26A00),
+    statusErrorSolid: Color(0xFFD92D20),
+    statusInfoSolid: Color(0xFF1F5BD8),
+    statusIdleSolid: Color(0xFF85858B),
+    statusConnectedOnSolid: Color(0xFFFFFFFF),
+    statusConnectingOnSolid: Color(0xFFFFFFFF),
+    statusErrorOnSolid: Color(0xFFFFFFFF),
+    statusInfoOnSolid: Color(0xFFFFFFFF),
+    statusIdleOnSolid: Color(0xFFFFFFFF),
+    statusConnectedWash: Color(0x1A0B7546),
+    statusConnectingWash: Color(0x1A8A4B00),
+    statusErrorWash: Color(0x1AB42318),
+    statusInfoWash: Color(0x1A1F5BD8),
+    statusIdleWash: Color(0x1A626268),
   );
 
-  /// Application background. Elevation level 0.
+  /// `canvas` — application background.
   final Color bgCanvas;
 
-  /// Cards and list rows. Elevation level 1.
+  /// `surface` — cards, grouped lists.
   final Color bgSurface;
 
-  /// Group header: a subscription sitting above its own nodes.
-  final Color bgGroupHeader;
-
-  /// Sheets, dialogs, menus and the connect disc. Elevation level 2.
+  /// `surface-raised` — sheets and dialogs.
   final Color bgRaised;
 
-  /// Hover, row selection, input field background.
+  /// `surface-2` — what sits inside a card: a pressed row, a field, a menu.
   final Color bgOverlay;
 
-  /// Recessed surfaces: the log view, a progress track.
+  /// `inset` — recessed surfaces: the log view, a progress track.
   final Color bgInset;
 
-  /// Dimmer painted under a modal. Carries its own alpha.
+  /// `scrim` — dimmer painted under a modal. Carries its own alpha.
   final Color bgScrim;
 
-  /// Separators inside one card.
+  /// `fill` — tracks of the segmented control and the switch, neutral chips,
+  /// the search field. Carries its own alpha.
+  final Color fill;
+
+  /// `fill-strong` — the sheet handle, a pressed chip. Carries its own alpha.
+  final Color fillStrong;
+
+  /// `line` — hairline separators.
   final Color borderSubtle;
 
-  /// Borders of cards and fields.
+  /// `line-default` — the edge of a field, of a flag.
   final Color borderDefault;
 
-  /// Focus ring and active border.
+  /// `line-strong` — the border of an interactive control: 3:1 and up.
   final Color borderStrong;
 
-  /// Primary text.
+  /// `focus` — the keyboard focus ring.
+  final Color focusRing;
+
+  /// The thumb of a switch that is off: white in both themes, as on iOS. A
+  /// switch that is on draws its thumb in [accentOnSolid] on [accentSolid].
+  final Color thumb;
+
+  /// The thumb of the segmented control: white on light, `#636366` on dark.
+  final Color segmentThumb;
+
+  /// `ink` — primary text.
   final Color textPrimary;
 
-  /// Captions and metadata.
+  /// `ink-2` — secondary text and captions.
   final Color textSecondary;
 
-  /// Third level. Never used below 13 px — see the contrast table, which
-  /// checks it against every ground it is drawn on, not only the surface.
+  /// `ink-3` — metadata and placeholders. Checked against every ground it is
+  /// drawn on, not only the surface.
   final Color textTertiary;
 
   /// Inactive text. Deliberately below the AA threshold (WCAG 1.4.3).
@@ -178,32 +236,63 @@ class CommyColors extends ThemeExtension<CommyColors> {
   /// Text placed on top of an accent fill.
   final Color textInverse;
 
-  /// Brand colour and primary action. Chalk on dark, ink on light.
+  /// `action` — the primary button, a switch that is on. The brand, too: it
+  /// is monochrome, chalk on dark and ink on light.
   final Color accentSolid;
 
-  /// Hover state of the primary action.
+  /// `action-pressed` — the primary action under a finger or a pointer.
   final Color accentHover;
 
-  /// Content drawn on top of [accentSolid].
+  /// `on-action` — content drawn on top of [accentSolid].
   final Color accentOnSolid;
 
-  /// Backing wash of a selected row. Carries its own alpha.
+  /// `wash` — a row under a pointer. Carries its own alpha.
   final Color accentWash;
 
-  /// "Connected", and nothing else. The signature hue of the product.
+  /// "Connected", and nothing else: words and icons.
   final Color statusConnected;
 
-  /// Transitional state: starting or stopping.
+  /// Transitional state, or something missing: words and icons.
   final Color statusConnecting;
 
-  /// Failure, disconnection.
+  /// Failure: words and icons.
   final Color statusError;
 
-  /// Informational.
+  /// Information and change: words and icons.
   final Color statusInfo;
 
-  /// Disconnected.
+  /// At rest: words and icons.
   final Color statusIdle;
+
+  /// [statusConnected] as a line, a dot or a fill — the lit route.
+  final Color statusConnectedSolid;
+
+  /// [statusConnecting] as a line, a dot or a fill.
+  final Color statusConnectingSolid;
+
+  /// [statusError] as a line, a dot or a fill under white.
+  final Color statusErrorSolid;
+
+  /// [statusInfo] as a line, a dot or a fill.
+  final Color statusInfoSolid;
+
+  /// [statusIdle] as a line, a dot or a ring — the route at rest.
+  final Color statusIdleSolid;
+
+  /// A glyph drawn on [statusConnectedSolid].
+  final Color statusConnectedOnSolid;
+
+  /// A glyph drawn on [statusConnectingSolid].
+  final Color statusConnectingOnSolid;
+
+  /// A glyph or a word drawn on [statusErrorSolid].
+  final Color statusErrorOnSolid;
+
+  /// A glyph drawn on [statusInfoSolid].
+  final Color statusInfoOnSolid;
+
+  /// A glyph drawn on [statusIdleSolid].
+  final Color statusIdleOnSolid;
 
   /// Chip background for [statusConnected]. Carries its own alpha.
   final Color statusConnectedWash;
@@ -220,30 +309,23 @@ class CommyColors extends ThemeExtension<CommyColors> {
   /// Chip background for [statusIdle]. Carries its own alpha.
   final Color statusIdleWash;
 
-  /// Glow of the connect ring when connected. The only glow in the product.
-  final Color statusConnectedGlow;
-
-  /// Glow of the connect ring when errored.
-  ///
-  /// The semantic table of docs/04-design-system.md spells out only
-  /// `status/connected/glow`; the Figma effect `Glow/Ошибка` exists too, so
-  /// this token repeats the same alpha rule (24% dark, 18% light) on
-  /// [statusError].
-  final Color statusErrorGlow;
-
   /// Returns a copy with the given colours replaced.
   @override
   CommyColors copyWith({
     Color? bgCanvas,
     Color? bgSurface,
-    Color? bgGroupHeader,
     Color? bgRaised,
     Color? bgOverlay,
     Color? bgInset,
     Color? bgScrim,
+    Color? fill,
+    Color? fillStrong,
     Color? borderSubtle,
     Color? borderDefault,
     Color? borderStrong,
+    Color? focusRing,
+    Color? thumb,
+    Color? segmentThumb,
     Color? textPrimary,
     Color? textSecondary,
     Color? textTertiary,
@@ -258,25 +340,37 @@ class CommyColors extends ThemeExtension<CommyColors> {
     Color? statusError,
     Color? statusInfo,
     Color? statusIdle,
+    Color? statusConnectedSolid,
+    Color? statusConnectingSolid,
+    Color? statusErrorSolid,
+    Color? statusInfoSolid,
+    Color? statusIdleSolid,
+    Color? statusConnectedOnSolid,
+    Color? statusConnectingOnSolid,
+    Color? statusErrorOnSolid,
+    Color? statusInfoOnSolid,
+    Color? statusIdleOnSolid,
     Color? statusConnectedWash,
     Color? statusConnectingWash,
     Color? statusErrorWash,
     Color? statusInfoWash,
     Color? statusIdleWash,
-    Color? statusConnectedGlow,
-    Color? statusErrorGlow,
   }) {
     return CommyColors(
       bgCanvas: bgCanvas ?? this.bgCanvas,
       bgSurface: bgSurface ?? this.bgSurface,
-      bgGroupHeader: bgGroupHeader ?? this.bgGroupHeader,
       bgRaised: bgRaised ?? this.bgRaised,
       bgOverlay: bgOverlay ?? this.bgOverlay,
       bgInset: bgInset ?? this.bgInset,
       bgScrim: bgScrim ?? this.bgScrim,
+      fill: fill ?? this.fill,
+      fillStrong: fillStrong ?? this.fillStrong,
       borderSubtle: borderSubtle ?? this.borderSubtle,
       borderDefault: borderDefault ?? this.borderDefault,
       borderStrong: borderStrong ?? this.borderStrong,
+      focusRing: focusRing ?? this.focusRing,
+      thumb: thumb ?? this.thumb,
+      segmentThumb: segmentThumb ?? this.segmentThumb,
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       textTertiary: textTertiary ?? this.textTertiary,
@@ -291,13 +385,24 @@ class CommyColors extends ThemeExtension<CommyColors> {
       statusError: statusError ?? this.statusError,
       statusInfo: statusInfo ?? this.statusInfo,
       statusIdle: statusIdle ?? this.statusIdle,
+      statusConnectedSolid: statusConnectedSolid ?? this.statusConnectedSolid,
+      statusConnectingSolid:
+          statusConnectingSolid ?? this.statusConnectingSolid,
+      statusErrorSolid: statusErrorSolid ?? this.statusErrorSolid,
+      statusInfoSolid: statusInfoSolid ?? this.statusInfoSolid,
+      statusIdleSolid: statusIdleSolid ?? this.statusIdleSolid,
+      statusConnectedOnSolid:
+          statusConnectedOnSolid ?? this.statusConnectedOnSolid,
+      statusConnectingOnSolid:
+          statusConnectingOnSolid ?? this.statusConnectingOnSolid,
+      statusErrorOnSolid: statusErrorOnSolid ?? this.statusErrorOnSolid,
+      statusInfoOnSolid: statusInfoOnSolid ?? this.statusInfoOnSolid,
+      statusIdleOnSolid: statusIdleOnSolid ?? this.statusIdleOnSolid,
       statusConnectedWash: statusConnectedWash ?? this.statusConnectedWash,
       statusConnectingWash: statusConnectingWash ?? this.statusConnectingWash,
       statusErrorWash: statusErrorWash ?? this.statusErrorWash,
       statusInfoWash: statusInfoWash ?? this.statusInfoWash,
       statusIdleWash: statusIdleWash ?? this.statusIdleWash,
-      statusConnectedGlow: statusConnectedGlow ?? this.statusConnectedGlow,
-      statusErrorGlow: statusErrorGlow ?? this.statusErrorGlow,
     );
   }
 
@@ -307,54 +412,56 @@ class CommyColors extends ThemeExtension<CommyColors> {
     if (other == null) {
       return this;
     }
+    Color mix(Color a, Color b) => Color.lerp(a, b, t)!;
     return CommyColors(
-      bgCanvas: Color.lerp(bgCanvas, other.bgCanvas, t)!,
-      bgSurface: Color.lerp(bgSurface, other.bgSurface, t)!,
-      bgGroupHeader: Color.lerp(bgGroupHeader, other.bgGroupHeader, t)!,
-      bgRaised: Color.lerp(bgRaised, other.bgRaised, t)!,
-      bgOverlay: Color.lerp(bgOverlay, other.bgOverlay, t)!,
-      bgInset: Color.lerp(bgInset, other.bgInset, t)!,
-      bgScrim: Color.lerp(bgScrim, other.bgScrim, t)!,
-      borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t)!,
-      borderDefault: Color.lerp(borderDefault, other.borderDefault, t)!,
-      borderStrong: Color.lerp(borderStrong, other.borderStrong, t)!,
-      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
-      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
-      textTertiary: Color.lerp(textTertiary, other.textTertiary, t)!,
-      textDisabled: Color.lerp(textDisabled, other.textDisabled, t)!,
-      textInverse: Color.lerp(textInverse, other.textInverse, t)!,
-      accentSolid: Color.lerp(accentSolid, other.accentSolid, t)!,
-      accentHover: Color.lerp(accentHover, other.accentHover, t)!,
-      accentOnSolid: Color.lerp(accentOnSolid, other.accentOnSolid, t)!,
-      accentWash: Color.lerp(accentWash, other.accentWash, t)!,
-      statusConnected: Color.lerp(statusConnected, other.statusConnected, t)!,
-      statusConnecting: Color.lerp(
-        statusConnecting,
-        other.statusConnecting,
-        t,
-      )!,
-      statusError: Color.lerp(statusError, other.statusError, t)!,
-      statusInfo: Color.lerp(statusInfo, other.statusInfo, t)!,
-      statusIdle: Color.lerp(statusIdle, other.statusIdle, t)!,
-      statusConnectedWash: Color.lerp(
-        statusConnectedWash,
-        other.statusConnectedWash,
-        t,
-      )!,
-      statusConnectingWash: Color.lerp(
-        statusConnectingWash,
-        other.statusConnectingWash,
-        t,
-      )!,
-      statusErrorWash: Color.lerp(statusErrorWash, other.statusErrorWash, t)!,
-      statusInfoWash: Color.lerp(statusInfoWash, other.statusInfoWash, t)!,
-      statusIdleWash: Color.lerp(statusIdleWash, other.statusIdleWash, t)!,
-      statusConnectedGlow: Color.lerp(
-        statusConnectedGlow,
-        other.statusConnectedGlow,
-        t,
-      )!,
-      statusErrorGlow: Color.lerp(statusErrorGlow, other.statusErrorGlow, t)!,
+      bgCanvas: mix(bgCanvas, other.bgCanvas),
+      bgSurface: mix(bgSurface, other.bgSurface),
+      bgRaised: mix(bgRaised, other.bgRaised),
+      bgOverlay: mix(bgOverlay, other.bgOverlay),
+      bgInset: mix(bgInset, other.bgInset),
+      bgScrim: mix(bgScrim, other.bgScrim),
+      fill: mix(fill, other.fill),
+      fillStrong: mix(fillStrong, other.fillStrong),
+      borderSubtle: mix(borderSubtle, other.borderSubtle),
+      borderDefault: mix(borderDefault, other.borderDefault),
+      borderStrong: mix(borderStrong, other.borderStrong),
+      focusRing: mix(focusRing, other.focusRing),
+      thumb: mix(thumb, other.thumb),
+      segmentThumb: mix(segmentThumb, other.segmentThumb),
+      textPrimary: mix(textPrimary, other.textPrimary),
+      textSecondary: mix(textSecondary, other.textSecondary),
+      textTertiary: mix(textTertiary, other.textTertiary),
+      textDisabled: mix(textDisabled, other.textDisabled),
+      textInverse: mix(textInverse, other.textInverse),
+      accentSolid: mix(accentSolid, other.accentSolid),
+      accentHover: mix(accentHover, other.accentHover),
+      accentOnSolid: mix(accentOnSolid, other.accentOnSolid),
+      accentWash: mix(accentWash, other.accentWash),
+      statusConnected: mix(statusConnected, other.statusConnected),
+      statusConnecting: mix(statusConnecting, other.statusConnecting),
+      statusError: mix(statusError, other.statusError),
+      statusInfo: mix(statusInfo, other.statusInfo),
+      statusIdle: mix(statusIdle, other.statusIdle),
+      statusConnectedSolid:
+          mix(statusConnectedSolid, other.statusConnectedSolid),
+      statusConnectingSolid:
+          mix(statusConnectingSolid, other.statusConnectingSolid),
+      statusErrorSolid: mix(statusErrorSolid, other.statusErrorSolid),
+      statusInfoSolid: mix(statusInfoSolid, other.statusInfoSolid),
+      statusIdleSolid: mix(statusIdleSolid, other.statusIdleSolid),
+      statusConnectedOnSolid:
+          mix(statusConnectedOnSolid, other.statusConnectedOnSolid),
+      statusConnectingOnSolid:
+          mix(statusConnectingOnSolid, other.statusConnectingOnSolid),
+      statusErrorOnSolid: mix(statusErrorOnSolid, other.statusErrorOnSolid),
+      statusInfoOnSolid: mix(statusInfoOnSolid, other.statusInfoOnSolid),
+      statusIdleOnSolid: mix(statusIdleOnSolid, other.statusIdleOnSolid),
+      statusConnectedWash: mix(statusConnectedWash, other.statusConnectedWash),
+      statusConnectingWash:
+          mix(statusConnectingWash, other.statusConnectingWash),
+      statusErrorWash: mix(statusErrorWash, other.statusErrorWash),
+      statusInfoWash: mix(statusInfoWash, other.statusInfoWash),
+      statusIdleWash: mix(statusIdleWash, other.statusIdleWash),
     );
   }
 }

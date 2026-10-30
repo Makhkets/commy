@@ -65,6 +65,7 @@ class SearchField extends StatelessWidget {
       hintText: hintText,
       autofocus: autofocus,
       prefixIcon: CommyIcons.search,
+      isSearch: true,
       textInputAction: TextInputAction.search,
       onChanged: onChanged,
       suffix: onClear == null || !hasText

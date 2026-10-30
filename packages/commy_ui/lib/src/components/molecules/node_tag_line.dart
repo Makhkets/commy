@@ -27,8 +27,10 @@ class NodeTag {
   String toString() => 'NodeTag($label, ${hue.name})';
 }
 
-/// `VLESS · Reality · TCP`, each word in its own hue and the dots between them
-/// in the caption colour — the way INCY draws it, which the owner asked for.
+/// `VLESS Reality TCP`, each word in its own hue — the way INCY draws it,
+/// which the owner asked for — with a 6 dp gap between the words instead of
+/// the middle dots it used to have: the hues already tell the words apart,
+/// and metadata is not joined with dots (docs/04-design-system.md §2.2).
 ///
 /// One line, ellipsised, in a list row: a long flow name must not push the
 /// row taller. A header with room to grow — the server's own menu — passes
@@ -49,8 +51,9 @@ class NodeTagLine extends StatelessWidget {
     super.key,
   });
 
-  /// What sits between two tags.
-  static const String separator = ' · ';
+  /// What sits between two tags when the line is read out or copied as text.
+  /// On screen the gap is `space/1.5`, not a character.
+  static const String separator = ' ';
 
   /// The words, in order.
   final List<NodeTag> tags;
@@ -58,8 +61,7 @@ class NodeTagLine extends StatelessWidget {
   /// Whether to drop the hues.
   final bool muted;
 
-  /// The colour of a muted line and of the separators. `text/secondary` when
-  /// `null`.
+  /// The colour of a muted line. `ink-2` when `null`.
   final Color? mutedColor;
 
   /// How many lines the words may take, ellipsised after the last; `null`
@@ -77,12 +79,13 @@ class NodeTagLine extends StatelessWidget {
       color: mutedColor ?? colors.textSecondary,
     );
 
+    final gap = context.spacing.s15;
     return Text.rich(
       TextSpan(
         style: base,
         children: <InlineSpan>[
           for (var index = 0; index < tags.length; index++) ...<InlineSpan>[
-            if (index > 0) const TextSpan(text: separator),
+            if (index > 0) WidgetSpan(child: SizedBox(width: gap)),
             TextSpan(
               text: tags[index].label,
               style: muted || tags[index].hue == CommyTagHue.neutral

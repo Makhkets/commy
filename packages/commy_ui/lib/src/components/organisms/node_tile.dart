@@ -11,16 +11,17 @@ import 'package:flutter/material.dart';
 /// One server, as a row inside the card of the subscription it came from.
 ///
 /// The active node is a rounded plate inset from the card — the connected
-/// wash with a hairline of the connected hue around it — never a tick on the
-/// trailing side. It used to be a bar down the leading edge; the plate is
-/// INCY's, which the owner pointed at (2026-10-10): it is caught by
-/// peripheral vision just as well while scrolling, costs no width either,
-/// and reads as "this one" rather than as a stripe on the card's edge.
+/// wash with a hairline of the connected fill around it, `block` (16) inside
+/// the card's 20 — never a tick on the trailing side. It used to be a bar
+/// down the leading edge; the plate is INCY's, which the owner pointed at
+/// (2026-10-10): it is caught by peripheral vision just as well while
+/// scrolling, costs no width either, and reads as "this one" rather than as
+/// a stripe on the card's edge.
 ///
-/// Every row is inset by `space/2` on each side and `space/1` above and
-/// below, so the plate and the press ripple of any row are the same rounded
-/// shape. A container that wants the plate as far from its top edge as from
-/// its sides pads the block of rows by another `space/1`.
+/// Every row is inset by `space/1` on each side, so the plate and the press
+/// highlight of any row are the same rounded shape, concentric with the card
+/// (`card − 4`). A container that wants the plate as far from its top edge
+/// as from its sides pads the block of rows by another `space/1`.
 ///
 /// An unreachable node is greyed — flag, text and tags — and given the
 /// offline glyph, but never hidden: a server that timed out once may be fine
@@ -45,6 +46,7 @@ class NodeTile extends StatelessWidget {
     this.latency,
     this.countryCode,
     this.isActive = false,
+    this.isLive = true,
     this.isReachable = true,
     this.offlineSemanticLabel,
     this.onTap,
@@ -52,8 +54,10 @@ class NodeTile extends StatelessWidget {
     super.key,
   });
 
-  /// What sits between two descriptors: `VLESS · Reality · TCP`.
-  static const String descriptorSeparator = NodeTagLine.separator;
+  /// What joins two descriptors written out as one string — a toast, an
+  /// announcement: `VLESS, Reality, TCP`. On screen the line is
+  /// [NodeTagLine], which leaves a gap instead.
+  static const String descriptorSeparator = ', ';
 
   /// Takes the colour out of a flag and keeps its light and dark, so it
   /// stays a flag — only a grey one. Rec. 709 luma weights; not a design
@@ -92,8 +96,16 @@ class NodeTile extends StatelessWidget {
   /// scan a long list.
   final String? countryCode;
 
-  /// Whether this is the node traffic currently goes through.
+  /// Whether this is the chosen node.
   final bool isActive;
+
+  /// Whether traffic goes through the chosen node right now.
+  ///
+  /// The plate of a chosen node is green only then: green says "connected"
+  /// and nothing else (docs/04-design-system.md §2). Chosen while the tunnel
+  /// is down, the plate is the neutral fill with a `line-strong` edge — the
+  /// choice, without a claim about the connection.
+  final bool isLive;
 
   /// Whether the last probe reached the server.
   final bool isReachable;
@@ -117,7 +129,7 @@ class NodeTile extends StatelessWidget {
     final spacing = context.spacing;
     final type = context.typography;
     final motion = context.motion;
-    final shape = context.radii.smAll;
+    final shape = context.radii.blockAll;
 
     // A server that did not answer is grey: its flag loses its colour and its
     // name drops to the tertiary step. One step down used to be all it got,
@@ -136,8 +148,8 @@ class NodeTile extends StatelessWidget {
       button: onTap != null,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.s2,
-          vertical: spacing.s1,
+          horizontal: spacing.s1,
+          vertical: spacing.s05,
         ),
         child: CommyFocusable(
           onActivate: onTap,
@@ -145,13 +157,18 @@ class NodeTile extends StatelessWidget {
             duration: motion.fast,
             curve: motion.fastCurve,
             decoration: BoxDecoration(
-              color: isActive
-                  ? colors.statusConnectedWash
-                  : CommyColors.transparent,
+              color: !isActive
+                  ? CommyColors.transparent
+                  : isLive
+                      ? colors.statusConnectedWash
+                      : colors.fill,
               borderRadius: shape,
               border: Border.all(
-                color:
-                    isActive ? colors.statusConnected : CommyColors.transparent,
+                color: !isActive
+                    ? CommyColors.transparent
+                    : isLive
+                        ? colors.statusConnectedSolid
+                        : colors.borderStrong,
               ),
             ),
             // Over the content, so the ring costs no layout and never moves
@@ -177,7 +194,7 @@ class NodeTile extends StatelessWidget {
                   ),
                   child: Padding(
                     padding: EdgeInsets.symmetric(
-                      horizontal: spacing.s2,
+                      horizontal: spacing.s3,
                       vertical: spacing.s2,
                     ),
                     child: Row(
@@ -188,7 +205,7 @@ class NodeTile extends StatelessWidget {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: colors.bgOverlay,
-                            borderRadius: context.radii.xsAll,
+                            borderRadius: context.radii.smAll,
                           ),
                           child: isReachable
                               ? flag

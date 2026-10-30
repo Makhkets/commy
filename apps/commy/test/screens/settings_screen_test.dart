@@ -57,7 +57,7 @@ void main() {
     // and a surface that cut the last rows off would be testing the window
     // rather than the screen.
     tester.view
-      ..physicalSize = const Size(420, 3400)
+      ..physicalSize = const Size(420, 4200)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);

@@ -1,6 +1,5 @@
 import 'package:commy_ui/src/tokens/breakpoints.dart';
 import 'package:commy_ui/src/tokens/colors.dart';
-import 'package:commy_ui/src/tokens/connect_tokens.dart';
 import 'package:commy_ui/src/tokens/elevation.dart';
 import 'package:commy_ui/src/tokens/layout_size.dart';
 import 'package:commy_ui/src/tokens/motion.dart';
@@ -56,22 +55,13 @@ extension CommyThemeContext on BuildContext {
     return Theme.of(this).extension<CommyMotion>() ?? CommyMotion.standard;
   }
 
-  /// Elevation shadow sets. Empty on the dark theme by design.
+  /// Shadow sets: only floating surfaces cast one, and only in light.
   CommyElevation get elevation {
     final theme = Theme.of(this);
     return theme.extension<CommyElevation>() ??
         (theme.brightness == Brightness.dark
             ? CommyElevation.dark
             : CommyElevation.light);
-  }
-
-  /// Geometry and derived colours of the connect button.
-  CommyConnectTokens get connectTokens {
-    final theme = Theme.of(this);
-    return theme.extension<CommyConnectTokens>() ??
-        (theme.brightness == Brightness.dark
-            ? CommyConnectTokens.dark
-            : CommyConnectTokens.light);
   }
 
   /// Colours of the protocol tags on a server row.
@@ -90,6 +80,18 @@ extension CommyThemeContext on BuildContext {
   CommyLayoutSize get layoutSize =>
       CommyBreakpoints.sizeFor(MediaQuery.sizeOf(this).width);
 
-  /// Base screen inset: `space/4` on mobile, `space/6` from tablet up.
-  double get screenInset => layoutSize.isCompact ? spacing.s4 : spacing.s6;
+  /// Side inset of a screen (docs/04-design-system.md §4): 16 on a phone,
+  /// 24 on a tablet, 32 on a laptop and 40 from 1440 dp up.
+  double get screenInset {
+    final size = layoutSize;
+    if (size.isCompact) {
+      return spacing.s4;
+    }
+    if (size.isMedium) {
+      return spacing.s6;
+    }
+    return MediaQuery.sizeOf(this).width >= CommyBreakpoints.wide
+        ? spacing.s10
+        : spacing.s8;
+  }
 }

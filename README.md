@@ -20,18 +20,40 @@ Android · iOS · Windows · macOS · Linux
 
 <table>
 <tr>
-<td align="center" width="50%">
-<img src="docs/screenshots/02-home-connected.png" width="280" alt="Commy connected: live throughput, the chosen server and the subscription card">
-<br><sub><b>Connected.</b> Live throughput, session time, the chosen server, and the subscription's quota and expiry.</sub>
+<td align="center" width="33%">
+<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy, connected: the answer at the top, the route from this device through the server to the internet, and the one button">
 </td>
-<td align="center" width="50%">
-<img src="docs/screenshots/01-first-run.png" width="280" alt="Commy first run: an empty library with four ways to import a server">
-<br><sub><b>First run.</b> Empty until you import something — there is nothing bundled to connect to.</sub>
+<td align="center" width="33%">
+<img src="docs/screenshots/home-connected-dark.png" width="250" alt="The same screen in the dark theme">
 </td>
+<td align="center" width="33%">
+<img src="docs/screenshots/first-run-light.png" width="250" alt="First run: add your own server; the route with its middle stop still empty">
+</td>
+</tr>
+<tr>
+<td align="center"><sub><b>The route.</b> Where your traffic goes: this device, your server, the internet — solid when the path is there.</sub></td>
+<td align="center"><sub><b>Both themes</b>, each drawn on purpose: true black under the cards, every text pair above 4.5:1.</sub></td>
+<td align="center"><sub><b>First run.</b> Empty until you add a server — there is nothing bundled to connect to.</sub></td>
+</tr>
+<tr>
+<td align="center" width="33%">
+<img src="docs/screenshots/diagnosis-dark.png" width="250" alt="Connection diagnosis: the layers of the check as stops on the same line, with a cross where it broke">
+</td>
+<td align="center" width="33%">
+<img src="docs/screenshots/routing-light.png" width="250" alt="Routing: the mode as segments and the rules as a grouped list">
+</td>
+<td align="center" width="33%">
+<img src="docs/screenshots/settings-dark.png" width="250" alt="Settings as grouped lists">
+</td>
+</tr>
+<tr>
+<td align="center"><sub><b>Diagnosis.</b> The same line through name, port, TLS and a request — the cross marks the layer that failed.</sub></td>
+<td align="center"><sub><b>Routing.</b> Global, by rules or direct; rules in order of priority.</sub></td>
+<td align="center"><sub><b>Settings.</b> Every request Commy may make on its own is listed, and off until you turn it on.</sub></td>
 </tr>
 </table>
 
-<sub>Rendered from the shipping widgets. The interface is localized; Russian is shown, English is included.</sub>
+<sub>Rendered from the shipping widgets by <code>apps/commy/test/screenshots/capture_screenshots.dart</code>; the phone around them is a drawing. The interface is localized — Russian is shown, English is included. Designed after Apple’s interface principles: <a href="docs/04-design-system.md">docs/04-design-system.md</a>.</sub>
 
 </div>
 

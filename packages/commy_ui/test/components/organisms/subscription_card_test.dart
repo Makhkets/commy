@@ -36,7 +36,8 @@ void main() {
 
     expect(find.text('Замеряю 8 из 24'), findsOneWidget);
     expect(find.byType(NodeTile), findsNothing);
-    expect(find.byType(CommyDivider), findsNothing);
+    // One hairline: between the header and the status it keeps.
+    expect(find.byType(CommyDivider), findsOneWidget);
   });
 
   testWidgets('an open card shows its status above its servers',
@@ -44,9 +45,10 @@ void main() {
     await pumpCard(tester, collapsed: false);
 
     expect(find.byType(NodeTile), findsNWidgets(2));
-    // One hairline, under the status: the servers themselves are inset rows
-    // with no line between them (INCY's look, 2026-10-10).
-    expect(find.byType(CommyDivider), findsOneWidget);
+    // Two hairlines — under the header and under the status — and none
+    // between the servers, which are inset rows of their own (INCY's look,
+    // 2026-10-10).
+    expect(find.byType(CommyDivider), findsNWidgets(2));
     final status = tester.getTopLeft(find.text('Замеряю 8 из 24')).dy;
     final first = tester.getTopLeft(find.text('Amsterdam 03')).dy;
     expect(status, lessThan(first));

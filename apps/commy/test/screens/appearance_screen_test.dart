@@ -38,7 +38,7 @@ void main() {
     // Taller than the 800x600 default: two sections of three rows each, and a
     // surface that cut the language group off would be testing the window.
     tester.view
-      ..physicalSize = const Size(420, 1600)
+      ..physicalSize = const Size(420, 2400)
       ..devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -81,8 +81,8 @@ void main() {
       (tester) async {
     await pumpScreen(tester);
 
-    expect(find.text(t.appearance.theme.toUpperCase()), findsOneWidget);
-    expect(find.text(t.appearance.language.toUpperCase()), findsOneWidget);
+    expect(find.text(t.appearance.theme), findsOneWidget);
+    expect(find.text(t.appearance.language), findsOneWidget);
     // A mode added to `AppThemeMode` and forgotten here is a theme the app
     // can store and the user cannot reach.
     expect(
@@ -299,5 +299,38 @@ void main() {
     expect(find.text(t.error.openLogs), findsOneWidget);
     // And nothing pretending to be editable underneath it.
     expect(find.byType(CommyRadio<AppThemeMode>), findsNothing);
+  });
+
+  testWidgets('offers three text sizes and stores the one picked',
+      (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.text(t.appearance.textSize), findsOneWidget);
+    expect(
+      find.byType(CommyRadio<AppTextSize>),
+      findsNWidgets(AppTextSize.values.length),
+    );
+
+    await tester.tap(find.text(t.appearance.textLarge));
+    await tester.pumpAndSettle();
+    expect((await stored()).textSize, AppTextSize.large);
+  });
+
+  testWidgets('reduce motion is a switch of its own, stored as set',
+      (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.text(t.appearance.reduceMotion), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text(t.appearance.reduceMotion),
+          matching: find.byType(SettingsTile),
+        ),
+        matching: find.byType(CommySwitch),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect((await stored()).reduceMotion, isTrue);
   });
 }

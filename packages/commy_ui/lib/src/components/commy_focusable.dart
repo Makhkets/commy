@@ -34,15 +34,15 @@ class CommyFocusable extends StatefulWidget {
   final Widget Function(BuildContext context, {required bool isFocused})
       builder;
 
-  /// The ring of a focused control: `border/strong`, the token that exists
-  /// for focus, [CommySizes.borderThick] wide.
+  /// The ring of a focused control: `focus` — ink on light, chalk on dark —
+  /// [CommySizes.borderThick] wide (docs/04-design-system.md §2.1).
   ///
   /// Transparent rather than absent while [isFocused] is false, so that the
   /// box it is drawn on keeps one size and the control never shifts when
   /// focus arrives.
   static Border ring(CommyColors colors, {required bool isFocused}) =>
       Border.all(
-        color: isFocused ? colors.borderStrong : CommyColors.transparent,
+        color: isFocused ? colors.focusRing : CommyColors.transparent,
         width: CommySizes.borderThick,
       );
 

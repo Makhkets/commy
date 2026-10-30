@@ -65,10 +65,12 @@ class ErrorBanner extends StatelessWidget {
     final hasAction = actionLabel != null;
 
     return Container(
+      // The tone's wash and nothing around it: the icon, the title in the
+      // tone's colour and the words already say what this is, and an outline
+      // on top of a tinted block was one signal too many.
       decoration: BoxDecoration(
         color: tone.wash(colors),
-        borderRadius: context.radii.smAll,
-        border: Border.all(color: foreground),
+        borderRadius: context.radii.blockAll,
       ),
       // With an action, the banner's bottom padding and the gap above the
       // action are handed to the action's own 48 pt box, which is mostly
@@ -99,7 +101,7 @@ class ErrorBanner extends StatelessWidget {
                 ],
                 Text(
                   message,
-                  style: type.body.copyWith(color: colors.textPrimary),
+                  style: type.caption.copyWith(color: colors.textPrimary),
                 ),
                 if (hasAction)
                   CommyInlineAction(
