@@ -21,7 +21,7 @@ Android · iOS · Windows · macOS · Linux
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy, connected: the answer at the top, the route from this device through the server to the internet, and the one button">
+<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy, connected: a large power button, live traffic, selected server and internet check">
 </td>
 <td align="center" width="33%">
 <img src="docs/screenshots/home-connected-dark.png" width="250" alt="The same screen in the dark theme">
@@ -31,7 +31,7 @@ Android · iOS · Windows · macOS · Linux
 </td>
 </tr>
 <tr>
-<td align="center"><sub><b>The route.</b> Where your traffic goes: this device, your server, the internet — solid when the path is there.</sub></td>
+<td align="center"><sub><b>One touch.</b> A large connection button, with your server and internet access directly below.</sub></td>
 <td align="center"><sub><b>Both themes</b>, each drawn on purpose: true black under the cards, every text pair above 4.5:1.</sub></td>
 <td align="center"><sub><b>First run.</b> Empty until you add a server — there is nothing bundled to connect to.</sub></td>
 </tr>

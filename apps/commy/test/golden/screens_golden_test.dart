@@ -125,6 +125,23 @@ void main() {
     extra: <Override>[liveTraffic],
   );
 
+  screenGolden(
+    'home_connected_desktop',
+    size: const Size(1440, 900),
+    screen: const HomeScreen(),
+    harness: () => CommyTestHarness(
+      nodes: nodes,
+      subscriptions: <Subscription>[subscription],
+    ),
+    seed: (harness) =>
+        harness.settingsRepository.writeSelectedNodeId('sub-1-1'),
+    status: TunnelStatus.connected(
+      since: CommyTestHarness.now.subtract(const Duration(minutes: 42)),
+      nodeId: 'sub-1-1',
+    ),
+    extra: <Override>[liveTraffic],
+  );
+
   // The route at rest: dashed legs, the chosen server at the middle stop,
   // and the one action of the screen in the action fill (docs/04 §8).
   screenGolden(

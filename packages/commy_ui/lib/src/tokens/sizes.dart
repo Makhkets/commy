@@ -24,9 +24,15 @@ abstract final class CommySizes {
   /// Height of a standard button — 44.
   static const double buttonHeight = 44;
 
-  /// Height of the one main action of a screen — 52. "Connect" on the main
-  /// screen; nothing else is that large.
+  /// Height of a prominent rectangular action — 52. The home screen uses
+  /// the circular [connectDiameter] control instead.
   static const double buttonHeightLarge = 52;
+
+  /// Diameter of the main connection dial, including its focus ring — 192.
+  static const double connectDiameter = 192;
+
+  /// Power symbol inside the main connection dial — 64.
+  static const double connectIcon = 64;
 
   /// Height of a compact button, used inside dense rows — 36.
   static const double buttonHeightSmall = 36;
