@@ -29,6 +29,20 @@ void main() {
   // half-drawn one.
   for (final state in ConnectState.values) {
     goldenTest(
+      'connect_button_${state.name}',
+      size: const Size(390, 300),
+      builder: (context) => ConnectButton(
+        state: state,
+        label: switch (state) {
+          ConnectState.idle || ConnectState.error => 'Подключиться',
+          ConnectState.starting => 'Отменить',
+          ConnectState.stopping => 'Отключение…',
+          _ => 'Отключиться',
+        },
+        onPressed: () {},
+      ),
+    );
+    goldenTest(
       'connection_route_${state.name}',
       size: const Size(390, 260),
       builder: (context) => Padding(
@@ -56,6 +70,17 @@ void main() {
       ),
     );
   }
+
+  goldenTest(
+    'connect_button_focused',
+    size: const Size(390, 300),
+    tabs: 1,
+    builder: (context) => ConnectButton(
+      state: ConnectState.idle,
+      label: 'Подключиться',
+      onPressed: () {},
+    ),
+  );
 
   goldenTest(
     'connection_route_no_answer',

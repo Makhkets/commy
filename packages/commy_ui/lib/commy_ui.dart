@@ -50,6 +50,7 @@ export 'src/components/molecules/segmented_control.dart';
 export 'src/components/molecules/segmented_control_item.dart';
 export 'src/components/molecules/toast.dart';
 export 'src/components/molecules/traffic_meter.dart';
+export 'src/components/organisms/connect_button.dart';
 export 'src/components/organisms/connect_state.dart';
 export 'src/components/organisms/connection_route.dart';
 export 'src/components/organisms/connection_row.dart';

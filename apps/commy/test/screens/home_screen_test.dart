@@ -158,7 +158,7 @@ void main() {
         await pumpHome(tester, status: status);
         expect(
           find.descendant(
-            of: find.byType(CommyButton),
+            of: find.byType(ConnectButton),
             matching: find.text(label),
           ),
           findsOneWidget,

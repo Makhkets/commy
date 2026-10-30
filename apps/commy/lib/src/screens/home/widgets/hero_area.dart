@@ -12,17 +12,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Everything above the server list: the answer, the route, the one button.
+/// Everything above the server list: the answer, the dial and the route.
 ///
 /// docs/04-design-system.md §8 and §9. The screen opens with the answer to
 /// the question it exists for — "Connected", "Not connected" — in the largest
 /// type in the product, and under it the line of fact that goes with it: the
 /// session clock and the rates while the tunnel is up, where traffic goes
-/// while it is not. Then the route, the signature: this device, the server,
-/// the internet, each leg dashed, travelling or solid. The server's stop is
-/// the server picker and the internet's stop carries the access check —
-/// each control beside what it acts on. Last, the one action of the screen,
-/// the full width of the column: "Connect" or "Disconnect", in words.
+/// while it is not. The large connection dial is the primary action. Below
+/// it, the compact route keeps the server picker and access check beside
+/// what they act on. A device failure restores the route's first stop.
 ///
 /// The picker opens at every width; it loses its chevron only when there is
 /// nothing to pick between.
@@ -155,10 +153,22 @@ class HeroArea extends ConsumerWidget {
             ],
           ),
         ),
-        SizedBox(height: spacing.s6),
+        SizedBox(height: spacing.s4),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
+          child: _MainAction(
+            state: connectState,
+            onPressed:
+                nodes.isNotEmpty || tunnelUp || connectState.isTransitional
+                    ? () => _toggle(ref)
+                    : null,
+          ),
+        ),
+        SizedBox(height: spacing.s4),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: spacing.s4),
           child: ConnectionRoute(
+            compact: true,
             semanticLabel: t.route.summary(
               device: t.route.device,
               server: serverName,
@@ -184,14 +194,6 @@ class HeroArea extends ConsumerWidget {
             onCheck: tunnelUp ? () => _check(ref) : null,
             isChecking: isChecking,
             breakAt: breakAt,
-          ),
-        ),
-        SizedBox(height: spacing.s5),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: spacing.s4),
-          child: _MainAction(
-            state: connectState,
-            onPressed: () => _toggle(ref),
           ),
         ),
         SizedBox(height: spacing.s6),
@@ -272,52 +274,26 @@ class HeroArea extends ConsumerWidget {
 
 /// The one action of the screen: "Connect" or "Disconnect", in words.
 ///
-/// The verb names the result (docs/04 §12). Primary — the action fill — while
-/// it starts a connection; tinted while it ends one or calls one off, so the
-/// screen's loudest control is always the way *in*. Disconnecting shows a
-/// spinner and takes no tap until the core has let go.
+/// The verb names the result (docs/04 §12). The ring and power symbol show
+/// the state. Stopping takes no tap until the core has let go.
 class _MainAction extends StatelessWidget {
   const _MainAction({required this.state, required this.onPressed});
 
   final ConnectState state;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final t = Translations.of(context);
-    final (label, variant, icon, busy) = switch (state) {
-      ConnectState.idle || ConnectState.error => (
-          t.route.connect,
-          CommyButtonVariant.primary,
-          CommyIcons.power,
-          false,
-        ),
-      ConnectState.starting => (
-          t.route.cancel,
-          CommyButtonVariant.secondary,
-          CommyIcons.close,
-          false,
-        ),
-      ConnectState.checking || ConnectState.connected => (
-          t.route.disconnect,
-          CommyButtonVariant.secondary,
-          CommyIcons.power,
-          false,
-        ),
-      ConnectState.stopping => (
-          t.route.stopping,
-          CommyButtonVariant.secondary,
-          null,
-          true,
-        ),
+    final label = switch (state) {
+      ConnectState.idle || ConnectState.error => t.route.connect,
+      ConnectState.starting => t.route.cancel,
+      ConnectState.checking || ConnectState.connected => t.route.disconnect,
+      ConnectState.stopping => t.route.stopping,
     };
-    return CommyButton(
+    return ConnectButton(
+      state: state,
       label: label,
-      icon: icon,
-      variant: variant,
-      isLarge: true,
-      isFullWidth: true,
-      isLoading: busy,
       onPressed: onPressed,
     );
   }

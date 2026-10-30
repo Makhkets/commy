@@ -9,7 +9,7 @@
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy подключён: ответ наверху, маршрут от устройства через сервер в интернет и одна кнопка">
+<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy подключён: большая кнопка питания, трафик, выбранный сервер и проверка интернета">
 </td>
 <td align="center" width="33%">
 <img src="docs/screenshots/home-connected-dark.png" width="250" alt="Тот же экран в тёмной теме">
@@ -19,7 +19,7 @@
 </td>
 </tr>
 <tr>
-<td align="center"><sub><b>Маршрут.</b> Куда идёт трафик: это устройство, ваш сервер, интернет — сплошная линия, когда путь есть.</sub></td>
+<td align="center"><sub><b>Одно касание.</b> Большая кнопка подключения, а под ней — ваш сервер и доступ в интернет.</sub></td>
 <td align="center"><sub><b>Обе темы</b>, каждая нарочно: чистый чёрный под карточками, любой текст контрастнее 4.5:1.</sub></td>
 <td align="center"><sub><b>Первый запуск.</b> Пусто, пока вы не добавите сервер, — встроенных серверов нет.</sub></td>
 </tr>

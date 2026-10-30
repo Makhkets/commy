@@ -30,8 +30,8 @@ enum RouteBreak {
 /// (docs/04-design-system.md §1 and §8, «Маршрут»).
 ///
 /// A proxy client does exactly one thing — it leads traffic along this path —
-/// so the line answers the question the main screen exists for, "is it
-/// working, and through what", faster than any button could. Each leg is in
+/// so the line explains "is it working, and through what" below the main
+/// connection button. Each leg is in
 /// one of three shapes, and the shape says it as well as the colour does:
 ///
 /// * dashed — there is no path here yet: traffic goes direct;
@@ -67,6 +67,7 @@ class ConnectionRoute extends StatefulWidget {
     this.isChecking = false,
     this.breakAt,
     this.semanticLabel,
+    this.compact = false,
     super.key,
   });
 
@@ -75,6 +76,10 @@ class ConnectionRoute extends StatefulWidget {
   /// tree, and only the two controls stay nodes of their own: the server
   /// picker and the access check. Already translated.
   final String? semanticLabel;
+
+  /// Starts at the server when a connection dial already represents the
+  /// device. A device failure still shows the first stop and its marker.
+  final bool compact;
 
   /// The state of the tunnel the route draws.
   final ConnectState state;
@@ -317,7 +322,9 @@ class _ConnectionRouteState extends State<ConnectionRoute>
     final server = _RouteRow(
       stop: _server,
       isServer: true,
-      legIn: toServer,
+      legIn: !widget.compact || widget.breakAt == RouteBreak.device
+          ? toServer
+          : null,
       legOut: toInternet,
       firstLineHeight: firstLine,
       sweep: _sweep,
@@ -456,7 +463,7 @@ class _ConnectionRouteState extends State<ConnectionRoute>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            device,
+            if (!widget.compact || widget.breakAt == RouteBreak.device) device,
             server,
             internetRow(actionBeside: beside),
           ],
