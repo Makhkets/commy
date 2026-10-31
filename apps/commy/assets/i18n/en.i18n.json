@@ -55,6 +55,8 @@
     "up": "Upload",
     "down": "Download",
     "session": "Session length",
+    "time": "Time",
+    "total": "$value total",
     "perSecond": "$value/s"
   },
 

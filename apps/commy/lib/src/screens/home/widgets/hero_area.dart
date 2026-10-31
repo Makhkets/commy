@@ -15,10 +15,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// Everything above the server list: the answer, the dial and the route.
 ///
 /// docs/04-design-system.md §8 and §9. The screen opens with the answer to
-/// the question it exists for — "Connected", "Not connected" — in the largest
-/// type in the product, and under it the line of fact that goes with it: the
-/// session clock and the rates while the tunnel is up, where traffic goes
-/// while it is not. The large connection dial is the primary action. Below
+/// the question it exists for — "Connected", "Not connected" — centred above
+/// three readouts: download, session time and upload while the tunnel is up;
+/// a traffic destination hint while it is not. The large connection dial is
+/// the primary action, on the same axis as the clock. Below
 /// it, the compact route keeps the server picker and access check beside
 /// what they act on. A device failure restores the route's first stop.
 ///
@@ -113,7 +113,7 @@ class HeroArea extends ConsumerWidget {
             spacing.s0,
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               // The words the route says, as the heading of the screen: a
@@ -128,10 +128,11 @@ class HeroArea extends ConsumerWidget {
                 // region could announce both.
                 child: Text(
                   answer,
-                  style: type.display.copyWith(color: colors.textPrimary),
+                  textAlign: TextAlign.center,
+                  style: type.title1.copyWith(color: colors.textPrimary),
                 ),
               ),
-              SizedBox(height: spacing.s1),
+              SizedBox(height: spacing.s3),
               if (tunnelUp)
                 MetricsStrip(
                   uplink: traffic?.uplink ?? 0,
@@ -139,14 +140,18 @@ class HeroArea extends ConsumerWidget {
                   session: _sessionOf(status, now),
                   isActive: true,
                   uplinkLabel: t.metrics.up,
-                  sessionLabel: t.metrics.session,
+                  sessionLabel: t.metrics.time,
                   downlinkLabel: t.metrics.down,
+                  uplinkTotal: traffic?.uplinkTotal ?? 0,
+                  downlinkTotal: traffic?.downlinkTotal ?? 0,
+                  totalLabel: (value) => t.metrics.total(value: value),
                 )
               else
                 Semantics(
                   container: true,
                   child: Text(
                     _hint(connectState, t, hasServers: nodes.isNotEmpty),
+                    textAlign: TextAlign.center,
                     style: type.body.copyWith(color: colors.textSecondary),
                   ),
                 ),

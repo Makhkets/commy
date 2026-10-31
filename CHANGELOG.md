@@ -10,6 +10,10 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
+- A calmer connection button with a single state outline. The status and
+  session clock are centred; download is on the left, upload on the right,
+  each showing its current rate and total volume for this connection.
+
 ## [0.1.0-alpha.16]
 
 Installs over alpha.14.
