@@ -136,27 +136,51 @@ void main() {
   goldenTest(
     'metrics_strip',
     size: const Size(360, 120),
-    builder: (context) => const MetricsStrip(
+    builder: (context) => MetricsStrip(
       uplink: 25600,
       downlink: 1348576,
-      session: Duration(hours: 1, minutes: 12, seconds: 47),
+      session: const Duration(hours: 1, minutes: 12, seconds: 47),
       isActive: true,
       uplinkLabel: 'Отдача',
-      sessionLabel: 'Сессия',
+      sessionLabel: 'Время',
       downlinkLabel: 'Загрузка',
+      uplinkTotal: 214 * 1024 * 1024,
+      downlinkTotal: 3 * 1024 * 1024 * 1024,
+      totalLabel: (value) => '$value всего',
     ),
   );
 
   goldenTest(
     'metrics_strip_idle',
     size: const Size(360, 120),
-    builder: (context) => const MetricsStrip(
+    builder: (context) => MetricsStrip(
       uplink: 25600,
       downlink: 1348576,
-      session: Duration(hours: 1),
+      session: const Duration(hours: 1),
       uplinkLabel: 'Отдача',
-      sessionLabel: 'Сессия',
+      sessionLabel: 'Время',
       downlinkLabel: 'Загрузка',
+      uplinkTotal: 214 * 1024 * 1024,
+      downlinkTotal: 3 * 1024 * 1024 * 1024,
+      totalLabel: (value) => '$value всего',
+    ),
+  );
+
+  goldenTest(
+    'metrics_strip_large_text',
+    size: const Size(320, 420),
+    textScale: 2,
+    builder: (context) => MetricsStrip(
+      uplink: 25600,
+      downlink: 1348576,
+      session: const Duration(hours: 1, minutes: 12, seconds: 47),
+      isActive: true,
+      uplinkLabel: 'Отдача',
+      sessionLabel: 'Время',
+      downlinkLabel: 'Загрузка',
+      uplinkTotal: 214 * 1024 * 1024,
+      downlinkTotal: 3 * 1024 * 1024 * 1024,
+      totalLabel: (value) => '$value всего',
     ),
   );
 

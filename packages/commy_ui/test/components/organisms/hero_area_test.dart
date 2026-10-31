@@ -303,11 +303,12 @@ void main() {
       expect(find.text('0 B/s'), findsNWidgets(2));
     });
 
-    testWidgets('shows live figures, the clock first', (tester) async {
+    testWidgets('centres the clock between download and upload',
+        (tester) async {
       await tester.pumpWidget(
         _host(
           child: const MetricsStrip(
-            uplink: 25600,
+            uplink: 5,
             downlink: 37888,
             session: Duration(minutes: 12, seconds: 47),
             isActive: true,
@@ -315,12 +316,103 @@ void main() {
         ),
       );
       expect(find.text('00:12:47'), findsOneWidget);
-      expect(find.text('25 KB/s'), findsOneWidget);
+      expect(find.text('5 B/s'), findsOneWidget);
       expect(find.text('37 KB/s'), findsOneWidget);
+      final clock = tester.getCenter(find.text('00:12:47'));
+      final strip = tester.getRect(find.byType(MetricsStrip));
+      expect(clock.dx, closeTo(strip.center.dx, 0.01));
       expect(
-        tester.getCenter(find.text('00:12:47')).dx,
-        lessThan(tester.getCenter(find.text('37 KB/s')).dx),
+        tester.getCenter(find.text('37 KB/s')).dx,
+        lessThan(clock.dx),
       );
+      expect(tester.getCenter(find.text('5 B/s')).dx, greaterThan(clock.dx));
+    });
+
+    testWidgets('keeps session totals under their respective rates', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        _host(
+          child: MetricsStrip(
+            uplink: 25600,
+            downlink: 37888,
+            session: const Duration(minutes: 12, seconds: 47),
+            isActive: true,
+            uplinkLabel: 'Upload',
+            sessionLabel: 'Time',
+            downlinkLabel: 'Download',
+            uplinkTotal: 214 * 1024 * 1024,
+            downlinkTotal: 3 * 1024 * 1024 * 1024,
+            totalLabel: (value) => '$value total',
+          ),
+        ),
+      );
+      final down = tester.getCenter(find.text('37 KB/s'));
+      final up = tester.getCenter(find.text('25 KB/s'));
+      final downTotal = tester.getCenter(find.text('3.0 GB total'));
+      final upTotal = tester.getCenter(find.text('214 MB total'));
+      expect(downTotal.dx, closeTo(down.dx, 0.01));
+      expect(upTotal.dx, closeTo(up.dx, 0.01));
+      expect(downTotal.dy, greaterThan(down.dy));
+      expect(upTotal.dy, greaterThan(up.dy));
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Download')),
+        matchesSemantics(label: 'Download', value: '37 KB/s, 3.0 GB total'),
+      );
+      semantics.dispose();
+    });
+
+    testWidgets('clears previous session totals when inactive', (tester) async {
+      await tester.pumpWidget(
+        _host(
+          child: MetricsStrip(
+            uplink: 25600,
+            downlink: 37888,
+            session: const Duration(minutes: 12),
+            uplinkTotal: 214 * 1024 * 1024,
+            downlinkTotal: 3 * 1024 * 1024 * 1024,
+            totalLabel: (value) => '$value total',
+          ),
+        ),
+      );
+      expect(find.text('0 B total'), findsNWidgets(2));
+      expect(find.text('0 B/s'), findsNWidgets(2));
+      expect(find.text('00:00:00'), findsOneWidget);
+    });
+
+    testWidgets('keeps large text readable and the clock centred on a phone', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _host(
+          textScale: 2,
+          child: MetricsStrip(
+            uplink: 25600,
+            downlink: 37888,
+            session: const Duration(hours: 12, minutes: 47),
+            isActive: true,
+            uplinkLabel: 'Upload',
+            sessionLabel: 'Time',
+            downlinkLabel: 'Download',
+            uplinkTotal: 214 * 1024 * 1024,
+            downlinkTotal: 3 * 1024 * 1024 * 1024,
+            totalLabel: (value) => '$value total',
+          ),
+        ),
+      );
+      final clock = tester.getCenter(find.text('12:47:00'));
+      expect(
+        clock.dx,
+        closeTo(tester.getRect(find.byType(MetricsStrip)).center.dx, 0.01),
+      );
+      expect(tester.getCenter(find.text('37 KB/s')).dy, greaterThan(clock.dy));
+      expect(tester.getCenter(find.text('25 KB/s')).dy, greaterThan(clock.dy));
+      expect(find.text('3.0 GB total'), findsOneWidget);
+      expect(find.text('214 MB total'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 

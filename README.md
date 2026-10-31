@@ -31,7 +31,7 @@ Android · iOS · Windows · macOS · Linux
 </td>
 </tr>
 <tr>
-<td align="center"><sub><b>One touch.</b> A large connection button, with your server and internet access directly below.</sub></td>
+<td align="center"><sub><b>One touch.</b> A large connection button. Download on the left, session time in the centre, upload on the right.</sub></td>
 <td align="center"><sub><b>Both themes</b>, each drawn on purpose: true black under the cards, every text pair above 4.5:1.</sub></td>
 <td align="center"><sub><b>First run.</b> Empty until you add a server — there is nothing bundled to connect to.</sub></td>
 </tr>

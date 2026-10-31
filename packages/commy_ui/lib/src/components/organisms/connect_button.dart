@@ -45,7 +45,6 @@ class _ConnectButtonState extends State<ConnectButton> {
     final enabled =
         widget.onPressed != null && widget.state != ConnectState.stopping;
     final activate = enabled ? widget.onPressed : null;
-    final active = widget.state.isTunnelUp;
     final busy = widget.state.isTransitional;
     final ink = !enabled
         ? colors.textDisabled
@@ -66,9 +65,6 @@ class _ConnectButtonState extends State<ConnectButton> {
       _ => colors.borderStrong,
     };
     final surface = _hovered && enabled ? colors.bgOverlay : colors.bgSurface;
-    final fill = active
-        ? Color.alphaBlend(colors.statusConnectedWash, surface)
-        : surface;
 
     return Semantics(
       container: true,
@@ -109,46 +105,24 @@ class _ConnectButtonState extends State<ConnectButton> {
                         AnimatedContainer(
                           duration: motion.fast,
                           curve: motion.fastCurve,
-                          padding: EdgeInsets.all(spacing.s2),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: <Color>[surface, colors.bgOverlay],
+                            ),
                             border: Border.all(
                               color: busy ? colors.borderSubtle : ring,
                               width: CommySizes.borderThick,
                             ),
                           ),
-                          child: AnimatedContainer(
-                            duration: motion.fast,
-                            curve: motion.fastCurve,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: <Color>[
-                                  fill,
-                                  if (active)
-                                    Color.alphaBlend(
-                                      colors.statusConnectedWash,
-                                      colors.bgOverlay,
-                                    )
-                                  else
-                                    colors.bgOverlay,
-                                ],
-                              ),
-                              border: Border.all(
-                                color: active
-                                    ? colors.statusConnectedWash
-                                    : colors.borderSubtle,
-                              ),
-                            ),
-                            child: Icon(
-                              widget.state == ConnectState.starting
-                                  ? CommyIcons.close
-                                  : CommyIcons.power,
-                              size: CommySizes.connectIcon,
-                              color: ink,
-                            ),
+                          child: Icon(
+                            widget.state == ConnectState.starting
+                                ? CommyIcons.close
+                                : CommyIcons.power,
+                            size: CommySizes.connectIcon,
+                            color: ink,
                           ),
                         ),
                         if (busy)

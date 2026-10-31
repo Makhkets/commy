@@ -94,6 +94,53 @@ void main() {
       });
     }
 
+    testWidgets(
+        'aligns the session clock with the dial and maps traffic totals',
+        (tester) async {
+      tester.view
+        ..physicalSize = const Size(393, 1000)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        harness.wrap(
+          const HomeScreen(),
+          status: TunnelStatus.connected(
+            since: CommyTestHarness.now.subtract(const Duration(minutes: 42)),
+          ),
+          extra: <Override>[
+            trafficProvider.overrideWith(
+              (ref) => Stream<TrafficSample>.value(
+                TrafficSample(
+                  at: CommyTestHarness.now,
+                  uplink: 384 * 1024,
+                  downlink: 3 * 1024 * 1024,
+                  uplinkTotal: 214 * 1024 * 1024,
+                  downlinkTotal: 3 * 1024 * 1024 * 1024,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      await settle(tester);
+
+      final metrics = tester.widget<MetricsStrip>(find.byType(MetricsStrip));
+      expect(metrics.uplink, 384 * 1024);
+      expect(metrics.downlink, 3 * 1024 * 1024);
+      expect(metrics.uplinkTotal, 214 * 1024 * 1024);
+      expect(metrics.downlinkTotal, 3 * 1024 * 1024 * 1024);
+      expect(metrics.totalLabel?.call('3 GB'), t.metrics.total(value: '3 GB'));
+      expect(
+        tester.getCenter(find.text('00:42:00')).dx,
+        closeTo(tester.getCenter(find.byType(ConnectButton)).dx, 0.01),
+      );
+      expect(
+        tester.widget<Text>(find.text(t.route.connected)).textAlign,
+        TextAlign.center,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('at rest the line under the answer says where traffic goes',
         (tester) async {
       await pumpHome(tester, status: const TunnelStatus.idle());

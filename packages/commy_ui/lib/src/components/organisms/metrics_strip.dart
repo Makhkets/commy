@@ -5,28 +5,14 @@ import 'package:commy_ui/src/util/byte_format.dart';
 import 'package:commy_ui/src/util/duration_format.dart';
 import 'package:flutter/material.dart';
 
-/// Session length, download and upload — the line under the answer at the
-/// top of the main screen, while the tunnel is up.
+/// Three equal columns: download, session time, upload.
 ///
-/// Quiet on purpose: `numericBody` — Inter with tabular figures, so a digit
-/// that changes once a second moves nothing around it — in `ink-2`, starting
-/// at the leading edge under the answer it belongs to. Digits that tick at
-/// 44 dp turn a calm screen into an instrument panel; here they are a line of
-/// fact under "Connected".
-///
-/// While nothing is connected the row shows zeros in `ink-disabled` rather
-/// than hiding, for a caller that keeps it on screen.
-///
-/// At large text scales the readouts reflow instead of overflowing, and the
-/// down and up rates stay together as a pair: a plain wrap once split them
-/// across the clock. The clock keeps the first line.
+/// The clock stays on the connection button's centreline even when the two
+/// rates have different widths. Rates are primary; optional session totals
+/// are secondary and explicitly labelled. Large text reflows below a centred
+/// clock instead of shrinking the reader's chosen type size.
 class MetricsStrip extends StatelessWidget {
-  /// Creates a metrics strip.
-  ///
-  /// The three `*Label` strings are finished, translated words announced to
-  /// assistive technology — this package owns no text. Without them a screen
-  /// reader would read three bare numbers, because the direction is carried
-  /// by an arrow that has no words of its own.
+  /// Creates the readouts. Every label arrives already translated.
   const MetricsStrip({
     required this.uplink,
     required this.downlink,
@@ -35,6 +21,9 @@ class MetricsStrip extends StatelessWidget {
     this.uplinkLabel,
     this.sessionLabel,
     this.downlinkLabel,
+    this.uplinkTotal,
+    this.downlinkTotal,
+    this.totalLabel,
     super.key,
   });
 
@@ -44,152 +33,192 @@ class MetricsStrip extends StatelessWidget {
   /// Bytes per second coming in.
   final int downlink;
 
-  /// How long the current session has been up.
+  /// How long this connection has been up.
   final Duration session;
 
-  /// Whether the tunnel is up. When false every figure reads zero.
+  /// When false every figure is zero, including optional totals.
   final bool isActive;
 
-  /// Word for the upload figure, for assistive technology.
+  /// Visible, accessible upload label.
   final String? uplinkLabel;
 
-  /// Word for the session length, for assistive technology.
+  /// Visible, accessible duration label.
   final String? sessionLabel;
 
-  /// Word for the download figure, for assistive technology.
+  /// Visible, accessible download label.
   final String? downlinkLabel;
+
+  /// Bytes sent during this session, not a rate.
+  final int? uplinkTotal;
+
+  /// Bytes received during this session, not a rate.
+  final int? downlinkTotal;
+
+  /// Adds the translated word for "total" to an already formatted volume.
+  /// No totals appear unless this formatter and the corresponding count exist.
+  final String Function(String value)? totalLabel;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final spacing = context.spacing;
-    final color =
-        isActive ? context.colors.textSecondary : context.colors.textDisabled;
+    final locale = Localizations.maybeLocaleOf(context);
+    final color = isActive ? colors.textPrimary : colors.textDisabled;
+    String? total(int? bytes) => bytes == null
+        ? null
+        : totalLabel?.call(
+            CommyByteFormat.bytes(isActive ? bytes : 0, locale: locale),
+          );
 
-    final up = _Metric(
-      icon: CommyIcons.arrowUp,
-      value: CommyByteFormat.rate(
-        isActive ? uplink : 0,
-        locale: Localizations.maybeLocaleOf(context),
-      ),
+    final down = _Metric(
+      icon: CommyIcons.arrowDown,
+      value: CommyByteFormat.rate(isActive ? downlink : 0, locale: locale),
+      label: downlinkLabel,
+      detail: total(downlinkTotal),
       color: color,
-      label: uplinkLabel,
     );
     final clock = _Metric(
       icon: CommyIcons.clock,
       value: CommyDurationFormat.clock(isActive ? session : Duration.zero),
-      color: color,
       label: sessionLabel,
-    );
-    final down = _Metric(
-      icon: CommyIcons.arrowDown,
-      value: CommyByteFormat.rate(
-        isActive ? downlink : 0,
-        locale: Localizations.maybeLocaleOf(context),
-      ),
       color: color,
-      label: downlinkLabel,
+    );
+    final up = _Metric(
+      icon: CommyIcons.arrowUp,
+      value: CommyByteFormat.rate(isActive ? uplink : 0, locale: locale),
+      label: uplinkLabel,
+      detail: total(uplinkTotal),
+      color: color,
     );
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final gap = spacing.s3;
         final available = constraints.maxWidth;
-        final upWidth = _widthOf(context, up.value);
-        final clockWidth = _widthOf(context, clock.value);
-        final downWidth = _widthOf(context, down.value);
-        final gap = spacing.s4;
-
-        // Everything on one line, from the leading edge.
-        if (upWidth + clockWidth + downWidth + gap * 2 <= available) {
-          return Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: gap,
-            runSpacing: spacing.s1,
-            children: <Widget>[clock, down, up],
-          );
-        }
-        // The clock keeps the first line, the pair takes the second.
-        if (upWidth + downWidth + gap <= available) {
-          return Column(
+        final column = (available - gap * 2) / 3;
+        final downWidth = down.widthOf(context);
+        final clockWidth = clock.widthOf(context);
+        final upWidth = up.widthOf(context);
+        if (downWidth <= column && clockWidth <= column && upWidth <= column) {
+          return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              clock,
-              SizedBox(height: spacing.s1),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: gap,
-                children: <Widget>[down, up],
-              ),
+              Expanded(child: down),
+              SizedBox(width: gap),
+              Expanded(child: clock),
+              SizedBox(width: gap),
+              Expanded(child: up),
             ],
           );
         }
-        // Not even two fit: one per line, in reading order.
+
+        final half = (available - gap) / 2;
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            clock,
-            SizedBox(height: spacing.s1),
-            down,
-            SizedBox(height: spacing.s1),
-            up,
+            Center(child: clock),
+            SizedBox(height: spacing.s3),
+            if (downWidth <= half && upWidth <= half)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: down),
+                  SizedBox(width: gap),
+                  Expanded(child: up),
+                ],
+              )
+            else ...<Widget>[
+              Center(child: down),
+              SizedBox(height: spacing.s3),
+              Center(child: up),
+            ],
           ],
         );
       },
     );
   }
-
-  /// Width one readout needs: the glyph, the gap and the figure, measured
-  /// with the style and the text scale it will actually be drawn with.
-  double _widthOf(BuildContext context, String value) {
-    final painter = TextPainter(
-      text: TextSpan(text: value, style: context.typography.numericBody),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 1,
-    )..layout();
-    final width = painter.width;
-    painter.dispose();
-    return width + CommySizes.iconInline + context.spacing.s1;
-  }
 }
 
-/// One icon and one figure.
+/// A labelled figure, optionally followed by the session's total volume.
 class _Metric extends StatelessWidget {
   const _Metric({
     required this.icon,
     required this.value,
-    required this.color,
     required this.label,
+    required this.color,
+    this.detail,
   });
 
   final IconData icon;
   final String value;
-  final Color color;
   final String? label;
+  final String? detail;
+  final Color color;
+
+  /// Measures the widest line using the same fonts and scale as the readout.
+  double widthOf(BuildContext context) {
+    final type = context.typography;
+    var widest = CommySizes.iconInline;
+    for (final (text, style) in <(String?, TextStyle)>[
+      (label, type.caption),
+      (value, type.numericBody),
+      (detail, type.caption),
+    ]) {
+      if (text == null) continue;
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout();
+      if (painter.width > widest) widest = painter.width;
+      painter.dispose();
+    }
+    return widest;
+  }
 
   @override
   Widget build(BuildContext context) {
-    final row = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Icon(icon, size: CommySizes.iconInline, color: color),
-        SizedBox(width: context.spacing.s1),
-        Text(
-          value,
-          maxLines: 1,
-          style: context.typography.numericBody.copyWith(color: color),
-        ),
-      ],
-    );
-    if (label == null) {
-      return row;
-    }
+    final type = context.typography;
+    final colors = context.colors;
+    final label = this.label;
+    final detail = this.detail;
     return Semantics(
+      container: true,
       label: label,
-      value: value,
+      value: detail == null ? value : '$value, $detail',
       excludeSemantics: true,
-      child: row,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (label != null)
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: type.caption.copyWith(color: colors.textSecondary),
+            )
+          else
+            Icon(
+              icon,
+              size: CommySizes.iconInline,
+              color: colors.textSecondary,
+            ),
+          SizedBox(height: context.spacing.s1),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            style: type.numericBody.copyWith(color: color),
+          ),
+          if (detail != null) ...<Widget>[
+            SizedBox(height: context.spacing.s1),
+            Text(
+              detail,
+              textAlign: TextAlign.center,
+              style: type.caption.copyWith(color: colors.textTertiary),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
