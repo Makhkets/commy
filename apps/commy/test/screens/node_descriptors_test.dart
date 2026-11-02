@@ -27,9 +27,9 @@ void main() {
           }),
         ),
         const <NodeTag>[
-          NodeTag('VLESS', hue: CommyTagHue.azure),
-          NodeTag('Reality', hue: CommyTagHue.iris),
-          NodeTag('TCP'),
+          NodeTag('VLESS', hue: CommyTagHue.lime),
+          NodeTag('Reality', hue: CommyTagHue.mint),
+          NodeTag('TCP', hue: CommyTagHue.sky),
           NodeTag('Vision', hue: CommyTagHue.gold),
         ],
       );
@@ -44,9 +44,9 @@ void main() {
           }),
         ),
         const <NodeTag>[
-          NodeTag('VLESS', hue: CommyTagHue.azure),
+          NodeTag('VLESS', hue: CommyTagHue.lime),
           NodeTag('TLS', hue: CommyTagHue.mint),
-          NodeTag('XHTTP'),
+          NodeTag('XHTTP', hue: CommyTagHue.sky),
         ],
       );
     });
@@ -77,7 +77,7 @@ void main() {
       CommyTagHue hueOf(Protocol protocol) =>
           NodeDescriptors.of(_node(protocol)).first.hue;
 
-      expect(hueOf(Protocol.vless), CommyTagHue.azure);
+      expect(hueOf(Protocol.vless), CommyTagHue.lime);
       expect(hueOf(Protocol.vmess), CommyTagHue.sky);
       expect(hueOf(Protocol.trojan), CommyTagHue.orchid);
       expect(hueOf(Protocol.shadowsocks), CommyTagHue.teal);
@@ -89,7 +89,7 @@ void main() {
       expect(hueOf(Protocol.http), CommyTagHue.neutral);
     });
 
-    test('the transport is never coloured', () {
+    test('the transport uses the shared blue hue', () {
       for (final type in <String>['tcp', 'ws', 'grpc', 'xhttp', '']) {
         final tags = NodeDescriptors.of(
           _node(Protocol.vless, <String, Object?>{
@@ -97,7 +97,7 @@ void main() {
             'type': type,
           }),
         );
-        expect(tags.last.hue, CommyTagHue.neutral, reason: type);
+        expect(tags.last.hue, CommyTagHue.sky, reason: type);
       }
     });
 
@@ -117,8 +117,8 @@ void main() {
             _node(Protocol.vless, <String, Object?>{'flow': flow}),
           ),
           const <NodeTag>[
-            NodeTag('VLESS', hue: CommyTagHue.azure),
-            NodeTag('TCP'),
+            NodeTag('VLESS', hue: CommyTagHue.lime),
+            NodeTag('TCP', hue: CommyTagHue.sky),
           ],
           reason: flow,
         );

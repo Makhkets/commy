@@ -28,6 +28,7 @@ void main() {
 
   for (final (name, colors, tags) in <(String, CommyColors, CommyTagColors)>[
     ('dark', CommyColors.dark, CommyTagColors.dark),
+    ('slate', CommyColors.slate, CommyTagColors.dark),
     ('light', CommyColors.light, CommyTagColors.light),
   ]) {
     group(name, () {

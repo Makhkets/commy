@@ -9,19 +9,19 @@
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy подключён: большая кнопка питания, трафик, выбранный сервер и проверка интернета">
+<img src="docs/screenshots/home-connected-slate.png" width="250" alt="Сланцевая тема по умолчанию">
 </td>
 <td align="center" width="33%">
-<img src="docs/screenshots/home-connected-dark.png" width="250" alt="Тот же экран в тёмной теме">
+<img src="docs/screenshots/home-connected-dark.png" width="250" alt="Чёрная тема">
 </td>
 <td align="center" width="33%">
-<img src="docs/screenshots/first-run-light.png" width="250" alt="Первый запуск: добавьте свой сервер; у маршрута пока пустая средняя остановка">
+<img src="docs/screenshots/home-connected-light.png" width="250" alt="Светлая тема">
 </td>
 </tr>
 <tr>
-<td align="center"><sub><b>Одно касание.</b> Большая кнопка подключения. Загрузка слева, время по центру, отдача справа.</sub></td>
-<td align="center"><sub><b>Обе темы</b>, каждая нарочно: чистый чёрный под карточками, любой текст контрастнее 4.5:1.</sub></td>
-<td align="center"><sub><b>Первый запуск.</b> Пусто, пока вы не добавите сервер, — встроенных серверов нет.</sub></td>
+<td align="center"><sub><b>Сланец.</b> Основная тема: единая палитра фона, кнопки и подписки.</sub></td>
+<td align="center"><sub><b>Чёрная.</b> Та же компоновка на чёрном фоне.</sub></td>
+<td align="center"><sub><b>Светлая.</b> Светлые поверхности и контрастные подписи.</sub></td>
 </tr>
 <tr>
 <td align="center" width="33%">

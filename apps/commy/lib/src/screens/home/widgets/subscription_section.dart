@@ -5,6 +5,7 @@ import 'package:commy/src/i18n/failure_text.dart';
 import 'package:commy/src/i18n/relative_time.dart';
 import 'package:commy/src/i18n/translations_locale.dart';
 import 'package:commy/src/router/app_routes.dart';
+import 'package:commy/src/screens/home/widgets/auto_row.dart';
 import 'package:commy/src/screens/home/widgets/domain_change_row.dart';
 import 'package:commy/src/screens/home/widgets/measure_progress_row.dart';
 import 'package:commy/src/screens/home/widgets/node_row.dart';
@@ -35,6 +36,7 @@ class SubscriptionSection extends ConsumerWidget {
   const SubscriptionSection({
     required this.subscription,
     required this.nodes,
+    this.includeAuto = false,
     super.key,
   });
 
@@ -43,6 +45,9 @@ class SubscriptionSection extends ConsumerWidget {
 
   /// Its servers, already filtered by the caller.
   final List<ProxyNode> nodes;
+
+  /// Auto belongs here only when this subscription is the whole library.
+  final bool includeAuto;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -78,6 +83,20 @@ class SubscriptionSection extends ConsumerWidget {
 
     return SubscriptionCard(
       name: subscription.name,
+      countLabel: t.subscription.nodes(
+        count: (ref.watch(nodesProvider).value ?? const <ProxyNode>[])
+            .where((node) => node.subscriptionId == subscription.id)
+            .length,
+      ),
+      collapseLabel: subscription.isCollapsed
+          ? t.subscription.menu.expand
+          : t.subscription.menu.collapse,
+      onCollapse: () => unawaited(
+        ref.read(subscriptionControllerProvider.notifier).setCollapsed(
+              id: subscription.id,
+              isCollapsed: !subscription.isCollapsed,
+            ),
+      ),
       subtitle: timed.subtitle,
       refreshLabel: t.subscription.refresh,
       pingAllLabel: t.subscription.pingAll,
@@ -160,6 +179,7 @@ class SubscriptionSection extends ConsumerWidget {
         if (isMeasuringThis) const MeasureProgressRow(),
       ],
       nodes: <Widget>[
+        if (includeAuto) const AutoRow(),
         for (final node in nodes)
           NodeRow(node: node, isActive: node.id == activeId),
       ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:commy_ui/src/components/atoms/commy_spinner.dart';
+import 'package:commy_ui/src/components/commy_focusable.dart';
 import 'package:commy_ui/src/components/commy_icons.dart';
 import 'package:commy_ui/src/components/commy_tone.dart';
 import 'package:commy_ui/src/components/molecules/latency_badge.dart';
@@ -68,6 +69,7 @@ class ConnectionRoute extends StatefulWidget {
     this.breakAt,
     this.semanticLabel,
     this.compact = false,
+    this.stateLabel,
     super.key,
   });
 
@@ -80,6 +82,9 @@ class ConnectionRoute extends StatefulWidget {
   /// Starts at the server when a connection dial already represents the
   /// device. A device failure still shows the first stop and its marker.
   final bool compact;
+
+  /// Localized connection state below the compact server picker.
+  final String? stateLabel;
 
   /// The state of the tunnel the route draws.
   final ConnectState state;
@@ -413,6 +418,88 @@ class _ConnectionRouteState extends State<ConnectionRoute>
             isChecking: widget.isChecking,
           )
         : null;
+    if (widget.compact && widget.breakAt != RouteBreak.device) {
+      return Semantics(
+        container: true,
+        label: widget.semanticLabel,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            CommyFocusable(
+              onActivate: widget.onServerTap,
+              builder: (context, {required isFocused}) => Container(
+                foregroundDecoration: BoxDecoration(
+                  border: CommyFocusable.ring(colors, isFocused: isFocused),
+                  borderRadius: context.radii.controlAll,
+                ),
+                child: InkWell(
+                  onTap: widget.onServerTap,
+                  canRequestFocus: false,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: CommySizes.minTapTarget,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        if (widget.flag != null) ...<Widget>[
+                          widget.flag!,
+                          SizedBox(width: spacing.s2),
+                        ],
+                        Flexible(
+                          child: Text(
+                            widget.serverName,
+                            textAlign: TextAlign.center,
+                            style: type.bodyStrong
+                                .copyWith(color: colors.textPrimary),
+                          ),
+                        ),
+                        if (widget.onServerTap != null) ...<Widget>[
+                          SizedBox(width: spacing.s2),
+                          Icon(
+                            CommyIcons.chevronDown,
+                            size: CommySizes.iconInline,
+                            color: colors.textSecondary,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (widget.stateLabel != null)
+              Semantics(
+                container: true,
+                header: true,
+                liveRegion: true,
+                child: Text(
+                  widget.stateLabel!,
+                  textAlign: TextAlign.center,
+                  style: type.body.copyWith(
+                    color: widget.state.isTunnelUp
+                        ? colors.statusConnected
+                        : colors.textSecondary,
+                  ),
+                ),
+              ),
+            if (status != null)
+              Text(
+                status,
+                textAlign: TextAlign.center,
+                style: type.caption
+                    .copyWith(color: widget.internetTone.foreground(colors)),
+              ),
+            if (action != null) ...<Widget>[
+              SizedBox(height: spacing.s3),
+              Align(alignment: AlignmentDirectional.centerStart, child: action),
+            ],
+          ],
+        ),
+      );
+    }
+
     final topPad = (internetLine - firstLine) / 2;
     Widget internetRow({required bool actionBeside}) => _RouteRow(
           stop: _internet,
@@ -463,6 +550,17 @@ class _ConnectionRouteState extends State<ConnectionRoute>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
+            if (widget.compact && widget.stateLabel != null)
+              Semantics(
+                container: true,
+                header: true,
+                liveRegion: true,
+                child: Text(
+                  widget.stateLabel!,
+                  textAlign: TextAlign.center,
+                  style: type.body.copyWith(color: colors.statusError),
+                ),
+              ),
             if (!widget.compact || widget.breakAt == RouteBreak.device) device,
             server,
             internetRow(actionBeside: beside),
@@ -830,7 +928,7 @@ class _CheckAction extends StatelessWidget {
       button: true,
       enabled: onPressed != null,
       child: Material(
-        type: MaterialType.transparency,
+        color: colors.fill,
         borderRadius: context.radii.controlAll,
         clipBehavior: Clip.antiAlias,
         child: InkWell(

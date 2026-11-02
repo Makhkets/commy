@@ -157,7 +157,9 @@ class _CommyAppState extends ConsumerState<CommyApp>
           onGenerateTitle: (context) => Translations.of(context).app.name,
           debugShowCheckedModeBanner: false,
           theme: CommyTheme.light,
-          darkTheme: CommyTheme.dark,
+          darkTheme: settings.themeMode == AppThemeMode.slate
+              ? CommyTheme.slate
+              : CommyTheme.dark,
           themeMode: _themeModeOf(settings.themeMode),
           routerConfig: router,
           locale: TranslationProvider.of(context).flutterLocale,
@@ -208,7 +210,7 @@ class _CommyAppState extends ConsumerState<CommyApp>
   ThemeMode _themeModeOf(AppThemeMode mode) => switch (mode) {
         AppThemeMode.system => ThemeMode.system,
         AppThemeMode.light => ThemeMode.light,
-        AppThemeMode.dark => ThemeMode.dark,
+        AppThemeMode.dark || AppThemeMode.slate => ThemeMode.dark,
       };
 }
 

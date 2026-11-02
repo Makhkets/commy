@@ -116,25 +116,9 @@ class HeroArea extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              // The words the route says, as the heading of the screen: a
-              // screen reader hears them once, here, and the route's own
-              // summary below carries the path.
-              Semantics(
-                container: true,
-                header: true,
-                liveRegion: true,
-                // Swapped, not cross-faded: during a fade the outgoing words
-                // stayed in the tree beside the new ones, and the live
-                // region could announce both.
-                child: Text(
-                  answer,
-                  textAlign: TextAlign.center,
-                  style: type.title1.copyWith(color: colors.textPrimary),
-                ),
-              ),
-              SizedBox(height: spacing.s3),
               if (tunnelUp)
                 MetricsStrip(
+                  compact: true,
                   uplink: traffic?.uplink ?? 0,
                   downlink: traffic?.downlink ?? 0,
                   session: _sessionOf(status, now),
@@ -174,6 +158,7 @@ class HeroArea extends ConsumerWidget {
           padding: EdgeInsets.symmetric(horizontal: spacing.s4),
           child: ConnectionRoute(
             compact: true,
+            stateLabel: answer,
             semanticLabel: t.route.summary(
               device: t.route.device,
               server: serverName,
@@ -299,6 +284,7 @@ class _MainAction extends StatelessWidget {
     return ConnectButton(
       state: state,
       label: label,
+      showLabel: false,
       onPressed: onPressed,
     );
   }

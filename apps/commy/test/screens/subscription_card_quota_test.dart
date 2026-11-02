@@ -62,12 +62,9 @@ void main() {
       ),
     );
     expect(card.quotaRatio, isNull, reason: 'No ceiling, so no share of it.');
-    // The owner: a full bar, as if it were all spent — except it is not,
-    // because there is no end. Drawn full and calm, never red.
     expect(card.isUnlimited, isTrue);
-    final bar = tester.widget<QuotaBar>(find.byType(QuotaBar));
-    expect(bar.isUnlimited, isTrue);
-    expect(bar.clampedRatio, 1);
+    expect(find.byType(QuotaBar), findsNothing,
+        reason: 'An unlimited plan has no percentage to draw.',);
   });
 
   testWidgets('a panel that sent no traffic figures draws no bar at all',

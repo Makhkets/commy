@@ -91,6 +91,7 @@ void main() {
     );
 
     final labels = <AppThemeMode, String>{
+      AppThemeMode.slate: t.appearance.themeSlate,
       AppThemeMode.system: t.appearance.themeSystem,
       AppThemeMode.light: t.appearance.themeLight,
       AppThemeMode.dark: t.appearance.themeDark,

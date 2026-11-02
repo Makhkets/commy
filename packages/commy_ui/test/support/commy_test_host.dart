@@ -14,9 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///   proves nothing about a design system whose type scale is half the design.
 ///   [loadCommyFonts] puts the real Inter, JetBrains Mono and Lucide into the
 ///   engine before anything is pumped.
-/// * **Both themes.** Every golden is taken twice. Dark is the theme the
-///   product was designed in; light is a full derivation and gets caught here
-///   when it stops being one.
+/// * **Three themes.** Every golden covers slate, black and light.
 /// * **Stillness.** Animations are disabled, the device pixel ratio is 1 and
 ///   the surface is exactly the size asked for, so a golden differs only when
 ///   the widget does.
@@ -24,17 +22,24 @@ import 'package:flutter_test/flutter_test.dart';
 /// The key of the frame each golden photographs.
 const ValueKey<String> goldenFrame = ValueKey<String>('commy-golden-frame');
 
-/// The two themes every golden is taken in.
+/// The three themes every golden is taken in.
 enum CommyGoldenTheme {
-  /// The theme the product was designed in.
+  /// The default slate palette.
+  slate,
+
+  /// The black palette.
   dark,
 
-  /// The full derivation of it.
+  /// The light palette.
   light;
 
   /// The [ThemeData] this theme renders through.
   ThemeData get data =>
-      this == CommyGoldenTheme.dark ? CommyTheme.dark : CommyTheme.light;
+      switch (this) {
+        CommyGoldenTheme.dark => CommyTheme.dark,
+        CommyGoldenTheme.light => CommyTheme.light,
+        CommyGoldenTheme.slate => CommyTheme.slate,
+      };
 }
 
 bool _fontsLoaded = false;

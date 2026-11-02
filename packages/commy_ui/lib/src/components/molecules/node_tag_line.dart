@@ -75,7 +75,7 @@ class NodeTagLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final tagColors = context.tagColors;
-    final base = context.typography.caption.copyWith(
+    final base = context.typography.footnote.copyWith(
       color: mutedColor ?? colors.textSecondary,
     );
 

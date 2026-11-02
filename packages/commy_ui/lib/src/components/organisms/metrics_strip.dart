@@ -18,6 +18,7 @@ class MetricsStrip extends StatelessWidget {
     required this.downlink,
     required this.session,
     this.isActive = false,
+    this.compact = false,
     this.uplinkLabel,
     this.sessionLabel,
     this.downlinkLabel,
@@ -38,6 +39,9 @@ class MetricsStrip extends StatelessWidget {
 
   /// When false every figure is zero, including optional totals.
   final bool isActive;
+
+  /// Single-line readouts for the home screen.
+  final bool compact;
 
   /// Visible, accessible upload label.
   final String? uplinkLabel;
@@ -71,6 +75,7 @@ class MetricsStrip extends StatelessWidget {
           );
 
     final down = _Metric(
+      compact: compact,
       icon: CommyIcons.arrowDown,
       value: CommyByteFormat.rate(isActive ? downlink : 0, locale: locale),
       label: downlinkLabel,
@@ -78,12 +83,14 @@ class MetricsStrip extends StatelessWidget {
       color: color,
     );
     final clock = _Metric(
+      compact: compact,
       icon: CommyIcons.clock,
       value: CommyDurationFormat.clock(isActive ? session : Duration.zero),
       label: sessionLabel,
       color: color,
     );
     final up = _Metric(
+      compact: compact,
       icon: CommyIcons.arrowUp,
       value: CommyByteFormat.rate(isActive ? uplink : 0, locale: locale),
       label: uplinkLabel,
@@ -147,12 +154,14 @@ class _Metric extends StatelessWidget {
     required this.label,
     required this.color,
     this.detail,
+    this.compact = false,
   });
 
   final IconData icon;
   final String value;
   final String? label;
   final String? detail;
+  final bool compact;
   final Color color;
 
   /// Measures the widest line using the same fonts and scale as the readout.
@@ -160,9 +169,9 @@ class _Metric extends StatelessWidget {
     final type = context.typography;
     var widest = CommySizes.iconInline;
     for (final (text, style) in <(String?, TextStyle)>[
-      (label, type.caption),
+      if (!compact) (label, type.caption),
       (value, type.numericBody),
-      (detail, type.caption),
+      if (!compact) (detail, type.caption),
     ]) {
       if (text == null) continue;
       final painter = TextPainter(
@@ -174,7 +183,11 @@ class _Metric extends StatelessWidget {
       if (painter.width > widest) widest = painter.width;
       painter.dispose();
     }
-    return widest;
+    return compact
+        ? widest +
+            (CommySizes.iconInline + context.spacing.s1) *
+                (icon == CommyIcons.clock ? 2 : 1)
+        : widest;
   }
 
   @override
@@ -188,37 +201,57 @@ class _Metric extends StatelessWidget {
       label: label,
       value: detail == null ? value : '$value, $detail',
       excludeSemantics: true,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (label != null)
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: type.caption.copyWith(color: colors.textSecondary),
+      child: compact
+          ? Tooltip(
+              message: [if (label != null) label, if (detail != null) detail]
+                  .join(', '),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Icon(
+                    icon,
+                    size: CommySizes.iconInline,
+                    color: colors.textSecondary,
+                  ),
+                  SizedBox(width: context.spacing.s1),
+                  Text(value, style: type.numericBody.copyWith(color: color)),
+                  if (icon == CommyIcons.clock)
+                    SizedBox(width: CommySizes.iconInline + context.spacing.s1),
+                ],
+              ),
             )
-          else
-            Icon(
-              icon,
-              size: CommySizes.iconInline,
-              color: colors.textSecondary,
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (label != null)
+                  Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: type.caption.copyWith(color: colors.textSecondary),
+                  )
+                else
+                  Icon(
+                    icon,
+                    size: CommySizes.iconInline,
+                    color: colors.textSecondary,
+                  ),
+                SizedBox(height: context.spacing.s1),
+                Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: type.numericBody.copyWith(color: color),
+                ),
+                if (detail != null) ...<Widget>[
+                  SizedBox(height: context.spacing.s1),
+                  Text(
+                    detail,
+                    textAlign: TextAlign.center,
+                    style: type.caption.copyWith(color: colors.textTertiary),
+                  ),
+                ],
+              ],
             ),
-          SizedBox(height: context.spacing.s1),
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            style: type.numericBody.copyWith(color: color),
-          ),
-          if (detail != null) ...<Widget>[
-            SizedBox(height: context.spacing.s1),
-            Text(
-              detail,
-              textAlign: TextAlign.center,
-              style: type.caption.copyWith(color: colors.textTertiary),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

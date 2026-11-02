@@ -82,7 +82,7 @@ scripts:
 
   test:golden:
     description: >-
-      Golden tests, both themes: the design system's components and the
+      Golden tests, all three themes: the design system's components and the
       application's screens. Skipped outside Linux — the images are Skia
       output and Skia rasterises text differently per platform.
     run: melos exec -c 1 --fail-fast -- "flutter test --tags golden"

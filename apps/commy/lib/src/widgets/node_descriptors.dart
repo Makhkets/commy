@@ -51,6 +51,7 @@ abstract final class NodeDescriptors {
         transport.isEmpty
             ? _carriedOver(node.protocol)
             : transport.toUpperCase(),
+        hue: CommyTagHue.sky,
       ),
     );
 
@@ -84,7 +85,7 @@ abstract final class NodeDescriptors {
   /// The hue of [protocol]: one per family, so a mixed list shows its
   /// families apart. Exhaustive for the same reason as [_carriedOver].
   static CommyTagHue _protocolHue(Protocol protocol) => switch (protocol) {
-        Protocol.vless => CommyTagHue.azure,
+        Protocol.vless => CommyTagHue.lime,
         Protocol.vmess => CommyTagHue.sky,
         Protocol.trojan => CommyTagHue.orchid,
         Protocol.shadowsocks || Protocol.shadowtls => CommyTagHue.teal,
@@ -97,7 +98,7 @@ abstract final class NodeDescriptors {
   static CommyTagHue _securityHue(String security) =>
       switch (security.toLowerCase()) {
         'tls' => CommyTagHue.mint,
-        'reality' => CommyTagHue.iris,
+        'reality' => CommyTagHue.mint,
         _ => CommyTagHue.neutral,
       };
 

@@ -88,6 +88,9 @@ class SubscriptionCard extends StatelessWidget {
     required this.pingAllLabel,
     required this.moreLabel,
     this.subtitle,
+    this.countLabel,
+    this.onCollapse,
+    this.collapseLabel,
     this.health = SubscriptionHealth.ok,
     this.healthSemanticLabel,
     this.quotaRatio,
@@ -123,6 +126,15 @@ class SubscriptionCard extends StatelessWidget {
   /// refreshes itself, for example `2 ч назад · авто 1 ч`. Already composed
   /// and translated by the caller — this package owns no strings.
   final String? subtitle;
+
+  /// Number of servers reported by the app.
+  final String? countLabel;
+
+  /// Optional direct collapse action; errors remain visible when folded.
+  final VoidCallback? onCollapse;
+
+  /// Translated description of the collapse action.
+  final String? collapseLabel;
 
   /// State of the subscription, drawn as the leading glyph.
   final SubscriptionHealth health;
@@ -215,6 +227,10 @@ class SubscriptionCard extends StatelessWidget {
           _Header(
             name: name,
             subtitle: subtitle,
+            countLabel: countLabel,
+            onCollapse: onCollapse,
+            collapseLabel: collapseLabel,
+            isCollapsed: isCollapsed,
             health: health,
             healthSemanticLabel: healthSemanticLabel,
             quotaRatio: quotaRatio,
@@ -258,6 +274,10 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.name,
     required this.subtitle,
+    required this.countLabel,
+    required this.onCollapse,
+    required this.collapseLabel,
+    required this.isCollapsed,
     required this.health,
     required this.healthSemanticLabel,
     required this.quotaRatio,
@@ -278,6 +298,10 @@ class _Header extends StatelessWidget {
 
   final String name;
   final String? subtitle;
+  final String? countLabel;
+  final VoidCallback? onCollapse;
+  final String? collapseLabel;
+  final bool isCollapsed;
   final SubscriptionHealth health;
   final String? healthSemanticLabel;
   final double? quotaRatio;
@@ -319,41 +343,47 @@ class _Header extends StatelessWidget {
             ),
             child: Row(
               children: <Widget>[
-                Container(
-                  padding: EdgeInsets.all(spacing.s2),
-                  decoration: BoxDecoration(
-                    color: health.tone.wash(colors),
-                    borderRadius: context.radii.smAll,
-                  ),
-                  child: Icon(
-                    health.icon,
-                    size: CommySizes.iconControl,
-                    color: health.tone.foreground(colors),
-                    semanticLabel: healthSemanticLabel,
-                  ),
+                Icon(
+                  health.icon,
+                  size: CommySizes.iconInline,
+                  color: health.tone.foreground(colors),
+                  semanticLabel: healthSemanticLabel,
                 ),
-                SizedBox(width: spacing.s3),
+                SizedBox(width: spacing.s2),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: type.title3.copyWith(color: colors.textPrimary),
-                      ),
-                      if (subtitle != null)
-                        Text(
-                          subtitle!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: type.caption.copyWith(
-                            color: colors.textSecondary,
-                          ),
+                  child: Semantics(
+                    button: onCollapse != null,
+                    label: collapseLabel,
+                    expanded: !isCollapsed,
+                    child: InkWell(
+                      onTap: onCollapse,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minHeight: CommySizes.minTapTarget,
                         ),
-                    ],
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: type.captionStrong
+                                    .copyWith(color: colors.textPrimary),
+                              ),
+                            ),
+                            if (onCollapse != null)
+                              Icon(
+                                isCollapsed
+                                    ? CommyIcons.chevronDown
+                                    : CommyIcons.chevronUp,
+                                size: CommySizes.iconInline,
+                                color: colors.textSecondary,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 if (isRefreshing)
@@ -388,11 +418,11 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          if (ratio != null || isUnlimited)
+          if (ratio != null && !isUnlimited)
             Padding(
               padding: EdgeInsets.symmetric(horizontal: spacing.s4),
               child: QuotaBar(
-                ratio: ratio ?? 1,
+                ratio: ratio,
                 isUnlimited: isUnlimited,
                 semanticLabel: quotaSemanticLabel,
               ),
@@ -449,6 +479,32 @@ class _Header extends StatelessWidget {
               ],
             ),
           ],
+          if (subtitle != null || countLabel != null)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: spacing.s4,
+                vertical: spacing.s2,
+              ),
+              child: Wrap(
+                spacing: spacing.s3,
+                runSpacing: spacing.s1,
+                alignment: WrapAlignment.spaceBetween,
+                children: <Widget>[
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      style:
+                          type.footnote.copyWith(color: colors.textSecondary),
+                    ),
+                  if (countLabel != null)
+                    Text(
+                      countLabel!,
+                      style:
+                          type.footnote.copyWith(color: colors.textSecondary),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -497,7 +553,7 @@ class _ProviderLink extends StatelessWidget {
                       link.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: context.typography.bodyStrong.copyWith(
+                      style: context.typography.captionStrong.copyWith(
                         color: colors.textPrimary,
                       ),
                     ),

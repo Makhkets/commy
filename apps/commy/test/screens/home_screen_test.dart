@@ -145,7 +145,10 @@ void main() {
         (tester) async {
       await pumpHome(tester, status: const TunnelStatus.idle());
       expect(find.text(t.route.idleHint), findsOneWidget);
-      expect(find.text(t.route.connect), findsOneWidget);
+      expect(
+        tester.widget<ConnectButton>(find.byType(ConnectButton)).label,
+        t.route.connect,
+      );
     });
 
     // A tap with nothing to connect to does nothing; the line must not say
@@ -204,12 +207,10 @@ void main() {
       testWidgets('the main action names its result: $status', (tester) async {
         await pumpHome(tester, status: status);
         expect(
-          find.descendant(
-            of: find.byType(ConnectButton),
-            matching: find.text(label),
-          ),
-          findsOneWidget,
+          tester.widget<ConnectButton>(find.byType(ConnectButton)).label,
+          label,
         );
+        expect(tester.getSemantics(find.byType(ConnectButton)).label, label);
       });
     }
 
@@ -230,7 +231,7 @@ void main() {
         isSemantics(label: t.route.connected, isHeader: true),
       );
       expect(
-        tester.getSemantics(find.text(t.route.disconnect)),
+        tester.getSemantics(find.byType(ConnectButton)),
         isSemantics(label: t.route.disconnect, isButton: true),
       );
       expect(
@@ -960,6 +961,8 @@ void main() {
         several.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
       await settle(tester);
+      await tester.tap(find.byIcon(CommyIcons.search).first);
+      await settle(tester);
       await tester.enterText(find.byType(EditableText), 'berlin');
       await settle(tester);
       // Focusing the field scrolls the list to it, and a list that is still
@@ -1054,6 +1057,8 @@ void main() {
         flagged.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
       await settle(tester);
+      await tester.tap(find.byIcon(CommyIcons.search).first);
+      await settle(tester);
       await tester.enterText(find.byType(EditableText), 'it');
       await settle(tester);
 
@@ -1108,6 +1113,10 @@ void main() {
         three.wrap(const HomeScreen(), status: const TunnelStatus.idle()),
       );
       await settle(tester);
+      if (find.byIcon(CommyIcons.search).evaluate().isNotEmpty) {
+        await tester.tap(find.byIcon(CommyIcons.search).first);
+        await settle(tester);
+      }
     }
 
     /// Server rows in list order, without the Auto row.

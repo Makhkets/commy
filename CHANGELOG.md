@@ -10,9 +10,17 @@ matching the tag out of this file and uses it as the release notes.
 
 ## [Unreleased]
 
-- A calmer connection button with a single state outline. The status and
-  session clock are centred; download is on the left, upload on the right,
-  each showing its current rate and total volume for this connection.
+## [0.1.0-alpha.17]
+
+Installs over alpha.16.
+
+- Slate is the default theme for new installations; light, black and system
+  appearance remain available. Existing theme choices are preserved.
+- A compact home screen with a flat power dial, a unified subscription panel,
+  smaller flags, coloured protocol labels and four-bar latency indicators.
+  The selected server uses a neutral fill without a checkmark or side stripe.
+- Search and sorting open from the header. Unlimited subscriptions show usage
+  without a misleading full quota bar. README images use the updated widgets.
 
 ## [0.1.0-alpha.16]
 

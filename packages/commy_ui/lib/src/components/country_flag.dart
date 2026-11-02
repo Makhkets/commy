@@ -91,17 +91,22 @@ class CountryFlag extends StatelessWidget {
         child: letters == null
             ? null
             : Center(
-                child: Text(
-                  letters,
-                  // A glyph in a fixed 26 × 20 box, not reading text: scaled
-                  // with the system font it would leave the chip.
-                  textScaler: TextScaler.noScaling,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.clip,
-                  style: context.typography.label.copyWith(
-                    color: colors.textSecondary,
-                    letterSpacing: 0,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    letters,
+                    // A glyph in a fixed flag box, not reading text: scaled
+                    // with the system font it would leave the chip.
+                    textScaler: TextScaler.noScaling,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.clip,
+                    style: context.typography.label.copyWith(
+                      fontSize: CommySizes.flagLabel,
+                      height: 1,
+                      color: colors.textSecondary,
+                      letterSpacing: 0,
+                    ),
                   ),
                 ),
               ),

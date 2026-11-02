@@ -8,36 +8,8 @@ import 'package:commy_ui/src/tokens/colors.dart';
 import 'package:commy_ui/src/tokens/sizes.dart';
 import 'package:flutter/material.dart';
 
-/// One server, as a row inside the card of the subscription it came from.
-///
-/// The active node is a rounded plate inset from the card — the connected
-/// wash with a hairline of the connected fill around it, `block` (16) inside
-/// the card's 20 — never a tick on the trailing side. It used to be a bar
-/// down the leading edge; the plate is INCY's, which the owner pointed at
-/// (2026-10-10): it is caught by peripheral vision just as well while
-/// scrolling, costs no width either, and reads as "this one" rather than as
-/// a stripe on the card's edge.
-///
-/// Every row is inset by `space/1` on each side, so the plate and the press
-/// highlight of any row are the same rounded shape, concentric with the card
-/// (`card − 4`). A container that wants the plate as far from its top edge
-/// as from its sides pads the block of rows by another `space/1`.
-///
-/// An unreachable node is greyed — flag, text and tags — and given the
-/// offline glyph, but never hidden: a server that timed out once may be fine
-/// a minute later. Hiding dead nodes is a separate, explicit switch
-/// (docs/05-ux-flows.md, scenario 4). The glyph matters: grey alone is a
-/// colour signal, and colour is never allowed to carry a meaning on its own.
-///
-/// Latency comes from [LatencyBadge], which shows bars *and* a number *and* a
-/// colour for the same reason.
-///
-/// Keyboard and D-pad focus is the 2 px `border/strong` ring the rest of the
-/// system uses ([CommyFocusable]), drawn over the row — never the ink fill
-/// Material paints by default. That fill (12 % black or white) is laid under
-/// the text and took the protocol tags below AA, worst on the active plate.
-/// Hover keeps its `accent/wash`, except over the plate, which is already
-/// the row's highlight.
+/// A compact server row. Selection uses only a neutral surface; semantics
+/// still announce it. Focus keeps its independent keyboard ring.
 class NodeTile extends StatelessWidget {
   /// Creates a node row.
   const NodeTile({
@@ -129,7 +101,7 @@ class NodeTile extends StatelessWidget {
     final spacing = context.spacing;
     final type = context.typography;
     final motion = context.motion;
-    final shape = context.radii.blockAll;
+    const shape = BorderRadius.zero;
 
     // A server that did not answer is grey: its flag loses its colour and its
     // name drops to the tertiary step. One step down used to be all it got,
@@ -148,8 +120,8 @@ class NodeTile extends StatelessWidget {
       button: onTap != null,
       child: Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: spacing.s1,
-          vertical: spacing.s05,
+          horizontal: spacing.s0,
+          vertical: spacing.s0,
         ),
         child: CommyFocusable(
           onActivate: onTap,
@@ -157,19 +129,8 @@ class NodeTile extends StatelessWidget {
             duration: motion.fast,
             curve: motion.fastCurve,
             decoration: BoxDecoration(
-              color: !isActive
-                  ? CommyColors.transparent
-                  : isLive
-                      ? colors.statusConnectedWash
-                      : colors.fill,
+              color: isActive ? colors.bgOverlay : CommyColors.transparent,
               borderRadius: shape,
-              border: Border.all(
-                color: !isActive
-                    ? CommyColors.transparent
-                    : isLive
-                        ? colors.statusConnectedSolid
-                        : colors.borderStrong,
-              ),
             ),
             // Over the content, so the ring costs no layout and never moves
             // the row by its width.
@@ -187,7 +148,7 @@ class NodeTile extends StatelessWidget {
                 // Focus belongs to the CommyFocusable around it.
                 canRequestFocus: false,
                 hoverColor: isActive ? CommyColors.transparent : null,
-                customBorder: RoundedRectangleBorder(borderRadius: shape),
+                customBorder: const RoundedRectangleBorder(),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(
                     minHeight: CommySizes.minTapTarget,
@@ -199,21 +160,10 @@ class NodeTile extends StatelessWidget {
                     ),
                     child: Row(
                       children: <Widget>[
-                        Container(
-                          width: CommySizes.flagTile,
-                          height: CommySizes.flagTile,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: colors.bgOverlay,
-                            borderRadius: context.radii.smAll,
-                          ),
-                          child: isReachable
-                              ? flag
-                              : ColorFiltered(
-                                  colorFilter: _greyscale,
-                                  child: flag,
-                                ),
-                        ),
+                        if (isReachable)
+                          flag
+                        else
+                          ColorFiltered(colorFilter: _greyscale, child: flag),
                         SizedBox(width: spacing.s3),
                         Expanded(
                           child: Column(
@@ -224,7 +174,8 @@ class NodeTile extends StatelessWidget {
                                 name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: type.title3.copyWith(color: nameColor),
+                                style: type.captionStrong
+                                    .copyWith(color: nameColor),
                               ),
                               if (descriptors.isNotEmpty)
                                 NodeTagLine(

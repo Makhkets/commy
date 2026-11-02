@@ -509,11 +509,16 @@ const ValueKey<String> _frame = ValueKey<String>('commy-golden-frame');
 
 /// The two themes every golden is taken in.
 enum _Theme {
+  slate,
   dark,
   light;
 
   ThemeData get data =>
-      this == _Theme.dark ? CommyTheme.dark : CommyTheme.light;
+      switch (this) {
+        _Theme.dark => CommyTheme.dark,
+        _Theme.light => CommyTheme.light,
+        _Theme.slate => CommyTheme.slate,
+      };
 }
 
 /// Registers one golden per theme for [screen].

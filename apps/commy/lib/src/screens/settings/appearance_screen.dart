@@ -147,6 +147,7 @@ class _Body extends ConsumerWidget {
         AppThemeMode.system => t.appearance.themeSystem,
         AppThemeMode.light => t.appearance.themeLight,
         AppThemeMode.dark => t.appearance.themeDark,
+        AppThemeMode.slate => t.appearance.themeSlate,
       };
 
   String _sizeLabel(Translations t, AppTextSize size) => switch (size) {

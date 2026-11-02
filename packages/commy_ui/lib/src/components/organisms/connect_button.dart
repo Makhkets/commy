@@ -18,6 +18,7 @@ class ConnectButton extends StatefulWidget {
     required this.state,
     required this.label,
     required this.onPressed,
+    this.showLabel = true,
     super.key,
   });
 
@@ -26,6 +27,9 @@ class ConnectButton extends StatefulWidget {
 
   /// The translated action, shown below the dial without truncation.
   final String label;
+
+  /// Whether the action is also printed below the dial.
+  final bool showLabel;
 
   /// Connects, disconnects or cancels. Null disables the control.
   final VoidCallback? onPressed;
@@ -107,11 +111,7 @@ class _ConnectButtonState extends State<ConnectButton> {
                           curve: motion.fastCurve,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: <Color>[surface, colors.bgOverlay],
-                            ),
+                            color: surface,
                             border: Border.all(
                               color: busy ? colors.borderSubtle : ring,
                               width: CommySizes.borderThick,
@@ -132,15 +132,17 @@ class _ConnectButtonState extends State<ConnectButton> {
                       ],
                     ),
                   ),
-                  SizedBox(height: spacing.s2),
-                  Text(
-                    widget.label,
-                    textAlign: TextAlign.center,
-                    style: context.typography.bodyStrong.copyWith(
-                      color:
-                          enabled ? colors.textPrimary : colors.textSecondary,
+                  if (widget.showLabel) ...<Widget>[
+                    SizedBox(height: spacing.s2),
+                    Text(
+                      widget.label,
+                      textAlign: TextAlign.center,
+                      style: context.typography.bodyStrong.copyWith(
+                        color:
+                            enabled ? colors.textPrimary : colors.textSecondary,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

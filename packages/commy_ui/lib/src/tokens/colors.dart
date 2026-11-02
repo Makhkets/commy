@@ -127,6 +127,26 @@ class CommyColors extends ThemeExtension<CommyColors> {
     statusIdleWash: Color(0x249C9CA2),
   );
 
+  /// Default slate palette. Surfaces share one hue across the whole app.
+  static final CommyColors slate = dark.copyWith(
+    statusErrorSolid: const Color(0xFFFF7A70),
+    statusErrorOnSolid: const Color(0xFF000000),
+    statusIdleSolid: const Color(0xFF8195A3),
+    bgCanvas: const Color(0xFF111C24),
+    bgSurface: const Color(0xFF17242E),
+    bgRaised: const Color(0xFF17242E),
+    bgOverlay: const Color(0xFF21333F),
+    bgInset: const Color(0xFF111C24),
+    fill: const Color(0xFF1D2D38),
+    fillStrong: const Color(0xFF2B3C48),
+    borderSubtle: const Color(0xFF2B3C48),
+    borderDefault: const Color(0xFF38505F),
+    borderStrong: const Color(0xFF8195A3),
+    textPrimary: const Color(0xFFF0F4F7),
+    textSecondary: const Color(0xFFB5C9D8),
+    textTertiary: const Color(0xFFA3B5C3),
+  );
+
   /// The light theme: white cards on Apple's grouped grey.
   static const CommyColors light = CommyColors(
     bgCanvas: Color(0xFFF2F2F7),

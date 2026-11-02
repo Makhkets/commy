@@ -9,16 +9,23 @@ import 'package:commy_ui/src/tokens/tag_colors.dart';
 import 'package:commy_ui/src/tokens/typography.dart';
 import 'package:flutter/material.dart';
 
-/// Builds the two [ThemeData] objects of the application.
+/// Builds the three [ThemeData] objects of the application.
 ///
 /// Everything a widget needs is hung off the theme as a [ThemeExtension] and
 /// read back through `context.colors`, `context.spacing` and friends. The
 /// Material properties below exist only so that the framework's own widgets —
 /// text fields, scrollbars, ink — do not look foreign next to ours.
 ///
-/// Neither theme is "the default". Dark is the one the product was designed
-/// in; light is a full derivation, not an afterthought.
+/// Slate is the default. Black and light share its layout and type scale.
 abstract final class CommyTheme {
+  /// The default slate theme.
+  static ThemeData get slate => _build(
+        colors: CommyColors.slate,
+        elevation: CommyElevation.dark,
+        tags: CommyTagColors.dark,
+        brightness: Brightness.dark,
+      );
+
   /// The dark theme.
   static ThemeData get dark => _build(
         colors: CommyColors.dark,

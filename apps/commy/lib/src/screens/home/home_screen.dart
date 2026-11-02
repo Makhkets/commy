@@ -52,12 +52,19 @@ import 'package:go_router/go_router.dart';
 /// nothing to connect to, a full failure view when the store itself is
 /// broken, and the content below. Only the last of the four has two halves
 /// to split — the other three own the whole width at every size.
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   /// Creates the screen.
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _showSearch = false;
+
+  @override
+  Widget build(BuildContext context) {
     final t = Translations.of(context);
     final nodes = ref.watch(nodesProvider);
     final subscriptions = ref.watch(subscriptionsProvider);
@@ -124,6 +131,12 @@ class HomeScreen extends ConsumerWidget {
             ),
         ],
         actions: <Widget>[
+          if ((nodes.value?.length ?? 0) > 1)
+            CommyIconButton(
+              icon: CommyIcons.search,
+              semanticLabel: t.common.search,
+              onPressed: () => setState(() => _showSearch = !_showSearch),
+            ),
           CommyIconButton(
             icon: CommyIcons.add,
             semanticLabel: t.a11y.addServer,
@@ -154,6 +167,7 @@ class HomeScreen extends ConsumerWidget {
             subscriptions: subs,
             nodes: all,
             hasConnectionPane: apart,
+            showSearch: _showSearch,
           );
         },
       ),
@@ -464,6 +478,7 @@ class _HomeContent extends ConsumerWidget {
     required this.subscriptions,
     required this.nodes,
     required this.hasConnectionPane,
+    required this.showSearch,
   });
 
   final List<Subscription> subscriptions;
@@ -471,6 +486,7 @@ class _HomeContent extends ConsumerWidget {
 
   /// Whether the connection is already drawn beside this list.
   final bool hasConnectionPane;
+  final bool showSearch;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -504,7 +520,12 @@ class _HomeContent extends ConsumerWidget {
       cards
         ..add(
           ListCard.inset(
-            child: SubscriptionSection(subscription: subscription, nodes: own),
+            child: SubscriptionSection(
+              subscription: subscription,
+              nodes: own,
+              includeAuto:
+                  hasChoice && subscriptions.length == 1 && manual.isEmpty,
+            ),
           ),
         )
         ..add(SizedBox(height: spacing.s4));
@@ -521,7 +542,8 @@ class _HomeContent extends ConsumerWidget {
           const HeroArea(),
           const _TunnelFailureBanner(),
         ],
-        if (hasChoice) ...<Widget>[
+        if (hasChoice &&
+            (subscriptions.length != 1 || manual.isNotEmpty)) ...<Widget>[
           ListCard(
             children: <Widget>[
               // The row's own inset is `space/1` vertically and `space/2`
@@ -534,7 +556,10 @@ class _HomeContent extends ConsumerWidget {
           ),
           SizedBox(height: spacing.s4),
         ],
-        if (hasChoice) ...<Widget>[
+        if (hasChoice &&
+            (hasConnectionPane ||
+                showSearch ||
+                filter.isSearching)) ...<Widget>[
           const ListToolbar(),
           SizedBox(height: spacing.s4),
         ],

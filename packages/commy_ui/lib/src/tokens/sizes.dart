@@ -28,8 +28,8 @@ abstract final class CommySizes {
   /// the circular [connectDiameter] control instead.
   static const double buttonHeightLarge = 52;
 
-  /// Diameter of the main connection dial, including its focus ring — 192.
-  static const double connectDiameter = 192;
+  /// Diameter of the main connection dial, including its focus ring — 160.
+  static const double connectDiameter = 160;
 
   /// Power symbol inside the main connection dial — 64.
   static const double connectIcon = 64;
@@ -98,10 +98,13 @@ abstract final class CommySizes {
   static const double statusDot = 8;
 
   /// Country flag width — 26.
-  static const double flagWidth = 26;
+  static const double flagWidth = 20;
 
   /// Country flag height — 20.
-  static const double flagHeight = 20;
+  static const double flagHeight = 14;
+
+  /// Fixed country-code glyph size inside a flag.
+  static const double flagLabel = 10;
 
   /// Width of one latency bar — 2.5.
   static const double latencyBarWidth = 2.5;
@@ -113,7 +116,7 @@ abstract final class CommySizes {
   static const double latencyBarHeight = 12;
 
   /// How many bars a latency badge draws — 3.
-  static const int latencyBarCount = 3;
+  static const int latencyBarCount = 4;
 
   /// Height of the quota track — 4.
   static const double quotaBarHeight = 4;

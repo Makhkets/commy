@@ -190,6 +190,20 @@ void main() {
     );
   });
 
+  testWidgets('home, connected, slate', (tester) async {
+    await library();
+    await _shoot(
+      tester,
+      harness,
+      'home-connected-slate',
+      const HomeScreen(),
+      dark: true,
+      theme: CommyTheme.slate,
+      status: connected,
+      extra: <Override>[liveTraffic()],
+    );
+  });
+
   testWidgets('first run', (tester) async {
     harness = CommyTestHarness();
     await _shoot(
@@ -292,6 +306,7 @@ Future<void> _shoot(
   String name,
   Widget screen, {
   required bool dark,
+  ThemeData? theme,
   TunnelStatus? status,
   List<Override> extra = const <Override>[],
 }) async {
@@ -319,7 +334,7 @@ Future<void> _shoot(
         screen,
         status: status,
         extra: extra,
-        theme: dark ? CommyTheme.dark : CommyTheme.light,
+        theme: theme ?? (dark ? CommyTheme.dark : CommyTheme.light),
       ),
     ),
   );

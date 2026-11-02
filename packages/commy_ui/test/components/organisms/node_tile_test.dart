@@ -138,7 +138,7 @@ void main() {
     expect(taps, 1);
   });
 
-  testWidgets('the active server is a plate with an edge, not a bar',
+  testWidgets('the active server uses a neutral fill without a border',
       (tester) async {
     await pumpCommy(
       tester,
@@ -159,11 +159,8 @@ void main() {
       ),
     );
     final decoration = plate.decoration! as BoxDecoration;
-    expect(decoration.color, colors.statusConnectedWash);
-    expect(
-      (decoration.border! as Border).top.color,
-      colors.statusConnected,
-    );
+    expect(decoration.color, colors.bgOverlay);
+    expect(decoration.border, isNull);
     expect(
       tester.getSemantics(find.byType(NodeTile).first),
       isSemantics(isSelected: true),

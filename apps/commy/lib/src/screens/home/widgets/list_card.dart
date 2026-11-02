@@ -33,7 +33,7 @@ class ListCard extends StatelessWidget {
     final colors = context.colors;
     final rows = children;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: context.spacing.s4),
+      padding: EdgeInsets.symmetric(horizontal: context.spacing.s5),
       child: rows == null
           ? child
           : Container(

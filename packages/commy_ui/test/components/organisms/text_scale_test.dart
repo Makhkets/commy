@@ -40,40 +40,47 @@ void main() {
     );
   }
 
-  testWidgets('MetricsStrip survives 200 %', (tester) async {
-    await expectSurvives(
-      tester,
-      'MetricsStrip',
-      const MetricsStrip(
-        uplink: 25600,
-        downlink: 1348576,
-        session: Duration(hours: 1, minutes: 12, seconds: 47),
-        isActive: true,
-        uplinkLabel: 'Отдача',
-        sessionLabel: 'Сессия',
-        downlinkLabel: 'Загрузка',
-      ),
-    );
-  });
+  for (final compact in <bool>[false, true]) {
+    testWidgets('MetricsStrip survives 200 %, compact=$compact',
+        (tester) async {
+      await expectSurvives(
+        tester,
+        'MetricsStrip',
+        MetricsStrip(
+          compact: compact,
+          uplink: 25600,
+          downlink: 1348576,
+          session: const Duration(hours: 1, minutes: 12, seconds: 47),
+          isActive: true,
+          uplinkLabel: 'Отдача',
+          sessionLabel: 'Сессия',
+          downlinkLabel: 'Загрузка',
+        ),
+      );
+    });
 
-  testWidgets('ConnectionRoute survives 200 %', (tester) async {
-    await expectSurvives(
-      tester,
-      'ConnectionRoute',
-      ConnectionRoute(
-        state: ConnectState.connected,
-        deviceLabel: 'Это устройство',
-        serverName: 'Amsterdam 03 — очень длинное имя узла',
-        internetLabel: 'Интернет',
-        flag: const CountryFlag(countryCode: 'NL'),
-        latency: const Duration(milliseconds: 48),
-        onServerTap: () {},
-        checkLabel: 'Проверить доступ',
-        onCheck: () {},
-        internetStatus: 'Доступ есть, 52 мс',
-      ),
-    );
-  });
+    testWidgets('ConnectionRoute survives 200 %, compact=$compact',
+        (tester) async {
+      await expectSurvives(
+        tester,
+        'ConnectionRoute',
+        ConnectionRoute(
+          compact: compact,
+          stateLabel: compact ? 'Подключено' : null,
+          state: ConnectState.connected,
+          deviceLabel: 'Это устройство',
+          serverName: 'Amsterdam 03 — очень длинное имя узла',
+          internetLabel: 'Интернет',
+          flag: const CountryFlag(countryCode: 'NL'),
+          latency: const Duration(milliseconds: 48),
+          onServerTap: () {},
+          checkLabel: 'Проверить доступ',
+          onCheck: () {},
+          internetStatus: 'Доступ есть, 52 мс',
+        ),
+      );
+    });
+  }
 
   testWidgets('NodeTile survives 200 %', (tester) async {
     await expectSurvives(

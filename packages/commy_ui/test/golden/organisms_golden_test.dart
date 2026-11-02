@@ -431,7 +431,7 @@ void main() {
   // the progress with its way out is not.
   goldenTest(
     'subscription_card_collapsed_status',
-    size: const Size(390, 168),
+    size: const Size(390, 208),
     builder: (context) => SubscriptionCard(
       name: 'MAKHKETS VPN',
       subtitle: '2 ч назад · авто 1 ч',

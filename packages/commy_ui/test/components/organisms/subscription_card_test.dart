@@ -54,6 +54,43 @@ void main() {
     expect(status, lessThan(first));
   });
 
+  testWidgets('title toggles servers while metadata stays visible',
+      (tester) async {
+    var collapsed = false;
+    await pumpCommy(
+      tester,
+      size: const Size(390, 600),
+      child: StatefulBuilder(
+        builder: (context, setState) => SubscriptionCard(
+          name: 'My panel',
+          refreshLabel: 'Refresh',
+          pingAllLabel: 'Measure all',
+          moreLabel: 'More',
+          subtitle: 'Updated 2 hours ago',
+          countLabel: '2 servers',
+          announcement: 'Support: @example',
+          isCollapsed: collapsed,
+          collapseLabel: collapsed ? 'Expand' : 'Collapse',
+          onCollapse: () => setState(() => collapsed = !collapsed),
+          nodes: <Widget>[
+            NodeTile(name: 'Amsterdam 03', onTap: () {}),
+            NodeTile(name: 'Frankfurt 01', onTap: () {}),
+          ],
+        ),
+      ),
+    );
+    await tester.tap(find.text('My panel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NodeTile), findsNothing);
+    expect(find.text('Updated 2 hours ago'), findsOneWidget);
+    expect(find.text('2 servers'), findsOneWidget);
+    expect(find.text('Support: @example'), findsOneWidget);
+    await tester.tap(find.text('My panel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(NodeTile), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets("the panel's notice is drawn in the secondary step",
       (tester) async {
     // It is 11 px, and text/tertiary is for 13 px and up: on the group

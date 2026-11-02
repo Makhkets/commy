@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 ///
 /// Three signals for one fact, on purpose: the bars survive a colour-blind
 /// reader, the number survives a small screen, and the colour is what the eye
-/// catches while scrolling. Below 100 ms is fast, below 300 ms is medium,
+/// catches while scrolling. Below 150 ms is fast, 150–300 ms is medium,
 /// anything else is slow, and an unmeasured node shows an em dash rather than
 /// a zero — zero would read as "instant".
 class LatencyBadge extends StatelessWidget {
@@ -26,7 +26,7 @@ class LatencyBadge extends StatelessWidget {
   /// Whether the millisecond figure is shown next to the bars.
   final bool showNumber;
 
-  /// How many of the three bars are lit: 3 fast, 2 medium, 1 slow, 0 unknown.
+  /// How many of the four bars are lit: 4 fast, 2 medium, 1 slow, 0 unknown.
   int get filledBars {
     final value = latency;
     if (value == null) {
@@ -35,8 +35,8 @@ class LatencyBadge extends StatelessWidget {
     if (value < CommyThresholds.latencyFast) {
       return CommySizes.latencyBarCount;
     }
-    if (value < CommyThresholds.latencySlow) {
-      return CommySizes.latencyBarCount - 1;
+    if (value <= CommyThresholds.latencySlow) {
+      return CommySizes.latencyBarCount ~/ 2;
     }
     return 1;
   }
@@ -50,7 +50,7 @@ class LatencyBadge extends StatelessWidget {
     if (value < CommyThresholds.latencyFast) {
       return CommyTone.connected;
     }
-    if (value < CommyThresholds.latencySlow) {
+    if (value <= CommyThresholds.latencySlow) {
       return CommyTone.connecting;
     }
     return CommyTone.error;
@@ -89,7 +89,7 @@ class LatencyBadge extends StatelessWidget {
                 isLit: index < filledBars,
                 color: foreground,
                 // `textTertiary`, not `borderDefault`. The unlit bars are
-                // the scale the lit ones are read against — "one of three"
+                // the scale the lit ones are read against — "one of four"
                 // is the whole message — and at `borderDefault` they
                 // measured 1.2:1 against the surface of a selected row,
                 // where WCAG asks a meaningful graphic for 3:1. The reading
@@ -107,7 +107,7 @@ class LatencyBadge extends StatelessWidget {
             Text(
               text,
               style: context.typography.numericBody.copyWith(
-                color: foreground,
+                color: colors.textSecondary,
               ),
             ),
           ],

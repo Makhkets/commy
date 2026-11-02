@@ -21,19 +21,19 @@ Android · iOS · Windows · macOS · Linux
 <table>
 <tr>
 <td align="center" width="33%">
-<img src="docs/screenshots/home-connected-light.png" width="250" alt="Commy, connected: a large power button, live traffic, selected server and internet check">
+<img src="docs/screenshots/home-connected-slate.png" width="250" alt="Default slate theme">
 </td>
 <td align="center" width="33%">
-<img src="docs/screenshots/home-connected-dark.png" width="250" alt="The same screen in the dark theme">
+<img src="docs/screenshots/home-connected-dark.png" width="250" alt="Black theme">
 </td>
 <td align="center" width="33%">
-<img src="docs/screenshots/first-run-light.png" width="250" alt="First run: add your own server; the route with its middle stop still empty">
+<img src="docs/screenshots/home-connected-light.png" width="250" alt="Light theme">
 </td>
 </tr>
 <tr>
-<td align="center"><sub><b>One touch.</b> A large connection button. Download on the left, session time in the centre, upload on the right.</sub></td>
-<td align="center"><sub><b>Both themes</b>, each drawn on purpose: true black under the cards, every text pair above 4.5:1.</sub></td>
-<td align="center"><sub><b>First run.</b> Empty until you add a server — there is nothing bundled to connect to.</sub></td>
+<td align="center"><sub><b>Slate.</b> The default palette unifies the canvas, dial and subscription.</sub></td>
+<td align="center"><sub><b>Black.</b> The same layout on a true-black canvas.</sub></td>
+<td align="center"><sub><b>Light.</b> Light surfaces with contrasting text and protocol labels.</sub></td>
 </tr>
 <tr>
 <td align="center" width="33%">

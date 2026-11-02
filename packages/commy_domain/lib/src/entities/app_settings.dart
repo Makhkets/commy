@@ -6,6 +6,9 @@ import 'package:commy_domain/src/entities/ping_method.dart';
 
 /// Theme preference. Deliberately not Flutter's `ThemeMode`: rule R5.
 enum AppThemeMode {
+  /// The default slate palette, independent of system brightness.
+  slate,
+
   /// Follow the operating system.
   system,
 
@@ -57,7 +60,7 @@ enum TunStack {
 class AppSettings {
   /// Creates the settings.
   const AppSettings({
-    this.themeMode = AppThemeMode.system,
+    this.themeMode = AppThemeMode.slate,
     this.textSize = AppTextSize.medium,
     this.reduceMotion = false,
     this.locale,
@@ -82,7 +85,7 @@ class AppSettings {
   /// Restores the settings from the map produced by [toJson].
   factory AppSettings.fromJson(JsonMap json) => AppSettings(
         themeMode: AppThemeMode.values.byName(
-          JsonRead.stringOr(json, 'themeMode', orElse: 'system'),
+          JsonRead.stringOr(json, 'themeMode', orElse: 'slate'),
         ),
         // A size this build does not know — written by a newer one, or by
         // hand — is the system's size, not a failure to read the settings.

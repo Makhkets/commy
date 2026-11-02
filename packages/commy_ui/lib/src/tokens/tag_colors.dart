@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 /// сервера". [neutral] is the caption colour the line had before it had any
 /// colour at all, and is what a transport and anything unknown get.
 enum CommyTagHue {
+  /// Lime. VLESS in the approved slate design.
+  lime,
+
   /// No hue: `text/secondary`.
   neutral,
 
@@ -75,7 +78,7 @@ class CommyTagColors extends ThemeExtension<CommyTagColors> {
   static const CommyTagColors dark = CommyTagColors(
     azure: Color(0xFF63A8FF),
     sky: Color(0xFF38BDF8),
-    iris: Color(0xFFA78BFA),
+    iris: Color(0xFFB79EFA),
     orchid: Color(0xFFE879F9),
     teal: Color(0xFF2DD4BF),
     tangerine: Color(0xFFFB923C),
@@ -127,6 +130,9 @@ class CommyTagColors extends ThemeExtension<CommyTagColors> {
   /// The colour of [hue]. [CommyTagHue.neutral] is `text/secondary` of
   /// [colors], so a tag without a hue looks exactly like the caption it is.
   Color of(CommyTagHue hue, CommyColors colors) => switch (hue) {
+        CommyTagHue.lime => colors.bgCanvas.computeLuminance() > 0.5
+            ? const Color(0xFF486314)
+            : const Color(0xFFB9D56C),
         CommyTagHue.neutral => colors.textSecondary,
         CommyTagHue.azure => azure,
         CommyTagHue.sky => sky,

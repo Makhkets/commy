@@ -8,10 +8,10 @@ import 'package:commy_domain/commy_domain.dart';
 /// from there instead of being re-declared.
 abstract final class CommyThresholds {
   /// Below this round trip a node is "fast" and gets `status/connected`.
-  static const Duration latencyFast = Duration(milliseconds: 100);
+  static const Duration latencyFast = Duration(milliseconds: 150);
 
-  /// Below this round trip a node is "medium" and gets `status/connecting`.
-  /// At or above it, `status/error`.
+  /// Up to this round trip a node is "medium" and gets `status/connecting`.
+  /// Above it, `status/error`.
   static const Duration latencySlow = Duration(milliseconds: 300);
 
   /// Share of quota at which the bar turns amber.
