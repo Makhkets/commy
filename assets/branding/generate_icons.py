@@ -87,6 +87,9 @@ render(512, rounded=True).save(os.path.join(OUT, "icon-512.png"))
 render(1024, rounded=True).save(os.path.join(OUT, "icon-1024.png"))
 render(192, rounded=True).save(os.path.join(OUT, "icon-192.png"))
 
+# iOS applies its own mask and requires an opaque RGB store icon.
+render(1024).convert("RGB").save(os.path.join(OUT, "icon-ios-1024.png"))
+
 # flat background colour for the adaptive icon's background layer
 Image.new("RGBA", (108, 108), BG_CANVAS + (255,)).save(
     os.path.join(OUT, "ic_launcher_background.png")

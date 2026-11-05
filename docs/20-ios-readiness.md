@@ -15,8 +15,7 @@ NETunnelProviderManager. Расширение запускает закрепл�
 scripts/build_core.sh apple
 melos bootstrap
 melos run gen --no-select
-cd apps/commy
-flutter build ios --release --no-codesign
+scripts/build_ios.sh
 ```
 
 В CI есть `.github/workflows/ios.yml`: сборка ядра, приложения и расширения
@@ -25,7 +24,8 @@ flutter build ios --release --no-codesign
 `dev.commy.app`, `dev.commy.app.CommyTunnel`, `group.dev.commy.app`, включить
 Network Extensions, App Groups и Keychain Sharing в профилях обоих targets.
 При смене идентификаторов согласовать `COMMY_APP_GROUP`, bundle IDs и общий
-Keychain во всех plist и entitlements. Номера версий app/extension должны совпадать.
+Keychain во всех plist и entitlements. Скрипт `build_ios.sh` берёт числовую версию без `alpha` и номер сборки из
+`pubspec.yaml`; расширение наследует их из Flutter xcconfig.
 
 ## Открытые условия приёмки
 

@@ -36,7 +36,17 @@ jobs:
           melos bootstrap
           melos run gen --no-select
       - name: Compile app and extension
-        working-directory: apps/commy
-        run: flutter build ios --release --no-codesign
-      - name: Verify extension is embedded
-        run: test -x apps/commy/build/ios/iphoneos/Runner.app/PlugIns/CommyTunnel.appex/CommyTunnel
+        run: scripts/build_ios.sh
+      - name: Verify embedded extension and matching versions
+        run: |
+          test -x apps/commy/build/ios/iphoneos/Runner.app/PlugIns/CommyTunnel.appex/CommyTunnel
+          python3 - <<'PYTHON'
+          import plistlib
+          from pathlib import Path
+          app = Path('apps/commy/build/ios/iphoneos/Runner.app')
+          main = plistlib.loads((app / 'Info.plist').read_bytes())
+          tunnel = plistlib.loads((app / 'PlugIns/CommyTunnel.appex/Info.plist').read_bytes())
+          for key in ['CFBundleShortVersionString', 'CFBundleVersion']:
+              assert main[key] == tunnel[key], (key, main[key], tunnel[key])
+          assert len(main['CFBundleShortVersionString'].split('.')) == 3
+          PYTHON

@@ -32,6 +32,8 @@ ic_launcher_background.png                   задний слой адапти�
 
 ```bash
 python assets/branding/generate_icons.py
+# iOS: квадратная RGB-иконка, маску накладывает система
+cp assets/branding/icon-out/icon-ios-1024.png apps/commy/ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon.png
 ```
 
 Скрипт рисует с восьмикратным супersampling'ом и уменьшает через LANCZOS:
