@@ -164,8 +164,10 @@ final secretVaultProvider = Provider<SecretVault>(
 /// and the pool holds sockets to the user's panel.
 final httpClientProvider = Provider<CommyHttpClient>((ref) {
   final info = ref.watch(appInfoProvider);
+  final logger = ref.watch(appLoggerProvider);
   final client = CommyHttpClient(
     userAgent: CommyUserAgent.honest(info.version),
+    onDiagnostic: (message) => logger.info(message, tag: 'http'),
   );
   ref.onDispose(client.close);
   return client;

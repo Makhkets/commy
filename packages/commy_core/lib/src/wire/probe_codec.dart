@@ -28,16 +28,26 @@ abstract final class ProbeCodec {
   /// Zero is "did not answer" and becomes `null`, as a delay of zero does
   /// everywhere on this wire: a server nobody heard from must never sort
   /// above one that answered in 12 ms.
-  static Map<String, Duration?> decodeOutbounds(Object? raw) {
+  static Map<String, Duration?> decodeOutbounds(
+    Object? raw, {
+    void Function(String tag, String reason)? onFailure,
+  }) {
     final json = WireJson.object(raw, 'probeOutbounds result');
-    return <String, Duration?>{
-      for (final entry in json.entries)
-        entry.key: switch (entry.value) {
-          final num millis when millis > 0 =>
-            Duration(milliseconds: millis.toInt()),
-          _ => null,
-        },
-    };
+    final delays = <String, Duration?>{};
+    for (final entry in json.entries) {
+      final value = entry.value;
+      final millis = value is Map ? value['delay'] : value;
+      delays[entry.key] = millis is num && millis > 0
+          ? Duration(milliseconds: millis.toInt())
+          : null;
+      final reason = value is Map ? value['error'] : null;
+      if (reason is String) {
+        if (reason.isNotEmpty) {
+          onFailure?.call(entry.key, reason);
+        }
+      }
+    }
+    return delays;
   }
 
   /// The argument of `ping`.

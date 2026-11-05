@@ -14,9 +14,15 @@ void main() {
       expect(client, isA<AndroidCoreClient>());
     });
 
+    test('iOS gets the channel client with its own diagnostic source', () {
+      final client = CoreClientFactory.create(platform: TargetPlatform.iOS);
+      expect(client, isA<AndroidCoreClient>());
+      expect((client as AndroidCoreClient).platformLogTag, 'core.ios');
+    });
+
     test('every platform without a tunnel yet gets the fake', () {
       for (final platform in TargetPlatform.values) {
-        if (platform == TargetPlatform.android) {
+        if (CoreClientFactory.supports(platform)) {
           continue;
         }
         final client = CoreClientFactory.create(platform: platform);
@@ -42,7 +48,7 @@ void main() {
     test('says out loud which platforms are real', () {
       expect(CoreClientFactory.supports(TargetPlatform.android), isTrue);
       expect(CoreClientFactory.supports(TargetPlatform.windows), isFalse);
-      expect(CoreClientFactory.supports(TargetPlatform.iOS), isFalse);
+      expect(CoreClientFactory.supports(TargetPlatform.iOS), isTrue);
     });
 
     test('notes the fallback in the log instead of failing silently', () {

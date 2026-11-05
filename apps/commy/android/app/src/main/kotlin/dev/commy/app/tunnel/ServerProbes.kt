@@ -44,7 +44,7 @@ internal object ServerProbes {
             // Same process, same Go runtime as the tunnel's core, and libbox
             // wants its setup before anything else in it runs (CoreSetup).
             CoreSetup.ensure(context)
-            Mobile.urlTestOutbounds(config, url, timeoutMs.toInt())
+            Mobile.urlTestOutboundsDetailed(config, url, timeoutMs.toInt())
         }
 
     /**

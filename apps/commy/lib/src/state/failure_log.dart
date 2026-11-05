@@ -30,6 +30,16 @@ abstract final class FailureLog {
       final why = detail == null || detail.isEmpty ? '' : ': $detail';
       return '${failure.code} ($kind$status$why)';
     }
-    return failure.code;
+    final detail = switch (failure) {
+      ConfigInvalidFailure(:final detail) => detail,
+      SubscriptionMalformedFailure(:final detail) => detail,
+      CoreCrashedFailure(:final log) => log,
+      StorageFailure(:final cause) => '$cause',
+      UnknownFailure(:final cause) => '$cause',
+      _ => '',
+    };
+    return detail.isEmpty
+        ? failure.code
+        : '${failure.code} (${const LogRedactor().redact(detail)})';
   }
 }

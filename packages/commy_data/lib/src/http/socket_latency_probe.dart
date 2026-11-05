@@ -39,21 +39,32 @@ class SocketLatencyProbe implements LatencyProbe {
   const SocketLatencyProbe({
     AddressLookup lookup = InternetAddress.lookup,
     EchoSender? echo,
+    this.onDiagnostic,
   })  : _lookup = lookup,
         _echo = echo;
 
   final AddressLookup _lookup;
   final EchoSender? _echo;
 
+  /// Local diagnostics, routed through the application's redacting logger.
+  final void Function(String message)? onDiagnostic;
+
   @override
   Future<Duration?> echoTime(String host, {required Duration timeout}) async {
     final echo = _echo;
     if (echo == null) {
+      onDiagnostic?.call('ICMP unavailable on this platform');
       return null;
     }
     try {
-      return await echo(host, timeout: timeout);
-    } on Object {
+      final delay = await echo(host, timeout: timeout);
+      final outcome = delay == null
+          ? 'no echo; ICMP may be unavailable or blocked'
+          : '${delay.inMilliseconds} ms';
+      onDiagnostic?.call('ICMP $host: $outcome');
+      return delay;
+    } on Object catch (error) {
+      onDiagnostic?.call('ICMP $host failed: $error');
       return null;
     }
   }
@@ -66,17 +77,38 @@ class SocketLatencyProbe implements LatencyProbe {
   }) async {
     final budget = Stopwatch()..start();
     Socket? socket;
+    var stage = 'DNS';
     try {
-      await _lookup(host).timeout(timeout);
-      final left = timeout - budget.elapsed;
-      if (left <= Duration.zero) {
+      final addresses = await _lookup(host).timeout(timeout);
+      if (addresses.isEmpty) {
+        onDiagnostic?.call('DNS $host: no addresses');
         return null;
       }
+      onDiagnostic?.call(
+        'DNS $host: ${addresses.length} addresses '
+        'in ${budget.elapsedMilliseconds} ms',
+      );
+      final left = timeout - budget.elapsed;
+      if (left <= Duration.zero) {
+        onDiagnostic?.call(
+          'DNS $host: exhausted ${timeout.inMilliseconds} ms deadline',
+        );
+        return null;
+      }
+      stage = 'TCP';
       final watch = Stopwatch()..start();
       socket = await Socket.connect(host, port, timeout: left);
       watch.stop();
+      onDiagnostic?.call(
+        'TCP $host:$port: connected in ${watch.elapsedMilliseconds} ms '
+        '(no proxy handshake tested)',
+      );
       return watch.elapsed;
-    } on Object {
+    } on Object catch (error) {
+      onDiagnostic?.call(
+        '$stage $host:$port failed after ${budget.elapsedMilliseconds} ms: '
+        '$error',
+      );
       // Refused, unreachable, timed out, a name that does not resolve: all of
       // them are "this server did not answer", which is a measurement and not
       // a fault of the app.

@@ -48,12 +48,12 @@ void main() {
     expect(line, 'subscription_unreachable (status 403)');
   });
 
-  test('any other failure is its code', () {
+  test('malformed subscriptions retain their parser reason', () {
     expect(
       FailureLog.describe(
         const CommyFailure.subscriptionMalformed('no proxies'),
       ),
-      'subscription_malformed',
+      'subscription_malformed (no proxies)',
     );
   });
 

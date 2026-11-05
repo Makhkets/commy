@@ -9,6 +9,7 @@ package mobile
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Makhkets/commy/core/latency"
@@ -21,4 +22,20 @@ import (
 func URLTestOutbounds(configContent string, link string, timeoutMillis int32) (string, error) {
 	ctx := latency.Context(context.Background())
 	return latency.MeasureConfig(ctx, configContent, link, time.Duration(timeoutMillis)*time.Millisecond)
+}
+
+// URLTestOutboundsDetailed also returns the local diagnostic for each failed probe.
+func URLTestOutboundsDetailed(configContent string, link string, timeoutMillis int32) (string, error) {
+	if timeoutMillis <= 0 || timeoutMillis > 60000 {
+		return "", fmt.Errorf("probe timeout must be within 1..60000 ms")
+	}
+	return latency.MeasureConfigDetailed(latency.Context(context.Background()), configContent, link, time.Duration(timeoutMillis)*time.Millisecond)
+}
+
+// URLTestOutbound preserves detours but measures only the requested tag.
+func URLTestOutbound(configContent, tag, link string, timeoutMillis int32) (string, error) {
+	if timeoutMillis <= 0 || timeoutMillis > 60000 {
+		return "", fmt.Errorf("probe timeout must be within 1..60000 ms")
+	}
+	return latency.MeasureOneConfig(latency.Context(context.Background()), configContent, tag, link, time.Duration(timeoutMillis)*time.Millisecond)
 }

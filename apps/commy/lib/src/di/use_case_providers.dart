@@ -280,7 +280,11 @@ final checkReachabilityUseCaseProvider =
 /// different blast radius.
 final latencyProbeProvider = Provider<LatencyProbe>((ref) {
   final system = ref.watch(systemSettingsProvider);
-  return SocketLatencyProbe(echo: system.ping);
+  final logger = ref.watch(appLoggerProvider);
+  return SocketLatencyProbe(
+    echo: system.ping,
+    onDiagnostic: (message) => logger.info(message, tag: 'probe'),
+  );
 });
 
 /// Exception E-1, the external IP check — the data half.

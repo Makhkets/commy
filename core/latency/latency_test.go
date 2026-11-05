@@ -209,3 +209,35 @@ func silentServer(t *testing.T) int {
 	})
 	return listener.Addr().(*net.TCPAddr).Port
 }
+
+func TestDetailedProbePreservesRefusedConnection(t *testing.T) {
+	port := closedPort(t)
+	document := fmt.Sprintf(`{"log":{"disabled":true},"outbounds":[{"type":"socks","tag":"refused","server":"127.0.0.1","server_port":%d}]}`, port)
+	raw, err := latency.MeasureConfigDetailed(latency.Context(context.Background()), document, "http://127.0.0.1/", time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var results map[string]latency.ProbeResult
+	if err := json.Unmarshal([]byte(raw), &results); err != nil {
+		t.Fatal(err)
+	}
+	if result := results["refused"]; result.Delay != 0 || result.Error == "" {
+		t.Fatalf("lost refusal reason: %+v", result)
+	}
+}
+
+func TestSingleProbeKeepsDetourWithoutMeasuringOtherOutbounds(t *testing.T) {
+	page := newProbePage(t)
+	document := fmt.Sprintf(`{"log":{"disabled":true},"outbounds":[{"type":"shadowsocks","tag":"target","server":"127.0.0.1","server_port":%d,"method":"aes-128-gcm","password":"commy","detour":"carrier"},{"type":"shadowsocks","tag":"carrier","server":"127.0.0.1","server_port":%d,"method":"aes-128-gcm","password":"commy"},{"type":"direct","tag":"unrelated"}]}`, startShadowsocksServer(t), startShadowsocksServer(t))
+	raw, err := latency.MeasureOneConfig(latency.Context(context.Background()), document, "target", page.URL, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var results map[string]latency.ProbeResult
+	if err := json.Unmarshal([]byte(raw), &results); err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results["target"].Delay == 0 || len(page.methods()) != 1 {
+		t.Fatalf("unexpected probes: %s; requests=%v", raw, page.methods())
+	}
+}

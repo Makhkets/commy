@@ -34,13 +34,16 @@ abstract final class CoreClientFactory {
       );
       return FakeCoreClient(logger: logger);
     }
-    return AndroidCoreClient(logger: logger);
+    return AndroidCoreClient(
+      logger: logger,
+      platformLogTag:
+          target == TargetPlatform.iOS ? 'core.ios' : AndroidCoreClient.logTag,
+    );
   }
 
   /// Whether [platform] has a real tunnel behind it today.
   ///
-  /// Android only, as of M1. Apple, Windows and Linux land in later milestones
-  /// (docs/07-roadmap.md); until then they answer `false` and get the fake.
+  /// Android and iOS implement the shared platform channel contract.
   static bool supports(TargetPlatform platform) =>
-      platform == TargetPlatform.android;
+      platform == TargetPlatform.android || platform == TargetPlatform.iOS;
 }

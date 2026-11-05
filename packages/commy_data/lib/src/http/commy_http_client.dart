@@ -47,6 +47,7 @@ class CommyHttpClient {
     this.maxBodyBytes = defaultMaxBodyBytes,
     Dio? directClient,
     Dio? proxiedClient,
+    this.onDiagnostic,
   })  : _injectedDirect = directClient,
         _injectedProxied = proxiedClient;
 
@@ -103,6 +104,11 @@ class CommyHttpClient {
 
   /// Identification sent unless a call overrides it.
   final String userAgent;
+
+  /// Local request lifecycle events. Never includes paths, headers or bodies.
+  final void Function(String message)? onDiagnostic;
+
+  int _requestSequence = 0;
 
   /// Local inbound used when a request must go through the tunnel.
   final ProxyEndpoint? tunnelProxy;
@@ -237,12 +243,20 @@ class CommyHttpClient {
     required Map<String, String> headers,
     Map<String, String> hostOnlyHeaders = const <String, String>{},
     CancelToken? cancelToken,
-  }) {
+  }) async {
+    final request = ++_requestSequence;
+    final watch = Stopwatch()..start();
+    final route =
+        throughTunnel && tunnelProxy != null ? 'local-proxy' : 'system';
+    onDiagnostic?.call(
+      'request=$request GET ${url.scheme}://${url.host}:${url.port} '
+      'route=$route deadline=${totalTimeout.inMilliseconds} ms',
+    );
     final hops = _HopTokens();
     if (cancelToken != null) {
       unawaited(cancelToken.whenCancel.then((_) => hops.abandon()));
     }
-    return _follow(
+    final result = await _follow(
       url,
       throughTunnel: throughTunnel,
       headers: headers,
@@ -257,6 +271,15 @@ class CommyHttpClient {
         );
       },
     );
+    final value = result.valueOrNull;
+    final failure = result.failureOrNull;
+    final outcome = value == null
+        ? '${failure?.code}'
+        : 'HTTP ${value.statusCode}, ${value.bytes.length} bytes';
+    onDiagnostic?.call(
+      'request=$request finished in ${watch.elapsedMilliseconds} ms: $outcome',
+    );
+    return result;
   }
 
   Future<Result<_Fetched, CommyFailure>> _follow(

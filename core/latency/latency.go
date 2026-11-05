@@ -79,6 +79,58 @@ func MeasureConfig(ctx context.Context, content string, link string, timeout tim
 // Only the instance itself failing — a configuration the core refuses — is an
 // error. A server that does not answer is a measurement.
 func Measure(ctx context.Context, options option.Options, link string, timeout time.Duration) (map[string]uint16, error) {
+	detailed, err := MeasureDetailed(ctx, options, link, timeout)
+	if err != nil {
+		return nil, err
+	}
+	delays := make(map[string]uint16, len(detailed))
+	for tag, result := range detailed {
+		delays[tag] = result.Delay
+	}
+	return delays, nil
+}
+
+// ProbeResult preserves the reason a server failed, alongside its delay.
+// Error is sent only to the local client, which redacts it before logging.
+type ProbeResult struct {
+	Delay uint16 `json:"delay"`
+	Error string `json:"error,omitempty"`
+}
+
+// MeasureConfigDetailed is the diagnostic sibling of MeasureConfig.
+func MeasureConfigDetailed(ctx context.Context, content, link string, timeout time.Duration) (string, error) {
+	options, err := json.UnmarshalExtendedContext[option.Options](ctx, []byte(content))
+	if err != nil {
+		return "", E.Cause(err, "decode config")
+	}
+	results, err := MeasureDetailed(ctx, options, link, timeout)
+	if err != nil {
+		return "", err
+	}
+	answer, err := stdjson.Marshal(results)
+	return string(answer), err
+}
+
+// MeasureDetailed runs the same probe while retaining individual errors.
+func MeasureDetailed(ctx context.Context, options option.Options, link string, timeout time.Duration) (map[string]ProbeResult, error) {
+	return measureTags(ctx, options, link, timeout, nil)
+}
+
+// MeasureOneConfig measures only tag while keeping its detours and endpoints.
+func MeasureOneConfig(ctx context.Context, content, tag, link string, timeout time.Duration) (string, error) {
+	options, err := json.UnmarshalExtendedContext[option.Options](ctx, []byte(content))
+	if err != nil {
+		return "", E.Cause(err, "decode config")
+	}
+	results, err := measureTags(ctx, options, link, timeout, []string{tag})
+	if err != nil {
+		return "", err
+	}
+	answer, err := stdjson.Marshal(results)
+	return string(answer), err
+}
+
+func measureTags(ctx context.Context, options option.Options, link string, timeout time.Duration, selected []string) (map[string]ProbeResult, error) {
 	if link == "" {
 		link = DefaultLink
 	}
@@ -108,14 +160,19 @@ func Measure(ctx context.Context, options option.Options, link string, timeout t
 		tags = append(tags, endpoint.Tag)
 	}
 
-	delays := make(map[string]uint16, len(tags))
+	if selected != nil {
+		tags = selected
+	}
+	delays := make(map[string]ProbeResult, len(tags))
 	var access sync.Mutex
 	var wait sync.WaitGroup
 	slots := make(chan struct{}, Concurrency)
 	for _, tag := range tags {
 		dialer, found := dialerOf(instance, tag)
 		if !found {
-			delays[tag] = 0
+			access.Lock()
+			delays[tag] = ProbeResult{Error: "outbound not found"}
+			access.Unlock()
 			continue
 		}
 		wait.Add(1)
@@ -125,9 +182,13 @@ func Measure(ctx context.Context, options option.Options, link string, timeout t
 			defer func() { <-slots }()
 			testCtx, testCancel := context.WithTimeout(ctx, timeout)
 			defer testCancel()
-			delay, _ := Get(testCtx, link, dialer)
+			delay, probeErr := Get(testCtx, link, dialer)
+			result := ProbeResult{Delay: delay}
+			if probeErr != nil {
+				result.Error = probeErr.Error()
+			}
 			access.Lock()
-			delays[tag] = delay
+			delays[tag] = result
 			access.Unlock()
 		}()
 	}

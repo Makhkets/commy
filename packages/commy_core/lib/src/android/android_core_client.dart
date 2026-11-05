@@ -54,6 +54,7 @@ class AndroidCoreClient implements CoreClient {
     AppLogger? logger,
     Duration urlTestTimeout = UrlTestCodec.defaultTimeout,
     String groupTag = SwitchNodeUseCase.defaultGroupTag,
+    this.platformLogTag = logTag,
   })  : _logger = logger,
         _urlTestTimeout = urlTestTimeout,
         _groupTag = groupTag;
@@ -61,9 +62,11 @@ class AndroidCoreClient implements CoreClient {
   /// Tag the client's own log lines carry.
   static const String logTag = 'core.android';
 
+  /// Source platform, also used by the iOS bridge with the same wire protocol.
+  final String platformLogTag;
+
   static const MethodChannel _method = MethodChannel(WireChannels.method);
-  static const EventChannel _statusChannel =
-      EventChannel(WireChannels.status);
+  static const EventChannel _statusChannel = EventChannel(WireChannels.status);
   static const EventChannel _trafficChannel =
       EventChannel(WireChannels.traffic);
   static const EventChannel _logsChannel = EventChannel(WireChannels.logs);
@@ -167,7 +170,13 @@ class AndroidCoreClient implements CoreClient {
     );
     return _read(
       WireMethods.probeOutbounds,
-      () => ProbeCodec.decodeOutbounds(raw),
+      () => ProbeCodec.decodeOutbounds(
+        raw,
+        onFailure: (tag, reason) => _logger?.warn(
+          'node=$tag proxy GET failed: $reason',
+          tag: 'probe',
+        ),
+      ),
     );
   }
 
@@ -206,10 +215,14 @@ class AndroidCoreClient implements CoreClient {
       final failure = WireFailureMapper.fromError(error, stackTrace);
       if (failure == null) {
         // `already_running`: the tunnel the caller wanted is already up.
-        _logger?.debug('$method: already running', tag: logTag);
+        _logger?.debug('$method: already running', tag: platformLogTag);
         return null;
       }
-      _logger?.warn('$method failed: ${failure.code}', tag: logTag);
+      _logger?.warn(
+        '$method failed: ${failure.code}',
+        tag: platformLogTag,
+        error: error,
+      );
       throw CoreClientException(
         failure,
         cause: error,
@@ -227,7 +240,7 @@ class AndroidCoreClient implements CoreClient {
     try {
       return decode();
     } on WireFormatException catch (error, stackTrace) {
-      _logger?.error('$method: bad result', tag: logTag, error: error);
+      _logger?.error('$method: bad result', tag: platformLogTag, error: error);
       throw CoreClientException(
         UnknownFailure(error, stackTrace),
         cause: error,
@@ -282,16 +295,15 @@ class AndroidCoreClient implements CoreClient {
               } on WireFormatException catch (error) {
                 _logger?.warn(
                   '$what: dropped a malformed payload',
-                  tag: logTag,
+                  tag: platformLogTag,
                   error: error,
                 );
               }
             },
             handleError: (error, stackTrace, sink) {
-              final failure =
-                  WireFailureMapper.fromError(error, stackTrace) ??
-                      const HelperUnavailableFailure();
-              _logger?.warn('$what: ${failure.code}', tag: logTag);
+              final failure = WireFailureMapper.fromError(error, stackTrace) ??
+                  const HelperUnavailableFailure();
+              _logger?.warn('$what: ${failure.code}', tag: platformLogTag);
               if (onError != null) {
                 onError(failure, sink);
                 return;

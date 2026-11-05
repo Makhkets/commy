@@ -1,4 +1,6 @@
+import 'package:commy/src/di/infrastructure_providers.dart';
 import 'package:commy/src/di/use_case_providers.dart';
+import 'package:commy/src/state/failure_log.dart';
 import 'package:commy/src/state/library_providers.dart';
 import 'package:commy/src/state/measurement_report.dart';
 import 'package:commy_config/commy_config.dart';
@@ -258,10 +260,26 @@ class MeasurementController extends Notifier<MeasurementState> {
   /// The round trip — `null` when the server did not answer — or what
   /// stopped it from being taken.
   Future<(Duration?, CommyFailure?)> _measure(ProxyNode node) async {
+    final logger = ref.read(appLoggerProvider);
+    final watch = Stopwatch()..start();
+    final tag = SingBoxTags.forNode(node);
+    logger.info('node=$tag method=${_method.name} probe started', tag: 'probe');
     final result = await ref.read(measureLatencyUseCaseProvider)(
       node: node,
       outboundTag: SingBoxTags.forNode(node),
     );
-    return (result.valueOrNull, result.failureOrNull);
+    final failure = result.failureOrNull;
+    final delay = result.valueOrNull;
+    final outcome = failure != null
+        ? FailureLog.describe(failure)
+        : delay == null
+            ? 'no response; inspect DNS, TCP and proxy handshake diagnostics'
+            : '${delay.inMilliseconds} ms';
+    logger.log(
+      failure != null || delay == null ? LogLevel.warn : LogLevel.info,
+      'node=$tag finished in ${watch.elapsedMilliseconds} ms: $outcome',
+      tag: 'probe',
+    );
+    return (delay, failure);
   }
 }

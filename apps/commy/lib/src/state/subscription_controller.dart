@@ -83,13 +83,33 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
   /// state, so a caller cannot mistake "not now" for "done".
   Future<bool> refresh(String id) async {
     if (state.refreshingId != null) {
+      ref
+          .read(appLoggerProvider)
+          .info('refresh skipped: another refresh is in progress', tag: logTag);
       return false;
     }
     state = SubscriptionActionState(refreshingId: id);
+    final logger = ref.read(appLoggerProvider);
+    final watch = Stopwatch()..start();
+    logger.info('refresh started', tag: logTag);
     final running = _running = Completer<void>();
     try {
       return await _refresh(id);
+    } on Object catch (error, stackTrace) {
+      final failure = CommyFailure.fromCaught(error, stackTrace);
+      logger.error(
+        'refresh failed: ${FailureLog.describe(failure)}',
+        tag: logTag,
+      );
+      if (ref.mounted) {
+        state = SubscriptionActionState(failure: failure);
+      }
+      return false;
     } finally {
+      logger.info(
+        'refresh finished in ${watch.elapsedMilliseconds} ms',
+        tag: logTag,
+      );
       running.complete();
       if (identical(_running, running)) {
         _running = null;
@@ -122,6 +142,11 @@ class SubscriptionController extends Notifier<SubscriptionActionState> {
       return false;
     }
     final synced = result.valueOrNull;
+    ref.read(appLoggerProvider).info(
+          'refresh succeeded: ${synced?.importedCount ?? 0} servers, '
+          'source=${synced?.servedBy.name ?? 'origin'}',
+          tag: logTag,
+        );
     state = SubscriptionActionState(
       importedCount: synced?.importedCount ?? 0,
       servedByMirror: synced?.servedBy == RecoverySource.mirror,

@@ -249,7 +249,8 @@ build_android() {
 
 build_apple() {
   need_go
-  need_javac
+  [[ "$(uname -s)" == "Darwin" ]] || die "the Apple target needs macOS with Xcode."
+  xcrun --sdk iphoneos --show-sdk-path >/dev/null 2>&1 || die "Install full Xcode and select it with xcode-select; Command Line Tools alone cannot build iOS."
   sync_modules
   ensure_gomobile
   mkdir -p "${BUILD_DIR}"
@@ -257,7 +258,8 @@ build_apple() {
   prepare_modules
   say "gomobile bind ${LIBBOX_PKG} ${MOBILE_PKG} for Apple"
   ( cd "${CORE_COPY}" && gomobile bind -v \
-      -target=ios,iossimulator,macos \
+      -target="${COMMY_APPLE_TARGETS:-ios,iossimulator,macos}" \
+      -iosversion=16.0 \
       -tags "${TAGS},with_low_memory" \
       -ldflags "${LDFLAGS}" \
       -trimpath \

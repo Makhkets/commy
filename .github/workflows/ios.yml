@@ -1,0 +1,42 @@
+name: iOS build
+on:
+  push:
+    branches: [main, 'ios-*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Unsigned iOS app and tunnel
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+      - name: Build pinned Apple core
+        env:
+          COMMY_APPLE_TARGETS: ios
+        run: scripts/build_core.sh apple
+      - name: Bootstrap and generate
+        run: |
+          dart pub global activate melos 6.3.3
+          export PATH="$HOME/.pub-cache/bin:$PATH"
+          melos bootstrap
+          melos run gen --no-select
+      - name: Compile app and extension
+        working-directory: apps/commy
+        run: flutter build ios --release --no-codesign
+      - name: Verify extension is embedded
+        run: test -x apps/commy/build/ios/iphoneos/Runner.app/PlugIns/CommyTunnel.appex/CommyTunnel

@@ -226,7 +226,11 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
       return;
     }
     await SharePlus.instance.share(
-      ShareParams(text: text, subject: t.diagnostics.title),
+      ShareParams(
+        text: text,
+        subject: t.diagnostics.title,
+        sharePositionOrigin: _shareOrigin(context),
+      ),
     );
   }
 }
@@ -568,4 +572,11 @@ class _ExportConfirmation extends StatelessWidget {
       ),
     );
   }
+}
+
+Rect? _shareOrigin(BuildContext context) {
+  final box = context.findRenderObject();
+  return box is RenderBox && box.hasSize
+      ? box.localToGlobal(Offset.zero) & box.size
+      : null;
 }

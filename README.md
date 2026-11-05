@@ -97,7 +97,7 @@ SHA-256 `49f1018be3c298a94cdba9a4a92737300680562b7be095ddd4fe3e2e42d3882e`.
 | Platform | State |
 |---|---|
 | **Android** | Milestone M1 done: nine protocols carry traffic against live servers, on emulators and on a real phone |
-| **iOS** | Not started — [milestone M4](docs/07-roadmap.md), the project's main risk |
+| **iOS** | Native integration in progress — [build and validation status](docs/20-ios-readiness.md) |
 | **Windows** | Not started — planned for 1.1 |
 | **macOS**, **Linux** | Not started — planned for 1.2 |
 
