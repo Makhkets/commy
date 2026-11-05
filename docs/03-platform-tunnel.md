@@ -96,7 +96,7 @@ Flutter UI  ──►  CoreClient  ──►  [граница процесса?]
 
 ## iOS · macOS (App Store)
 
-**Статус:** M4 · главный риск проекта
+**Статус:** M4 в работе; реализация и проверки — [docs/20](20-ios-readiness.md)
 **Граница процесса:** да — Network Extension
 
 ### Как работает
@@ -107,8 +107,9 @@ Flutter UI  ──►  CoreClient  ──►  [граница процесса?]
 1. Приложение через `NETunnelProviderManager` сохраняет конфигурацию и стартует
    туннель.
 2. Система поднимает процесс расширения.
-3. Расширение читает конфиг из общего контейнера **App Group** и запускает
-   `libbox` внутри себя.
+3. Расширение читает конфиг из общей **Keychain access group** и запускает
+   `libbox` внутри себя. Пароли не попадают в `providerConfiguration` или
+   открытые файлы App Group — [ADR-0022](adr/0022-ios-keychain-and-diagnostics.md).
 4. Расширение вызывает `setTunnelNetworkSettings` и получает `packetFlow`.
 5. UI и расширение общаются через **unix-сокет в контейнере App Group** по
    протоколу `libbox.CommandClient`.
@@ -138,7 +139,8 @@ Flutter UI  ──►  CoreClient  ──►  [граница процесса?]
 |---|---|
 | Apple Developer Program | $99/год, обязателен — без него Network Extension не подписать |
 | Entitlement `com.apple.developer.networking.networkextension` | Со значением `packet-tunnel-provider` |
-| App Group | Общий контейнер для сокета и конфига |
+| App Group | Общий контейнер для сокета и публичных наборов правил |
+| Keychain Sharing | Общий конфиг и секрет CommandClient, AfterFirstUnlockThisDeviceOnly |
 | Ревью App Store | VPN-приложения проверяют пристально; см. ниже |
 
 ### Ревью App Store — что говорить

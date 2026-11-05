@@ -222,7 +222,8 @@ final class CoreBridge: NSObject {
       UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
       result(nil)
     case "ping": result("{\"delayMs\":null}")
-    case "proxies": result(SharedCore.json(events.groups))
+    case "proxies":
+      result(SharedCore.json(manager?.connection.status == .connected ? events.groups : []))
     case "reload", "select", "urlTest", "probeOutbounds":
       worker.async { [weak self] in
         guard let self else { return }

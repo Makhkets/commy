@@ -54,3 +54,4 @@
 | [0018](0018-core-module-copies.md) | Правки ядра — в копиях модулей вне кеша (вместо `go build -overlay`); Go — поддерживаемая линия 1.26 | Accepted (по поручению владельца, 2026-09-30) |
 | [0019](0019-subscription-domain-recovery.md) | Восстановление домена подписки: подписанный манифест оператора, Commy Cloud — курьер | Accepted |
 | [0020](0020-design-system-route.md) | Дизайн-система «Маршрут»: принципы Apple, одна сигнатура (путь устройство → сервер → интернет) | Accepted (по поручению владельца, 2026-10-29) |
+| [0022](0022-ios-keychain-and-diagnostics.md) | Keychain и диагностика iOS-туннеля | Реализовано; device validation pending |
