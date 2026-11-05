@@ -5,6 +5,8 @@ import Security
 
 // Secrets never go in providerConfiguration, UserDefaults or plaintext files.
 enum SharedCore {
+  private static let setupLock = NSLock()
+  private static var setupComplete = false
   static var group: String { Bundle.main.object(forInfoDictionaryKey: "CommyAppGroup") as! String }
   static var keychainGroup: String {
     Bundle.main.object(forInfoDictionaryKey: "CommyKeychainGroup") as! String
@@ -81,6 +83,9 @@ enum SharedCore {
     return json(config)
   }
   static func setup() throws {
+    setupLock.lock()
+    defer { setupLock.unlock() }
+    guard !setupComplete else { return }
     let root = try directory
     for name in ["core", "tmp"] {
       try FileManager.default.createDirectory(
@@ -101,6 +106,7 @@ enum SharedCore {
     LibboxSetup(options, &error)
     if let error { throw error }
     LibboxSetMemoryLimit(true)
+    setupComplete = true
   }
   static func json(_ value: Any) -> String {
     guard
