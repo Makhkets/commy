@@ -15,6 +15,7 @@
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		37C6C7EEFE6A747D6BDFD9A2 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A69C976E35147B4F536F35E /* PacketTunnelProvider.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		45DA0E5E2F540BFC6214699F /* Libbox.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9CEE81F461555A32C38681B4 /* Libbox.xcframework */; };
 		462F64D9BFCF4CA2048D1DA3 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 466D9F0468DDD395659CBCCB /* Foundation.framework */; };
 		4A1C493309B8724307B3D4E4 /* SharedCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50524EA3E100D069DCC6BC5 /* SharedCore.swift */; };
 		5EBEACD4C0C71B5CBBC61247 /* CoreBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02DCC800BE92DAD2771DD9A9 /* CoreBridge.swift */; };
@@ -127,6 +128,14 @@
 				A33A8CB0F3C3DC04179D6678 /* Libbox.xcframework in Frameworks */,
 				EEECA38E07CB7845FA11FAB8 /* NetworkExtension.framework in Frameworks */,
 				9B2185E04A3CC9F4558B327C /* Security.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AF0153414F328549694AB053 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				45DA0E5E2F540BFC6214699F /* Libbox.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +252,7 @@
 			buildPhases = (
 				331C807D294A63A400263BE5 /* Sources */,
 				331C807F294A63A400263BE5 /* Resources */,
+				AF0153414F328549694AB053 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -568,6 +578,7 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.commy.app.CommyTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -642,6 +653,7 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.commy.app.CommyTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
@@ -832,6 +844,7 @@
 				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.commy.app.CommyTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;

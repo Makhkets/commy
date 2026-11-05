@@ -44,6 +44,34 @@ HttpTransportError? causeOf(CommyFailure? failure) =>
     (failure! as SubscriptionUnreachableFailure).cause as HttpTransportError?;
 
 void main() {
+  test('request diagnostics omit credentials, paths, headers and bodies',
+      () async {
+    final diagnostics = <String>[];
+    final adapter = StubHttpAdapter(
+      (_) async => ResponseBody.fromString('private-response-body', 403),
+    );
+    final dio = Dio()..httpClientAdapter = adapter;
+    final client = CommyHttpClient(
+      directClient: dio,
+      onDiagnostic: diagnostics.add,
+    );
+    final result = await client.fetchText(
+      Uri.parse('https://user:secret-pass@panel.example/sub/private-token'),
+      throughTunnel: false,
+    );
+    expect(result.failureOrNull, isNotNull);
+    expect(diagnostics, hasLength(2));
+    final text = diagnostics.join('\n');
+    expect(text, contains('GET https://panel.example:443'));
+    for (final secret in <String>[
+      'secret-pass',
+      'private-token',
+      'private-response-body',
+    ]) {
+      expect(text, isNot(contains(secret)));
+    }
+  });
+
   group('the body cap', () {
     test('a body past the cap is dropped while it arrives, not after',
         () async {

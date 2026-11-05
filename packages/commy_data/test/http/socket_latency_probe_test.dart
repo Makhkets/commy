@@ -7,6 +7,24 @@ void main() {
   group('SocketLatencyProbe', () {
     const probe = SocketLatencyProbe();
 
+    test('DNS failures report the stage and preserve the reason', () async {
+      final diagnostics = <String>[];
+      final probe = SocketLatencyProbe(
+        lookup: (_) async => throw const SocketException('name not found'),
+        onDiagnostic: diagnostics.add,
+      );
+      expect(
+        await probe.connectTime(
+          'missing.example',
+          443,
+          timeout: const Duration(seconds: 1),
+        ),
+        isNull,
+      );
+      expect(diagnostics.single, startsWith('DNS missing.example:443 failed'));
+      expect(diagnostics.single, contains('name not found'));
+    });
+
     test('times a server that accepts, and sends it nothing', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);

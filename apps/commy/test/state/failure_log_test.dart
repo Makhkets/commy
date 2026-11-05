@@ -57,6 +57,17 @@ void main() {
     );
   });
 
+  test('unexpected errors retain a reason without subscription secrets', () {
+    final line = FailureLog.describe(
+      CommyFailure.unknown(
+        StateError('GET https://panel.example/sub/secret-token failed'),
+        StackTrace.current,
+      ),
+    );
+    expect(line, contains('failed'));
+    expect(line, isNot(contains('secret-token')));
+  });
+
   test('a refresh from the card logs why it failed', () async {
     final logger = AppLogger(
       sink: (_) {},

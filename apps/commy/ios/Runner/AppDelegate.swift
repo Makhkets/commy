@@ -7,8 +7,11 @@ import UIKit
   private var pendingURLs: [URL] = []
 
   func receive(_ url: URL) {
-    if let coreBridge { coreBridge.receive(url) }
-    else { pendingURLs = Array((pendingURLs + [url]).suffix(10)) }
+    if let coreBridge {
+      coreBridge.receive(url)
+    } else {
+      pendingURLs = Array((pendingURLs + [url]).suffix(10))
+    }
   }
 
   override func application(
