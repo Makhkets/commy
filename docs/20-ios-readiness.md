@@ -31,9 +31,9 @@ Keychain во всех plist и entitlements. Скрипт `build_ios.sh` бер
 
 - [Штатный CI](https://github.com/Makhkets/commy/actions/runs/41985571128):
   анализ, Dart-тесты, golden-тесты, Android debug APK и Kotlin-тесты зелёные.
-- [iOS CI](https://github.com/Makhkets/commy/actions/runs/41986826945):
+- [iOS CI](https://github.com/Makhkets/commy/actions/runs/41988828629):
   ядро, release-сборка Runner и CommyTunnel без подписи, наличие расширения
-  внутри приложения и совпадение версий проверены на коммите `87af6ac`.
+  внутри приложения и совпадение версий проверены на коммите `19b1a9b`.
 - Локально: анализ всех пакетов, полный Dart-набор, дополнительные регрессии
   ошибок DNS/HTTP и удаления секретов, `go test -race ./latency ./mobile`,
   контракт Dart/Kotlin, проверка типов общего Swift-кода и расширения против
